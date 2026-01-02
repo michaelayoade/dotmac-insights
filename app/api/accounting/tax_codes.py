@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.tax import TaxCode, TaxType, RoundingMethod
 from app.services.tax_calculator import TaxCalculator
@@ -18,9 +18,7 @@ from .helpers import paginate
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
 
 class TaxCodeCreate(BaseModel):
     """Schema for creating a tax code."""
@@ -67,9 +65,7 @@ class TaxCalculateRequest(BaseModel):
     is_inclusive: Optional[bool] = None
 
 
-# =============================================================================
 # TAX CODES LIST & DETAIL
-# =============================================================================
 
 @router.get("/tax-codes", dependencies=[Depends(Require("accounting:read"))])
 def list_tax_codes(
@@ -159,15 +155,13 @@ def get_tax_code(
     }
 
 
-# =============================================================================
 # TAX CODES CRUD
-# =============================================================================
 
 @router.post("/tax-codes", dependencies=[Depends(Require("books:write"))])
 def create_tax_code(
     data: TaxCodeCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new tax code."""
     # Check for duplicate code
@@ -210,7 +204,7 @@ def create_tax_code(
         valid_from=valid_from,
         valid_to=valid_to,
         company=data.company,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
     db.add(tc)
     db.commit()
@@ -228,7 +222,7 @@ def update_tax_code(
     tax_code_id: int,
     data: TaxCodeUpdate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a tax code."""
     tc = db.query(TaxCode).filter(TaxCode.id == tax_code_id).first()
@@ -282,7 +276,7 @@ def update_tax_code(
 def deactivate_tax_code(
     tax_code_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Deactivate (soft delete) a tax code."""
     tc = db.query(TaxCode).filter(TaxCode.id == tax_code_id).first()
@@ -298,9 +292,7 @@ def deactivate_tax_code(
     }
 
 
-# =============================================================================
 # TAX CALCULATION
-# =============================================================================
 
 @router.post("/tax-codes/calculate", dependencies=[Depends(Require("accounting:read"))])
 def calculate_tax(

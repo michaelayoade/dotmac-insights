@@ -113,10 +113,10 @@ async def calendar_view(
     context["zone_options"] = get_zone_options(db)
 
     if is_htmx_request(request):
-        template = templates.get_template("field_service/partials/calendar_grid.html")
+        template = templates.get_template("modules/field_service/templates/partials/calendar_grid.html")
         return HTMLResponse(template.render(context))
 
-    template = templates.get_template("field_service/pages/calendar.html")
+    template = templates.get_template("modules/field_service/templates/pages/calendar.html")
     return HTMLResponse(template.render(context))
 
 
@@ -203,10 +203,10 @@ async def dispatch_board(
     context["technician_options"] = get_technician_options(db)
 
     if is_htmx_request(request):
-        template = templates.get_template("field_service/partials/dispatch_board.html")
+        template = templates.get_template("modules/field_service/templates/partials/dispatch_board.html")
         return HTMLResponse(template.render(context))
 
-    template = templates.get_template("field_service/pages/dispatch.html")
+    template = templates.get_template("modules/field_service/templates/pages/dispatch.html")
     return HTMLResponse(template.render(context))
 
 
@@ -301,7 +301,7 @@ async def map_dispatch(
     context["team_options"] = get_team_options(db)
     context["zone_options"] = get_zone_options(db)
 
-    template = templates.get_template("field_service/pages/map_dispatch.html")
+    template = templates.get_template("modules/field_service/templates/pages/map_dispatch.html")
     return HTMLResponse(template.render(context))
 
 
@@ -409,8 +409,8 @@ async def technician_schedule(
     context["next_week"] = (start_date + timedelta(days=7)).isoformat()
 
     if is_htmx_request(request):
-        template = templates.get_template("field_service/partials/technician_schedule.html")
+        template = templates.get_template("modules/field_service/templates/partials/technician_schedule.html")
         return HTMLResponse(template.render(context))
 
-    template = templates.get_template("field_service/pages/technician_schedule.html")
+    template = templates.get_template("modules/field_service/templates/pages/technician_schedule.html")
     return HTMLResponse(template.render(context))

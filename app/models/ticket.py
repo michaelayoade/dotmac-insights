@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, JSON
+from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.utils.datetime_utils import utc_now, ensure_utc
@@ -191,6 +191,15 @@ class Ticket(SoftDeleteMixin, Base):
     )
     parent_ticket: Mapped[Optional["Ticket"]] = relationship(
         "Ticket", remote_side=[id], foreign_keys=[parent_ticket_id]
+    )
+
+    __table_args__ = (
+        Index("ix_tickets_merged_into_id", "merged_into_id"),
+        Index("ix_tickets_parent_ticket_id", "parent_ticket_id"),
+        # Audit column indexes
+        Index("ix_tickets_created_by_id", "created_by_id"),
+        Index("ix_tickets_updated_by_id", "updated_by_id"),
+        Index("ix_tickets_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:

@@ -39,7 +39,6 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-dotmac}:${POSTGRES_PASSWORD:-dotmac_dev_password}@db:5432/${POSTGRES_DB:-dotmac_insights}
       REDIS_URL: redis://redis:6379/0
-      AUTH_DISABLED: "true"  # DEV ONLY - disable auth for SSR testing
     env_file:
       - .env
     ports:
@@ -53,14 +52,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Use uvicorn with --reload for hot-reloading in development
-    # NOTE: Hot-reload temporarily disabled due to file watcher issues
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
 
   celery_worker:

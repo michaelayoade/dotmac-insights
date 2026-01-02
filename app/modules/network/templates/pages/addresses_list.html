@@ -1,7 +1,14 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<div class="max-w-screen-2xl mx-auto">
+{% set address_columns = [
+    {'key': 'ip', 'label': 'IP Address', 'required': True},
+    {'key': 'hostname', 'label': 'Hostname'},
+    {'key': 'module', 'label': 'Module'},
+    {'key': 'customer', 'label': 'Customer'},
+    {'key': 'status', 'label': 'Status'},
+] %}
+<div class="max-w-screen-2xl mx-auto" x-data="columnPicker('addresses-table', {{ address_columns  | tojson | e }})">
     {# Page Header #}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
         <div class="relative">
@@ -38,7 +45,7 @@
                 </div>
 
                 {# Filters #}
-                <div class="flex gap-2 flex-wrap items-center">
+                <div class="flex gap-2 flex-wrap items-center" x-data="{ open: false }">
                     <span class="text-xs text-gray-400 font-medium uppercase tracking-wider hidden sm:inline">Filters:</span>
 
                     {# Status Filter #}
@@ -69,6 +76,50 @@
                         Clear
                     </a>
                     {% endif %}
+
+                    <div class="relative" @click.away="open = false">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                            @click="open = !open"
+                        >
+                            <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                            Columns
+                        </button>
+                        <div
+                            x-show="open"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-100"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-75"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+                        >
+                            <template x-for="col in columns" :key="col.key">
+                                <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        :checked="isVisible(col.key)"
+                                        :disabled="col.required"
+                                        @change="toggleColumn(col.key)"
+                                    >
+                                    <span x-text="col.label"></span>
+                                </label>
+                            </template>
+                            <button
+                                type="button"
+                                class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                                @click="resetColumns()"
+                            >
+                                Reset columns
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -108,9 +108,9 @@ async def vehicles_list(
 
     # Check if HTMX request
     if request.headers.get("HX-Request"):
-        template = templates.get_template("vehicles/partials/vehicles_table.html")
+        template = templates.get_template("modules/vehicles/templates/partials/vehicles_table.html")
     else:
-        template = templates.get_template("vehicles/pages/list.html")
+        template = templates.get_template("modules/vehicles/templates/pages/list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -167,5 +167,5 @@ async def vehicle_detail(
     context["page_title"] = f"Vehicle: {vehicle.license_plate}"
     context["vehicle"] = vehicle
 
-    template = templates.get_template("vehicles/pages/detail.html")
+    template = templates.get_template("modules/vehicles/templates/pages/detail.html")
     return HTMLResponse(template.render(context))

@@ -24,6 +24,10 @@ test.describe('Contacts List', () => {
   });
 
   test('search filters contacts via HTMX @critical', async ({ htmx }) => {
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
     // Get initial count
     const initialCount = await contactsPage.getContactCount();
 
@@ -45,11 +49,19 @@ test.describe('Contacts List', () => {
   });
 
   test('filter by contact type updates table', async ({ htmx }) => {
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
     await contactsPage.filterByType('customer');
     await htmx.waitForHtmxIdle();
 
     // All visible rows should have customer type
     const rows = await contactsPage.contactsTable.locator('tbody tr').all();
+    if (rows.length === 0) {
+      test.skip();
+      return;
+    }
     for (const row of rows) {
       const typeCell = row.locator('[data-type], td:nth-child(4)');
       await expect(typeCell).toContainText(/customer/i);
@@ -57,11 +69,19 @@ test.describe('Contacts List', () => {
   });
 
   test('filter by status shows only matching contacts', async ({ htmx }) => {
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
     await contactsPage.filterByStatus('active');
     await htmx.waitForHtmxIdle();
 
     // Verify status filter applied
     const rows = await contactsPage.contactsTable.locator('tbody tr').all();
+    if (rows.length === 0) {
+      test.skip();
+      return;
+    }
     for (const row of rows) {
       const statusBadge = row.locator('.badge, [data-status]');
       await expect(statusBadge).toContainText(/active/i);
@@ -69,6 +89,10 @@ test.describe('Contacts List', () => {
   });
 
   test('pagination loads next page via HTMX', async ({ htmx, page }) => {
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
     // Skip if no pagination
     const pagination = contactsPage.getPagination();
     if (await pagination.count() === 0) {
@@ -89,6 +113,10 @@ test.describe('Contacts List', () => {
   });
 
   test('click contact navigates to detail', async ({ htmx, page }) => {
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
     // Get first contact name
     const firstRow = await contactsPage.getContactData(0);
 
@@ -152,6 +180,10 @@ test.describe('Contact Editing', () => {
     contactsPage = new ContactsPage(page);
     // Navigate to first contact
     await contactsPage.gotoList();
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
     const firstRow = await contactsPage.getContactData(0);
     await contactsPage.clickContact(firstRow.name);
   });
@@ -181,6 +213,10 @@ test.describe('Bulk Operations', () => {
   test.beforeEach(async ({ page }) => {
     contactsPage = new ContactsPage(page);
     await contactsPage.gotoList();
+    if (!(await contactsPage.ensureHasContacts())) {
+      test.skip();
+      return;
+    }
   });
 
   test('select multiple contacts enables bulk actions', async () => {

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.payment_terms import PaymentTermsTemplate, PaymentTermsSchedule
 from app.services.due_date_calculator import DueDateCalculator
@@ -18,9 +18,7 @@ from .helpers import paginate
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
 
 class PaymentScheduleCreate(BaseModel):
     """Schema for creating a payment schedule line."""
@@ -63,9 +61,7 @@ class PaymentScheduleRequest(BaseModel):
     payment_terms_id: int
 
 
-# =============================================================================
 # PAYMENT TERMS LIST & DETAIL
-# =============================================================================
 
 @router.get("/payment-terms", dependencies=[Depends(Require("accounting:read"))])
 def list_payment_terms(
@@ -140,15 +136,13 @@ def get_payment_terms(
     }
 
 
-# =============================================================================
 # PAYMENT TERMS CRUD
-# =============================================================================
 
 @router.post("/payment-terms", dependencies=[Depends(Require("books:write"))])
 def create_payment_terms(
     data: PaymentTermsCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create new payment terms."""
     # Check for duplicate
@@ -174,7 +168,7 @@ def create_payment_terms(
         template_name=data.template_name,
         description=data.description,
         company=data.company,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
     db.add(terms)
     db.flush()
@@ -209,7 +203,7 @@ def update_payment_terms(
     terms_id: int,
     data: PaymentTermsUpdate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update payment terms."""
     terms = db.query(PaymentTermsTemplate).filter(
@@ -275,9 +269,7 @@ def update_payment_terms(
     }
 
 
-# =============================================================================
 # DUE DATE CALCULATION
-# =============================================================================
 
 @router.post("/payment-terms/calculate-due-date", dependencies=[Depends(Require("accounting:read"))])
 def calculate_due_date(

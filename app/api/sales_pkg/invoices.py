@@ -1,41 +1,35 @@
 """
-Invoices Endpoints
+Invoices Read-Only Endpoints (Sales View)
+
+NOTE: For creating/updating/deleting invoices, use the accounting module:
+  - POST   /api/v1/accounting/invoices
+  - PATCH  /api/v1/accounting/invoices/{id}
+  - DELETE /api/v1/accounting/invoices/{id}
+  - POST   /api/v1/accounting/invoices/{id}/submit
+  - POST   /api/v1/accounting/invoices/{id}/approve
+  - POST   /api/v1/accounting/invoices/{id}/post
+
+The accounting module is the single source of truth for invoice writes,
+ensuring proper workflow (draft → pending → approved → posted) and GL integration.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, desc
-from typing import Dict, Any, Optional, List, cast
-from datetime import datetime, date, timedelta, timezone
-from decimal import Decimal
+from sqlalchemy import or_
+from typing import Dict, Any, Optional
 
 from app.database import get_db
 from app.auth import Require
-from app.cache import cached, CACHE_TTL
 from app.models.invoice import Invoice, InvoiceStatus
-from app.models.payment import Payment, PaymentStatus
-from app.models.credit_note import CreditNote
-from app.models.customer import Customer, CustomerStatus
-from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.sales import (
-    ERPNextLead, SalesOrder, Quotation, CustomerGroup, 
-    Territory, SalesPerson
-)
+from app.models.customer import Customer
 from app.api.sales_pkg.common import (
-    Principal,
-    InvoiceCreateRequest,
-    InvoiceUpdateRequest,
-    InvoiceSource,
-    _ensure_utc,
-    _parse_invoice_status,
     _parse_iso_utc,
     _resolve_currency_or_raise,
     _serialize_invoice,
-    get_company_context,
-    get_current_principal,
 )
 
 router = APIRouter()
+
 
 @router.get("/invoices", dependencies=[Depends(Require("explorer:read"))])
 async def list_invoices(
@@ -55,7 +49,7 @@ async def list_invoices(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List invoices with filtering, search, sort, and pagination (single-currency only)."""
-    query = db.query(Invoice)
+    query = db.query(Invoice).filter(Invoice.is_deleted == False)
 
     if status:
         try:
@@ -152,171 +146,9 @@ async def get_invoice(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get detailed invoice information."""
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-
-    return _serialize_invoice(invoice, db)
-
-
-@router.delete("/invoices/{invoice_id}", dependencies=[Depends(Require("sales:write"))])
-async def delete_invoice(
-    invoice_id: int,
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Soft delete an invoice."""
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id, Invoice.is_deleted == False).first()
+
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-
-    invoice.is_deleted = True
-    invoice.deleted_at = datetime.now(timezone.utc)
-    invoice.deleted_by_id = principal.id
-    db.commit()
-    return {"status": "disabled", "invoice_id": invoice_id}
-
-
-@router.post("/invoices", dependencies=[Depends(Require("sales:write"))])
-async def create_invoice(
-    payload: InvoiceCreateRequest,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Create a new invoice stored locally (not pushed upstream)."""
-    if payload.customer_id:
-        customer_exists = db.query(Customer.id).filter(Customer.id == payload.customer_id).first()
-        if not customer_exists:
-            raise HTTPException(status_code=400, detail=f"Customer {payload.customer_id} not found")
-
-    status = _parse_invoice_status(payload.status) or InvoiceStatus.PENDING
-    total_amount = payload.amount + payload.tax_amount
-    balance = total_amount - (payload.amount_paid or Decimal("0"))
-
-    invoice = Invoice(
-        source=InvoiceSource.ERPNEXT,
-        customer_id=payload.customer_id,
-        invoice_number=payload.invoice_number,
-        description=payload.description,
-        amount=payload.amount,
-        tax_amount=payload.tax_amount,
-        total_amount=total_amount,
-        amount_paid=payload.amount_paid,
-        balance=balance,
-        currency=payload.currency,
-        status=status,
-        invoice_date=_ensure_utc(payload.invoice_date),
-        due_date=_ensure_utc(payload.due_date),
-        paid_date=_ensure_utc(payload.paid_date),
-        category=payload.category,
-        company=get_company_context(allow_null=True),
-    )
-
-    db.add(invoice)
-    db.commit()
-    db.refresh(invoice)
 
     return _serialize_invoice(invoice, db)
-
-
-@router.patch("/invoices/{invoice_id}", dependencies=[Depends(Require("sales:write"))])
-async def update_invoice(
-    invoice_id: int,
-    payload: InvoiceUpdateRequest,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Update an existing invoice stored locally."""
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-
-    if payload.customer_id is not None:
-        customer_exists = db.query(Customer.id).filter(Customer.id == payload.customer_id).first()
-        if not customer_exists:
-            raise HTTPException(status_code=400, detail=f"Customer {payload.customer_id} not found")
-        invoice.customer_id = payload.customer_id
-
-    if payload.invoice_number is not None:
-        invoice.invoice_number = payload.invoice_number
-    if payload.description is not None:
-        invoice.description = payload.description
-    if payload.amount is not None:
-        invoice.amount = payload.amount
-    if payload.tax_amount is not None:
-        invoice.tax_amount = payload.tax_amount
-    if payload.amount_paid is not None:
-        invoice.amount_paid = payload.amount_paid
-    if payload.currency is not None:
-        invoice.currency = payload.currency
-    if payload.status is not None:
-        invoice.status = _parse_invoice_status(payload.status) or invoice.status
-    if payload.invoice_date is not None:
-        invoice.invoice_date = cast(datetime, _ensure_utc(payload.invoice_date))
-    if payload.due_date is not None:
-        invoice.due_date = _ensure_utc(payload.due_date)
-    if payload.paid_date is not None:
-        invoice.paid_date = _ensure_utc(payload.paid_date)
-    if payload.category is not None:
-        invoice.category = payload.category
-
-    # Recalculate totals if any amount fields changed
-    if any(field is not None for field in [payload.amount, payload.tax_amount, payload.total_amount]):
-        invoice.total_amount = payload.total_amount if payload.total_amount is not None else invoice.amount + (invoice.tax_amount or Decimal("0"))
-
-    invoice.balance = invoice.total_amount - (invoice.amount_paid or Decimal("0"))
-
-    db.commit()
-    db.refresh(invoice)
-
-    return _serialize_invoice(invoice, db)
-
-
-@router.post("/invoices/{invoice_id}/post", dependencies=[Depends(Require("billing:write"))])
-async def post_invoice(
-    invoice_id: int,
-    db: Session = Depends(get_db),
-    user=Depends(Require("billing:write")),
-) -> Dict[str, Any]:
-    """Post invoice to GL - creates AR debit, revenue credit."""
-    from app.services.document_posting import DocumentPostingService, PostingError
-    from app.services.billing_outbound_sync import BillingOutboundSyncService
-    from app.api.accounting.helpers import invalidate_report_cache
-
-    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-
-    # Check workflow/docstatus (only post draft invoices)
-    if invoice.docstatus != 0:
-        raise HTTPException(status_code=400, detail="Invoice already posted or cancelled")
-
-    posting_service = DocumentPostingService(db)
-    try:
-        # post_invoice requires (invoice_id, user_id, posting_date=None)
-        je = posting_service.post_invoice(invoice_id, user.id)
-        invoice.docstatus = 1
-        invoice.journal_entry_id = je.id
-        db.commit()
-        db.refresh(invoice)  # ensure returned data reflects DB state
-    except PostingError as e:
-        db.rollback()
-        # PostingError contains safe validation messages (not internal details)
-        raise HTTPException(status_code=400, detail=f"Posting failed: {e.args[0] if e.args else 'validation error'}")
-    except Exception:
-        db.rollback()
-        raise  # let FastAPI handle unexpected errors
-
-    await invalidate_report_cache()
-
-    # Trigger outbound sync to ERPNext (if enabled via feature flag)
-    sync_service = BillingOutboundSyncService(db)
-    sync_service.sync_invoice_to_erpnext(invoice)
-    db.commit()  # persist sync log
-
-    return {
-        "message": "Invoice posted",
-        "invoice_id": invoice.id,
-        "journal_entry_id": je.id,
-        "docstatus": invoice.docstatus,
-    }
-

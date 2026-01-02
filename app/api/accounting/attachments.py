@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -9,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.document_attachment import DocumentAttachment
 
@@ -23,9 +24,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
 
 
-# =============================================================================
 # DOCUMENT ATTACHMENTS
-# =============================================================================
 
 @router.get("/documents/{doctype}/{doc_id}/attachments", dependencies=[Depends(Require("accounting:read"))])
 def list_document_attachments(
@@ -67,7 +66,7 @@ async def upload_attachment(
     description: Optional[str] = Form(None),
     is_primary: bool = Form(False),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Upload an attachment for a document."""
     # Validate file extension
@@ -90,9 +89,17 @@ async def upload_attachment(
             detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
         )
 
-    # Generate unique filename
+    # Generate unique filename with path traversal protection
     unique_id = uuid.uuid4().hex[:8]
-    safe_filename = f"{unique_id}_{file.filename}"
+    # Sanitize filename: remove path components and special characters
+    original_filename = os.path.basename(file.filename or "upload")
+    # Remove any remaining special characters except . - _
+    sanitized_filename = re.sub(r'[^\w.\-]', '_', original_filename)
+    # Prevent double extensions like .pdf.exe
+    if sanitized_filename.count('.') > 1:
+        parts = sanitized_filename.rsplit('.', 1)
+        sanitized_filename = parts[0].replace('.', '_') + '.' + parts[1]
+    safe_filename = f"{unique_id}_{sanitized_filename}"
 
     # Create upload directory if needed
     doc_dir = os.path.join(UPLOAD_DIR, doctype, str(doc_id))
@@ -122,7 +129,7 @@ async def upload_attachment(
         attachment_type=attachment_type,
         is_primary=is_primary,
         description=description,
-        uploaded_by_id=user.id,
+        uploaded_by_id=principal.id,
     )
     db.add(attachment)
     db.commit()
@@ -169,7 +176,7 @@ def get_attachment(
 def delete_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an attachment."""
     attachment = db.query(DocumentAttachment).filter(
@@ -199,7 +206,7 @@ def update_attachment(
     attachment_type: Optional[str] = None,
     is_primary: Optional[bool] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update attachment metadata."""
     attachment = db.query(DocumentAttachment).filter(
@@ -234,9 +241,7 @@ def update_attachment(
     }
 
 
-# =============================================================================
 # ATTACHMENT REQUIREMENTS
-# =============================================================================
 
 @router.get("/documents/{doctype}/{doc_id}/attachment-requirements", dependencies=[Depends(Require("accounting:read"))])
 def check_attachment_requirements(

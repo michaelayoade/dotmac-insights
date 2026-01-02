@@ -121,9 +121,9 @@ async def ar_payments_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("payments/partials/ar_payments_table.html")
+        template = templates.get_template("modules/payments/templates/partials/ar_payments_table.html")
     else:
-        template = templates.get_template("payments/pages/ar_list.html")
+        template = templates.get_template("modules/payments/templates/pages/ar_list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -184,7 +184,7 @@ async def ar_payment_detail(
     context["page_title"] = f"Payment: {payment.receipt_number or payment.id}"
     context["payment"] = payment
 
-    template = templates.get_template("payments/pages/ar_detail.html")
+    template = templates.get_template("modules/payments/templates/pages/ar_detail.html")
     return HTMLResponse(template.render(context))
 
 
@@ -266,9 +266,9 @@ async def ap_payments_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("payments/partials/ap_payments_table.html")
+        template = templates.get_template("modules/payments/templates/partials/ap_payments_table.html")
     else:
-        template = templates.get_template("payments/pages/ap_list.html")
+        template = templates.get_template("modules/payments/templates/pages/ap_list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -326,5 +326,5 @@ async def ap_payment_detail(
     context["page_title"] = f"Payment: {payment.payment_number}"
     context["payment"] = payment
 
-    template = templates.get_template("payments/pages/ap_detail.html")
+    template = templates.get_template("modules/payments/templates/pages/ap_detail.html")
     return HTMLResponse(template.render(context))

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.accounting_ext import AuditAction
 
@@ -18,9 +18,7 @@ from .helpers import parse_date, paginate
 router = APIRouter()
 
 
-# =============================================================================
 # TAX CATEGORIES
-# =============================================================================
 
 @router.get("/tax-categories", dependencies=[Depends(Require("accounting:read"))])
 def get_tax_categories(
@@ -60,9 +58,7 @@ def get_tax_categories(
     }
 
 
-# =============================================================================
 # SALES TAX TEMPLATES
-# =============================================================================
 
 @router.get("/sales-tax-templates", dependencies=[Depends(Require("accounting:read"))])
 def get_sales_tax_templates(
@@ -158,9 +154,7 @@ def get_sales_tax_template_detail(
     }
 
 
-# =============================================================================
 # PURCHASE TAX TEMPLATES
-# =============================================================================
 
 @router.get("/purchase-tax-templates", dependencies=[Depends(Require("accounting:read"))])
 def get_purchase_tax_templates(
@@ -257,9 +251,7 @@ def get_purchase_tax_template_detail(
     }
 
 
-# =============================================================================
 # ITEM TAX TEMPLATES
-# =============================================================================
 
 @router.get("/item-tax-templates", dependencies=[Depends(Require("accounting:read"))])
 def get_item_tax_templates(
@@ -342,9 +334,7 @@ def get_item_tax_template_detail(
     }
 
 
-# =============================================================================
 # TAX WITHHOLDING CATEGORIES
-# =============================================================================
 
 @router.get("/tax-withholding-categories", dependencies=[Depends(Require("accounting:read"))])
 def get_tax_withholding_categories(
@@ -376,9 +366,7 @@ def get_tax_withholding_categories(
     }
 
 
-# =============================================================================
 # TAX RULES
-# =============================================================================
 
 @router.get("/tax-rules", dependencies=[Depends(Require("accounting:read"))])
 def get_tax_rules(
@@ -440,9 +428,7 @@ def get_tax_rules(
     }
 
 
-# =============================================================================
 # TAX FILING PERIODS
-# =============================================================================
 
 @router.get("/tax/filing-periods", dependencies=[Depends(Require("accounting:read"))])
 def list_tax_filing_periods(
@@ -523,7 +509,7 @@ def create_tax_filing_period(
     tax_base: float = Query(0, description="Tax base amount"),
     tax_amount: float = Query(0, description="Tax amount due"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new tax filing period.
 
@@ -555,7 +541,7 @@ def create_tax_filing_period(
         due_date=parse_date(due_date, "due_date"),
         tax_base=Decimal(str(tax_base)),
         tax_amount=Decimal(str(tax_amount)),
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
     db.add(period)
     db.flush()
@@ -564,7 +550,7 @@ def create_tax_filing_period(
     audit.log_create(
         doctype="tax_filing_period",
         document_id=period.id,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"{tax_type} {period_name}",
         new_values=serialize_for_audit(period),
     )
@@ -635,7 +621,7 @@ def file_tax_period(
     period_id: int,
     filing_reference: Optional[str] = Query(None, description="Filing reference number"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark a tax filing period as filed.
 
@@ -659,7 +645,7 @@ def file_tax_period(
     old_status = period.status.value
     period.status = TaxFilingStatus.FILED
     period.filed_at = datetime.now(timezone.utc)
-    period.filed_by_id = user.id
+    period.filed_by_id = principal.id
     period.filing_reference = filing_reference
 
     audit = AuditLogger(db)
@@ -667,7 +653,7 @@ def file_tax_period(
         doctype="tax_filing_period",
         document_id=period.id,
         action=AuditAction.UPDATE,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"{period.tax_type.value} {period.period_name}",
         old_values={"status": old_status},
         new_values={"status": "filed", "filing_reference": filing_reference},
@@ -691,7 +677,7 @@ def record_tax_payment(
     payment_method: Optional[str] = Query(None, description="Payment method"),
     bank_account: Optional[str] = Query(None, description="Bank account used"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Record a tax payment for a filing period.
 
@@ -720,7 +706,7 @@ def record_tax_payment(
         payment_reference=payment_reference,
         payment_method=payment_method,
         bank_account=bank_account,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
     db.add(payment)
 
@@ -734,7 +720,7 @@ def record_tax_payment(
         doctype="tax_payment",
         document_id=payment.id,
         action=AuditAction.CREATE,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"{period.tax_type.value} {period.period_name}",
         new_values={"amount": amount, "payment_reference": payment_reference},
         remarks=f"Payment for {period.period_name}",
@@ -750,9 +736,7 @@ def record_tax_payment(
     }
 
 
-# =============================================================================
 # TAX DASHBOARD
-# =============================================================================
 
 @router.get("/tax/dashboard", dependencies=[Depends(Require("accounting:read"))])
 def get_tax_dashboard(

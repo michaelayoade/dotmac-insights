@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Float
+from sqlalchemy import String, Text, ForeignKey, Enum, Float, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from app.utils.datetime_utils import utc_now
@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from app.models.ticket import Ticket
     from app.models.project import Project
     from app.models.customer_usage import CustomerUsage
-    from app.models.unified_contact import UnifiedContact
     from app.models.payment_subscription import PaymentSubscription
 
 
@@ -27,6 +26,7 @@ class CustomerStatus(enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"      # Splynx "disabled"
     SUSPENDED = "suspended"    # Splynx "blocked"
+    CANCELLED = "cancelled"    # Account terminated
     PROSPECT = "prospect"      # Splynx "new"
 
 
@@ -127,23 +127,18 @@ class Customer(SoftDeleteMixin, Base):
     deposit_balance: Mapped[Optional[Decimal]] = mapped_column(nullable=True)
     payment_per_month: Mapped[Optional[Decimal]] = mapped_column(nullable=True)
 
+    # Audit columns
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # deleted_by_id inherited from SoftDeleteMixin
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
-    # is_deleted, deleted_at, deleted_by_id inherited from SoftDeleteMixin
-
-    # Link to unified contact (for migration to UnifiedContact model)
-    # Once fully migrated, Customer data will be derived from UnifiedContact
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
-        nullable=True,
-        index=True
-    )
 
     # Relationships
     pop: Mapped[Optional[Pop]] = relationship(back_populates="customers")
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
     subscriptions: Mapped[List[Subscription]] = relationship(back_populates="customer")
     payment_subscriptions: Mapped[List["PaymentSubscription"]] = relationship(back_populates="customer")
     invoices: Mapped[List[Invoice]] = relationship(back_populates="customer")
@@ -154,13 +149,20 @@ class Customer(SoftDeleteMixin, Base):
     projects: Mapped[List[Project]] = relationship(back_populates="customer")
     usage_records: Mapped[List[CustomerUsage]] = relationship(back_populates="customer")
 
+    __table_args__ = (
+        # Audit column indexes
+        Index("ix_customers_created_by_id", "created_by_id"),
+        Index("ix_customers_updated_by_id", "updated_by_id"),
+        Index("ix_customers_deleted_by_id", "deleted_by_id"),
+    )
+
     def __repr__(self) -> str:
         return f"<Customer {self.name} ({self.status.value})>"
 
     @property
     def is_churned(self) -> bool:
-        """Customer is churned if status is INACTIVE (Splynx 'disabled')."""
-        return self.status == CustomerStatus.INACTIVE
+        """Customer is churned if status is INACTIVE or CANCELLED."""
+        return self.status in (CustomerStatus.INACTIVE, CustomerStatus.CANCELLED)
 
     @property
     def tenure_days(self) -> int:

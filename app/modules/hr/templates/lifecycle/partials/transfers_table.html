@@ -2,19 +2,19 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Transfer Date</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">New Department</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('employee')" x-cloak>Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('date')" x-cloak>Transfer Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('department')" x-cloak>New Department</th>
             <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for transfer in transfers %}
             <tr class="group hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('employee')" x-cloak>
                     <a href="/hr/lifecycle/transfers/{{ transfer.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ transfer.employee_name or 'Unknown' }}</a>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ transfer.transfer_date.strftime('%b %d, %Y') if transfer.transfer_date else '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ transfer.new_department or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('date')" x-cloak>{{ transfer.transfer_date.strftime('%b %d, %Y') if transfer.transfer_date else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('department')" x-cloak>{{ transfer.new_department or '-' }}</td>
                 <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                     <a href="/hr/lifecycle/transfers/{{ transfer.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View</a>
                 </td>

@@ -5,6 +5,7 @@ import httpx
 
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
 from app.models.customer import Customer
+from app.models.party import CustomerAccount, PartyExternalId
 from app.sync.splynx_parts.utils import parse_date
 from app.config import settings
 from app.models.sync_cursor import parse_datetime
@@ -56,6 +57,15 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
             c.splynx_id: c.id
             for c in sync_client.db.query(Customer).all()
         }
+        account_by_splynx_id = {
+            pe.external_id: ca.id
+            for pe, ca in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(PartyExternalId.system == "splynx")
+                .all()
+            )
+        }
 
         processed_count = 0
         skipped_count = 0
@@ -83,6 +93,9 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
             # Find customer using pre-fetched map
             customer_splynx_id = inv_data.get("customer_id")
             customer_id = customers_by_splynx_id.get(customer_splynx_id)
+            customer_account_id = None
+            if customer_splynx_id is not None:
+                customer_account_id = account_by_splynx_id.get(str(customer_splynx_id))
 
             # Determine status
             date_payment = inv_data.get("date_payment")
@@ -110,12 +123,14 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
 
             if existing:
                 existing.customer_id = customer_id
+                existing.customer_account_id = customer_account_id
                 existing.invoice_number = invoice_number
                 existing.total_amount = total_amount
                 existing.amount = total_amount
                 existing.amount_paid = amount_paid
                 existing.balance = total_amount - amount_paid
                 existing.status = status
+                existing.company = existing.company or "Dotmac Technologies"
                 existing.last_synced_at = datetime.now(timezone.utc)
 
                 date_created = inv_data.get("date_created", inv_data.get("real_create_datetime", ""))
@@ -129,12 +144,14 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                     splynx_id=splynx_id,
                     source=InvoiceSource.SPLYNX,
                     customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     invoice_number=invoice_number,
                     total_amount=total_amount,
                     amount=total_amount,
                     amount_paid=amount_paid,
                     balance=total_amount - amount_paid,
                     status=status,
+                    company="Dotmac Technologies",
                     invoice_date=datetime.now(timezone.utc),
                 )
 

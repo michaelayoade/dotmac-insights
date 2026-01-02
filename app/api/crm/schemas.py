@@ -526,14 +526,3 @@ class ImportContactsResponse(BaseModel):
     skipped: int
     errors: List[dict]
 
-
-# =============================================================================
-# BACKWARD COMPATIBILITY ALIASES
-# =============================================================================
-
-# Keep old names for backward compatibility during migration
-UnifiedContactCreate = ContactCreate
-UnifiedContactUpdate = ContactUpdate
-UnifiedContactResponse = ContactResponse
-UnifiedContactSummary = ContactSummary
-UnifiedContactListResponse = ContactListResponse

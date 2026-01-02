@@ -129,7 +129,38 @@ async def reports_dashboard(
         },
     ]
 
-    template = templates.get_template("reports/pages/dashboard.html")
+    context["tax_reports"] = [
+        {
+            "name": "VAT Report",
+            "description": "Value Added Tax summary",
+            "url": "/reports/vat",
+            "icon": "receipt",
+            "color": "blue",
+        },
+        {
+            "name": "WHT Report",
+            "description": "Withholding Tax deductions",
+            "url": "/reports/wht",
+            "icon": "scissors",
+            "color": "amber",
+        },
+        {
+            "name": "PAYE Report",
+            "description": "Payroll tax summary",
+            "url": "/reports/paye",
+            "icon": "users",
+            "color": "green",
+        },
+        {
+            "name": "Tax Calendar",
+            "description": "Filing deadlines and status",
+            "url": "/reports/tax-calendar",
+            "icon": "calendar",
+            "color": "purple",
+        },
+    ]
+
+    template = templates.get_template("modules/reports/templates/pages/dashboard.html")
     return HTMLResponse(template.render(context))
 
 
@@ -151,7 +182,7 @@ async def trial_balance(
     context["as_of"] = as_of.isoformat()
     context["report_type"] = "trial-balance"
 
-    template = templates.get_template("reports/pages/trial_balance.html")
+    template = templates.get_template("modules/reports/templates/pages/trial_balance.html")
     return HTMLResponse(template.render(context))
 
 
@@ -175,7 +206,7 @@ async def balance_sheet(
     context["comparative"] = comparative
     context["report_type"] = "balance-sheet"
 
-    template = templates.get_template("reports/pages/balance_sheet.html")
+    template = templates.get_template("modules/reports/templates/pages/balance_sheet.html")
     return HTMLResponse(template.render(context))
 
 
@@ -201,7 +232,7 @@ async def income_statement(
     context["comparative"] = comparative
     context["report_type"] = "income-statement"
 
-    template = templates.get_template("reports/pages/income_statement.html")
+    template = templates.get_template("modules/reports/templates/pages/income_statement.html")
     return HTMLResponse(template.render(context))
 
 
@@ -225,7 +256,7 @@ async def cash_flow(
     context["end_date"] = end_date.isoformat()
     context["report_type"] = "cash-flow"
 
-    template = templates.get_template("reports/pages/cash_flow.html")
+    template = templates.get_template("modules/reports/templates/pages/cash_flow.html")
     return HTMLResponse(template.render(context))
 
 
@@ -251,7 +282,7 @@ async def general_ledger(
     context["end_date"] = end_date.isoformat()
     context["report_type"] = "general-ledger"
 
-    template = templates.get_template("reports/pages/general_ledger.html")
+    template = templates.get_template("modules/reports/templates/pages/general_ledger.html")
     return HTMLResponse(template.render(context))
 
 
@@ -276,7 +307,7 @@ async def receivables_aging(
     # Define aging buckets
     context["aging_buckets"] = ["Current", "1-30 Days", "31-60 Days", "61-90 Days", "90+ Days"]
 
-    template = templates.get_template("reports/pages/receivables_aging.html")
+    template = templates.get_template("modules/reports/templates/pages/receivables_aging.html")
     return HTMLResponse(template.render(context))
 
 
@@ -301,7 +332,7 @@ async def payables_aging(
     # Define aging buckets
     context["aging_buckets"] = ["Current", "1-30 Days", "31-60 Days", "61-90 Days", "90+ Days"]
 
-    template = templates.get_template("reports/pages/payables_aging.html")
+    template = templates.get_template("modules/reports/templates/pages/payables_aging.html")
     return HTMLResponse(template.render(context))
 
 
@@ -323,7 +354,7 @@ async def financial_ratios(
     context["as_of"] = as_of.isoformat()
     context["report_type"] = "financial-ratios"
 
-    template = templates.get_template("reports/pages/financial_ratios.html")
+    template = templates.get_template("modules/reports/templates/pages/financial_ratios.html")
     return HTMLResponse(template.render(context))
 
 
@@ -345,7 +376,7 @@ async def customer_balances(
     context["as_of"] = as_of.isoformat()
     context["report_type"] = "customer-balances"
 
-    template = templates.get_template("reports/pages/customer_balances.html")
+    template = templates.get_template("modules/reports/templates/pages/customer_balances.html")
     return HTMLResponse(template.render(context))
 
 
@@ -367,7 +398,7 @@ async def supplier_balances(
     context["as_of"] = as_of.isoformat()
     context["report_type"] = "supplier-balances"
 
-    template = templates.get_template("reports/pages/supplier_balances.html")
+    template = templates.get_template("modules/reports/templates/pages/supplier_balances.html")
     return HTMLResponse(template.render(context))
 
 
@@ -391,5 +422,125 @@ async def revenue_analysis(
     context["end_date"] = end_date.isoformat()
     context["report_type"] = "revenue-analysis"
 
-    template = templates.get_template("reports/pages/revenue_analysis.html")
+    template = templates.get_template("modules/reports/templates/pages/revenue_analysis.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# TAX REPORTS
+# =============================================================================
+
+def get_current_period() -> str:
+    """Get current month period in YYYY-MM format."""
+    today = date.today()
+    return today.strftime("%Y-%m")
+
+
+def get_previous_periods(count: int = 12) -> list[str]:
+    """Get list of previous periods for dropdown."""
+    periods = []
+    today = date.today()
+    for i in range(count):
+        month = today.month - i
+        year = today.year
+        while month <= 0:
+            month += 12
+            year -= 1
+        periods.append(f"{year}-{month:02d}")
+    return periods
+
+
+@router.get("/vat", response_class=HTMLResponse, dependencies=[RequireReportsRead])
+async def vat_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    period: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$", description="Period YYYY-MM"),
+):
+    """VAT Report - Input/Output VAT and net payable."""
+    if not period:
+        period = get_current_period()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "VAT Report"
+    context["period"] = period
+    context["periods"] = get_previous_periods(12)
+    context["report_type"] = "vat"
+
+    # Parse period for display
+    year, month = period.split("-")
+    context["period_display"] = date(int(year), int(month), 1).strftime("%B %Y")
+
+    template = templates.get_template("modules/reports/templates/pages/vat_report.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/wht", response_class=HTMLResponse, dependencies=[RequireReportsRead])
+async def wht_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    start_date: Optional[date] = Query(None, description="Start date"),
+    end_date: Optional[date] = Query(None, description="End date"),
+):
+    """WHT Report - Withholding tax deductions and remittances."""
+    if not start_date or not end_date:
+        start_date, end_date = get_default_dates()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Withholding Tax Report"
+    context["start_date"] = start_date.isoformat()
+    context["end_date"] = end_date.isoformat()
+    context["report_type"] = "wht"
+
+    template = templates.get_template("modules/reports/templates/pages/wht_report.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/paye", response_class=HTMLResponse, dependencies=[RequireReportsRead])
+async def paye_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    period: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$", description="Period YYYY-MM"),
+):
+    """PAYE Report - Payroll tax summary."""
+    if not period:
+        period = get_current_period()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "PAYE Report"
+    context["period"] = period
+    context["periods"] = get_previous_periods(12)
+    context["report_type"] = "paye"
+
+    # Parse period for display
+    year, month = period.split("-")
+    context["period_display"] = date(int(year), int(month), 1).strftime("%B %Y")
+
+    template = templates.get_template("modules/reports/templates/pages/paye_report.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/tax-calendar", response_class=HTMLResponse, dependencies=[RequireReportsRead])
+async def tax_calendar(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+):
+    """Tax Filing Calendar - Upcoming deadlines and filing status."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Tax Filing Calendar"
+    context["report_type"] = "tax-calendar"
+    context["today"] = date.today().isoformat()
+
+    template = templates.get_template("modules/reports/templates/pages/tax_calendar.html")
     return HTMLResponse(template.render(context))

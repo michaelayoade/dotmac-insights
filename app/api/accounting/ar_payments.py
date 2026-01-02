@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
@@ -20,39 +20,25 @@ from app.services.payment_allocation_service import (
 )
 
 from .helpers import parse_date, paginate
+from .schemas.allocation import AllocationCreate
 
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
-
-class AllocationCreate(BaseModel):
-    """Schema for creating a payment allocation."""
-    document_type: str  # invoice, credit_note
-    document_id: int
-    allocated_amount: float
-    discount_amount: float = 0
-    write_off_amount: float = 0
-    discount_type: Optional[str] = None
-    discount_account: Optional[str] = None
-    write_off_account: Optional[str] = None
-    write_off_reason: Optional[str] = None
-
 
 class CustomerPaymentCreate(BaseModel):
     """Schema for creating a customer payment."""
     contact_id: Optional[int] = None  # CRM contact (preferred)
     customer_id: Optional[int] = None  # legacy customer
     payment_date: str
-    amount: float
+    amount: float = Field(..., gt=0, description="Payment amount must be positive")
     currency: str = "NGN"
     payment_method: str = "bank_transfer"
     receipt_number: Optional[str] = None
     transaction_reference: Optional[str] = None
     notes: Optional[str] = None
-    conversion_rate: float = 1
+    conversion_rate: float = Field(default=1, gt=0, description="Conversion rate must be positive")
     bank_account_id: Optional[int] = None
     allocations: List[AllocationCreate] = []
 
@@ -60,16 +46,14 @@ class CustomerPaymentCreate(BaseModel):
 class CustomerPaymentUpdate(BaseModel):
     """Schema for updating a customer payment."""
     payment_date: Optional[str] = None
-    amount: Optional[float] = None
+    amount: Optional[float] = Field(default=None, gt=0, description="Payment amount must be positive")
     payment_method: Optional[str] = None
     transaction_reference: Optional[str] = None
     notes: Optional[str] = None
-    conversion_rate: Optional[float] = None
+    conversion_rate: Optional[float] = Field(default=None, gt=0, description="Conversion rate must be positive")
 
 
-# =============================================================================
 # AR PAYMENTS LIST & DETAIL
-# =============================================================================
 
 @router.get("/ar-payments", dependencies=[Depends(Require("accounting:read"))])
 def list_ar_payments(
@@ -95,7 +79,11 @@ def list_ar_payments(
             status_enum = PaymentStatus(status.lower())
             query = query.filter(Payment.status == status_enum)
         except ValueError:
-            pass
+            valid_statuses = [s.value for s in PaymentStatus]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{status}'. Valid values: {valid_statuses}"
+            )
 
     if start_date:
         query = query.filter(Payment.payment_date >= parse_date(start_date, "start_date"))
@@ -180,9 +168,7 @@ def get_ar_payment(
     }
 
 
-# =============================================================================
 # AR PAYMENTS CRUD
-# =============================================================================
 
 @router.post("/ar-payments", dependencies=[Depends(Require("books:write"))])
 def create_ar_payment(
@@ -281,7 +267,8 @@ def update_ar_payment(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Update a customer payment."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    # Use SELECT FOR UPDATE to prevent race conditions on concurrent updates
+    payment = db.query(Payment).filter(Payment.id == payment_id).with_for_update().first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
@@ -350,9 +337,7 @@ def delete_ar_payment(
     return {"message": "Payment deleted"}
 
 
-# =============================================================================
 # ALLOCATIONS
-# =============================================================================
 
 @router.post("/ar-payments/{payment_id}/allocations", dependencies=[Depends(Require("books:write"))])
 def add_payment_allocations(
@@ -422,9 +407,7 @@ def remove_payment_allocation(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # POSTING
-# =============================================================================
 
 @router.post("/ar-payments/{payment_id}/post", dependencies=[Depends(Require("books:approve"))])
 async def post_ar_payment(
@@ -498,9 +481,7 @@ def approve_ar_payment(
     }
 
 
-# =============================================================================
 # OUTSTANDING INVOICES
-# =============================================================================
 
 @router.get("/ar-payments/outstanding-invoices", dependencies=[Depends(Require("accounting:read"))])
 def get_outstanding_invoices(

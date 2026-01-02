@@ -5,6 +5,13 @@ import structlog
 import bcrypt
 
 from app.models.customer import Customer, CustomerStatus, CustomerType, BillingType
+from app.models.party import (
+    CustomerAccount,
+    Party,
+    PartyExternalId,
+    PartyRole,
+    PartyType,
+)
 from app.models.pop import Pop
 from app.config import settings
 from app.models.sync_cursor import parse_datetime
@@ -255,6 +262,16 @@ async def sync_customers(sync_client, client, full_sync: bool):
             pop.splynx_id: pop.id
             for pop in sync_client.db.query(Pop).all()
         }
+        party_ext_ids = (
+            sync_client.db.query(PartyExternalId)
+            .filter(PartyExternalId.system == "splynx")
+            .all()
+        )
+        party_by_ext = {p.external_id: p.party_id for p in party_ext_ids}
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
 
         # Pre-fetch customer details concurrently in batches (bulk API doesn't return password, billing info, activation)
         # Each customer requires 3 API calls: /customer/{id}, /billing-info/{id}, /customer/{id}/logs-changes--first-activation
@@ -355,6 +372,125 @@ async def sync_customers(sync_client, client, full_sync: bool):
             # Parse GPS coordinates
             gps_raw = cust_data.get("gps") or None
             latitude, longitude = _parse_gps(gps_raw)
+
+            # Ensure party-based identity records exist
+            party = None
+            if splynx_id is not None:
+                party_id = party_by_ext.get(str(splynx_id))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
+
+            email = (cust_data.get("email") or "").strip().lower()
+            if not party and email:
+                party = party_email_index.get(email)
+
+            if not party:
+                party_type = (
+                    PartyType.ORGANIZATION.value
+                    if customer_type == CustomerType.BUSINESS
+                    else PartyType.PERSON.value
+                )
+                party = Party(
+                    type=party_type,
+                    name=cust_data.get("name", "") or None,
+                    emails=[],
+                    phones=[],
+                )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+
+            if email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email for e in emails):
+                    emails.append(
+                        {
+                            "address": email,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+                    party_email_index[email] = party
+
+            billing_email = (cust_data.get("billing_email") or "").strip().lower()
+            if billing_email and billing_email != email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == billing_email for e in emails):
+                    emails.append(
+                        {
+                            "address": billing_email,
+                            "label": "billing",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+
+            phone = cust_data.get("phone") or None
+            if phone:
+                phones = list(party.phones or [])
+                if not any((p.get("number") or "") == phone for p in phones):
+                    phones.append(
+                        {
+                            "number": phone,
+                            "label": "primary",
+                            "is_primary": len(phones) == 0,
+                            "can_sms": False,
+                            "can_whatsapp": False,
+                        }
+                    )
+                    party.phones = phones
+
+            if not party.name:
+                party.name = cust_data.get("name") or party.name
+
+            if splynx_id is not None and str(splynx_id) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="splynx",
+                        external_id=str(splynx_id),
+                        external_key_type="customer_id",
+                    )
+                )
+                party_by_ext[str(splynx_id)] = party.id
+
+            has_customer_role = (
+                sync_client.db.query(PartyRole)
+                .filter(PartyRole.party_id == party.id, PartyRole.role == "customer", PartyRole.until.is_(None))
+                .first()
+            )
+            if not has_customer_role:
+                sync_client.db.add(PartyRole(party_id=party.id, role="customer"))
+
+            account = (
+                sync_client.db.query(CustomerAccount)
+                .filter(CustomerAccount.party_id == party.id)
+                .first()
+            )
+            account_status = "active"
+            if splynx_status in ["blocked", "disabled"]:
+                account_status = "suspended"
+            elif splynx_status in ["new"]:
+                account_status = "pending"
+
+            if not account:
+                account_number = cust_data.get("login") or str(splynx_id)
+                account = CustomerAccount(
+                    party_id=party.id,
+                    account_number=str(account_number),
+                    status=account_status,
+                    billing_email=cust_data.get("billing_email") or cust_data.get("email"),
+                    external_ids={
+                        "splynx_id": splynx_id,
+                    },
+                )
+                sync_client.db.add(account)
+            else:
+                account.status = account_status
+                if not account.billing_email:
+                    account.billing_email = cust_data.get("billing_email") or cust_data.get("email")
 
             if existing:
                 # Basic info

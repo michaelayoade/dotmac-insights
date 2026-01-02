@@ -3,17 +3,17 @@
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
-                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Supplier</th>
-                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Group</th>
-                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Contact</th>
-                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Outstanding</th>
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('supplier')" x-cloak>Supplier</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('group')" x-cloak>Group</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('contact')" x-cloak>Contact</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('outstanding')" x-cloak>Outstanding</th>
                 <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for supplier in suppliers %}
             <tr class="hover:bg-surface-50 group">
-                <td class="py-4 pl-6 pr-3">
+                <td class="py-4 pl-6 pr-3" x-show="isVisible('supplier')" x-cloak>
                     <div class="flex items-center gap-3">
                         <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center font-medium text-sm">
                             {{ supplier.supplier_name[:2].upper() if supplier.supplier_name else 'S' }}
@@ -28,10 +28,10 @@
                         </div>
                     </div>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('group')" x-cloak>
                     {{ supplier.supplier_group or '-' }}
                 </td>
-                <td class="px-3 py-4 text-sm text-gray-600 hidden md:table-cell">
+                <td class="px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('contact')" x-cloak>
                     <div class="max-w-[200px]">
                         {% if supplier.email_id %}
                         <p class="truncate text-gray-600">{{ supplier.email_id }}</p>
@@ -44,7 +44,7 @@
                         {% endif %}
                     </div>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-right">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-right" x-show="isVisible('outstanding')" x-cloak>
                     {% if supplier.outstanding_balance and supplier.outstanding_balance > 0 %}
                     <span class="font-mono font-medium text-red-600">{{ '{:,.2f}'.format(supplier.outstanding_balance) }}</span>
                     {% else %}

@@ -8,7 +8,7 @@
     </td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ supplier.email_id or '-' }}</td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ supplier.country or '-' }}</td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden xl:table-cell">{{ supplier.default_currency or 'USD' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden xl:table-cell">{{ supplier.default_currency or base_currency }}</td>
     <td class="whitespace-nowrap px-3 py-4">
         {% if supplier.disabled %}
         <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-gray-50 text-gray-700 ring-gray-600/20">Inactive</span>

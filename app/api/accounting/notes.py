@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.credit_note import CreditNote, CreditNoteStatus
 from app.models.books_settings import DebitNote, DebitNoteStatus
@@ -19,9 +19,7 @@ from .helpers import parse_date, paginate
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
 
 class NoteLineCreate(BaseModel):
     """Schema for creating a note line."""
@@ -74,9 +72,7 @@ class NoteUpdate(BaseModel):
     posting_date: Optional[str] = None
 
 
-# =============================================================================
 # CREDIT NOTES (AR)
-# =============================================================================
 
 @router.get("/credit-notes", dependencies=[Depends(Require("accounting:read"))])
 def list_credit_notes(
@@ -182,7 +178,7 @@ def get_credit_note(
 def create_credit_note(
     data: CreditNoteCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new credit note."""
     from app.models.document_lines import CreditNoteLine
@@ -212,7 +208,7 @@ def create_credit_note(
         conversion_rate=Decimal(str(data.conversion_rate)),
         company=data.company,
         status=CreditNoteStatus.DRAFT,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
 
     # Calculate totals from lines
@@ -259,9 +255,7 @@ def create_credit_note(
     }
 
 
-# =============================================================================
 # DEBIT NOTES (AP)
-# =============================================================================
 
 @router.get("/debit-notes", dependencies=[Depends(Require("accounting:read"))])
 def list_debit_notes(
@@ -371,7 +365,7 @@ def get_debit_note(
 def create_debit_note(
     data: DebitNoteCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new debit note."""
     from app.models.document_lines import DebitNoteLine
@@ -398,7 +392,7 @@ def create_debit_note(
         conversion_rate=Decimal(str(data.conversion_rate)),
         company=data.company,
         status=DebitNoteStatus.DRAFT,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
 
     # Calculate totals from lines
@@ -443,15 +437,13 @@ def create_debit_note(
     }
 
 
-# =============================================================================
 # WORKFLOW
-# =============================================================================
 
 @router.post("/credit-notes/{note_id}/submit", dependencies=[Depends(Require("books:write"))])
 def submit_credit_note(
     note_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit a credit note for approval."""
     note = db.query(CreditNote).filter(CreditNote.id == note_id).first()
@@ -477,7 +469,7 @@ def submit_credit_note(
 def submit_debit_note(
     note_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit a debit note for approval."""
     note = db.query(DebitNote).filter(DebitNote.id == note_id).first()

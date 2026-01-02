@@ -346,6 +346,7 @@ class SalarySlip(Base):
     # Audit fields
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     status_changed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     status_changed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
@@ -364,6 +365,10 @@ class SalarySlip(Base):
 
     __table_args__ = (
         Index("ix_salary_slips_emp_period", "employee_id", "start_date", "end_date"),
+        # Audit column indexes
+        Index("ix_salary_slips_created_by_id", "created_by_id"),
+        Index("ix_salary_slips_updated_by_id", "updated_by_id"),
+        Index("ix_salary_slips_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:

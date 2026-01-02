@@ -1,0 +1,320 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Data Cleanup</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Scan, clean, and normalize data quality issues</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/data-cleanup/scans"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Scan History
+        </a>
+        <button
+            type="button"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-teal-600 to-teal-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-teal-600/25 hover:from-teal-500 hover:to-teal-600 transition-all duration-200"
+            data-testid="scan-button"
+            x-data
+            @click="$dispatch('open-scan-modal')"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            Scan Now
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Data Quality Score -->
+<div class="mb-8 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Data Quality Score</h2>
+        {% if last_scan %}
+        <span class="text-sm text-gray-500">Last scan: {{ last_scan.completed_at.strftime('%b %d, %Y %H:%M') if last_scan.completed_at else 'N/A' }}</span>
+        {% else %}
+        <span class="text-sm text-gray-500">No scans yet</span>
+        {% endif %}
+    </div>
+    <div class="flex items-center gap-6">
+        <div class="flex-shrink-0">
+            <div class="relative w-24 h-24">
+                <svg class="w-24 h-24 transform -rotate-90">
+                    <circle cx="48" cy="48" r="40" stroke="#e5e7eb" stroke-width="8" fill="none"/>
+                    <circle cx="48" cy="48" r="40"
+                            stroke="{{ 'url(#quality-gradient)' }}"
+                            stroke-width="8"
+                            fill="none"
+                            stroke-dasharray="{{ 251.2 * quality_score / 100 }} 251.2"
+                            stroke-linecap="round"/>
+                    <defs>
+                        <linearGradient id="quality-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stop-color="#14b8a6"/>
+                            <stop offset="100%" stop-color="#0d9488"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="absolute inset-0 flex items-center justify-center">
+                    <span class="text-2xl font-bold text-gray-900">{{ quality_score }}%</span>
+                </div>
+            </div>
+        </div>
+        <div class="flex-1">
+            <p class="text-gray-600 mb-2">
+                {% if quality_score >= 95 %}
+                Excellent! Your data quality is in great shape.
+                {% elif quality_score >= 80 %}
+                Good data quality. Some issues need attention.
+                {% elif quality_score >= 60 %}
+                Fair data quality. Several issues should be addressed.
+                {% else %}
+                Data quality needs improvement. Many issues detected.
+                {% endif %}
+            </p>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div class="bg-gradient-to-r from-teal-500 to-teal-600 h-2 rounded-full transition-all duration-500"
+                     style="width: {{ quality_score }}%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Issue Stats Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" data-testid="issue-stats">
+    <!-- Critical -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-red-100 to-rose-200 flex items-center justify-center ring-2 ring-red-200/50">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-red-600 tabular-nums">{{ issue_counts.critical }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Critical</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- High -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-orange-100 to-amber-200 flex items-center justify-center ring-2 ring-orange-200/50">
+                <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-orange-600 tabular-nums">{{ issue_counts.high }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">High</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medium -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-100 to-amber-200 flex items-center justify-center ring-2 ring-yellow-200/50">
+                <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-yellow-600 tabular-nums">{{ issue_counts.medium }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Medium</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Low -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-gray-100 to-slate-200 flex items-center justify-center ring-2 ring-gray-200/50">
+                <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-600 tabular-nums">{{ issue_counts.low }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Low</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Recent Issues -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Issues</h2>
+            <a href="/settings/data-cleanup/issues" class="text-sm text-teal-600 hover:text-teal-700 font-medium">
+                View All
+            </a>
+        </div>
+        {% if recent_issues %}
+        <ul class="divide-y divide-gray-100">
+            {% for issue in recent_issues %}
+            <li class="px-6 py-4 hover:bg-gray-50 transition-colors">
+                <a href="/settings/data-cleanup/issues/{{ issue.id }}" class="block">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset {{ severity_colors[issue.severity.value] }}">
+                                {{ issue.severity.value|title }}
+                            </span>
+                            <span class="text-sm text-gray-900 font-medium">{{ issue.title }}</span>
+                        </div>
+                        <span class="text-sm text-gray-500">{{ issue.record_count }} records</span>
+                    </div>
+                    <p class="mt-1 text-sm text-gray-500">
+                        {{ get_entity_display(issue.entity_type.value) }} - {{ get_issue_type_display(issue.issue_type.value) }}
+                    </p>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <h3 class="mt-4 text-sm font-semibold text-gray-900">No issues found</h3>
+            <p class="mt-1 text-sm text-gray-500">Your data quality is excellent!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Jobs -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Cleanup Jobs</h2>
+            <a href="/settings/data-cleanup/jobs" class="text-sm text-teal-600 hover:text-teal-700 font-medium">
+                View All
+            </a>
+        </div>
+        {% if recent_jobs %}
+        <ul class="divide-y divide-gray-100">
+            {% for job in recent_jobs %}
+            <li class="px-6 py-4 hover:bg-gray-50 transition-colors">
+                <a href="/settings/data-cleanup/jobs/{{ job.id }}" class="block">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-900 font-medium">{{ job.name }}</span>
+                        <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset {{ job_status_colors[job.status.value] }}">
+                            {{ job.status.value.replace('_', ' ')|title }}
+                        </span>
+                    </div>
+                    <div class="mt-1 flex items-center gap-4 text-sm text-gray-500">
+                        <span>{{ job.records_changed }} records changed</span>
+                        <span>{{ job.created_at.strftime('%b %d, %H:%M') }}</span>
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="px-6 py-12 text-center">
+            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+            </svg>
+            <h3 class="mt-4 text-sm font-semibold text-gray-900">No cleanup jobs yet</h3>
+            <p class="mt-1 text-sm text-gray-500">Run a scan to detect issues and start cleaning</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="mt-8 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <h2 class="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+    <div class="flex flex-wrap gap-3">
+        <button type="button" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled title="Coming in Phase 2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+            </svg>
+            Normalize Phones
+        </button>
+        <button type="button" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled title="Coming in Phase 2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Fix Emails
+        </button>
+        <button type="button" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled title="Coming in Phase 2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+            Find Duplicates
+        </button>
+        <a href="/settings/data-cleanup/rules" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            Manage Rules
+        </a>
+    </div>
+</div>
+
+<!-- Scan Modal (placeholder for now) -->
+<div x-data="{ open: false }"
+     @open-scan-modal.window="open = true"
+     x-show="open"
+     x-cloak
+     class="fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+        <div x-show="open"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+             @click="open = false"></div>
+
+        <div x-show="open"
+             x-transition:enter="ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+             x-transition:leave="ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+             x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+             class="relative transform overflow-hidden rounded-2xl bg-white px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6">
+            <div>
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-teal-100">
+                    <svg class="h-6 w-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <div class="mt-3 text-center sm:mt-5">
+                    <h3 class="text-lg font-semibold leading-6 text-gray-900">Start Data Quality Scan</h3>
+                    <p class="mt-2 text-sm text-gray-500">
+                        Select the entity types you want to scan for data quality issues.
+                    </p>
+                </div>
+            </div>
+            <div class="mt-5">
+                <p class="text-center text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
+                    Scanning functionality will be available in Phase 2.
+                </p>
+            </div>
+            <div class="mt-5 sm:mt-6">
+                <button type="button"
+                        class="inline-flex w-full justify-center rounded-xl bg-teal-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+                        @click="open = false">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

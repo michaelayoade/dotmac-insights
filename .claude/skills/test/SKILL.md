@@ -7,6 +7,30 @@ description: Testing skill for generating, running, and analyzing tests. Support
 
 Generate, run, and analyze tests for the DotMAC codebase. Matches existing pytest patterns and conventions.
 
+## Standard Output Format
+When reporting test recommendations or results, use:
+```
+### Findings
+- [What is missing or failing]
+
+### Risks
+- [What could regress without coverage]
+
+### Fixes
+- [Tests to add or changes to make]
+
+### Tests
+- [Commands to run]
+```
+
+## Severity Levels
+| Severity | Criteria | Action |
+|----------|----------|--------|
+| Critical | Security flaw, data loss, crash | Must fix before merge |
+| High | Incorrect results or broken core behavior | Should fix |
+| Medium | Edge-case, performance, or maintainability risk | Consider fixing |
+| Low | Style or minor improvement | Optional |
+
 ## Commands
 
 ### `/test generate [file_or_function]`
@@ -228,6 +252,9 @@ This skill activates when:
 - User asks to debug a failing test
 - User needs fixtures or mocks
 
+## Required Output
+- Always recommend tests for non-trivial changes, even if not writing them.
+
 ---
 
 ## Anti-Patterns to Avoid
@@ -267,3 +294,6 @@ pytest -x
 # Re-run failed
 pytest --lf
 ```
+
+## References
+- See `reference.md` for unit/integration test templates.

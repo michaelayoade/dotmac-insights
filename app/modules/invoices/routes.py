@@ -5,7 +5,7 @@ Provides SSR pages for invoice management and credit notes.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response, Depends, Query, Form
+from fastapi import APIRouter, Request, Response, Depends, Query, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
@@ -66,7 +66,7 @@ async def invoices_list(
             status_enum = InvoiceStatus(status.upper())
             query = query.where(Invoice.status == status_enum)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
     if date_from:
         query = query.where(Invoice.invoice_date >= date_from)
@@ -115,9 +115,9 @@ async def invoices_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("invoices/partials/invoices_table.html")
+        template = templates.get_template("modules/invoices/templates/partials/invoices_table.html")
     else:
-        template = templates.get_template("invoices/pages/list.html")
+        template = templates.get_template("modules/invoices/templates/pages/list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -172,7 +172,7 @@ async def credit_notes_list(
             status_enum = CreditNoteStatus(status.upper())
             query = query.where(CreditNote.status == status_enum)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
     count_query = select(func.count()).select_from(query.subquery())
     total = db.scalar(count_query) or 0
@@ -201,9 +201,9 @@ async def credit_notes_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("invoices/partials/credit_notes_table.html")
+        template = templates.get_template("modules/invoices/templates/partials/credit_notes_table.html")
     else:
-        template = templates.get_template("invoices/pages/credit_notes.html")
+        template = templates.get_template("modules/invoices/templates/pages/credit_notes.html")
 
     return HTMLResponse(template.render(context))
 
@@ -244,7 +244,7 @@ async def invoice_detail(
     context["page_title"] = f"Invoice: {invoice.invoice_number or invoice.id}"
     context["invoice"] = invoice
 
-    template = templates.get_template("invoices/pages/detail.html")
+    template = templates.get_template("modules/invoices/templates/pages/detail.html")
     return HTMLResponse(template.render(context))
 
 
@@ -281,7 +281,7 @@ async def credit_note_detail(
     context["page_title"] = f"Credit Note: {credit_note.credit_number or credit_note.id}"
     context["credit_note"] = credit_note
 
-    template = templates.get_template("invoices/pages/credit_note_detail.html")
+    template = templates.get_template("modules/invoices/templates/pages/credit_note_detail.html")
     return HTMLResponse(template.render(context))
 
 

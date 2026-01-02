@@ -98,9 +98,9 @@ async def evaluation_periods_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("performance/partials/periods_table.html")
+        template = templates.get_template("modules/performance/templates/partials/periods_table.html")
     else:
-        template = templates.get_template("performance/pages/list.html")
+        template = templates.get_template("modules/performance/templates/pages/list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -179,9 +179,9 @@ async def scorecards_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("performance/partials/scorecards_table.html")
+        template = templates.get_template("modules/performance/templates/partials/scorecards_table.html")
     else:
-        template = templates.get_template("performance/pages/scorecards_list.html")
+        template = templates.get_template("modules/performance/templates/pages/scorecards_list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -218,7 +218,7 @@ async def scorecard_templates_list(
     context["per_page"] = per_page
     context["total_pages"] = (total + per_page - 1) // per_page
 
-    template = templates.get_template("performance/pages/templates_list.html")
+    template = templates.get_template("modules/performance/templates/pages/templates_list.html")
     return HTMLResponse(template.render(context))
 
 
@@ -254,7 +254,7 @@ async def kra_definitions_list(
     context["per_page"] = per_page
     context["total_pages"] = (total + per_page - 1) // per_page
 
-    template = templates.get_template("performance/pages/kras_list.html")
+    template = templates.get_template("modules/performance/templates/pages/kras_list.html")
     return HTMLResponse(template.render(context))
 
 
@@ -290,7 +290,7 @@ async def kpi_definitions_list(
     context["per_page"] = per_page
     context["total_pages"] = (total + per_page - 1) // per_page
 
-    template = templates.get_template("performance/pages/kpis_list.html")
+    template = templates.get_template("modules/performance/templates/pages/kpis_list.html")
     return HTMLResponse(template.render(context))
 
 
@@ -330,7 +330,7 @@ async def evaluation_period_detail(
     context["period"] = period
     context["scorecards"] = scorecards
 
-    template = templates.get_template("performance/pages/detail.html")
+    template = templates.get_template("modules/performance/templates/pages/detail.html")
     return HTMLResponse(template.render(context))
 
 
@@ -366,5 +366,5 @@ async def scorecard_detail(
     context["page_title"] = f"Scorecard #{scorecard.id}"
     context["scorecard"] = scorecard
 
-    template = templates.get_template("performance/pages/scorecard_detail.html")
+    template = templates.get_template("modules/performance/templates/pages/scorecard_detail.html")
     return HTMLResponse(template.render(context))

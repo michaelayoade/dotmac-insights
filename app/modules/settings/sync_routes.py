@@ -85,14 +85,24 @@ SYNC_ENTITIES: dict[str, SyncSourceConfig] = {
         "label": "ERPNext",
         "description": "Enterprise resource planning",
         "entities": [
+            # Sales
+            {"id": "customers", "label": "Customers", "icon": "users", "category": "Sales"},
+            {"id": "leads", "label": "Leads", "icon": "user-plus", "category": "Sales"},
+            {"id": "quotations", "label": "Quotations", "icon": "file-text", "category": "Sales"},
+            {"id": "sales_orders", "label": "Sales Orders", "icon": "shopping-cart", "category": "Sales"},
+            # Accounting
+            {"id": "invoices", "label": "Sales Invoices", "icon": "file-text", "category": "Accounting"},
+            {"id": "payments", "label": "Payments", "icon": "credit-card", "category": "Accounting"},
+            {"id": "expenses", "label": "Expense Claims", "icon": "receipt", "category": "Accounting"},
+            {"id": "journal_entries", "label": "Journal Entries", "icon": "book", "category": "Accounting"},
+            {"id": "suppliers", "label": "Suppliers", "icon": "truck", "category": "Accounting"},
+            # HR
             {"id": "employees", "label": "Employees", "icon": "users", "category": "HR"},
             {"id": "departments", "label": "Departments", "icon": "briefcase", "category": "HR"},
+            # Inventory
             {"id": "items", "label": "Items", "icon": "box", "category": "Inventory"},
-            {"id": "warehouses", "label": "Warehouses", "icon": "home", "category": "Inventory"},
-            {"id": "suppliers", "label": "Suppliers", "icon": "truck", "category": "Purchasing"},
-            {"id": "purchase_orders", "label": "Purchase Orders", "icon": "shopping-cart", "category": "Purchasing"},
-            {"id": "journal_entries", "label": "Journal Entries", "icon": "book", "category": "Accounting"},
-            {"id": "assets", "label": "Assets", "icon": "package", "category": "Assets"},
+            # Support
+            {"id": "hd_tickets", "label": "HD Tickets", "icon": "message-square", "category": "Support"},
         ],
     },
     "chatwoot": {
@@ -382,16 +392,89 @@ async def trigger_sync(
     if not entity_config:
         raise HTTPException(status_code=404, detail="Unknown entity type")
 
-    # In production, this would enqueue a Celery task
-    # For now, just show a message that sync was triggered
-    message = f"Sync triggered for {source_config['label']} {entity_config['label']}"
+    # Trigger the appropriate Celery task
+    task_triggered = False
+    task_name = f"sync_{source}_{entity_type}"
+
+    try:
+        from app.tasks import sync_tasks
+
+        # Map entity types to Celery tasks
+        task_map = {
+            # Splynx tasks - CRM
+            ("splynx", "customers"): sync_tasks.sync_splynx_customers,
+            ("splynx", "leads"): sync_tasks.sync_splynx_leads,
+            ("splynx", "customer_notes"): sync_tasks.sync_splynx_customer_notes,
+            # Splynx tasks - Services
+            ("splynx", "services"): sync_tasks.sync_splynx_services,
+            ("splynx", "tariffs"): sync_tasks.sync_splynx_tariffs,
+            ("splynx", "usage"): sync_tasks.sync_splynx_usage,
+            # Splynx tasks - Billing
+            ("splynx", "invoices"): sync_tasks.sync_splynx_invoices,
+            ("splynx", "payments"): sync_tasks.sync_splynx_payments,
+            ("splynx", "credit_notes"): sync_tasks.sync_splynx_credit_notes,
+            ("splynx", "payment_methods"): sync_tasks.sync_splynx_payment_methods,
+            ("splynx", "transaction_categories"): sync_tasks.sync_splynx_transaction_categories,
+            # Splynx tasks - Network
+            ("splynx", "locations"): sync_tasks.sync_splynx_locations,
+            ("splynx", "routers"): sync_tasks.sync_splynx_routers,
+            ("splynx", "ipv4_networks"): sync_tasks.sync_splynx_ipv4_networks,
+            ("splynx", "ipv4_addresses"): sync_tasks.sync_splynx_ipv4_addresses,
+            ("splynx", "ipv6_networks"): sync_tasks.sync_splynx_ipv6_networks,
+            ("splynx", "network_monitors"): sync_tasks.sync_splynx_network_monitors,
+            # Splynx tasks - Support
+            ("splynx", "tickets"): sync_tasks.sync_splynx_tickets,
+            ("splynx", "ticket_messages"): sync_tasks.sync_splynx_ticket_messages,
+            # Splynx tasks - Admin
+            ("splynx", "administrators"): sync_tasks.sync_splynx_administrators,
+            # ERPNext tasks - HR
+            ("erpnext", "employees"): sync_tasks.sync_erpnext_hr,
+            ("erpnext", "departments"): sync_tasks.sync_erpnext_hr,
+            # ERPNext tasks - Inventory
+            ("erpnext", "items"): sync_tasks.sync_erpnext_items,
+            # ERPNext tasks - Purchasing
+            ("erpnext", "suppliers"): sync_tasks.sync_erpnext_extended_accounting,
+            # ERPNext tasks - Accounting
+            ("erpnext", "journal_entries"): sync_tasks.sync_erpnext_accounting,
+            ("erpnext", "customers"): sync_tasks.sync_erpnext_customers,
+            ("erpnext", "invoices"): sync_tasks.sync_erpnext_invoices,
+            ("erpnext", "payments"): sync_tasks.sync_erpnext_payments,
+            ("erpnext", "expenses"): sync_tasks.sync_erpnext_expenses,
+            # ERPNext tasks - Support
+            ("erpnext", "hd_tickets"): sync_tasks.sync_erpnext_hd_tickets,
+            # ERPNext tasks - Sales
+            ("erpnext", "sales_orders"): sync_tasks.sync_erpnext_sales,
+            ("erpnext", "quotations"): sync_tasks.sync_erpnext_sales,
+            ("erpnext", "leads"): sync_tasks.sync_erpnext_sales,
+            # Chatwoot tasks
+            ("chatwoot", "contacts"): sync_tasks.sync_chatwoot_contacts,
+            ("chatwoot", "conversations"): sync_tasks.sync_chatwoot_conversations,
+            ("chatwoot", "messages"): sync_tasks.sync_chatwoot_conversations,  # Messages synced with conversations
+        }
+
+        task = task_map.get((source, entity_type))
+        if task:
+            task.delay(full_sync=False)
+            task_triggered = True
+            message = f"Sync queued for {source_config['label']} {entity_config['label']}"
+        else:
+            message = f"No dedicated task for {entity_config['label']}. Use full sync instead."
+
+    except ImportError as e:
+        logger.warning("celery_import_failed", error=str(e))
+        message = f"Sync service unavailable: {str(e)}"
+    except Exception as e:
+        logger.error("sync_trigger_failed", error=str(e), source=source, entity=entity_type)
+        message = f"Failed to trigger sync: {str(e)}"
+
+    toast_type = "success" if task_triggered else "warning"
 
     if is_htmx_request(request):
-        htmx_toast(response, message, "info")
+        htmx_toast(response, message, toast_type)
         response.headers["HX-Refresh"] = "true"
         return HTMLResponse("", headers=dict(response.headers))
 
-    set_flash(response, message, "info")
+    set_flash(response, message, toast_type)
     return HTMLResponse(
         "",
         status_code=303,

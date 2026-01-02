@@ -11,7 +11,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.auth import Require, get_current_user
+from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models import (
     Project,
@@ -98,7 +98,7 @@ async def submit_project_for_approval(
     project_id: int,
     payload: Optional[ApprovalSubmitPayload] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit a project for approval."""
     # Verify project exists
@@ -112,7 +112,7 @@ async def submit_project_for_approval(
         approval = engine.submit_document(
             doctype="project",
             document_id=project_id,
-            user_id=user.id,
+            user_id=principal.id,
             amount=project.estimated_costing,
             document_name=project.project_name,
         )
@@ -124,9 +124,9 @@ async def submit_project_for_approval(
             entity_id=project_id,
             activity_type=ProjectActivityType.APPROVAL_SUBMITTED,
             description=f"Project submitted for approval",
-            actor_id=user.id,
-            actor_name=user.name if hasattr(user, "name") else None,
-            actor_email=user.email if hasattr(user, "email") else None,
+            actor_id=principal.id,
+            actor_name=principal.name if hasattr(principal, "name") else None,
+            actor_email=principal.email if hasattr(principal, "email") else None,
         )
 
         db.commit()
@@ -143,7 +143,7 @@ async def submit_project_for_approval(
                     payload={
                         "project_id": project_id,
                         "project_name": project.project_name,
-                        "requester_name": user.name if hasattr(user, "name") else user.email,
+                        "requester_name": principal.name if hasattr(principal, "name") else principal.email,
                         "estimated_costing": float(project.estimated_costing) if project.estimated_costing else None,
                     },
                     entity_type="project",
@@ -172,7 +172,7 @@ async def approve_project(
     project_id: int,
     payload: Optional[ApprovalActionPayload] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("approvals:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Approve a project at the current approval step."""
     # Verify project exists
@@ -187,7 +187,7 @@ async def approve_project(
         approval = engine.approve_document(
             doctype="project",
             document_id=project_id,
-            user_id=user.id,
+            user_id=principal.id,
             remarks=remarks,
         )
 
@@ -198,9 +198,9 @@ async def approve_project(
             entity_id=project_id,
             activity_type=ProjectActivityType.APPROVAL_APPROVED,
             description=f"Project approved at step {approval.current_step}",
-            actor_id=user.id,
-            actor_name=user.name if hasattr(user, "name") else None,
-            actor_email=user.email if hasattr(user, "email") else None,
+            actor_id=principal.id,
+            actor_name=principal.name if hasattr(principal, "name") else None,
+            actor_email=principal.email if hasattr(principal, "email") else None,
         )
 
         db.commit()
@@ -221,7 +221,7 @@ async def approve_project(
                     payload={
                         "project_id": project_id,
                         "project_name": project.project_name,
-                        "approver_name": user.name if hasattr(user, "name") else user.email,
+                        "approver_name": principal.name if hasattr(principal, "name") else principal.email,
                         "remarks": remarks,
                     },
                     entity_type="project",
@@ -253,7 +253,7 @@ async def reject_project(
     project_id: int,
     payload: ApprovalActionPayload,
     db: Session = Depends(get_db),
-    user=Depends(Require("approvals:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Reject a project."""
     # Verify project exists
@@ -270,7 +270,7 @@ async def reject_project(
         approval = engine.reject_document(
             doctype="project",
             document_id=project_id,
-            user_id=user.id,
+            user_id=principal.id,
             reason=payload.reason,
         )
 
@@ -281,9 +281,9 @@ async def reject_project(
             entity_id=project_id,
             activity_type=ProjectActivityType.APPROVAL_REJECTED,
             description=f"Project rejected: {payload.reason[:100]}",
-            actor_id=user.id,
-            actor_name=user.name if hasattr(user, "name") else None,
-            actor_email=user.email if hasattr(user, "email") else None,
+            actor_id=principal.id,
+            actor_name=principal.name if hasattr(principal, "name") else None,
+            actor_email=principal.email if hasattr(principal, "email") else None,
         )
 
         db.commit()
@@ -304,7 +304,7 @@ async def reject_project(
                     payload={
                         "project_id": project_id,
                         "project_name": project.project_name,
-                        "rejector_name": user.name if hasattr(user, "name") else user.email,
+                        "rejector_name": principal.name if hasattr(principal, "name") else principal.email,
                         "reason": payload.reason,
                     },
                     entity_type="project",
@@ -335,7 +335,7 @@ async def reject_project(
 async def check_can_approve_project(
     project_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Check if the current user can approve a project."""
     # Verify project exists
@@ -344,10 +344,10 @@ async def check_can_approve_project(
         raise HTTPException(status_code=404, detail="Project not found")
 
     engine = ApprovalEngine(db)
-    can_approve = engine.can_user_approve("project", project_id, user.id)
+    can_approve = engine.can_user_approve("project", project_id, principal.id)
 
     return {
         "project_id": project_id,
-        "user_id": user.id,
+        "user_id": principal.id,
         "can_approve": can_approve,
     }

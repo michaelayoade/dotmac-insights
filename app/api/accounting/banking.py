@@ -6,11 +6,11 @@ import io
 import re
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, ValidationInfo
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
@@ -32,9 +32,7 @@ from .helpers import parse_date, paginate
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
 
 class BankTransactionSplitCreate(BaseModel):
     """Schema for creating a bank transaction split."""
@@ -65,6 +63,20 @@ class BankTransactionCreate(BaseModel):
     party: Optional[str] = None
     splits: List[BankTransactionSplitCreate] = []
 
+    @field_validator("deposit", "withdrawal")
+    def _validate_amounts(cls, value: float, info: ValidationInfo) -> float:
+        other_key = "withdrawal" if info.field_name == "deposit" else "deposit"
+        other_value = info.data.get(other_key)
+        if other_value is None:
+            return value
+        if value < 0 or other_value < 0:
+            raise ValueError("Deposit and withdrawal must be non-negative.")
+        if value > 0 and other_value > 0:
+            raise ValueError("Provide either a deposit or a withdrawal, not both.")
+        if value == 0 and other_value == 0:
+            raise ValueError("Provide a positive deposit or withdrawal amount.")
+        return value
+
 
 class BankTransactionUpdate(BaseModel):
     """Schema for updating a bank transaction."""
@@ -79,6 +91,20 @@ class BankTransactionUpdate(BaseModel):
     payee_account: Optional[str] = None
     party_type: Optional[str] = None
     party: Optional[str] = None
+
+    @field_validator("deposit", "withdrawal")
+    def _validate_amounts(cls, value: Optional[float], info: ValidationInfo) -> Optional[float]:
+        other_key = "withdrawal" if info.field_name == "deposit" else "deposit"
+        other_value = info.data.get(other_key)
+        if value is None or other_value is None:
+            return value
+        if value < 0 or other_value < 0:
+            raise ValueError("Deposit and withdrawal must be non-negative.")
+        if value > 0 and other_value > 0:
+            raise ValueError("Provide either a deposit or a withdrawal, not both.")
+        if value == 0 and other_value == 0:
+            raise ValueError("Provide a positive deposit or withdrawal amount.")
+        return value
 
 
 class BankAccountCreate(BaseModel):
@@ -120,9 +146,7 @@ class ReconcileRequest(BaseModel):
     create_payment_entry: bool = False
 
 
-# =============================================================================
 # BANK ACCOUNTS
-# =============================================================================
 
 @router.get("/bank-accounts", dependencies=[Depends(Require("accounting:read"))])
 def get_bank_accounts(
@@ -184,9 +208,7 @@ def get_bank_accounts(
     }
 
 
-# =============================================================================
 # BANK ACCOUNT CRUD
-# =============================================================================
 
 @router.post("/bank-accounts", dependencies=[Depends(Require("accounting:write"))])
 def create_bank_account(
@@ -246,9 +268,7 @@ def delete_bank_account(
     return {"status": "disabled", "bank_account_id": bank_account_id}
 
 
-# =============================================================================
 # BANK RECONCILIATION
-# =============================================================================
 
 
 @router.get("/bank-accounts/{bank_account_id}/reconciliation-status", dependencies=[Depends(Require("accounting:read"))])
@@ -413,9 +433,7 @@ async def complete_bank_reconciliation(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-# =============================================================================
 # BANK TRANSACTIONS
-# =============================================================================
 
 @router.get("/bank-transactions", dependencies=[Depends(Require("accounting:read"))])
 def list_bank_transactions(
@@ -611,9 +629,7 @@ def get_bank_transaction_detail(
     }
 
 
-# =============================================================================
 # BANK TRANSACTIONS CRUD
-# =============================================================================
 
 @router.post("/bank-transactions", dependencies=[Depends(Require("books:write"))])
 def create_bank_transaction(
@@ -809,9 +825,7 @@ def delete_bank_transaction(
     return {"message": "Bank transaction deleted"}
 
 
-# =============================================================================
 # BANK TRANSACTION SPLITS
-# =============================================================================
 
 @router.post("/bank-transactions/{transaction_id}/splits", dependencies=[Depends(Require("books:write"))])
 def add_transaction_splits(
@@ -902,9 +916,7 @@ def delete_transaction_split(
     return {"message": "Split deleted"}
 
 
-# =============================================================================
 # RECONCILIATION
-# =============================================================================
 
 @router.post("/bank-transactions/{transaction_id}/reconcile", dependencies=[Depends(Require("books:write"))])
 def reconcile_transaction(
@@ -966,9 +978,7 @@ def unreconcile_transaction(
     }
 
 
-# =============================================================================
 # BANK TRANSACTION IMPORT
-# =============================================================================
 
 def _parse_csv_content(content: str, column_mapping: Dict[str, str]) -> List[Dict[str, Any]]:
     """Parse CSV content into transaction records.
@@ -1087,7 +1097,7 @@ def _parse_ofx_content(content: str) -> List[Dict[str, Any]]:
         amount_str = extract_tag(block, "TRNAMT")
         try:
             amount = Decimal(amount_str)
-        except:
+        except (ValueError, TypeError, InvalidOperation):
             continue
 
         deposit = amount if amount >= 0 else Decimal("0")
@@ -1145,8 +1155,8 @@ async def import_bank_transactions(
     # Read file content
     try:
         content = (await file.read()).decode("utf-8", errors="replace")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(e)}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Failed to read file. Please ensure it is a valid CSV or OFX file.")
 
     # Parse transactions based on format
     if format == "csv":
@@ -1252,9 +1262,7 @@ async def import_bank_transactions(
     }
 
 
-# =============================================================================
 # RECONCILIATION SUGGESTIONS
-# =============================================================================
 
 @router.get("/bank-transactions/{transaction_id}/suggestions", dependencies=[Depends(Require("accounting:read"))])
 def get_reconciliation_suggestions(
@@ -1421,16 +1429,14 @@ def get_reconciliation_suggestions(
     }
 
 
-# =============================================================================
 # ENHANCED RECONCILIATION WITH ALLOCATIONS
-# =============================================================================
 
 @router.post("/bank-transactions/{transaction_id}/allocate", dependencies=[Depends(Require("books:write"))])
 def allocate_bank_transaction(
     transaction_id: int,
     data: ReconcileRequest,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Allocate a bank transaction to one or more documents.
 
@@ -1444,7 +1450,8 @@ def allocate_bank_transaction(
     Returns:
         Allocation results
     """
-    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).first()
+    # Use SELECT FOR UPDATE to prevent race conditions on concurrent allocations
+    txn = db.query(BankTransaction).filter(BankTransaction.id == transaction_id).with_for_update().first()
     if not txn:
         raise HTTPException(status_code=404, detail="Bank transaction not found")
 
@@ -1464,7 +1471,8 @@ def allocate_bank_transaction(
 
     for alloc in data.allocations:
         if alloc.document_type == "Sales Invoice":
-            invoice = db.query(Invoice).filter(Invoice.id == alloc.document_id).first()
+            # Lock invoice row to prevent concurrent allocation updates
+            invoice = db.query(Invoice).filter(Invoice.id == alloc.document_id).with_for_update().first()
             if not invoice:
                 raise HTTPException(status_code=404, detail=f"Invoice {alloc.document_id} not found")
 
@@ -1479,7 +1487,8 @@ def allocate_bank_transaction(
             })
 
         elif alloc.document_type == "Purchase Invoice":
-            bill = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == alloc.document_id).first()
+            # Lock bill row to prevent concurrent allocation updates
+            bill = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == alloc.document_id).with_for_update().first()
             if not bill:
                 raise HTTPException(status_code=404, detail=f"Bill {alloc.document_id} not found")
 

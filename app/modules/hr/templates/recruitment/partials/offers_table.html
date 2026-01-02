@@ -3,23 +3,23 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Applicant</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Job Title</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Offer Date</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Salary</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('applicant')" x-cloak>Applicant</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('title')" x-cloak>Job Title</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('offer_date')" x-cloak>Offer Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('salary')" x-cloak>Salary</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('status')" x-cloak>Status</th>
             <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for offer in offers %}
             <tr class="group hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('applicant')" x-cloak>
                     <a href="/hr/recruitment/offers/{{ offer.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ offer.applicant_name }}</a>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ offer.job_title or offer.designation or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ offer.offer_date or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ offer.offer_salary|default(0)|round(2) if offer.offer_salary else '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('title')" x-cloak>{{ offer.job_title or offer.designation or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('offer_date')" x-cloak>{{ offer.offer_date or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell" x-show="isVisible('salary')" x-cloak>{{ offer.offer_salary|default(0)|round(2) if offer.offer_salary else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('status')" x-cloak>
                     {% set status_colors = {
                         'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
                         'Awaiting Response': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',

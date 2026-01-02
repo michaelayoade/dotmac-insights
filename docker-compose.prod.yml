@@ -19,8 +19,11 @@ services:
       service: api
     environment:
       ENVIRONMENT: production
+      AUTH_DISABLED: "false"
+      E2E_AUTH_ENABLED: "false"
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
       REDIS_URL: ${REDIS_URL:?set REDIS_URL}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
       JWKS_URL: ${JWKS_URL:?set JWKS_URL}
       JWT_ISSUER: ${JWT_ISSUER:?set JWT_ISSUER}
       JWT_AUDIENCE: ${JWT_AUDIENCE:?set JWT_AUDIENCE}

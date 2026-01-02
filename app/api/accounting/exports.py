@@ -8,16 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.cache import get_redis_client, CACHE_TTL
 from app.database import get_db
 
 router = APIRouter()
 
 
-# =============================================================================
 # HELPER FUNCTIONS
-# =============================================================================
 
 def _export_headers(base_filename: str, extension: str) -> Dict[str, str]:
     """Build Content-Disposition headers for streamed exports."""
@@ -34,9 +32,7 @@ def _stream_export(content: Any, media_type: str, base_filename: str, extension:
     )
 
 
-# =============================================================================
 # CACHE & EXPORT METADATA
-# =============================================================================
 
 @router.get("/cache-metadata", dependencies=[Depends(Require("accounting:read"))])
 async def get_accounting_cache_metadata() -> Dict[str, Any]:
@@ -89,9 +85,7 @@ def get_export_status() -> Dict[str, Any]:
     }
 
 
-# =============================================================================
 # TRIAL BALANCE EXPORT
-# =============================================================================
 
 @router.get("/trial-balance/export", dependencies=[Depends(Require("books:read"))])
 def export_trial_balance(
@@ -101,7 +95,7 @@ def export_trial_balance(
     cost_center: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Export trial balance report to CSV or PDF.
 
@@ -138,7 +132,7 @@ def export_trial_balance(
     audit.log_export(
         doctype="trial_balance",
         document_id=0,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"Trial Balance {as_of_date or 'today'}",
         remarks=f"Exported as {format.upper()}",
     )
@@ -157,9 +151,7 @@ def export_trial_balance(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # BALANCE SHEET EXPORT
-# =============================================================================
 
 @router.get("/balance-sheet/export", dependencies=[Depends(Require("books:read"))])
 def export_balance_sheet(
@@ -168,7 +160,7 @@ def export_balance_sheet(
     comparative_date: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Export balance sheet report to CSV or PDF.
 
@@ -203,7 +195,7 @@ def export_balance_sheet(
     audit.log_export(
         doctype="balance_sheet",
         document_id=0,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"Balance Sheet {as_of_date or 'today'}",
         remarks=f"Exported as {format.upper()}",
     )
@@ -222,9 +214,7 @@ def export_balance_sheet(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # INCOME STATEMENT EXPORT
-# =============================================================================
 
 @router.get("/income-statement/export", dependencies=[Depends(Require("books:read"))])
 def export_income_statement(
@@ -236,7 +226,7 @@ def export_income_statement(
     basis: str = Query("accrual", description="Accounting basis: accrual or cash"),
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Export income statement report to CSV or PDF.
 
@@ -280,7 +270,7 @@ def export_income_statement(
     audit.log_export(
         doctype="income_statement",
         document_id=0,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"Income Statement {start_date or ''} to {end_date or 'today'}",
         remarks=f"Exported as {format.upper()}, basis: {basis}",
     )
@@ -299,9 +289,7 @@ def export_income_statement(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # GENERAL LEDGER EXPORT
-# =============================================================================
 
 @router.get("/general-ledger/export", dependencies=[Depends(Require("books:read"))])
 def export_general_ledger(
@@ -315,7 +303,7 @@ def export_general_ledger(
     limit: int = Query(default=1000, le=10000),
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Export general ledger to CSV or PDF.
 
@@ -360,7 +348,7 @@ def export_general_ledger(
     audit.log_export(
         doctype="general_ledger",
         document_id=0,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"General Ledger {start_date or ''} to {end_date or ''}",
         remarks=f"Exported as {format.upper()}, {data.get('total', 0)} records",
     )
@@ -379,9 +367,7 @@ def export_general_ledger(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # RECEIVABLES AGING EXPORT
-# =============================================================================
 
 @router.get("/receivables-aging/export", dependencies=[Depends(Require("books:read"))])
 def export_receivables_aging(
@@ -389,7 +375,7 @@ def export_receivables_aging(
     as_of_date: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Export receivables aging report to CSV or PDF.
 
@@ -418,7 +404,7 @@ def export_receivables_aging(
     audit.log_export(
         doctype="receivables_aging",
         document_id=0,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"Receivables Aging {as_of_date or 'today'}",
         remarks=f"Exported as {format.upper()}",
     )
@@ -437,9 +423,7 @@ def export_receivables_aging(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # PAYABLES AGING EXPORT
-# =============================================================================
 
 @router.get("/payables-aging/export", dependencies=[Depends(Require("books:read"))])
 def export_payables_aging(
@@ -447,7 +431,7 @@ def export_payables_aging(
     as_of_date: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    principal: Principal = Depends(get_current_principal),
 ):
     """Export payables aging report to CSV or PDF.
 
@@ -476,7 +460,7 @@ def export_payables_aging(
     audit.log_export(
         doctype="payables_aging",
         document_id=0,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=f"Payables Aging {as_of_date or 'today'}",
         remarks=f"Exported as {format.upper()}",
     )

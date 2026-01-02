@@ -3,18 +3,18 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Program Name</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Trainer</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Supplier</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Status</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('program')" x-cloak>Program Name</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('trainer')" x-cloak>Trainer</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('supplier')" x-cloak>Supplier</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('status')" x-cloak>Status</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for program in programs %}
             <tr class="hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-gray-900">{{ program.program_name or program.name }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ program.trainer_name or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ program.supplier or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 hidden lg:table-cell">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-gray-900" x-show="isVisible('program')" x-cloak>{{ program.program_name or program.name }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('trainer')" x-cloak>{{ program.trainer_name or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('supplier')" x-cloak>{{ program.supplier or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 hidden lg:table-cell" x-show="isVisible('status')" x-cloak>
                     <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ 'bg-green-50 text-green-700 ring-green-600/20' if program.is_active else 'bg-gray-50 text-gray-700 ring-gray-600/20' }}">
                         {{ 'Active' if program.is_active else 'Inactive' }}
                     </span>

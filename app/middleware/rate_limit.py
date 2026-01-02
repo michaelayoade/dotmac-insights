@@ -2,7 +2,7 @@
 Rate limiting middleware for authentication endpoints.
 
 Provides protection against brute-force attacks on login endpoints.
-Uses in-memory storage by default, with optional Redis backend for distributed deployments.
+Uses Redis backend for distributed deployments, with in-memory fallback.
 """
 from __future__ import annotations
 
@@ -18,6 +18,12 @@ from fastapi import HTTPException, Request
 from app.config import settings
 
 logger = structlog.get_logger("auth.rate_limit")
+
+try:
+    from redis.exceptions import RedisError
+except ImportError:
+    class RedisError(Exception):
+        pass
 
 
 @dataclass
@@ -128,20 +134,124 @@ class InMemoryRateLimiter:
         return len(expired_keys)
 
 
+class RedisRateLimiter:
+    """
+    Redis-backed rate limiter using sliding window algorithm.
+    Falls back to in-memory when Redis is unavailable.
+    """
+
+    def __init__(
+        self,
+        requests_per_window: int = 10,
+        window_seconds: int = 60,
+        block_seconds: int = 300,
+        key_prefix: str = "ratelimit",
+    ):
+        self.requests_per_window = requests_per_window
+        self.window_seconds = window_seconds
+        self.block_seconds = block_seconds
+        self.key_prefix = key_prefix
+        self._fallback = InMemoryRateLimiter(
+            requests_per_window, window_seconds, block_seconds
+        )
+
+    async def is_rate_limited(self, key: str) -> Tuple[bool, Optional[int]]:
+        """Check if key is rate limited. Falls back to in-memory if Redis unavailable."""
+        from app.cache import get_redis_client
+
+        client = await get_redis_client()
+        if client is None:
+            return await self._fallback.is_rate_limited(key)
+
+        try:
+            return await self._check_redis(client, key)
+        except RedisError as e:
+            logger.warning("redis_rate_limit_fallback", error=str(e))
+            return await self._fallback.is_rate_limited(key)
+
+    async def _check_redis(self, client, key: str) -> Tuple[bool, Optional[int]]:
+        """Redis implementation using sorted sets for sliding window."""
+        redis_key = f"{self.key_prefix}:{key}"
+        block_key = f"{self.key_prefix}:blocked:{key}"
+        now = time.time()
+        window_start = now - self.window_seconds
+
+        blocked_until = await client.get(block_key)
+        if blocked_until:
+            retry_after = int(float(blocked_until) - now)
+            if retry_after > 0:
+                return True, retry_after
+            else:
+                await client.delete(block_key)
+
+        pipe = client.pipeline()
+        pipe.zremrangebyscore(redis_key, 0, window_start)
+        pipe.zadd(redis_key, {str(now): now})
+        pipe.zcard(redis_key)
+        pipe.expire(redis_key, self.window_seconds * 2)
+        results = await pipe.execute()
+
+        count = results[2]
+
+        if count > self.requests_per_window:
+            await client.setex(block_key, self.block_seconds, str(now + self.block_seconds))
+            logger.warning("rate_limit_exceeded_redis", key=key, count=count)
+            return True, self.block_seconds
+
+        return False, None
+
+    async def record_failure(self, key: str) -> None:
+        """Record a failed attempt with heavier weight."""
+        from app.cache import get_redis_client
+
+        client = await get_redis_client()
+        if client is None:
+            await self._fallback.record_failure(key)
+            return
+
+        try:
+            redis_key = f"{self.key_prefix}:{key}"
+            now = time.time()
+            pipe = client.pipeline()
+            pipe.zadd(redis_key, {f"{now}_1": now})
+            pipe.zadd(redis_key, {f"{now}_2": now})
+            pipe.expire(redis_key, self.window_seconds * 2)
+            await pipe.execute()
+        except RedisError:
+            await self._fallback.record_failure(key)
+
+    async def clear(self, key: str) -> None:
+        """Clear rate limit entry for a key."""
+        from app.cache import get_redis_client
+
+        client = await get_redis_client()
+        if client is None:
+            await self._fallback.clear(key)
+            return
+
+        try:
+            redis_key = f"{self.key_prefix}:{key}"
+            block_key = f"{self.key_prefix}:blocked:{key}"
+            await client.delete(redis_key, block_key)
+        except RedisError:
+            await self._fallback.clear(key)
+
+
 # Global rate limiter instance for auth endpoints
-# Conservative defaults: 10 requests/minute, 5-minute block on excess
-auth_rate_limiter = InMemoryRateLimiter(
+# Uses Redis when available, falls back to in-memory
+auth_rate_limiter = RedisRateLimiter(
     requests_per_window=10,
     window_seconds=60,
     block_seconds=300,
+    key_prefix="auth",
 )
 
 # Webhook rate limiter - more permissive but still protective
-# 100 requests/minute per IP, 5-minute block on excess
-webhook_rate_limiter = InMemoryRateLimiter(
+webhook_rate_limiter = RedisRateLimiter(
     requests_per_window=100,
     window_seconds=60,
     block_seconds=300,
+    key_prefix="webhook",
 )
 
 

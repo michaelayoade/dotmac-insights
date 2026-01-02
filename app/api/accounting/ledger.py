@@ -101,9 +101,7 @@ class GLEntryUpdateRequest(BaseModel):
         return Decimal(str(value))
 
 
-# =============================================================================
 # ACCOUNTS LIST
-# =============================================================================
 
 @router.get("/accounts", dependencies=[Depends(Require("accounting:read"))])
 def list_accounts(
@@ -147,6 +145,12 @@ def list_accounts(
         query = query.filter(Account.disabled == False)
 
     if search:
+        # Require minimum 2 characters to prevent ILIKE DoS with broad patterns
+        if len(search) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Search query must be at least 2 characters"
+            )
         query = query.filter(Account.account_name.ilike(f"%{search}%"))
 
     query = query.order_by(Account.account_name)
@@ -160,9 +164,7 @@ def list_accounts(
     }
 
 
-# =============================================================================
 # ACCOUNT DETAIL
-# =============================================================================
 
 @router.get("/accounts/{account_id}", dependencies=[Depends(Require("accounting:read"))])
 def get_account_detail(
@@ -259,9 +261,7 @@ def get_account_detail(
     return result
 
 
-# =============================================================================
 # ACCOUNT CRUD
-# =============================================================================
 
 @router.post("/accounts", dependencies=[Depends(Require("accounting:write"))])
 def create_account(
@@ -334,9 +334,7 @@ def delete_account(
     return {"status": "disabled", "account_id": account_id}
 
 
-# =============================================================================
 # ACCOUNT LEDGER (with running balance)
-# =============================================================================
 
 @router.get("/accounts/{account_id}/ledger", dependencies=[Depends(Require("accounting:read"))])
 def get_account_ledger(
@@ -441,9 +439,7 @@ def get_account_ledger(
     }
 
 
-# =============================================================================
 # CHART OF ACCOUNTS
-# =============================================================================
 
 @router.get("/chart-of-accounts", dependencies=[Depends(Require("accounting:read"))])
 def get_chart_of_accounts(
@@ -549,88 +545,7 @@ def get_chart_of_accounts(
     }
 
 
-# =============================================================================
-# GENERAL LEDGER
-# =============================================================================
-
-@router.get("/general-ledger", dependencies=[Depends(Require("accounting:read"))])
-def get_general_ledger(
-    account: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    party_type: Optional[str] = None,
-    party: Optional[str] = None,
-    voucher_type: Optional[str] = None,
-    currency: Optional[str] = None,
-    limit: int = Query(default=100, le=1000),
-    offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Get general ledger transactions with filtering and pagination.
-
-    Args:
-        account: Filter by account
-        start_date: Filter from date
-        end_date: Filter to date
-        party_type: Filter by party type (Customer, Supplier)
-        party: Filter by party name
-        voucher_type: Filter by voucher type
-        currency: Currency filter (reserved for future use)
-        limit: Max records to return
-        offset: Pagination offset
-
-    Returns:
-        Paginated GL entries
-    """
-    query = db.query(GLEntry).filter(GLEntry.is_cancelled == False)
-
-    if account:
-        query = query.filter(GLEntry.account.ilike(f"%{account}%"))
-
-    if start_date:
-        query = query.filter(GLEntry.posting_date >= parse_date(start_date, "start_date"))
-
-    if end_date:
-        query = query.filter(GLEntry.posting_date <= parse_date(end_date, "end_date"))
-
-    if party_type:
-        query = query.filter(GLEntry.party_type == party_type)
-
-    if party:
-        query = query.filter(GLEntry.party.ilike(f"%{party}%"))
-
-    if voucher_type:
-        query = query.filter(GLEntry.voucher_type == voucher_type)
-
-    query = query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc())
-    total, entries = paginate(query, offset, limit)
-
-    return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "entries": [
-            {
-                "id": e.id,
-                "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-                "account": e.account,
-                "party_type": e.party_type,
-                "party": e.party,
-                "debit": float(e.debit),
-                "credit": float(e.credit),
-                "voucher_type": e.voucher_type,
-                "voucher_no": e.voucher_no,
-                "cost_center": e.cost_center,
-                "fiscal_year": e.fiscal_year,
-            }
-            for e in entries
-        ],
-    }
-
-
-# =============================================================================
 # GL ENTRIES LIST
-# =============================================================================
 
 @router.get("/gl-entries", dependencies=[Depends(Require("accounting:read"))])
 def list_gl_entries(
@@ -700,6 +615,12 @@ def list_gl_entries(
         query = query.filter(GLEntry.is_cancelled == is_cancelled)
 
     if search:
+        # Require minimum 2 characters to prevent ILIKE DoS with broad patterns
+        if len(search) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Search query must be at least 2 characters"
+            )
         query = query.filter(
             or_(
                 GLEntry.account.ilike(f"%{search}%"),
@@ -708,8 +629,12 @@ def list_gl_entries(
             )
         )
 
-    # Sorting
-    sort_key = sort_by or "posting_date"
+    # Sorting - whitelist allowed columns to prevent injection via getattr
+    ALLOWED_GL_SORTS = {
+        "posting_date", "account", "party", "debit", "credit",
+        "voucher_type", "voucher_no", "cost_center", "id",
+    }
+    sort_key = sort_by if sort_by in ALLOWED_GL_SORTS else "posting_date"
     sort_column = getattr(GLEntry, sort_key, GLEntry.posting_date)
     if sort_dir == "asc":
         query = query.order_by(sort_column.asc())
@@ -741,9 +666,7 @@ def list_gl_entries(
     }
 
 
-# =============================================================================
 # GL ENTRY DETAIL
-# =============================================================================
 
 @router.get("/gl-entries/{entry_id}", dependencies=[Depends(Require("accounting:read"))])
 def get_gl_entry_detail(
@@ -785,9 +708,7 @@ def get_gl_entry_detail(
     }
 
 
-# =============================================================================
 # GL ENTRY CRUD
-# =============================================================================
 
 @router.post("/gl-entries", dependencies=[Depends(Require("accounting:write"))])
 def create_gl_entry(
@@ -856,9 +777,7 @@ def delete_gl_entry(
     return {"status": "deleted", "gl_entry_id": entry_id}
 
 
-# =============================================================================
 # ACCOUNT TYPES
-# =============================================================================
 
 @router.get("/account-types", dependencies=[Depends(Require("accounting:read"))])
 def get_account_types(

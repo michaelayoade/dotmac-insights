@@ -1,0 +1,120 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Blocked Customers</h1>
+            <p class="mt-1 text-sm text-gray-500">Customers currently suspended - recovery targeting</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/customers/dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+                Dashboard
+            </a>
+            <a href="/customers" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                All Customers
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert -->
+    <div class="bg-gradient-to-r from-red-50 to-orange-50 rounded-2xl shadow-warm-sm ring-1 ring-red-200/50 p-6">
+        <div class="flex items-start gap-4">
+            <div class="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-red-900">{{ stats.total_blocked }} Blocked Customers</h3>
+                <p class="text-sm text-red-700 mt-1">{{ stats.total_mrr_at_risk | format_currency }} MRR at risk ({{ stats.blocked_rate }}% of total customer base)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Blocked Customers</p>
+            <p class="text-2xl font-bold text-red-600 mt-1">{{ stats.total_blocked | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">MRR at Risk</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ stats.total_mrr_at_risk | format_currency }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Active Customers</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.total_active | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Blocked Rate</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.blocked_rate }}%</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Blocked List -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Blocked Customers</h3>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm text-gray-500">Sort by:</span>
+                        <select onchange="window.location.href='?sort='+this.value+'&dir={{ 'asc' if sort_dir == 'desc' else 'desc' }}'" class="text-sm border-0 bg-transparent text-gray-700 font-medium focus:ring-0">
+                            <option value="mrr" {% if sort_key == 'mrr' %}selected{% endif %}>MRR</option>
+                            <option value="name" {% if sort_key == 'name' %}selected{% endif %}>Name</option>
+                            <option value="signup_date" {% if sort_key == 'signup_date' %}selected{% endif %}>Signup Date</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for customer in customers %}
+                    <a href="/customers/{{ customer.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900">{{ customer.name }}</p>
+                            <p class="text-sm text-gray-500">{{ customer.account_number or customer.email or 'No ID' }}</p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="text-sm font-medium text-amber-600">{{ customer.mrr | format_currency }}</p>
+                            <p class="text-xs text-gray-500">MRR at risk</p>
+                        </div>
+                    </a>
+                    {% else %}
+                    <div class="px-6 py-12 text-center text-gray-500">
+                        <p>No blocked customers</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if pagination.total_pages > 1 %}
+                <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+                    <span class="text-sm text-gray-500">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+                    <div class="flex gap-2">
+                        {% if pagination.has_prev %}
+                        <a href="?page={{ pagination.page - 1 }}" class="px-3 py-1 text-sm bg-white ring-1 ring-gray-200 rounded-lg hover:bg-gray-50">Previous</a>
+                        {% endif %}
+                        {% if pagination.has_next %}
+                        <a href="?page={{ pagination.page + 1 }}" class="px-3 py-1 text-sm bg-white ring-1 ring-gray-200 rounded-lg hover:bg-gray-50">Next</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- By Tenure -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">By Customer Tenure</h3>
+            <div class="space-y-3">
+                {% for item in by_tenure %}
+                <div class="flex items-center justify-between py-2">
+                    <span class="text-sm text-gray-700">{{ item.tenure }}</span>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-gray-900">{{ item.count }}</span>
+                        <span class="text-xs text-gray-500">{{ item.mrr | format_currency }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

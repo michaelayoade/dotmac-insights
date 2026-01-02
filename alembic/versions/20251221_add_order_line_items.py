@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_order_line_items'
-down_revision = None  # Will be set by Alembic
+down_revision = 'fa02400b5de5'  # After sales_orders, quotations, purchase_orders exist
 branch_labels = None
 depends_on = None
 

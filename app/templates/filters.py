@@ -16,6 +16,9 @@ from typing import Any, Optional, Union
 
 from markupsafe import Markup
 
+from app.config import settings
+from app.currency import get_currency_symbol
+
 
 def register_filters(env: Any) -> None:
     """Register all custom filters with the Jinja2 environment."""
@@ -24,6 +27,7 @@ def register_filters(env: Any) -> None:
     env.filters["format_number"] = format_number_filter
     env.filters["format_date"] = format_date_filter
     env.filters["date_format"] = date_format_filter  # Alias with strftime format
+    env.filters["dateformat"] = date_format_filter  # Alias without underscore
     env.filters["format_time"] = format_time_filter
     env.filters["format_datetime"] = format_datetime_filter
     env.filters["timeago"] = timeago_filter
@@ -39,7 +43,7 @@ def register_filters(env: Any) -> None:
 
 def currency_filter(
     value: Optional[Union[int, float, Decimal, str]],
-    symbol: str = "₦",
+    symbol: Optional[str] = None,
     decimal_places: int = 2,
 ) -> str:
     """
@@ -47,20 +51,22 @@ def currency_filter(
 
     Examples:
         {{ 1234.56 | currency }} -> "₦1,234.56"
-        {{ 1234 | currency("$") }} -> "$1,234.00"
-        {{ amount | currency(symbol="€", decimal_places=0) }} -> "€1,235"
+        {{ 1234 | currency }} -> "₦1,234.00"
+        {{ amount | currency(decimal_places=0) }} -> "₦1,235"
     """
+    base_symbol = get_currency_symbol(settings.base_currency)
+    currency_symbol = base_symbol if symbol is None else base_symbol
     if value is None:
-        return f"{symbol}0.00"
+        return f"{currency_symbol}0.00"
 
     try:
         num = float(value)
     except (ValueError, TypeError):
-        return f"{symbol}0.00"
+        return f"{currency_symbol}0.00"
 
     # Format with thousands separator and decimal places
     formatted = f"{num:,.{decimal_places}f}"
-    return f"{symbol}{formatted}"
+    return f"{currency_symbol}{formatted}"
 
 
 def format_number_filter(

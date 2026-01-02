@@ -323,6 +323,7 @@ class ERPNextSync(BaseSyncClient):
             # Core entities
             await sync_customers(self, client, full_sync)
             await sync_employees(self, client, full_sync)
+            # Invoices/payments depend on customer account mapping.
             await sync_invoices(self, client, full_sync)
             await sync_payments(self, client, full_sync)
             await sync_expenses(self, client, full_sync)

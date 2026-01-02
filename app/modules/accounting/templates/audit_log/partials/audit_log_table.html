@@ -39,8 +39,8 @@
                     </div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-3.5 text-sm">
-                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ action_colors.get(entry.action.upper() if entry.action else 'UPDATE', action_colors['UPDATE']) }}">
-                        {{ entry.action.title() if entry.action else '-' }}
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ action_colors.get(entry.action.value.upper() if entry.action else 'UPDATE', action_colors['UPDATE']) }}">
+                        {{ entry.action.value.replace('_', ' ').title() if entry.action else '-' }}
                     </span>
                 </td>
                 <td class="px-3 py-3.5 text-sm">

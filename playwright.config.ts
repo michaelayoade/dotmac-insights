@@ -9,6 +9,9 @@ export default defineConfig({
   // Test directory
   testDir: './tests/e2e-browser',
 
+  // Global setup for authentication
+  globalSetup: './tests/e2e-browser/global-setup.ts',
+
   // Run tests in parallel
   fullyParallel: true,
 

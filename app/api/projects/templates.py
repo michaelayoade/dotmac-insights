@@ -11,7 +11,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, ConfigDict
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models import (
     Project,
@@ -186,7 +186,7 @@ async def list_project_templates(
 async def create_project_template(
     payload: ProjectTemplateCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new project template."""
     template = ProjectTemplate(
@@ -197,7 +197,7 @@ async def create_project_template(
         estimated_duration_days=payload.estimated_duration_days,
         default_notes=payload.default_notes,
         is_active=payload.is_active if payload.is_active is not None else True,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
     db.add(template)
     db.flush()
@@ -259,7 +259,7 @@ async def update_project_template(
     template_id: int,
     payload: ProjectTemplateUpdate,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a project template."""
     template = db.query(ProjectTemplate).filter(ProjectTemplate.id == template_id).first()
@@ -322,7 +322,7 @@ async def update_project_template(
 async def delete_project_template(
     template_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a project template."""
     template = db.query(ProjectTemplate).filter(ProjectTemplate.id == template_id).first()
@@ -349,7 +349,7 @@ async def create_project_from_template(
     template_id: int,
     payload: CreateFromTemplatePayload,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new project from a template."""
     template = db.query(ProjectTemplate).filter(
@@ -391,7 +391,7 @@ async def create_project_from_template(
             planned_start_date=start_date + timedelta(days=mt.start_day_offset),
             planned_end_date=start_date + timedelta(days=mt.end_day_offset),
             idx=mt.idx,
-            created_by_id=user.id,
+            created_by_id=principal.id,
         )
         db.add(milestone)
         db.flush()
@@ -430,7 +430,7 @@ async def create_project_from_template(
         entity_id=project.id,
         activity_type=ProjectActivityType.CREATED,
         description=f"Project created from template: {template.name}",
-        actor_id=user.id,
+        actor_id=principal.id,
         actor_name=user.name if hasattr(user, "name") else None,
         actor_email=user.email if hasattr(user, "email") else None,
     )

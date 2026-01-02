@@ -1,4 +1,7 @@
 from pathlib import Path
+import json
+import uuid
+from datetime import datetime
 
 from fastapi import FastAPI, Depends, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.exceptions import HTTPException
 from contextlib import asynccontextmanager
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 import structlog
 
 from app.templates.environment import get_template_env
@@ -15,11 +20,14 @@ from app.web.routes import web_router
 from app.config import settings
 from app.auth import get_current_principal
 from app.middleware.metrics import get_metrics_response
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 from app.observability.otel import setup_otel, shutdown_otel
 from app.middleware.license import enforce_license
 from app.services.rbac_sync import ensure_admin_has_all_permissions
 from app.services.platform_client import init_platform_client, close_platform_client
 from app.events import register_subscription_events
+from app.database import get_db
 
 # Configure structured logging
 structlog.configure(
@@ -47,6 +55,10 @@ async def lifespan(app: FastAPI):
             e2e_jwt_secret_configured=bool(settings.e2e_jwt_secret),
         )
         raise RuntimeError("E2E auth must be disabled in production")
+
+    if settings.is_production and settings.auth_disabled:
+        logger.error("auth_disabled_in_production")
+        raise RuntimeError("AUTH_DISABLED must be false in production")
 
     logger.info(
         "starting_application",
@@ -111,6 +123,10 @@ app.add_middleware(
     ],
 )
 logger.info("cors_configured", origins=settings.cors_origins_list)
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+logger.info("security_middleware_enabled")
 
 
 # Include API routes with JWT/RBAC authentication
@@ -182,20 +198,96 @@ async def not_found_handler(request: Request, exc: HTTPException):
     return HTMLResponse(template.render(context), status_code=404)
 
 
-@app.get("/health")
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global handler for unhandled exceptions."""
+    error_id = str(uuid.uuid4())[:8]
+
+    logger.exception(
+        "unhandled_exception",
+        error_id=error_id,
+        path=request.url.path,
+        method=request.method,
+        client_ip=request.client.host if request.client else "unknown",
+        exc_type=type(exc).__name__,
+    )
+
+    if request.url.path.startswith("/api/"):
+        return Response(
+            content=json.dumps({"detail": "Internal server error", "error_id": error_id}),
+            status_code=500,
+            media_type="application/json",
+        )
+
+    template = templates.get_template("errors/500.html")
+    context = {
+        "csrf_token": "",
+        "product_name": "DotMac BOS",
+        "error_id": error_id,
+    }
+    return HTMLResponse(template.render(context), status_code=500)
+
+
+@app.get("/health", tags=["System"])
 async def health_check():
-    """Health check endpoint (public)."""
+    """Liveness probe - always returns healthy if process is running."""
     return {"status": "healthy"}
 
 
-# Convenience health endpoint under /api for environments that prefix requests
-@app.get("/api/health")
+@app.get("/health/ready", tags=["System"])
+async def readiness_check(db: Session = Depends(get_db)):
+    """Readiness probe - checks all dependencies."""
+    from app.cache import get_redis_client
+
+    checks = {"database": "unknown", "redis": "unknown"}
+    all_healthy = True
+
+    try:
+        db.execute(text("SELECT 1"))
+        checks["database"] = "healthy"
+    except Exception as e:
+        checks["database"] = f"unhealthy: {str(e)[:50]}"
+        all_healthy = False
+        logger.error("health_check_db_failed", error=str(e))
+
+    try:
+        redis_client = await get_redis_client()
+        if redis_client:
+            await redis_client.ping()
+            checks["redis"] = "healthy"
+        else:
+            checks["redis"] = "not_configured"
+    except Exception as e:
+        checks["redis"] = f"unhealthy: {str(e)[:50]}"
+        if settings.redis_url:
+            all_healthy = False
+            logger.error("health_check_redis_failed", error=str(e))
+
+    status_code = 200 if all_healthy else 503
+    return Response(
+        content=json.dumps({
+            "status": "ready" if all_healthy else "not_ready",
+            "checks": checks,
+            "timestamp": datetime.utcnow().isoformat(),
+        }),
+        status_code=status_code,
+        media_type="application/json",
+    )
+
+
+@app.get("/api/health", tags=["System"])
 async def api_health_check():
     """Health check for clients that expect /api/health."""
     return {"status": "healthy"}
 
 
-@app.get("/metrics")
+@app.get("/api/health/ready", tags=["System"])
+async def api_readiness_check(db: Session = Depends(get_db)):
+    """Readiness check for clients that expect /api/health/ready."""
+    return await readiness_check(db)
+
+
+@app.get("/metrics", tags=["System"])
 async def metrics():
     """
     Prometheus metrics endpoint.

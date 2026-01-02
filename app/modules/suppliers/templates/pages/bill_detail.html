@@ -53,11 +53,11 @@
         </div>
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <p class="text-sm text-gray-500 mb-1">Total Amount</p>
-            <p class="text-xl font-bold text-gray-900">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or 'USD' }}</p>
+            <p class="text-xl font-bold text-gray-900">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or base_currency }}</p>
         </div>
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <p class="text-sm text-gray-500 mb-1">Outstanding</p>
-            <p class="text-xl font-bold {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or 'USD' }}</p>
+            <p class="text-xl font-bold {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or base_currency }}</p>
         </div>
     </div>
 
@@ -83,7 +83,7 @@
                     {% endif %}
                     <div>
                         <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Currency</dt>
-                        <dd class="mt-1 text-sm text-gray-900">{{ bill.currency or 'USD' }}</dd>
+                        <dd class="mt-1 text-sm text-gray-900">{{ bill.currency or base_currency }}</dd>
                     </div>
                     {% if bill.conversion_rate and bill.conversion_rate != 1 %}
                     <div>
@@ -122,7 +122,7 @@
                     {% endif %}
                     <div class="flex justify-between pt-3 border-t border-gray-100">
                         <dt class="text-sm font-semibold text-gray-900">Grand Total</dt>
-                        <dd class="text-sm font-bold text-gray-900">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or 'USD' }}</dd>
+                        <dd class="text-sm font-bold text-gray-900">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or base_currency }}</dd>
                     </div>
                     <div class="flex justify-between">
                         <dt class="text-sm text-gray-500">Paid</dt>
@@ -130,7 +130,7 @@
                     </div>
                     <div class="flex justify-between pt-3 border-t border-gray-100">
                         <dt class="text-sm font-semibold {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-gray-900' }}">Outstanding</dt>
-                        <dd class="text-sm font-bold {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or 'USD' }}</dd>
+                        <dd class="text-sm font-bold {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or base_currency }}</dd>
                     </div>
                 </dl>
             </div>

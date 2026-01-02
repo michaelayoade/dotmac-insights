@@ -75,9 +75,11 @@ class SupplierUpdateRequest(BaseModel):
     on_hold: Optional[bool] = None
 
 
-# =============================================================================
 # ACCOUNTS PAYABLE AGING
-# =============================================================================
+
+# Maximum invoices to process for aging report (DoS protection)
+MAX_AGING_INVOICES = 10000
+
 
 @router.get("/accounts-payable", dependencies=[Depends(Require("accounting:read"))])
 def get_accounts_payable(
@@ -111,12 +113,19 @@ def get_accounts_payable(
     )
 
     if supplier:
+        # Require minimum 2 characters to prevent ILIKE DoS with broad patterns
+        if len(supplier) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Supplier filter must be at least 2 characters"
+            )
         query = query.filter(PurchaseInvoice.supplier.ilike(f"%{supplier}%"))
 
     if currency:
         query = query.filter(PurchaseInvoice.currency == currency)
 
-    invoices = query.all()
+    # Apply limit to prevent DoS from large datasets
+    invoices = query.order_by(PurchaseInvoice.due_date.asc()).limit(MAX_AGING_INVOICES).all()
 
     # Age buckets
     buckets: Dict[str, AgingBucket] = {
@@ -160,29 +169,18 @@ def get_accounts_payable(
     }
     total_payable = sum(b["total"] for b in buckets_response.values())
 
+    total_invoices = sum(b["count"] for b in buckets.values())
     return {
         "as_of_date": cutoff.isoformat(),
         "total_payable": total_payable,
-        "total_invoices": sum(b["count"] for b in buckets.values()),
+        "total_invoices": total_invoices,
+        "truncated": len(invoices) >= MAX_AGING_INVOICES,
+        "max_invoices": MAX_AGING_INVOICES,
         "aging": buckets_response,
     }
 
 
-# Alias
-@router.get("/payables-aging", dependencies=[Depends(Require("accounting:read"))])
-def get_payables_aging(
-    as_of_date: Optional[str] = None,
-    supplier: Optional[str] = None,
-    currency: Optional[str] = None,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Alias for /accounts-payable - AP aging report."""
-    return get_accounts_payable(as_of_date, supplier, currency, db)
-
-
-# =============================================================================
 # SUPPLIERS
-# =============================================================================
 
 @router.get("/suppliers", dependencies=[Depends(Require("accounting:read"))])
 def get_suppliers(
@@ -338,9 +336,7 @@ def delete_supplier(
     return {"status": "disabled", "supplier_id": supplier_id}
 
 
-# =============================================================================
 # OUTSTANDING PAYABLES
-# =============================================================================
 
 @router.get("/payables-outstanding", dependencies=[Depends(Require("accounting:read"))])
 def get_payables_outstanding(

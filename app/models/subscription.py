@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy import String, Text, ForeignKey, Enum, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from decimal import Decimal
@@ -100,6 +100,10 @@ class Subscription(Base):
     customer: Mapped[Customer] = relationship(back_populates="subscriptions")
     tariff = relationship("Tariff", backref="subscriptions")
     router = relationship("Router", backref="subscriptions")
+
+    __table_args__ = (
+        Index("ix_subscriptions_status_currency", "status", "currency"),
+    )
 
     def __repr__(self) -> str:
         return f"<Subscription {self.plan_name} - {self.customer_id}>"

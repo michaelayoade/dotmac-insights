@@ -4,7 +4,7 @@
     id="invoice-row-{{ inv.id }}"
     data-testid="invoice-row-{{ inv.id }}"
 >
-    <td class="py-4 pl-6 pr-3">
+    <td class="py-4 pl-6 pr-3" x-show="isVisible('invoice')" x-cloak>
         <div class="flex items-center gap-3">
             <div class="flex-shrink-0">
                 {% set status_icon_colors = {
@@ -43,7 +43,7 @@
             </div>
         </div>
     </td>
-    <td class="px-3 py-4 hidden sm:table-cell">
+    <td class="px-3 py-4 hidden sm:table-cell" x-show="isVisible('customer')" x-cloak>
         {% if inv.customer %}
         <a href="/customers/{{ inv.customer.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
             {{ inv.customer.name }}
@@ -56,12 +56,12 @@
         <span class="text-sm text-gray-400 italic font-body">No customer</span>
         {% endif %}
     </td>
-    <td class="px-3 py-4">
+    <td class="px-3 py-4" x-show="isVisible('amount')" x-cloak>
         <span class="text-sm font-semibold text-gray-900 font-body" data-testid="invoice-amount-{{ inv.id }}">
             {{ inv.total_amount | currency }}
         </span>
     </td>
-    <td class="px-3 py-4 hidden md:table-cell">
+    <td class="px-3 py-4 hidden md:table-cell" x-show="isVisible('balance')" x-cloak>
         {% if inv.balance and inv.balance > 0 %}
         <span class="text-sm font-medium text-amber-600 font-body">
             {{ inv.balance | currency }}
@@ -70,7 +70,7 @@
         <span class="text-sm text-gray-400 font-body">-</span>
         {% endif %}
     </td>
-    <td class="px-3 py-4 hidden lg:table-cell">
+    <td class="px-3 py-4 hidden lg:table-cell" x-show="isVisible('due')" x-cloak>
         {% if inv.due_date %}
         <span class="text-sm text-gray-700 font-body {% if inv.is_overdue %}text-red-600 font-medium{% endif %}">
             {{ inv.due_date | format_date }}
@@ -82,7 +82,7 @@
         <span class="text-sm text-gray-400 italic font-body">Not set</span>
         {% endif %}
     </td>
-    <td class="px-3 py-4">
+    <td class="px-3 py-4" x-show="isVisible('status')" x-cloak>
         {% set status_styles = {
             'draft': 'bg-gray-50 text-gray-600 ring-gray-500/20',
             'pending': 'bg-blue-50 text-blue-700 ring-blue-600/20',

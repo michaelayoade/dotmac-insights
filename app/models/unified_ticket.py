@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from sqlalchemy import (
     String, Text, Enum, DateTime, ForeignKey, Boolean, Integer,
-    Float, Index, UniqueConstraint
+    Float, Index, UniqueConstraint, text
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -23,7 +23,7 @@ from app.database import Base
 from app.utils.datetime_utils import utc_now, ensure_utc
 
 if TYPE_CHECKING:
-    from app.models.unified_contact import UnifiedContact
+    from app.models.party import Party
     from app.models.employee import Employee
     from app.models.ticket import Ticket
     from app.models.conversation import Conversation
@@ -163,11 +163,11 @@ class UnifiedTicket(Base):
     # CUSTOMER/CONTACT REFERENCE
     # ==========================================================================
 
-    # Primary link to unified contact
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Primary link to party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
 
     # Denormalized for quick access (updated via triggers/app logic)
@@ -320,8 +320,8 @@ class UnifiedTicket(Base):
     # RELATIONSHIPS
     # ==========================================================================
 
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(
-        foreign_keys=[unified_contact_id]
+    party: Mapped[Optional["Party"]] = relationship(
+        foreign_keys=[party_id]
     )
     assigned_to: Mapped[Optional["Employee"]] = relationship(
         back_populates="assigned_unified_tickets",
@@ -363,11 +363,20 @@ class UnifiedTicket(Base):
         # Composite indexes for common queries
         Index("ix_unified_tickets_status_priority", "status", "priority"),
         Index("ix_unified_tickets_assigned_status", "assigned_to_id", "status"),
-        Index("ix_unified_tickets_contact_status", "unified_contact_id", "status"),
+        Index("ix_unified_tickets_party_status", "party_id", "status"),
         Index("ix_unified_tickets_source_status", "source", "status"),
         Index("ix_unified_tickets_created_status", "created_at", "status"),
         Index("ix_unified_tickets_sla_response", "response_by", "response_sla_breached"),
         Index("ix_unified_tickets_sla_resolution", "resolution_by", "resolution_sla_breached"),
+        Index("ix_unified_tickets_merged_into_id", "merged_into_id"),
+        Index(
+            "ix_unified_tickets_status_resolution_created",
+            "status",
+            "resolution_by",
+            "created_at",
+            postgresql_where=text("status IN ('open','in_progress','waiting')"),
+        ),
+        Index("ix_unified_tickets_category_created", "category", "created_at"),
     )
 
     # ==========================================================================

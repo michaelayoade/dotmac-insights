@@ -103,9 +103,9 @@ class TestBooksAppEndpoints:
         data = response.json()
         
         assert "total" in data
-        assert "data" in data or "entries" in data # ledger.py returns "data" in gl-entries but "entries" in general-ledger
-        
-        entries = data.get("data") or data.get("entries")
+        assert "data" in data
+
+        entries = data.get("data")
         assert isinstance(entries, list)
 
     def test_chart_of_accounts_endpoint(self, client):
@@ -131,7 +131,7 @@ BOOKS_PAGE_ENDPOINTS = [
     ("/api/v1/accounting/balance-sheet", dict, ["assets", "liabilities", "equity"]),
     ("/api/v1/accounting/income-statement", dict, None),
     ("/api/v1/accounting/accounts", dict, ["total", "accounts"]),
-    ("/api/v1/accounting/general-ledger", dict, ["entries"]),
+    ("/api/v1/accounting/gl-entries", dict, ["data"]),
     ("/api/v1/accounting/accounts-receivable", dict, ["aging"]),
     ("/api/v1/accounting/accounts-payable", dict, ["aging"]),
     ("/api/v1/accounting/receivables-outstanding", dict, ["total_outstanding"]),

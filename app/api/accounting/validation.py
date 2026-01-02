@@ -20,9 +20,7 @@ from sqlalchemy.orm import Session
 from app.models.accounting import Account, AccountType, GLEntry
 
 
-# =============================================================================
 # Sign Convention Documentation
-# =============================================================================
 """
 IFRS Sign Conventions (enforced throughout the system):
 
@@ -157,9 +155,7 @@ def _serialize_value(value: Any) -> Any:
 RECONCILIATION_TOLERANCE = Decimal("0.01")
 
 
-# =============================================================================
 # Cross-Statement Tie-Back Validations
-# =============================================================================
 
 def validate_retained_earnings_movement(
     prior_retained_earnings: Decimal,
@@ -382,9 +378,7 @@ def validate_balance_sheet_equation(
     return result
 
 
-# =============================================================================
 # Income Statement Subtotal Validations
-# =============================================================================
 
 def validate_income_statement_subtotals(
     revenue: Decimal,
@@ -483,9 +477,7 @@ def validate_income_statement_subtotals(
     return result
 
 
-# =============================================================================
 # Cash Flow Operating Activities Validation
-# =============================================================================
 
 def validate_operating_activities_reconciliation(
     net_income: Decimal,
@@ -536,9 +528,7 @@ def validate_operating_activities_reconciliation(
     return result
 
 
-# =============================================================================
 # Equity Statement Validation
-# =============================================================================
 
 def validate_equity_component_movement(
     component_name: str,
@@ -581,9 +571,7 @@ def validate_equity_component_movement(
     return result
 
 
-# =============================================================================
 # Trial Balance Validation
-# =============================================================================
 
 def validate_trial_balance(
     total_debits: Decimal,
@@ -618,9 +606,7 @@ def validate_trial_balance(
     return result
 
 
-# =============================================================================
 # Sign Convention Validation
-# =============================================================================
 
 def validate_sign_convention(
     value: Decimal,
@@ -661,9 +647,7 @@ def validate_sign_convention(
     return result
 
 
-# =============================================================================
 # Comprehensive Statement Validation
-# =============================================================================
 
 def validate_all_statements(
     balance_sheet: Dict[str, Any],
@@ -748,9 +732,7 @@ def validate_all_statements(
     return result
 
 
-# =============================================================================
 # Database-Level Validation Helpers
-# =============================================================================
 
 def get_cash_balance_from_db(db: Session, as_of: date) -> Decimal:
     """Get total cash and cash equivalents from GL as of a date.

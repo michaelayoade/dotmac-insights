@@ -31,12 +31,12 @@ def get_template_env() -> Environment:
     Get the configured Jinja2 environment.
 
     Returns a cached Environment instance with:
-    - FileSystemLoader pointing to app/templates and app/modules
+    - FileSystemLoader pointing to app/templates and app/
     - Autoescape enabled for HTML files
     - Custom filters registered
     - Global context variables set
     """
-    # Include both templates dir and modules dir for module templates
+    # Include both templates dir and app dir for module templates
     search_paths = [str(TEMPLATES_DIR), str(APP_DIR)]
 
     env = Environment(

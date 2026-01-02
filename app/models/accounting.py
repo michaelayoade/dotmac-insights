@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey
+from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.utils.datetime_utils import utc_now
@@ -166,6 +166,13 @@ class CostCenter(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
+    # Relationships - back references
+    gl_entries: Mapped[List["GLEntry"]] = relationship(
+        "GLEntry",
+        foreign_keys="GLEntry.cost_center_id",
+        back_populates="cost_center_rel"
+    )
+
     def __repr__(self) -> str:
         return f"<CostCenter {self.cost_center_name}>"
 
@@ -216,10 +223,22 @@ class BankAccount(Base):
     is_default: Mapped[bool] = mapped_column(default=False)
     disabled: Mapped[bool] = mapped_column(default=False)
 
+    # FK relationship to Chart of Accounts
+    account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True, index=True
+    )
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    account_rel: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[account_id],
+        back_populates="bank_accounts"
+    )
 
     def __repr__(self) -> str:
         return f"<BankAccount {self.account_name} - {self.bank}>"
@@ -387,7 +406,11 @@ class PurchaseInvoice(Base):
     # Additional links
     fiscal_period_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fiscal_periods.id"), nullable=True)
     journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+
+    # Audit columns
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -398,6 +421,34 @@ class PurchaseInvoice(Base):
     lines: Mapped[List[BillLine]] = relationship(
         back_populates="purchase_invoice",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_purchase_invoices_status_date_currency",
+            "status",
+            "posting_date",
+            "currency",
+            postgresql_where=text("outstanding_amount > 0"),
+        ),
+        Index(
+            "ix_purchase_invoices_due_status",
+            "due_date",
+            "status",
+            postgresql_where=text("outstanding_amount > 0"),
+        ),
+        Index(
+            "ix_purchase_invoices_supplier_outstanding",
+            "supplier_name",
+            text("outstanding_amount DESC"),
+        ),
+        Index("ix_purchase_invoices_payment_terms_id", "payment_terms_id"),
+        Index("ix_purchase_invoices_fiscal_period_id", "fiscal_period_id"),
+        Index("ix_purchase_invoices_journal_entry_id", "journal_entry_id"),
+        # Audit column indexes
+        Index("ix_purchase_invoices_created_by_id", "created_by_id"),
+        Index("ix_purchase_invoices_updated_by_id", "updated_by_id"),
+        Index("ix_purchase_invoices_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:
@@ -432,9 +483,45 @@ class GLEntry(Base):
 
     is_cancelled: Mapped[bool] = mapped_column(default=False)
 
+    # FK relationships to master data
+    account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True, index=True
+    )
+    cost_center_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cost_centers.id"), nullable=True, index=True
+    )
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+    __table_args__ = (
+        Index(
+            "ix_gl_entries_voucher_party_cancelled",
+            "voucher_type",
+            "party_type",
+            "is_cancelled",
+            text("posting_date DESC"),
+        ),
+        Index(
+            "ix_gl_entries_account_cancelled_date",
+            "account",
+            "is_cancelled",
+            "posting_date",
+        ),
+    )
+
+    # Relationships
+    account_rel: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[account_id],
+        back_populates="gl_entries"
+    )
+    cost_center_rel: Mapped[Optional["CostCenter"]] = relationship(
+        "CostCenter",
+        foreign_keys=[cost_center_id],
+        back_populates="gl_entries"
+    )
 
     def __repr__(self) -> str:
         return f"<GLEntry {self.erpnext_id} - {self.account}>"
@@ -473,6 +560,22 @@ class Account(Base):
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    # Relationships - back references
+    gl_entries: Mapped[List["GLEntry"]] = relationship(
+        "GLEntry",
+        foreign_keys="GLEntry.account_id",
+        back_populates="account_rel"
+    )
+
+    __table_args__ = (
+        Index("ix_accounts_root_type_disabled", "root_type", "disabled"),
+    )
+    bank_accounts: Mapped[List["BankAccount"]] = relationship(
+        "BankAccount",
+        foreign_keys="BankAccount.account_id",
+        back_populates="account_rel"
+    )
 
     def __repr__(self) -> str:
         return f"<Account {self.account_name}>"
@@ -544,8 +647,10 @@ class BankTransaction(Base):
     workflow_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
-    # Audit
+    # Audit columns
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -557,6 +662,14 @@ class BankTransaction(Base):
     payments: Mapped[List["BankTransactionPayment"]] = relationship(
         back_populates="bank_transaction",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        Index("ix_bank_transactions_transaction_id", "transaction_id"),
+        # Audit column indexes
+        Index("ix_bank_transactions_created_by_id", "created_by_id"),
+        Index("ix_bank_transactions_updated_by_id", "updated_by_id"),
+        Index("ix_bank_transactions_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:
@@ -602,34 +715,29 @@ class BankReconciliation(Base):
     __tablename__ = "bank_reconciliations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
 
-    bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    bank_account: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    from_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    to_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    from_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    to_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
 
     bank_statement_opening_balance: Mapped[Decimal] = mapped_column(
-        Numeric(18, 6), default=Decimal("0")
+        Numeric(18, 4), default=Decimal("0")
     )
     bank_statement_closing_balance: Mapped[Decimal] = mapped_column(
-        Numeric(18, 6), default=Decimal("0")
+        Numeric(18, 4), default=Decimal("0")
     )
     account_opening_balance: Mapped[Decimal] = mapped_column(
-        Numeric(18, 6), default=Decimal("0")
+        Numeric(18, 4), default=Decimal("0")
     )
-    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    total_credits: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    total_debits: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
 
     status: Mapped[BankReconciliationStatus] = mapped_column(
         Enum(BankReconciliationStatus),
         default=BankReconciliationStatus.DRAFT,
         index=True,
     )
-    docstatus: Mapped[int] = mapped_column(default=0)
 
-    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 

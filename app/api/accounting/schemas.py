@@ -9,9 +9,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
-# =============================================================================
 # Enums
-# =============================================================================
 
 class RootType(str, Enum):
     """Account root types."""
@@ -74,9 +72,7 @@ class InterestDividendClassification(str, Enum):
     FINANCING = "financing"
 
 
-# =============================================================================
 # Validation Schemas
-# =============================================================================
 
 class ValidationIssue(BaseModel):
     """A single validation error or warning."""
@@ -94,9 +90,7 @@ class ValidationResultSchema(BaseModel):
     warnings: List[ValidationIssue] = Field(default_factory=list, description="Non-blocking warnings")
 
 
-# =============================================================================
 # FX and Currency Schemas
-# =============================================================================
 
 class FXMetadata(BaseModel):
     """FX metadata for financial statements."""
@@ -107,9 +101,7 @@ class FXMetadata(BaseModel):
     closing_rate: Optional[float] = Field(1.0, description="Closing FX rate")
 
 
-# =============================================================================
 # EPS Schemas (IAS 33)
-# =============================================================================
 
 class DilutiveInstrument(BaseModel):
     """A dilutive financial instrument for EPS calculation."""
@@ -128,9 +120,7 @@ class EarningsPerShare(BaseModel):
     note: Optional[str] = Field(None, description="EPS calculation note or disclaimer")
 
 
-# =============================================================================
 # Tax Reconciliation Schema (IAS 12)
-# =============================================================================
 
 class TaxReconciliationItem(BaseModel):
     """A line item in tax reconciliation."""
@@ -149,9 +139,7 @@ class TaxReconciliation(BaseModel):
     effective_tax_rate: float = Field(..., description="Effective tax rate")
 
 
-# =============================================================================
 # Non-Cash Transaction Schema (IAS 7)
-# =============================================================================
 
 class NonCashTransaction(BaseModel):
     """A non-cash transaction for IAS 7 disclosure."""
@@ -162,9 +150,7 @@ class NonCashTransaction(BaseModel):
     credit_account: Optional[str] = None
 
 
-# =============================================================================
 # Cash Flow Classification Policy (IAS 7)
-# =============================================================================
 
 class CashFlowClassificationPolicy(BaseModel):
     """IAS 7 classification policy choices."""
@@ -190,9 +176,7 @@ class CashFlowClassificationPolicy(BaseModel):
     )
 
 
-# =============================================================================
 # OCI Components Schema (IAS 1)
-# =============================================================================
 
 class OCIComponent(BaseModel):
     """Other Comprehensive Income component."""
@@ -217,9 +201,7 @@ class OtherComprehensiveIncome(BaseModel):
     total_oci: float = 0.0
 
 
-# =============================================================================
 # Comparative Period Schema
-# =============================================================================
 
 class ComparativePeriod(BaseModel):
     """Prior period comparative data."""
@@ -228,9 +210,7 @@ class ComparativePeriod(BaseModel):
     as_of_date: Optional[str] = None
 
 
-# =============================================================================
 # Base/Common Schemas
-# =============================================================================
 
 class PaginatedResponse(BaseModel):
     """Base schema for paginated responses."""
@@ -251,9 +231,7 @@ class PeriodInfo(BaseModel):
     end_date: Optional[str] = None
 
 
-# =============================================================================
 # Account Schemas
-# =============================================================================
 
 class AccountBase(BaseModel):
     """Base account fields."""
@@ -298,9 +276,7 @@ class AccountListResponse(PaginatedResponse):
     accounts: List[AccountResponse]
 
 
-# =============================================================================
 # Journal Entry Schemas
-# =============================================================================
 
 class JournalEntryLineCreate(BaseModel):
     """Schema for a journal entry line item."""
@@ -388,9 +364,7 @@ class JournalEntryListResponse(PaginatedResponse):
     entries: List[JournalEntryResponse]
 
 
-# =============================================================================
 # Supplier Schemas
-# =============================================================================
 
 class SupplierCreate(BaseModel):
     """Schema for creating a supplier."""
@@ -439,9 +413,7 @@ class SupplierListResponse(PaginatedResponse):
     suppliers: List[SupplierResponse]
 
 
-# =============================================================================
 # GL Entry Schemas
-# =============================================================================
 
 class GLEntryResponse(BaseModel):
     """Schema for GL entry in API responses."""
@@ -468,9 +440,7 @@ class GLEntryListResponse(PaginatedResponse):
     entries: List[GLEntryResponse]
 
 
-# =============================================================================
 # Workflow Schemas
-# =============================================================================
 
 class WorkflowStepCreate(BaseModel):
     """Schema for creating a workflow step."""
@@ -524,9 +494,7 @@ class WorkflowResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# =============================================================================
 # Fiscal Period Schemas
-# =============================================================================
 
 class FiscalPeriodCreate(BaseModel):
     """Schema for creating a fiscal period."""
@@ -553,9 +521,7 @@ class FiscalPeriodResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# =============================================================================
 # Tax Filing Schemas
-# =============================================================================
 
 class TaxFilingPeriodCreate(BaseModel):
     """Schema for creating a tax filing period."""
@@ -606,9 +572,7 @@ class TaxFilingPeriodResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-# =============================================================================
 # Bank Reconciliation Schemas
-# =============================================================================
 
 class BankReconciliationStartRequest(BaseModel):
     """Schema for starting bank reconciliation."""
@@ -635,9 +599,7 @@ class BankStatementImportResponse(BaseModel):
     errors: List[str] = []
 
 
-# =============================================================================
 # Dashboard/Report Schemas
-# =============================================================================
 
 class DashboardSummary(BaseModel):
     """Dashboard summary section."""
@@ -678,9 +640,7 @@ class DashboardResponse(BaseModel):
     activity: DashboardActivity
 
 
-# =============================================================================
 # Write-off/Waiver Schemas
-# =============================================================================
 
 class InvoiceWriteOffRequest(BaseModel):
     """Schema for invoice write-off request."""
@@ -707,9 +667,7 @@ class InvoiceWaiverRequest(BaseModel):
         return Decimal(str(v))
 
 
-# =============================================================================
 # Credit Management Schemas
-# =============================================================================
 
 class CreditLimitUpdate(BaseModel):
     """Schema for updating customer credit limit."""
@@ -740,9 +698,7 @@ class CustomerCreditStatusResponse(BaseModel):
     oldest_overdue_days: Optional[int] = None
 
 
-# =============================================================================
 # Dunning Schemas
-# =============================================================================
 
 class DunningSendRequest(BaseModel):
     """Schema for sending dunning notice."""

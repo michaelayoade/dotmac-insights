@@ -66,6 +66,10 @@ class CannedResponse(Base):
     # Flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
+    # Chatwoot sync
+    chatwoot_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

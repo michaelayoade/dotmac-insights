@@ -65,6 +65,7 @@ from .activities import router as activities_router
 from .pipeline import router as pipeline_router
 from .sales import router as sales_router
 from .config import router as config_router
+from .customers import router as customers_router
 
 # Create main CRM router
 router = APIRouter(prefix="/crm", tags=["crm"])
@@ -87,3 +88,6 @@ router.include_router(sales_router)
 
 # Configuration sub-module (territories, sales-persons, customer-groups)
 router.include_router(config_router)
+
+# Customer master data (source of truth for customer entity)
+router.include_router(customers_router)

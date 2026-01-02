@@ -74,7 +74,7 @@
         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <a
                 href="/field-service/{{ order.id }}"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
                 title="View"
                 data-testid="order-view-{{ order.id }}"
             >
@@ -85,7 +85,7 @@
             </a>
             <a
                 href="/field-service/{{ order.id }}/edit"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                 title="Edit"
                 data-testid="order-edit-{{ order.id }}"
             >
@@ -95,7 +95,7 @@
             </a>
             <button
                 type="button"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
                 title="Delete"
                 hx-delete="/field-service/{{ order.id }}"
                 hx-target="#order-row-{{ order.id }}"

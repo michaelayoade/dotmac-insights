@@ -39,9 +39,11 @@ class AgingBucket(TypedDict):
     invoices: List[Dict[str, Any]]
 
 
-# =============================================================================
 # ACCOUNTS RECEIVABLE AGING
-# =============================================================================
+
+# Maximum invoices to process for aging report (DoS protection)
+MAX_AGING_INVOICES = 10000
+
 
 @router.get("/accounts-receivable", dependencies=[Depends(Require("accounting:read"))])
 def get_accounts_receivable(
@@ -82,7 +84,8 @@ def get_accounts_receivable(
     if currency:
         query = query.filter(Invoice.currency == currency)
 
-    invoices = query.all()
+    # Apply limit to prevent DoS from large datasets
+    invoices = query.order_by(Invoice.due_date.asc()).limit(MAX_AGING_INVOICES).all()
 
     # Age buckets
     buckets: Dict[str, AgingBucket] = {
@@ -94,7 +97,14 @@ def get_accounts_receivable(
     }
 
     for inv in invoices:
-        due = inv.due_date.date() if inv.due_date else inv.invoice_date.date()
+        # Null guard: skip invoices with no date information
+        if inv.due_date:
+            due = inv.due_date.date() if hasattr(inv.due_date, 'date') else inv.due_date
+        elif inv.invoice_date:
+            due = inv.invoice_date.date() if hasattr(inv.invoice_date, 'date') else inv.invoice_date
+        else:
+            # No date available - skip this invoice for aging
+            continue
         days_overdue = (cutoff - due).days if cutoff > due else 0
         outstanding = inv.total_amount - inv.amount_paid
 
@@ -134,30 +144,18 @@ def get_accounts_receivable(
     }
     total_receivable = sum(b["total"] for b in buckets_response.values())
 
+    total_invoices = sum(b["count"] for b in buckets.values())
     return {
         "as_of_date": cutoff.isoformat(),
         "total_receivable": total_receivable,
-        "total_invoices": sum(b["count"] for b in buckets.values()),
+        "total_invoices": total_invoices,
+        "truncated": len(invoices) >= MAX_AGING_INVOICES,
+        "max_invoices": MAX_AGING_INVOICES,
         "aging": buckets_response,
     }
 
 
-# Alias
-@router.get("/receivables-aging", dependencies=[Depends(Require("accounting:read"))])
-def get_receivables_aging(
-    as_of_date: Optional[str] = None,
-    customer_id: Optional[int] = None,
-    contact_id: Optional[int] = None,
-    currency: Optional[str] = None,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Alias for /accounts-receivable - AR aging report."""
-    return get_accounts_receivable(as_of_date, customer_id, contact_id, currency, db)
-
-
-# =============================================================================
 # OUTSTANDING RECEIVABLES
-# =============================================================================
 
 @router.get("/receivables-outstanding", dependencies=[Depends(Require("accounting:read"))])
 def get_receivables_outstanding(
@@ -295,7 +293,8 @@ async def get_receivables_aging_enhanced(
     if currency:
         query = query.filter(Invoice.currency == currency)
 
-    invoices = query.all()
+    # Apply limit to prevent DoS from large datasets
+    invoices = query.order_by(Invoice.due_date.asc()).limit(MAX_AGING_INVOICES).all()
 
     # Aggregations
     totals = {

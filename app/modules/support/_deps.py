@@ -179,7 +179,7 @@ def get_agents(db):
     return db.query(Employee).filter(
         Employee.is_deleted == False,
         Employee.status == EmploymentStatus.ACTIVE
-    ).order_by(Employee.first_name).all()
+    ).order_by(Employee.name).all()
 
 
 def get_teams(db):

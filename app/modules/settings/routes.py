@@ -95,6 +95,15 @@ SETTINGS_CATEGORIES = [
         "scope": "admin:write",
         "color": "violet",
     },
+    {
+        "id": "data-cleanup",
+        "name": "Data Cleanup",
+        "description": "Scan, clean, and normalize data quality issues",
+        "icon": "check-circle",
+        "href": "/settings/data-cleanup",
+        "scope": "admin:read",
+        "color": "teal",
+    },
 ]
 
 
@@ -142,6 +151,7 @@ from app.modules.settings.hr_routes import router as hr_router
 from app.modules.settings.support_routes import router as support_router
 from app.modules.settings.assets_routes import router as assets_router
 from app.modules.settings.sync_routes import router as sync_router
+from app.modules.settings.cleanup_routes import router as cleanup_router
 from app.modules.settings.migration_routes import router as migration_router
 
 router.include_router(general_router)
@@ -151,4 +161,21 @@ router.include_router(hr_router)
 router.include_router(support_router)
 router.include_router(assets_router)
 router.include_router(sync_router)
-router.include_router(migration_router)  # type: ignore[has-type]
+router.include_router(cleanup_router)
+router.include_router(migration_router)
+
+
+# Redirect for workflow tasks - consolidated under settings
+from fastapi.responses import RedirectResponse
+
+
+@router.get("/tasks")
+async def settings_tasks_redirect():
+    """Redirect to workflow tasks."""
+    return RedirectResponse(url="/workflow-tasks", status_code=302)
+
+
+@router.get("/tasks/{path:path}")
+async def settings_tasks_path_redirect(path: str):
+    """Redirect workflow task sub-paths."""
+    return RedirectResponse(url=f"/workflow-tasks/{path}", status_code=302)

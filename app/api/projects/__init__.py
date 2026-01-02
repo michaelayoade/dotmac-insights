@@ -26,7 +26,6 @@ from app.api.projects.templates import router as templates_router
 
 router = APIRouter()
 
-# Include all module routers
 router.include_router(schemas_router)
 router.include_router(dashboard_router)
 router.include_router(projects_router)

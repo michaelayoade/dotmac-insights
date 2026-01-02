@@ -64,7 +64,7 @@ sla_router = APIRouter(prefix="/support/sla", tags=["support-sla"])
 # SUPPORT DASHBOARD
 # =============================================================================
 
-@dashboard_router.get("/dashboard", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@dashboard_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def support_dashboard(
     request: Request,
     response: Response,
@@ -125,161 +125,6 @@ async def support_dashboard(
     context["today"] = today
 
     template = templates.get_template("modules/support/templates/pages/dashboard.html")
-    return HTMLResponse(template.render(context))
-
-
-@dashboard_router.get("/analytics", response_class=HTMLResponse, dependencies=[RequireSupportRead])
-async def support_analytics(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-):
-    """Support analytics page with detailed metrics and trends."""
-    from sqlalchemy import case, extract
-
-    today = datetime.utcnow()
-    thirty_days_ago = today - timedelta(days=30)
-    ninety_days_ago = today - timedelta(days=90)
-
-    # Overall stats
-    total_tickets = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.is_deleted == False
-    ).scalar() or 0
-
-    open_tickets = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.status.in_(["open", "replied", "on_hold"])
-    ).scalar() or 0
-
-    resolved_30d = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.resolved_at >= thirty_days_ago
-    ).scalar() or 0
-
-    # Resolution time
-    avg_resolution_hours = db.query(
-        func.avg(
-            func.extract('epoch', UnifiedTicket.resolved_at - UnifiedTicket.created_at) / 3600
-        )
-    ).filter(
-        UnifiedTicket.resolved_at.isnot(None),
-        UnifiedTicket.resolved_at >= thirty_days_ago,
-    ).scalar()
-
-    # By status
-    by_status = db.query(
-        UnifiedTicket.status,
-        func.count(UnifiedTicket.id).label("count")
-    ).filter(
-        UnifiedTicket.is_deleted == False
-    ).group_by(UnifiedTicket.status).all()
-
-    # By priority
-    by_priority = db.query(
-        UnifiedTicket.priority,
-        func.count(UnifiedTicket.id).label("count")
-    ).filter(
-        UnifiedTicket.is_deleted == False
-    ).group_by(UnifiedTicket.priority).all()
-
-    # By type (top 10)
-    by_type = db.query(
-        UnifiedTicket.ticket_type,
-        func.count(UnifiedTicket.id).label("count")
-    ).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.ticket_type.isnot(None),
-        UnifiedTicket.created_at >= ninety_days_ago,
-    ).group_by(UnifiedTicket.ticket_type).order_by(func.count(UnifiedTicket.id).desc()).limit(10).all()
-
-    # By channel
-    by_channel = db.query(
-        UnifiedTicket.channel,
-        func.count(UnifiedTicket.id).label("count")
-    ).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.channel.isnot(None),
-        UnifiedTicket.created_at >= ninety_days_ago,
-    ).group_by(UnifiedTicket.channel).order_by(func.count(UnifiedTicket.id).desc()).all()
-
-    # Agent performance
-    agent_stats = db.query(
-        Employee.name,
-        func.count(UnifiedTicket.id).label("total"),
-        func.sum(case(
-            (UnifiedTicket.status.in_(["resolved", "closed"]), 1),
-            else_=0
-        )).label("resolved"),
-    ).join(
-        UnifiedTicket, UnifiedTicket.assigned_to_id == Employee.id
-    ).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.created_at >= thirty_days_ago,
-    ).group_by(Employee.id, Employee.name).order_by(func.count(UnifiedTicket.id).desc()).limit(10).all()
-
-    # SLA compliance
-    sla_met = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.resolved_at.isnot(None),
-        UnifiedTicket.resolution_by.isnot(None),
-        UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
-    ).scalar() or 0
-
-    sla_total = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.resolved_at.isnot(None),
-        UnifiedTicket.resolution_by.isnot(None),
-    ).scalar() or 0
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = "Support Analytics"
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "Support", "url": "/support/dashboard"},
-        {"label": "Analytics"},
-    ])
-
-    context["stats"] = {
-        "total_tickets": total_tickets,
-        "open_tickets": open_tickets,
-        "resolved_30d": resolved_30d,
-        "avg_resolution_hours": round(float(avg_resolution_hours or 0), 1),
-        "sla_met": sla_met,
-        "sla_total": sla_total,
-        "sla_rate": round(sla_met / sla_total * 100, 1) if sla_total > 0 else 0,
-    }
-
-    context["by_status"] = [
-        {"status": s.status, "count": s.count}
-        for s in by_status
-    ]
-
-    context["by_priority"] = [
-        {"priority": p.priority, "count": p.count}
-        for p in by_priority
-    ]
-
-    context["by_type"] = [
-        {"type": t.type, "count": t.count}
-        for t in by_type
-    ]
-
-    context["by_channel"] = [
-        {"channel": c.channel, "count": c.count}
-        for c in by_channel
-    ]
-
-    context["agent_stats"] = [
-        {
-            "name": a.name,
-            "total": a.total,
-            "resolved": a.resolved or 0,
-            "resolution_rate": round((a.resolved or 0) / a.total * 100, 1) if a.total > 0 else 0,
-        }
-        for a in agent_stats
-    ]
-
-    template = templates.get_template("modules/support/templates/pages/analytics.html")
     return HTMLResponse(template.render(context))
 
 
@@ -761,7 +606,7 @@ kb_router = APIRouter(prefix="/support/kb", tags=["support-kb"])
 def get_article_status_options():
     """Get article status options for select dropdown."""
     return [
-        {"value": s.value, "label": s.value.name()}
+        {"value": s.value, "label": s.name.replace('_', ' ').title()}
         for s in ArticleStatus
     ]
 
@@ -769,7 +614,7 @@ def get_article_status_options():
 def get_visibility_options():
     """Get visibility options for select dropdown."""
     return [
-        {"value": v.value, "label": v.value.name()}
+        {"value": v.value, "label": v.name.replace('_', ' ').title()}
         for v in ArticleVisibility
     ]
 
@@ -1419,7 +1264,7 @@ async def agent_detail(
 def get_canned_scope_options():
     """Get scope options for canned responses."""
     return [
-        {"value": s.value, "label": s.value.name()}
+        {"value": s.value, "label": s.name.replace('_', ' ').title()}
         for s in CannedResponseScope
     ]
 
@@ -2304,7 +2149,7 @@ async def routing_list(
     """Routing configuration page with rules, workload, and queue health."""
     from app.models.support_sla import RoutingRule, RoutingStrategy
     from app.models.agent import Agent, Team, TeamMember
-    from app.models.ticket import Ticket, TicketStatus
+    from app.models.unified_ticket import UnifiedTicket
 
     # Get routing rules
     query = db.query(RoutingRule)
@@ -2600,4 +2445,479 @@ async def conversation_detail(
     context["status_labels"] = status_labels
 
     template = templates.get_template("modules/support/templates/pages/conversation_detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# CSAT ANALYTICS
+# =============================================================================
+
+@csat_router.get("/analytics", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def csat_analytics(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    days: int = Query(30, ge=7, le=90),
+):
+    """CSAT Analytics - trends, by agent, satisfaction metrics."""
+    from app.models.support_csat import CSATSurvey, CSATResponse, SurveyType
+    from app.models.agent import Agent
+    from sqlalchemy import extract
+
+    start_dt = datetime.utcnow() - timedelta(days=days)
+    six_months_ago = datetime.utcnow() - timedelta(days=180)
+
+    # Overall stats
+    overall = db.query(
+        func.count(CSATResponse.id).label("total"),
+        func.avg(CSATResponse.rating).label("avg_rating"),
+        func.sum(func.cast(CSATResponse.rating >= 4, func.literal(1).type)).label("positive"),
+        func.sum(func.cast(CSATResponse.rating <= 2, func.literal(1).type)).label("negative"),
+    ).filter(
+        CSATResponse.responded_at >= start_dt,
+        CSATResponse.rating.isnot(None),
+    ).first()
+
+    # Response rate
+    sent_count = db.query(func.count(CSATResponse.id)).filter(
+        CSATResponse.sent_at >= start_dt
+    ).scalar() or 0
+    responded_count = db.query(func.count(CSATResponse.id)).filter(
+        CSATResponse.responded_at >= start_dt
+    ).scalar() or 0
+
+    # Trends - monthly for last 6 months
+    trends = db.query(
+        extract('year', CSATResponse.responded_at).label('year'),
+        extract('month', CSATResponse.responded_at).label('month'),
+        func.count(CSATResponse.id).label('count'),
+        func.avg(CSATResponse.rating).label('avg_rating'),
+    ).filter(
+        CSATResponse.responded_at >= six_months_ago,
+        CSATResponse.rating.isnot(None),
+    ).group_by(
+        extract('year', CSATResponse.responded_at),
+        extract('month', CSATResponse.responded_at)
+    ).order_by(
+        extract('year', CSATResponse.responded_at),
+        extract('month', CSATResponse.responded_at)
+    ).all()
+
+    # By agent
+    by_agent = db.query(
+        CSATResponse.agent_id,
+        Agent.display_name,
+        func.count(CSATResponse.id).label("count"),
+        func.avg(CSATResponse.rating).label("avg_rating"),
+        func.sum(func.cast(CSATResponse.rating >= 4, func.literal(1).type)).label("positive"),
+    ).join(Agent, Agent.id == CSATResponse.agent_id, isouter=True).filter(
+        CSATResponse.responded_at >= start_dt,
+        CSATResponse.rating.isnot(None),
+        CSATResponse.agent_id.isnot(None),
+    ).group_by(CSATResponse.agent_id, Agent.display_name).order_by(
+        func.avg(CSATResponse.rating).desc()
+    ).all()
+
+    # By survey type
+    by_type = db.query(
+        CSATSurvey.survey_type,
+        func.count(CSATResponse.id).label("count"),
+        func.avg(CSATResponse.rating).label("avg_rating"),
+    ).join(CSATSurvey, CSATSurvey.id == CSATResponse.survey_id).filter(
+        CSATResponse.responded_at >= start_dt,
+        CSATResponse.rating.isnot(None),
+    ).group_by(CSATSurvey.survey_type).all()
+
+    # Recent feedback with comments
+    recent_feedback = db.query(CSATResponse).filter(
+        CSATResponse.responded_at >= start_dt,
+        CSATResponse.feedback_text.isnot(None),
+        CSATResponse.feedback_text != "",
+    ).order_by(CSATResponse.responded_at.desc()).limit(20).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "CSAT Analytics"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Support", "href": "/support/dashboard"},
+        {"label": "CSAT", "href": "/support/csat"},
+        {"label": "Analytics"},
+    ])
+
+    context["period_days"] = days
+    context["stats"] = {
+        "total_responses": overall.total if overall else 0,
+        "avg_rating": round(float(overall.avg_rating or 0), 2) if overall else 0,
+        "positive": overall.positive or 0 if overall else 0,
+        "negative": overall.negative or 0 if overall else 0,
+        "satisfaction_pct": round((overall.positive or 0) / overall.total * 100, 1) if overall and overall.total > 0 else 0,
+        "response_rate": round(responded_count / sent_count * 100, 1) if sent_count > 0 else 0,
+    }
+
+    context["trends"] = [
+        {
+            "period": f"{int(t.year)}-{int(t.month):02d}",
+            "count": t.count,
+            "avg_rating": round(float(t.avg_rating or 0), 2),
+        }
+        for t in trends
+    ]
+
+    context["by_agent"] = [
+        {
+            "agent_id": a.agent_id,
+            "agent_name": a.display_name or "Unknown",
+            "count": a.count,
+            "avg_rating": round(float(a.avg_rating or 0), 2),
+            "satisfaction_pct": round((a.positive or 0) / a.count * 100, 1) if a.count > 0 else 0,
+        }
+        for a in by_agent
+    ]
+
+    context["by_type"] = [
+        {
+            "type": t.survey_type.upper() if t.survey_type else "Unknown",
+            "count": t.count,
+            "avg_rating": round(float(t.avg_rating or 0), 2),
+        }
+        for t in by_type
+    ]
+
+    context["recent_feedback"] = recent_feedback
+
+    template = templates.get_template("modules/support/templates/pages/csat_analytics.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# SLA BREACHES
+# =============================================================================
+
+@sla_router.get("/breaches", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def sla_breaches(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    days: int = Query(30, ge=7, le=90),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """SLA breaches list - tickets that breached SLA targets."""
+    from app.models.ticket import Ticket, TicketStatus
+
+    start_dt = datetime.utcnow() - timedelta(days=days)
+    offset = (page - 1) * per_page
+
+    # Get tickets that breached SLA (first response or resolution)
+    breached_query = db.query(UnifiedTicket).filter(
+        UnifiedTicket.created_at >= start_dt,
+        or_(
+            UnifiedTicket.response_sla_breached.is_(True),
+            UnifiedTicket.resolution_sla_breached.is_(True),
+        ),
+    )
+
+    total = breached_query.count()
+    breached_tickets = breached_query.order_by(UnifiedTicket.created_at.desc()).offset(offset).limit(per_page).all()
+
+    # Breach stats
+    first_response_breaches = db.query(func.count(UnifiedTicket.id)).filter(
+        UnifiedTicket.response_sla_breached == True,
+        UnifiedTicket.created_at >= start_dt,
+    ).scalar() or 0
+
+    resolution_breaches = db.query(func.count(UnifiedTicket.id)).filter(
+        UnifiedTicket.resolution_sla_breached == True,
+        UnifiedTicket.created_at >= start_dt,
+    ).scalar() or 0
+
+    # Total tickets in period
+    total_tickets = db.query(func.count(UnifiedTicket.id)).filter(
+        UnifiedTicket.created_at >= start_dt
+    ).scalar() or 1
+
+    # By priority (if available)
+    by_priority = db.query(
+        UnifiedTicket.priority,
+        func.count(UnifiedTicket.id).label("count"),
+    ).filter(
+        UnifiedTicket.created_at >= start_dt,
+        or_(
+            UnifiedTicket.response_sla_breached.is_(True),
+            UnifiedTicket.resolution_sla_breached.is_(True),
+        ),
+    ).group_by(UnifiedTicket.priority).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "SLA Breaches"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Support", "href": "/support/dashboard"},
+        {"label": "SLA", "href": "/support/sla"},
+        {"label": "Breaches"},
+    ])
+
+    context["period_days"] = days
+    context["tickets"] = breached_tickets
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    context["stats"] = {
+        "total_breaches": total,
+        "first_response_breaches": first_response_breaches,
+        "resolution_breaches": resolution_breaches,
+        "breach_rate": round(total / total_tickets * 100, 2) if total_tickets > 0 else 0,
+    }
+
+    context["by_priority"] = [
+        {"priority": p.priority or "Unknown", "count": p.count}
+        for p in by_priority
+    ]
+
+    template = templates.get_template("modules/support/templates/pages/sla_breaches.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# TEAMS
+# =============================================================================
+
+teams_router = APIRouter(prefix="/support/teams", tags=["support-teams"])
+
+
+@teams_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def teams_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Support teams list."""
+    from app.models.agent import Agent, Team, TeamMember
+
+    teams = db.query(Team).order_by(Team.name).all()
+
+    # Get member counts and stats
+    team_stats: dict[int, dict[str, Any]] = {}
+    for team in teams:
+        members = db.query(TeamMember).filter(TeamMember.team_id == team.id).all()
+        member_count = len(members)
+        agent_ids = [m.agent_id for m in members]
+        agents = db.query(Agent).filter(Agent.id.in_(agent_ids)).all() if agent_ids else []
+        active_agents = sum(1 for a in agents if a.is_active)
+        total_capacity = sum(a.capacity or 0 for a in agents if a.is_active)
+        team_stats[team.id] = {
+            "member_count": member_count,
+            "active_agents": active_agents,
+            "total_capacity": total_capacity,
+        }
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Support Teams"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Support", "href": "/support/dashboard"},
+        {"label": "Teams"},
+    ])
+
+    context["teams"] = teams
+    context["team_stats"] = team_stats
+    context["summary"] = {
+        "total_teams": len(teams),
+        "active_teams": sum(1 for t in teams if t.is_active),
+    }
+
+    template = templates.get_template("modules/support/templates/pages/teams_list.html")
+    return HTMLResponse(template.render(context))
+
+
+@teams_router.get("/{team_id}", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def team_detail(
+    team_id: int,
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Team detail page with members."""
+    from app.models.agent import Agent, Team, TeamMember
+    from app.models.ticket import Ticket, TicketStatus
+
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Get members with agent details
+    members = db.query(TeamMember).filter(TeamMember.team_id == team_id).all()
+    agent_ids = [m.agent_id for m in members]
+    agents = db.query(Agent).filter(Agent.id.in_(agent_ids)).all() if agent_ids else []
+
+    # Agent workload
+    agent_workload: list[dict[str, Any]] = []
+    for agent in agents:
+        name = agent.display_name or agent.email
+        open_tickets = db.query(func.count(Ticket.id)).filter(
+            Ticket.assigned_to == name,
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+        ).scalar() or 0
+        agent_workload.append({
+            "agent": agent,
+            "open_tickets": open_tickets,
+            "capacity": agent.capacity or 10,
+            "utilization": round(open_tickets / (agent.capacity or 10) * 100, 1) if agent.capacity else 0,
+        })
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = team.name
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Support", "href": "/support/dashboard"},
+        {"label": "Teams", "href": "/support/teams"},
+        {"label": team.name},
+    ])
+
+    context["team"] = team
+    context["agents"] = agent_workload
+    context["stats"] = {
+        "member_count": len(members),
+        "active_agents": sum(1 for a in agents if a.is_active),
+        "total_capacity": sum(a.capacity or 0 for a in agents if a.is_active),
+    }
+
+    template = templates.get_template("modules/support/templates/pages/team_detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# TAGS
+# =============================================================================
+
+tags_router = APIRouter(prefix="/support/tags", tags=["support-tags"])
+
+
+@tags_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def tags_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Support tags list."""
+    from app.models.support import Tag, TicketTag
+    from app.models.ticket import Ticket
+
+    tags = db.query(Tag).order_by(Tag.name).all()
+
+    # Get usage counts
+    tag_usage: dict[int, int] = {}
+    for tag in tags:
+        count = db.query(func.count(TicketTag.ticket_id)).filter(
+            TicketTag.tag_id == tag.id
+        ).scalar() or 0
+        tag_usage[tag.id] = count
+
+    # Recent usage (last 30 days)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    recent_usage_query = db.query(
+        TicketTag.tag_id,
+        func.count(TicketTag.ticket_id).label("count"),
+    ).join(Ticket, Ticket.id == TicketTag.ticket_id).filter(
+        Ticket.created_at >= thirty_days_ago
+    ).group_by(TicketTag.tag_id).all()
+
+    recent_usage = {row.tag_id: row.count for row in recent_usage_query}
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Ticket Tags"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Support", "href": "/support/dashboard"},
+        {"label": "Tags"},
+    ])
+
+    context["tags"] = tags
+    context["tag_usage"] = tag_usage
+    context["recent_usage"] = recent_usage
+    context["summary"] = {
+        "total_tags": len(tags),
+        "active_tags": sum(1 for t in tags if tag_usage.get(t.id, 0) > 0),
+    }
+
+    template = templates.get_template("modules/support/templates/pages/tags_list.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# AUTOMATION LOGS
+# =============================================================================
+
+@automation_router.get("/logs", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+async def automation_logs(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    rule_id: Optional[int] = Query(None),
+    success: Optional[bool] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """Automation execution logs."""
+    from app.models.support_automation import AutomationRule, AutomationLog
+
+    offset = (page - 1) * per_page
+
+    query = db.query(AutomationLog)
+
+    if rule_id:
+        query = query.filter(AutomationLog.rule_id == rule_id)
+    if success is not None:
+        query = query.filter(AutomationLog.success == success)
+
+    total = query.count()
+    logs = query.order_by(AutomationLog.created_at.desc()).offset(offset).limit(per_page).all()
+
+    # Get rules for filter dropdown
+    rules = db.query(AutomationRule).order_by(AutomationRule.name).all()
+
+    # Stats
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    stats_query = db.query(
+        func.count(AutomationLog.id).label("total"),
+        func.sum(func.cast(AutomationLog.success, func.literal(1).type)).label("success"),
+        func.avg(AutomationLog.execution_time_ms).label("avg_time"),
+    ).filter(AutomationLog.created_at >= thirty_days_ago)
+
+    stats = stats_query.first()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Automation Logs"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Support", "href": "/support/dashboard"},
+        {"label": "Automation", "href": "/support/automation"},
+        {"label": "Logs"},
+    ])
+
+    context["logs"] = logs
+    context["rules"] = rules
+    context["rule_filter"] = rule_id
+    context["success_filter"] = success
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    context["stats"] = {
+        "total_30d": stats.total if stats else 0,
+        "success_30d": stats.success or 0 if stats else 0,
+        "success_rate": round((stats.success or 0) / stats.total * 100, 1) if stats and stats.total > 0 else 0,
+        "avg_time_ms": round(float(stats.avg_time or 0), 1) if stats else 0,
+    }
+
+    template = templates.get_template("modules/support/templates/pages/automation_logs.html")
     return HTMLResponse(template.render(context))

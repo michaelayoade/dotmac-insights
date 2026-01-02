@@ -80,9 +80,7 @@ from .validation import (
 router = APIRouter()
 
 
-# =============================================================================
 # COMPARATIVES AND CURRENCY HELPERS
-# =============================================================================
 
 def calculate_prior_period(
     start_date: date,
@@ -176,9 +174,7 @@ def calculate_variance(
     }
 
 
-# =============================================================================
 # TRIAL BALANCE
-# =============================================================================
 
 @router.get("/trial-balance", dependencies=[Depends(Require("accounting:read"))])
 def get_trial_balance(
@@ -272,9 +268,7 @@ def get_trial_balance(
     }
 
 
-# =============================================================================
 # BALANCE SHEET
-# =============================================================================
 
 @router.get("/balance-sheet", dependencies=[Depends(Require("accounting:read"))])
 def get_balance_sheet(
@@ -746,9 +740,7 @@ def get_balance_sheet(
     return result
 
 
-# =============================================================================
 # INCOME STATEMENT (P&L)
-# =============================================================================
 
 @router.get("/income-statement", dependencies=[Depends(Require("accounting:read"))])
 def get_income_statement(
@@ -1407,9 +1399,7 @@ def get_income_statement(
     return result
 
 
-# =============================================================================
 # CASH FLOW (Indirect Method - GAAP/IFRS Compliant)
-# =============================================================================
 
 # Account types for cash flow classification
 OPERATING_ACCOUNT_TYPES = {
@@ -1905,9 +1895,7 @@ def get_cash_flow(
     return result
 
 
-# =============================================================================
 # FINANCIAL RATIOS (Comprehensive)
-# =============================================================================
 
 @router.get("/financial-ratios", dependencies=[Depends(Require("accounting:read"))])
 def get_financial_ratios(
@@ -2272,9 +2260,7 @@ def get_financial_ratios(
     }
 
 
-# =============================================================================
 # STATEMENT OF CHANGES IN EQUITY (IAS 1)
-# =============================================================================
 
 @router.get("/equity-statement", dependencies=[Depends(Require("accounting:read"))])
 def get_equity_statement(

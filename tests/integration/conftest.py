@@ -139,7 +139,7 @@ def auth_client(integration_db, integration_client):
     Usage:
         def test_api(auth_client):
             client = auth_client(["contacts:read", "contacts:write"])
-            resp = client.get("/api/contacts")
+            resp = client.get("/api/v1/crm/contacts")
     """
     def _make_client(scopes: list[str], is_superuser: bool = False, user_id: int = 1):
         mock_principal = create_integration_principal(

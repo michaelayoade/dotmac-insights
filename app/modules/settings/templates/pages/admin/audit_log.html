@@ -22,6 +22,14 @@
 {% endblock %}
 
 {% block settings_content %}
+{% set audit_columns = [
+    {'key': 'timestamp', 'label': 'Timestamp', 'required': True},
+    {'key': 'user', 'label': 'User'},
+    {'key': 'group', 'label': 'Group'},
+    {'key': 'action', 'label': 'Action'},
+    {'key': 'details', 'label': 'Details'},
+] %}
+<div x-data="columnPicker('settings-audit-table', {{ audit_columns  | tojson | e }})">
 <!-- Admin Tabs -->
 <div class="mb-6 border-b border-gray-200">
     <nav class="flex gap-6 -mb-px overflow-x-auto">
@@ -38,7 +46,7 @@
 
 <!-- Filters -->
 <div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
-    <div class="flex flex-col sm:flex-row gap-4">
+    <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center" x-data="{ open: false }">
         <div class="flex-1 relative">
             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,10 +88,56 @@
                 hx-include="[name='q'], [name='group']"
             >
                 <option value="">All Actions</option>
-                {% for opt in action_options %}
+            {% for opt in action_options %}
                 <option value="{{ opt }}" {{ 'selected' if current_action == opt else '' }}>{{ opt | title }}</option>
                 {% endfor %}
             </select>
+        </div>
+        <div class="relative" @click.away="open = false">
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50"
+                @click="open = !open"
+            >
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                <span>Columns</span>
+                <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="absolute right-0 z-10 mt-2 w-52 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+            >
+                <template x-for="col in columns" :key="col.key">
+                    <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                        <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            :checked="isVisible(col.key)"
+                            :disabled="col.required"
+                            @change="toggleColumn(col.key)"
+                        >
+                        <span x-text="col.label"></span>
+                    </label>
+                </template>
+                <button
+                    type="button"
+                    class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                    @click="resetColumns()"
+                >
+                    Reset columns
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -91,5 +145,6 @@
 <!-- Audit Table -->
 <div id="audit-table-container">
     {% include "modules/settings/templates/partials/audit_table.html" %}
+</div>
 </div>
 {% endblock %}

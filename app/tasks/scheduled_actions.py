@@ -264,7 +264,7 @@ def followup_lead(
     Create a follow-up reminder/activity for a lead.
 
     Args:
-        contact_id: UnifiedContact ID
+        contact_id: Contact ID
         user_id: User to notify
         notes: Follow-up notes
         create_activity: If True, also create a CRM activity
@@ -273,13 +273,13 @@ def followup_lead(
         Result summary
     """
     try:
-        from app.models.unified_contact import UnifiedContact
+        from app.models.contact import Contact
         from app.models.crm import Activity, ActivityType, ActivityStatus
         from app.services.notification_service import NotificationService
         from app.models.notification import NotificationEventType
 
         with SessionLocal() as db:
-            contact = db.query(UnifiedContact).filter(UnifiedContact.id == contact_id).first()
+            contact = db.query(Contact).filter(Contact.id == contact_id).first()
 
             if not contact:
                 result = {"status": "not_found", "contact_id": contact_id}

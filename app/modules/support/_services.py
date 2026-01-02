@@ -34,6 +34,12 @@ class SupportWebService:
     providing a clean interface for route handlers.
     """
 
+    # Allowed sort columns to prevent SQL injection via getattr
+    ALLOWED_TICKET_SORTS = {
+        "created_at", "updated_at", "ticket_number", "subject",
+        "status", "priority", "ticket_type", "due_date",
+    }
+
     def __init__(self, db: Session, user_id: Optional[int] = None):
         self.db = db
         self.user_id = user_id
@@ -47,27 +53,33 @@ class SupportWebService:
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         week_ago = today - timedelta(days=7)
 
-        # Ticket counts
+        # Ticket counts - use .value for PostgreSQL enum compatibility
+        open_statuses = [
+            TicketStatus.OPEN.value,
+            TicketStatus.IN_PROGRESS.value,
+            TicketStatus.WAITING.value,
+            TicketStatus.REOPENED.value
+        ]
         total_open = self.db.query(func.count(UnifiedTicket.id)).filter(
             UnifiedTicket.is_deleted == False,
-            UnifiedTicket.status.in_(["open", "in_progress", "pending", "waiting_on_customer"])
+            UnifiedTicket.status.in_(open_statuses)
         ).scalar() or 0
 
         urgent_tickets = self.db.query(func.count(UnifiedTicket.id)).filter(
             UnifiedTicket.is_deleted == False,
-            UnifiedTicket.priority == "urgent",
-            UnifiedTicket.status.notin_(["closed", "resolved"])
+            UnifiedTicket.priority == TicketPriority.URGENT.value,
+            UnifiedTicket.status.notin_([TicketStatus.CLOSED.value, TicketStatus.RESOLVED.value])
         ).scalar() or 0
 
         resolved_today = self.db.query(func.count(UnifiedTicket.id)).filter(
             UnifiedTicket.is_deleted == False,
-            UnifiedTicket.status == "resolved",
+            UnifiedTicket.status == TicketStatus.RESOLVED.value,
             UnifiedTicket.updated_at >= today
         ).scalar() or 0
 
         resolved_week = self.db.query(func.count(UnifiedTicket.id)).filter(
             UnifiedTicket.is_deleted == False,
-            UnifiedTicket.status == "resolved",
+            UnifiedTicket.status == TicketStatus.RESOLVED.value,
             UnifiedTicket.updated_at >= week_ago
         ).scalar() or 0
 
@@ -87,7 +99,7 @@ class SupportWebService:
             func.count(UnifiedTicket.id).label("count")
         ).filter(
             UnifiedTicket.is_deleted == False,
-            UnifiedTicket.status.notin_(["closed", "resolved"])
+            UnifiedTicket.status.notin_([TicketStatus.CLOSED.value, TicketStatus.RESOLVED.value])
         ).group_by(UnifiedTicket.priority).all()
 
         priority_distribution = {row.priority: row.count for row in priority_counts}
@@ -102,27 +114,53 @@ class SupportWebService:
         }
 
     def get_agent_stats(self, limit: int = 10) -> List[Dict[str, Any]]:
-        """Get agent workload statistics."""
-        agents = self.db.query(Agent).filter(
-            Agent.is_active == True
-        ).limit(limit).all()
+        """Get agent workload statistics.
 
-        agent_stats = []
-        for agent in agents:
-            open_count = self.db.query(func.count(UnifiedTicket.id)).filter(
-                UnifiedTicket.assigned_to_id == agent.employee_id,
+        Uses a single aggregate query instead of N+1 queries.
+        """
+        # Get agents with their ticket counts in a single query
+        from sqlalchemy import outerjoin
+        from sqlalchemy.orm import aliased
+
+        # Subquery for open ticket counts per agent
+        open_tickets_subq = (
+            self.db.query(
+                UnifiedTicket.assigned_to_id,
+                func.count(UnifiedTicket.id).label("open_count")
+            )
+            .filter(
                 UnifiedTicket.is_deleted == False,
-                UnifiedTicket.status.notin_(["closed", "resolved"])
-            ).scalar() or 0
+                UnifiedTicket.status.notin_([TicketStatus.CLOSED.value, TicketStatus.RESOLVED.value])
+            )
+            .group_by(UnifiedTicket.assigned_to_id)
+            .subquery()
+        )
 
-            agent_stats.append({
-                "id": agent.id,
-                "name": agent.display_name or agent.email or f"Agent {agent.id}",
-                "email": agent.email,
-                "open_tickets": open_count,
-            })
+        # Join agents with their ticket counts
+        agents_with_counts = (
+            self.db.query(
+                Agent.id,
+                Agent.display_name,
+                Agent.email,
+                Agent.employee_id,
+                func.coalesce(open_tickets_subq.c.open_count, 0).label("open_tickets")
+            )
+            .outerjoin(open_tickets_subq, Agent.employee_id == open_tickets_subq.c.assigned_to_id)
+            .filter(Agent.is_active == True)
+            .order_by(func.coalesce(open_tickets_subq.c.open_count, 0).desc())
+            .limit(limit)
+            .all()
+        )
 
-        return agent_stats
+        return [
+            {
+                "id": row.id,
+                "name": row.display_name or row.email or f"Agent {row.id}",
+                "email": row.email,
+                "open_tickets": row.open_tickets,
+            }
+            for row in agents_with_counts
+        ]
 
     # =========================================================================
     # TICKET LISTING
@@ -176,7 +214,9 @@ class SupportWebService:
         # Count total
         total = query.count()
 
-        # Sorting
+        # Sorting - validate sort column against whitelist to prevent SQL injection
+        if sort not in self.ALLOWED_TICKET_SORTS:
+            sort = "created_at"
         sort_column = getattr(UnifiedTicket, sort, UnifiedTicket.created_at)
         if dir == "desc":
             sort_column = sort_column.desc()

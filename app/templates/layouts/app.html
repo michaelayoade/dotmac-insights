@@ -1,7 +1,72 @@
 {% extends "layouts/base.html" %}
 
 {% block body %}
-<div class="min-h-full" x-data="{ sidebarOpen: false }">
+<!-- Skip link for accessibility -->
+<a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary-600 focus:text-white focus:rounded-lg focus:shadow-lg">
+    Skip to main content
+</a>
+
+{% set ns = namespace(default_collapsed={}) %}
+{% for section in navigation %}
+{% set _ = ns.default_collapsed.update({section.section: True}) %}
+{% endfor %}
+<div
+    class="min-h-full"
+    x-data="{
+        sidebarOpen: false,
+        navSearch: '',
+        favorites: [],
+        defaultCollapsed: {{ ns.default_collapsed | tojson | forceescape }},
+        collapsedSections: {},
+        init() {
+            this.loadNavPrefs();
+        },
+        loadNavPrefs() {
+            try {
+                const favorites = window.localStorage.getItem('nav:favorites');
+                this.favorites = favorites ? JSON.parse(favorites) : [];
+            } catch (error) {
+                this.favorites = [];
+            }
+            try {
+                const collapsed = window.localStorage.getItem('nav:collapsed');
+                const parsed = collapsed ? JSON.parse(collapsed) : {};
+                this.collapsedSections = { ...this.defaultCollapsed, ...parsed };
+            } catch (error) {
+                this.collapsedSections = this.defaultCollapsed;
+            }
+        },
+        saveFavorites() {
+            window.localStorage.setItem('nav:favorites', JSON.stringify(this.favorites));
+        },
+        saveCollapsed() {
+            window.localStorage.setItem('nav:collapsed', JSON.stringify(this.collapsedSections));
+        },
+        toggleFavorite(href) {
+            if (this.favorites.includes(href)) {
+                this.favorites = this.favorites.filter(item => item !== href);
+            } else {
+                this.favorites = [...this.favorites, href];
+            }
+            this.saveFavorites();
+        },
+        isFavorite(href) {
+            return this.favorites.includes(href);
+        },
+        toggleSection(sectionKey) {
+            this.collapsedSections[sectionKey] = this.isSectionOpen(sectionKey);
+            this.saveCollapsed();
+        },
+        isSectionOpen(sectionKey) {
+            if (this.navSearch) return true;
+            return !this.collapsedSections[sectionKey];
+        },
+        matchesFilter(label) {
+            if (!this.navSearch) return true;
+            return label.toLowerCase().includes(this.navSearch.toLowerCase());
+        }
+    }"
+>
     <!-- Mobile sidebar overlay -->
     <div
         x-show="sidebarOpen"
@@ -22,6 +87,17 @@
         :class="{ '-translate-x-full lg:translate-x-0': !sidebarOpen, 'translate-x-0': sidebarOpen }"
         data-testid="sidebar"
     >
+        <!-- Mobile close button -->
+        <button
+            @click="sidebarOpen = false"
+            class="lg:hidden absolute top-4 right-4 p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors z-50"
+            aria-label="Close menu"
+        >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+
         <!-- Logo & Brand -->
         <div class="flex h-20 shrink-0 items-center px-6 border-b border-white/5">
             <a href="/" class="flex items-center gap-3 group" data-testid="sidebar-logo">
@@ -39,52 +115,144 @@
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto scrollbar-thin py-6 px-4" data-testid="sidebar-nav">
+        <nav class="flex-1 overflow-y-auto scrollbar-thin py-6 px-4" aria-label="Main navigation" data-testid="sidebar-nav">
+            <div class="px-2 mb-5">
+                <div class="relative">
+                    <input
+                        type="text"
+                        x-model="navSearch"
+                        placeholder="Search navigation..."
+                        class="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 pl-9 text-sm text-white/80 placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition"
+                        aria-label="Search navigation"
+                    >
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <button
+                        type="button"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition"
+                        x-show="navSearch.length"
+                        @click="navSearch = ''"
+                        aria-label="Clear navigation search"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-8" x-show="favorites.length > 0">
+                <h3 class="px-3 mb-3 text-xs font-bold text-amber-300/70 uppercase tracking-[0.18em]">
+                    Favorites
+                </h3>
+                <ul class="space-y-1">
+                    {% for section in navigation %}
+                    {% for item in section.links %}
+                    <li x-show="isFavorite({{ item.href | tojson | forceescape }}) && matchesFilter({{ item.label | tojson | forceescape }})" data-nav-item>
+                        <div class="flex items-center gap-2">
+                            <a
+                                href="{{ item.href }}"
+                                class="group flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                                       {% if current_path == item.href %}
+                                       bg-white/10 text-white shadow-inner-glow
+                                       {% else %}
+                                       text-white/60 hover:bg-white/5 hover:text-white
+                                       {% endif %}"
+                                data-testid="nav-favorite-{{ item.label | lower | replace(' ', '-') }}"
+                                {% if current_path == item.href %}aria-current="page"{% endif %}
+                            >
+                                <span class="w-5 h-5 flex items-center justify-center {% if current_path == item.href %}text-primary-400{% else %}text-white/40 group-hover:text-white/70{% endif %} transition-colors">
+                                    {% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}
+                                </span>
+                                <span>{{ item.label }}</span>
+                                {% if current_path == item.href %}
+                                <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400"></span>
+                                {% endif %}
+                            </a>
+                            <button
+                                type="button"
+                                class="p-1 rounded-md hover:bg-white/10 transition"
+                                :class="isFavorite({{ item.href | tojson | forceescape }}) ? 'text-amber-300' : 'text-white/30 hover:text-white/60'"
+                                @click.stop.prevent="toggleFavorite({{ item.href | tojson | forceescape }})"
+                                aria-label="Toggle favorite"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.168c.969 0 1.371 1.24.588 1.81l-3.372 2.45a1 1 0 00-.364 1.118l1.287 3.966c.3.921-.755 1.688-1.538 1.118l-3.372-2.45a1 1 0 00-1.176 0l-3.372 2.45c-.783.57-1.838-.197-1.538-1.118l1.287-3.966a1 1 0 00-.364-1.118L2.05 9.393c-.783-.57-.38-1.81.588-1.81h4.168a1 1 0 00.95-.69l1.286-3.966z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </li>
+                    {% endfor %}
+                    {% endfor %}
+                </ul>
+            </div>
+
             {% for section in navigation %}
             <div class="mb-8">
-                {% if section.href %}
-                <a
-                    href="{{ section.href }}"
-                    class="flex items-center gap-2 px-3 mb-3 text-[10px] font-bold uppercase tracking-[0.2em] group transition-colors {{ 'text-primary-400' if current_path == section.href else 'text-white/30 hover:text-white/60' }}"
-                    data-testid="section-{{ section.section | lower }}"
-                >
-                    <span>{{ section.section }}</span>
-                    <svg class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </a>
-                {% else %}
-                <h3 class="px-3 mb-3 text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">
-                    {{ section.section }}
-                </h3>
-                {% endif %}
-                <ul class="space-y-1">
+                <div class="flex items-center justify-between px-3 mb-3">
+                    {% if section.href %}
+                    <a
+                        href="{{ section.href }}"
+                        class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] group transition-colors {{ 'text-primary-400' if current_path == section.href else 'text-white/30 hover:text-white/60' }}"
+                        data-testid="section-{{ section.section | lower }}"
+                    >
+                        <span>{{ section.section }}</span>
+                        <svg class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                    {% else %}
+                    <h3 class="text-xs font-bold text-white/30 uppercase tracking-[0.18em]">
+                        {{ section.section }}
+                    </h3>
+                    {% endif %}
+                    <button
+                        type="button"
+                        class="p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/10 transition"
+                        @click="toggleSection({{ section.section | tojson | forceescape }})"
+                        aria-label="Toggle section"
+                    >
+                        <svg class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" :class="{ 'rotate-180': isSectionOpen({{ section.section | tojson | forceescape }}) }">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                </div>
+                <ul class="space-y-1" x-show="isSectionOpen({{ section.section | tojson | forceescape }})">
                     {% for item in section.links %}
-                    <li>
-                        <a
-                            href="{{ item.href }}"
-                            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
-                                   {% if current_path == item.href %}
-                                   bg-white/10 text-white shadow-inner-glow
-                                   {% else %}
-                                   text-white/60 hover:bg-white/5 hover:text-white
-                                   {% endif %}"
-                            data-testid="nav-{{ item.label | lower | replace(' ', '-') }}"
-                            {% if current_path != item.href %}
-                            hx-get="{{ item.href }}"
-                            hx-target="#main-content"
-                            hx-push-url="true"
-                            hx-indicator="#page-loader"
-                            {% endif %}
-                        >
-                            <span class="w-5 h-5 flex items-center justify-center {% if current_path == item.href %}text-primary-400{% else %}text-white/40 group-hover:text-white/70{% endif %} transition-colors">
-                                {% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}
-                            </span>
-                            <span>{{ item.label }}</span>
-                            {% if current_path == item.href %}
-                            <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400"></span>
-                            {% endif %}
-                        </a>
+                    <li x-show="!isFavorite({{ item.href | tojson | forceescape }}) && matchesFilter({{ item.label | tojson | forceescape }})" data-nav-item>
+                        <div class="flex items-center gap-2">
+                            <a
+                                href="{{ item.href }}"
+                                class="group flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
+                                       {% if current_path == item.href %}
+                                       bg-white/10 text-white shadow-inner-glow
+                                       {% else %}
+                                       text-white/60 hover:bg-white/5 hover:text-white
+                                       {% endif %}"
+                                data-testid="nav-{{ item.label | lower | replace(' ', '-') }}"
+                                {% if current_path == item.href %}aria-current="page"{% endif %}
+                            >
+                                <span class="w-5 h-5 flex items-center justify-center {% if current_path == item.href %}text-primary-400{% else %}text-white/40 group-hover:text-white/70{% endif %} transition-colors">
+                                    {% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}
+                                </span>
+                                <span>{{ item.label }}</span>
+                                {% if current_path == item.href %}
+                                <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400"></span>
+                                {% endif %}
+                            </a>
+                            <button
+                                type="button"
+                                class="p-1 rounded-md hover:bg-white/10 transition"
+                                :class="isFavorite({{ item.href | tojson | forceescape }}) ? 'text-amber-300' : 'text-white/30 hover:text-white/60'"
+                                @click.stop.prevent="toggleFavorite({{ item.href | tojson | forceescape }})"
+                                aria-label="Toggle favorite"
+                            >
+                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.168c.969 0 1.371 1.24.588 1.81l-3.372 2.45a1 1 0 00-.364 1.118l1.287 3.966c.3.921-.755 1.688-1.538 1.118l-3.372-2.45a1 1 0 00-1.176 0l-3.372 2.45c-.783.57-1.838-.197-1.538-1.118l1.287-3.966a1 1 0 00-.364-1.118L2.05 9.393c-.783-.57-.38-1.81.588-1.81h4.168a1 1 0 00.95-.69l1.286-3.966z"/>
+                                </svg>
+                            </button>
+                        </div>
                     </li>
                     {% endfor %}
                 </ul>
@@ -163,34 +331,144 @@
                     </svg>
                 </button>
 
-                <!-- Breadcrumbs -->
-                {% if breadcrumbs %}
-                <nav class="hidden sm:flex" aria-label="Breadcrumb" data-testid="breadcrumbs">
-                    <ol class="flex items-center">
-                        {% for crumb in breadcrumbs %}
-                        <li class="flex items-center">
-                            {% if not loop.first %}
-                            <svg class="h-4 w-4 text-gray-300 mx-2" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                            </svg>
-                            {% endif %}
-                            {% if crumb.href and not crumb.is_current %}
-                            <a href="{{ crumb.href }}" class="text-sm text-gray-500 hover:text-primary-600 transition-colors">
-                                {{ crumb.label }}
-                            </a>
-                            {% else %}
-                            <span class="text-sm font-semibold text-gray-900">{{ crumb.label }}</span>
-                            {% endif %}
-                        </li>
-                        {% endfor %}
-                    </ol>
-                </nav>
-                {% endif %}
+                <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <!-- Mobile: Back link when in sub-page -->
+                    {% if breadcrumbs and breadcrumbs | length > 1 %}
+                    <a
+                        href="{{ breadcrumbs[-2].href }}"
+                        class="md:hidden flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors shrink-0"
+                        data-testid="mobile-back-link"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        <span class="sr-only sm:not-sr-only">{{ breadcrumbs[-2].label }}</span>
+                    </a>
+                    {% endif %}
 
-                <!-- Page title (mobile) -->
-                <h1 class="sm:hidden text-lg font-display font-bold text-gray-900" data-testid="page-title-mobile">
-                    {{ page_title | default("Dashboard") }}
-                </h1>
+                    <!-- Desktop: Full breadcrumbs -->
+                    {% if breadcrumbs %}
+                    <nav class="hidden md:flex min-w-0" aria-label="Breadcrumb" data-testid="breadcrumbs">
+                        <ol class="flex items-center min-w-0">
+                            {% for crumb in breadcrumbs %}
+                            <li class="flex items-center min-w-0">
+                                {% if not loop.first %}
+                                <svg class="h-4 w-4 text-gray-300 mx-2 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                </svg>
+                                {% endif %}
+                                {% if crumb.href and not crumb.is_current %}
+                                <a href="{{ crumb.href }}" class="text-sm text-gray-500 hover:text-primary-600 transition-colors truncate">
+                                    {{ crumb.label }}
+                                </a>
+                                {% else %}
+                                <span class="text-sm font-semibold text-gray-900 truncate">{{ crumb.label }}</span>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+                        </ol>
+                    </nav>
+                    {% endif %}
+                </div>
+
+                <!-- Global Search -->
+                <div x-data="globalSearch()" class="hidden sm:block flex-1 max-w-md mx-4" @keydown.escape="close()">
+                    <div class="relative">
+                        <div class="relative">
+                            <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <input
+                                type="search"
+                                x-model="query"
+                                @input.debounce.300ms="search()"
+                                @focus="if (query.length >= 2) open = true"
+                                @keydown.down.prevent="focusNext()"
+                                @keydown.up.prevent="focusPrev()"
+                                @keydown.enter.prevent="selectFocused()"
+                                placeholder="Search..."
+                                class="block w-full rounded-xl border-0 bg-gray-100/80 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
+                                data-testid="global-search-input"
+                            >
+                            <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                <template x-if="loading">
+                                    <svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                </template>
+                                <kbd class="hidden lg:inline-flex items-center gap-0.5 rounded bg-gray-200/80 px-1.5 py-0.5 text-xs text-gray-500 font-medium">
+                                    <span class="text-xs">⌘</span>K
+                                </kbd>
+                            </div>
+                        </div>
+
+                        <!-- Search Results Dropdown -->
+                        <div
+                            x-show="open && (results.length > 0 || (query.length >= 2 && !loading))"
+                            x-cloak
+                            @click.away="close()"
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute top-full left-0 right-0 z-50 mt-2 rounded-xl bg-white shadow-warm-xl ring-1 ring-gray-200/50 overflow-hidden"
+                            data-testid="global-search-results"
+                        >
+                            <div class="max-h-96 overflow-y-auto p-2">
+                                <template x-if="results.length === 0 && query.length >= 2 && !loading">
+                                    <div class="py-8 text-center text-sm text-gray-500">
+                                        <svg class="mx-auto h-8 w-8 text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                        No results found
+                                    </div>
+                                </template>
+
+                                <template x-for="(group, groupIndex) in groupedResults" :key="group.type">
+                                    <div class="mb-2 last:mb-0">
+                                        <div class="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider" x-text="group.label"></div>
+                                        <template x-for="(item, itemIndex) in group.items" :key="item.id">
+                                            <a
+                                                :href="item.url"
+                                                class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-100 transition-colors"
+                                                :class="{ 'bg-surface-100': focusedIndex === getGlobalIndex(groupIndex, itemIndex) }"
+                                                @mouseenter="focusedIndex = getGlobalIndex(groupIndex, itemIndex)"
+                                                @click="close()"
+                                            >
+                                                <span
+                                                    class="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
+                                                    :class="getIconClass(item.type)"
+                                                    x-html="getIcon(item.type)"
+                                                ></span>
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="text-sm font-medium text-gray-900 truncate" x-text="item.title"></div>
+                                                    <div class="text-xs text-gray-500 truncate" x-text="item.subtitle"></div>
+                                                </div>
+                                                <span
+                                                    x-show="item.status"
+                                                    class="text-xs px-2 py-0.5 rounded-full"
+                                                    :class="getStatusClass(item.status)"
+                                                    x-text="item.status"
+                                                ></span>
+                                            </a>
+                                        </template>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div class="border-t border-gray-100 px-3 py-2 bg-surface-50/50">
+                                <div class="flex items-center justify-between text-xs text-gray-500">
+                                    <span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs">↑↓</kbd> navigate</span>
+                                    <span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs">↵</kbd> select</span>
+                                    <span><kbd class="px-1.5 py-0.5 bg-gray-100 rounded text-xs">esc</kbd> close</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Right side -->
                 <div class="ml-auto flex items-center gap-3">
@@ -199,75 +477,12 @@
                         <div class="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
                     </div>
 
-                    <!-- Quick actions -->
-                    <div x-data="{ open: false }" class="relative">
-                        <button
-                            type="button"
-                            class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:bg-primary-500 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all"
-                            @click="open = !open"
-                            data-testid="quick-actions-button"
-                        >
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
-                            </svg>
-                            <span class="hidden sm:inline">New</span>
-                        </button>
-
-                        <div
-                            x-show="open"
-                            x-cloak
-                            @click.away="open = false"
-                            x-transition:enter="transition ease-out duration-150"
-                            x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
-                            x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-                            x-transition:leave="transition ease-in duration-100"
-                            x-transition:leave-start="opacity-100 scale-100"
-                            x-transition:leave-end="opacity-0 scale-95"
-                            class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-xl bg-white p-2 shadow-warm-xl ring-1 ring-gray-200/50"
-                            role="menu"
-                            data-testid="quick-actions-menu"
-                        >
-                            {% if has_scope('crm:write') %}
-                            <a href="/crm/contacts/new" class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-surface-100 transition-colors" role="menuitem">
-                                <span class="w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-                                </span>
-                                <div>
-                                    <span class="font-medium">New Contact</span>
-                                    <span class="block text-xs text-gray-500">Add a lead or customer</span>
-                                </div>
-                            </a>
-                            {% endif %}
-                            {% if has_scope('support:write') %}
-                            <a href="/support/tickets/new" class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-surface-100 transition-colors" role="menuitem">
-                                <span class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
-                                </span>
-                                <div>
-                                    <span class="font-medium">New Ticket</span>
-                                    <span class="block text-xs text-gray-500">Create support ticket</span>
-                                </div>
-                            </a>
-                            {% endif %}
-                            {% if has_scope('accounting:write') %}
-                            <a href="/accounting/invoices/new" class="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-700 rounded-lg hover:bg-surface-100 transition-colors" role="menuitem">
-                                <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                </span>
-                                <div>
-                                    <span class="font-medium">New Invoice</span>
-                                    <span class="block text-xs text-gray-500">Bill a customer</span>
-                                </div>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
                 </div>
             </div>
         </header>
 
         <!-- Main content -->
-        <main class="py-8" id="main-content" data-testid="main-content">
+        <main class="py-8" id="main-content" data-testid="main-content" data-page-title="{{ page_title | default('Dashboard') }}">
             <div class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 <!-- Page header -->
                 {% block page_header %}
@@ -291,358 +506,7 @@
         </main>
     </div>
 
-    <!-- Toast Notifications Container -->
-    <div id="toast-container" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none" aria-live="polite"></div>
-
-    <!-- Modal Container -->
-    <div id="modal-container" class="fixed inset-0 z-50 hidden" aria-modal="true" role="dialog">
-        <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" id="modal-backdrop"></div>
-        <div class="fixed inset-0 overflow-y-auto">
-            <div class="flex min-h-full items-center justify-center p-4">
-                <div id="modal-content" class="relative bg-white rounded-2xl shadow-warm-xl max-w-md w-full p-6 transform transition-all"></div>
-            </div>
-        </div>
-    </div>
 </div>
-
-<!-- HTMX Extensions and Handlers -->
-<script>
-    // Toast notification system
-    window.showToast = function(message, type = 'success', duration = 4000) {
-        const container = document.getElementById('toast-container');
-        const toast = document.createElement('div');
-
-        const colors = {
-            success: 'bg-emerald-500',
-            error: 'bg-red-500',
-            warning: 'bg-amber-500',
-            info: 'bg-primary-500'
-        };
-
-        const icons = {
-            success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>',
-            error: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>',
-            warning: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>',
-            info: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'
-        };
-
-        toast.className = `pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl ${colors[type]} text-white shadow-lg animate-slide-in-right`;
-        toast.innerHTML = `
-            <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type]}</svg>
-            <span class="text-sm font-medium">${message}</span>
-            <button onclick="this.parentElement.remove()" class="ml-2 p-1 hover:bg-white/20 rounded-lg transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        `;
-
-        container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.classList.add('animate-slide-out-right');
-            setTimeout(() => toast.remove(), 250);
-        }, duration);
-    };
-
-    // Modal system
-    window.showModal = function(content) {
-        const container = document.getElementById('modal-container');
-        const contentEl = document.getElementById('modal-content');
-        contentEl.innerHTML = content;
-        container.classList.remove('hidden');
-        document.body.classList.add('overflow-hidden');
-    };
-
-    window.hideModal = function() {
-        const container = document.getElementById('modal-container');
-        container.classList.add('hidden');
-        document.body.classList.remove('overflow-hidden');
-    };
-
-    document.getElementById('modal-backdrop')?.addEventListener('click', hideModal);
-
-    // HTMX event handlers
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        // Check for toast message in response headers
-        const toastMessage = evt.detail.xhr.getResponseHeader('HX-Toast');
-        const toastType = evt.detail.xhr.getResponseHeader('HX-Toast-Type') || 'success';
-        if (toastMessage) {
-            showToast(decodeURIComponent(toastMessage), toastType);
-        }
-    });
-
-    document.body.addEventListener('htmx:responseError', function(evt) {
-        showToast('An error occurred. Please try again.', 'error');
-    });
-
-    // Custom delete confirmation modal
-    document.body.addEventListener('htmx:confirm', function(evt) {
-        if (evt.detail.question && evt.detail.elt.hasAttribute('hx-delete')) {
-            evt.preventDefault();
-            const itemName = evt.detail.elt.dataset.itemName || 'this item';
-            showModal(`
-                <div class="text-center">
-                    <div class="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete ${itemName}?</h3>
-                    <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
-                    <div class="flex gap-3 justify-center">
-                        <button onclick="hideModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-                            Cancel
-                        </button>
-                        <button onclick="hideModal(); document.querySelector('[data-delete-id=\\'${evt.detail.elt.dataset.deleteId}\\']').dispatchEvent(new CustomEvent('confirmed'))" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 transition-colors">
-                            Delete
-                        </button>
-                    </div>
-                </div>
-            `);
-
-            evt.detail.elt.addEventListener('confirmed', function() {
-                evt.detail.issueRequest();
-            }, { once: true });
-        }
-    });
-
-    // Inline edit handlers
-    window.startInlineEdit = function(el, field, value, endpoint) {
-        const display = el.querySelector('.display-value');
-        const editor = el.querySelector('.edit-input');
-        display.classList.add('hidden');
-        editor.classList.remove('hidden');
-        editor.querySelector('input, select').focus();
-    };
-
-    window.cancelInlineEdit = function(el) {
-        const display = el.querySelector('.display-value');
-        const editor = el.querySelector('.edit-input');
-        display.classList.remove('hidden');
-        editor.classList.add('hidden');
-    };
-
-    // ==========================================================================
-    // BULK SELECT ALPINE COMPONENT
-    // ==========================================================================
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('bulkSelect', () => ({
-            selectedIds: [],
-            allSelected: false,
-
-            toggleAll(checked, selector = '[data-bulk-id]') {
-                this.allSelected = checked;
-                const checkboxes = document.querySelectorAll(selector);
-                this.selectedIds = checked
-                    ? Array.from(checkboxes).map(el => el.dataset.bulkId)
-                    : [];
-            },
-
-            toggleOne(id, checked) {
-                if (checked) {
-                    if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
-                } else {
-                    this.selectedIds = this.selectedIds.filter(i => i !== id);
-                    this.allSelected = false;
-                }
-            },
-
-            isSelected(id) {
-                return this.selectedIds.includes(id);
-            },
-
-            clearSelection() {
-                this.selectedIds = [];
-                this.allSelected = false;
-                document.querySelectorAll('[data-bulk-checkbox]').forEach(cb => cb.checked = false);
-            },
-
-            async deleteSelected(url, itemName) {
-                const count = this.selectedIds.length;
-                showModal(`
-                    <div class="text-center">
-                        <div class="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
-                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete ${count} ${itemName}?</h3>
-                        <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
-                        <div class="flex gap-3 justify-center">
-                            <button onclick="hideModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
-                            <button onclick="hideModal(); window.executeBulkDelete('${url}')" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 transition-colors">Delete All</button>
-                        </div>
-                    </div>
-                `);
-            },
-
-            async exportSelected(url) {
-                const params = new URLSearchParams();
-                this.selectedIds.forEach(id => params.append('ids', id));
-                window.location.href = `${url}?${params.toString()}`;
-            },
-
-            async bulkAction(url, method, confirm, message) {
-                if (confirm) {
-                    if (!window.confirm(message)) return;
-                }
-                await this.executeBulkAction(url, method);
-            },
-
-            async executeBulkAction(url, method = 'POST') {
-                const response = await fetch(url, {
-                    method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-Token': document.querySelector('[name="_csrf_token"]')?.value || ''
-                    },
-                    body: JSON.stringify({ ids: this.selectedIds })
-                });
-                if (response.ok) {
-                    htmx.trigger(document.body, 'bulkActionComplete');
-                    this.clearSelection();
-                    showToast('Action completed', 'success');
-                } else {
-                    showToast('Action failed', 'error');
-                }
-            }
-        }));
-    });
-
-    window.executeBulkDelete = async function(url) {
-        const component = Alpine.$data(document.querySelector('[x-data*="bulkSelect"]'));
-        if (component) {
-            await component.executeBulkAction(url, 'DELETE');
-            location.reload();
-        }
-    };
-
-    // ==========================================================================
-    // KEYBOARD SHORTCUTS
-    // ==========================================================================
-    document.addEventListener('keydown', (e) => {
-        // Skip if user is typing in an input
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
-        if (e.target.isContentEditable) return;
-
-        const rows = document.querySelectorAll('tbody tr[data-row-id]');
-        if (!rows.length) return;
-
-        let currentIndex = Array.from(rows).findIndex(r => r.classList.contains('ring-2'));
-
-        switch(e.key) {
-            case 'j': // Next row
-                e.preventDefault();
-                if (currentIndex < rows.length - 1) {
-                    rows[currentIndex]?.classList.remove('ring-2', 'ring-primary-500');
-                    rows[currentIndex + 1]?.classList.add('ring-2', 'ring-primary-500');
-                    rows[currentIndex + 1]?.scrollIntoView({ block: 'nearest' });
-                } else if (currentIndex === -1 && rows.length) {
-                    rows[0]?.classList.add('ring-2', 'ring-primary-500');
-                }
-                break;
-
-            case 'k': // Previous row
-                e.preventDefault();
-                if (currentIndex > 0) {
-                    rows[currentIndex]?.classList.remove('ring-2', 'ring-primary-500');
-                    rows[currentIndex - 1]?.classList.add('ring-2', 'ring-primary-500');
-                    rows[currentIndex - 1]?.scrollIntoView({ block: 'nearest' });
-                }
-                break;
-
-            case 'Enter': // View selected row
-            case 'o':
-                if (currentIndex >= 0) {
-                    e.preventDefault();
-                    const viewBtn = rows[currentIndex].querySelector('[data-action="view"], a[href*="/"]');
-                    if (viewBtn) viewBtn.click();
-                }
-                break;
-
-            case 'e': // Edit selected row
-                if (currentIndex >= 0) {
-                    e.preventDefault();
-                    const editBtn = rows[currentIndex].querySelector('[data-action="edit"], a[href*="/edit"]');
-                    if (editBtn) editBtn.click();
-                }
-                break;
-
-            case 'd': // Delete selected row (with shift)
-                if (e.shiftKey && currentIndex >= 0) {
-                    e.preventDefault();
-                    const deleteBtn = rows[currentIndex].querySelector('[data-action="delete"], button[hx-delete]');
-                    if (deleteBtn) deleteBtn.click();
-                }
-                break;
-
-            case '/': // Focus search
-                e.preventDefault();
-                const searchInput = document.querySelector('input[type="search"], input[name="q"]');
-                if (searchInput) searchInput.focus();
-                break;
-
-            case 'Escape': // Clear selection
-                rows.forEach(r => r.classList.remove('ring-2', 'ring-primary-500'));
-                break;
-
-            case 'x': // Toggle checkbox on current row
-                if (currentIndex >= 0) {
-                    e.preventDefault();
-                    const checkbox = rows[currentIndex].querySelector('[data-bulk-checkbox]');
-                    if (checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        checkbox.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }
-                break;
-        }
-    });
-
-    // ==========================================================================
-    // INFINITE SCROLL
-    // ==========================================================================
-    window.initInfiniteScroll = function(containerSelector, loadUrl, loadingId) {
-        const container = document.querySelector(containerSelector);
-        if (!container) return;
-
-        let loading = false;
-        let page = 1;
-        let hasMore = true;
-
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting && !loading && hasMore) {
-                loading = true;
-                page++;
-                const loadingEl = document.getElementById(loadingId);
-                if (loadingEl) loadingEl.classList.remove('hidden');
-
-                fetch(`${loadUrl}?page=${page}`, {
-                    headers: { 'HX-Request': 'true' }
-                })
-                .then(res => res.text())
-                .then(html => {
-                    if (html.trim()) {
-                        container.insertAdjacentHTML('beforeend', html);
-                        htmx.process(container);
-                    } else {
-                        hasMore = false;
-                    }
-                })
-                .finally(() => {
-                    loading = false;
-                    if (loadingEl) loadingEl.classList.add('hidden');
-                });
-            }
-        }, { threshold: 0.1 });
-
-        const sentinel = document.createElement('div');
-        sentinel.id = 'infinite-scroll-sentinel';
-        container.appendChild(sentinel);
-        observer.observe(sentinel);
-    };
-</script>
 
 <!-- Keyboard shortcuts help (shown with ?) -->
 <div id="keyboard-shortcuts-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onclick="this.classList.add('hidden')">
@@ -661,11 +525,4 @@
         <button onclick="document.getElementById('keyboard-shortcuts-modal').classList.add('hidden')" class="mt-4 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium">Close</button>
     </div>
 </div>
-<script>
-document.addEventListener('keydown', (e) => {
-    if (e.key === '?' && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
-        document.getElementById('keyboard-shortcuts-modal').classList.toggle('hidden');
-    }
-});
-</script>
 {% endblock %}

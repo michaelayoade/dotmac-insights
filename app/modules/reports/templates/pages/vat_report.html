@@ -1,0 +1,183 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/reports" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-display font-bold text-gray-900">VAT Report</h1>
+                <p class="mt-1 text-sm text-gray-500">Value Added Tax summary for {{ period_display }}</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="window.print()" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Print
+            </button>
+        </div>
+    </div>
+
+    <!-- Period Selector -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form method="GET" class="flex flex-wrap items-end gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Period</label>
+                <select name="period" class="rounded-lg border-gray-300 text-sm focus:ring-primary-500 focus:border-primary-500" onchange="this.form.submit()">
+                    {% for p in periods %}
+                    <option value="{{ p }}" {{ 'selected' if p == period else '' }}>{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- VAT Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4" id="vat-summary"
+         hx-get="/api/v1/tax/vat/summary/{{ period }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Output VAT</p>
+                    <p class="text-xl font-bold text-gray-900"><span class="text-base font-normal text-gray-500">{{ currency_symbol }}</span> Loading...</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Input VAT</p>
+                    <p class="text-xl font-bold text-gray-900"><span class="text-base font-normal text-gray-500">{{ currency_symbol }}</span> Loading...</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Net VAT Payable</p>
+                    <p class="text-xl font-bold text-gray-900"><span class="text-base font-normal text-gray-500">{{ currency_symbol }}</span> Loading...</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Filing Status</p>
+                    <p class="text-xl font-bold text-gray-900">Loading...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Output VAT (Sales) -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 bg-blue-50">
+            <h2 class="text-lg font-display font-semibold text-blue-900">Output VAT (Sales)</h2>
+            <p class="text-sm text-blue-600">VAT collected from customers on sales</p>
+        </div>
+        <div class="overflow-x-auto" id="output-vat-table"
+             hx-get="/api/v1/tax/vat/transactions?period={{ period }}&transaction_type=output"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                        <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Customer</th>
+                        <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Document</th>
+                        <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Taxable Amount</th>
+                        <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">VAT Rate</th>
+                        <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">VAT Amount</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr>
+                        <td colspan="6" class="py-12 text-center text-gray-500">
+                            <svg class="w-5 h-5 animate-spin inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Loading output VAT transactions...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Input VAT (Purchases) -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 bg-green-50">
+            <h2 class="text-lg font-display font-semibold text-green-900">Input VAT (Purchases)</h2>
+            <p class="text-sm text-green-600">VAT paid to suppliers on purchases (claimable credit)</p>
+        </div>
+        <div class="overflow-x-auto" id="input-vat-table"
+             hx-get="/api/v1/tax/vat/transactions?period={{ period }}&transaction_type=input"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                        <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Supplier</th>
+                        <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Document</th>
+                        <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Taxable Amount</th>
+                        <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">VAT Rate</th>
+                        <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">VAT Amount</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    <tr>
+                        <td colspan="6" class="py-12 text-center text-gray-500">
+                            <svg class="w-5 h-5 animate-spin inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Loading input VAT transactions...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Filing Info -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">VAT Filing Information</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+            <div>
+                <p class="text-gray-500">VAT Rate</p>
+                <p class="font-semibold text-gray-900">7.5% (Standard Rate)</p>
+            </div>
+            <div>
+                <p class="text-gray-500">Filing Deadline</p>
+                <p class="font-semibold text-gray-900">21st of following month</p>
+            </div>
+            <div>
+                <p class="text-gray-500">Authority</p>
+                <p class="font-semibold text-gray-900">FIRS (Federal Inland Revenue Service)</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print { display: none !important; }
+    body { background: white; }
+    .shadow-warm-sm, .shadow-warm-md { box-shadow: none !important; }
+    .ring-1 { ring-width: 0 !important; }
+}
+</style>
+{% endblock %}

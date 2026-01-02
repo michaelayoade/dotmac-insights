@@ -9,7 +9,7 @@ from ._deps import (
     RequireAccountingRead,
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs,
-    Account, GLEntry,
+    Account, AccountType, GLEntry,
     func, or_, datetime, Decimal,
 )
 
@@ -89,7 +89,7 @@ def get_balance_sheet_data(db, as_of_date: Optional[datetime] = None) -> dict:
     if not as_of_date:
         as_of_date = datetime.utcnow()
 
-    def get_section_data(root_type: str) -> list:
+    def get_section_data(root_type: AccountType) -> list:
         accounts = db.query(Account).filter(
             Account.is_group == False,
             Account.root_type == root_type,
@@ -110,7 +110,7 @@ def get_balance_sheet_data(db, as_of_date: Optional[datetime] = None) -> dict:
             ).scalar() or Decimal("0")
 
             balance = debit_sum - credit_sum
-            if root_type in ['liability', 'equity']:
+            if root_type in [AccountType.LIABILITY, AccountType.EQUITY]:
                 balance = -balance  # These normally have credit balances
 
             if balance != 0:
@@ -121,16 +121,16 @@ def get_balance_sheet_data(db, as_of_date: Optional[datetime] = None) -> dict:
 
         return result
 
-    assets = get_section_data("asset")
-    liabilities = get_section_data("liability")
-    equity = get_section_data("equity")
+    assets = get_section_data(AccountType.ASSET)
+    liabilities = get_section_data(AccountType.LIABILITY)
+    equity = get_section_data(AccountType.EQUITY)
 
     # Calculate net income (revenue - expenses) for retained earnings
     income_sum = db.query(func.sum(GLEntry.credit) - func.sum(GLEntry.debit)).filter(
         GLEntry.is_cancelled == False,
         GLEntry.posting_date <= as_of_date,
         GLEntry.account.in_(
-            db.query(Account.account_name).filter(Account.root_type == "income")
+            db.query(Account.account_name).filter(Account.root_type == AccountType.INCOME)
         )
     ).scalar() or Decimal("0")
 
@@ -138,7 +138,7 @@ def get_balance_sheet_data(db, as_of_date: Optional[datetime] = None) -> dict:
         GLEntry.is_cancelled == False,
         GLEntry.posting_date <= as_of_date,
         GLEntry.account.in_(
-            db.query(Account.account_name).filter(Account.root_type == "expense")
+            db.query(Account.account_name).filter(Account.root_type == AccountType.EXPENSE)
         )
     ).scalar() or Decimal("0")
 
@@ -169,7 +169,7 @@ def get_income_statement_data(db, start_date: Optional[datetime] = None, end_dat
     if not start_date:
         start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    def get_section_data(root_type: str) -> list:
+    def get_section_data(root_type: AccountType) -> list:
         accounts = db.query(Account).filter(
             Account.is_group == False,
             Account.root_type == root_type,
@@ -191,7 +191,7 @@ def get_income_statement_data(db, start_date: Optional[datetime] = None, end_dat
                 GLEntry.posting_date <= end_date,
             ).scalar() or Decimal("0")
 
-            if root_type == "income":
+            if root_type == AccountType.INCOME:
                 balance = credit_sum - debit_sum
             else:  # expense
                 balance = debit_sum - credit_sum
@@ -204,8 +204,8 @@ def get_income_statement_data(db, start_date: Optional[datetime] = None, end_dat
 
         return result
 
-    income = get_section_data("income")
-    expenses = get_section_data("expense")
+    income = get_section_data(AccountType.INCOME)
+    expenses = get_section_data(AccountType.EXPENSE)
 
     total_income = sum(i["balance"] for i in income)
     total_expenses = sum(e["balance"] for e in expenses)
@@ -365,7 +365,7 @@ async def cash_flow_report(
     # Get cash/bank accounts
     cash_accounts = db.query(Account).filter(
         Account.is_group == False,
-        Account.root_type == "asset",
+        Account.root_type == AccountType.ASSET,
         or_(
             Account.account_type.ilike("%cash%"),
             Account.account_type.ilike("%bank%"),

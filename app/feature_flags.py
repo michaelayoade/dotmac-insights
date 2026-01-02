@@ -27,8 +27,8 @@ class FeatureFlags(BaseSettings):
     # CONTACTS DOMAIN FLAGS
     # =========================================================================
 
-    # Enable dual-write to both unified_contacts and legacy tables (customers)
-    # When true, creating/updating a UnifiedContact also updates the legacy Customer
+    # Enable dual-write between party-based identity and legacy tables (customers)
+    # When true, creating/updating a Party also updates the legacy Customer
     CONTACTS_DUAL_WRITE_ENABLED: bool = False
 
     # Enable outbound sync to external systems (Splynx, ERPNext)
@@ -77,7 +77,7 @@ class FeatureFlags(BaseSettings):
     # =========================================================================
 
     # Enable Nigeria compliance bundle (VAT, WHT, PAYE, CIT, e-invoicing)
-    NIGERIA_COMPLIANCE_ENABLED: bool = False
+    NIGERIA_COMPLIANCE_ENABLED: bool = True
 
     # Enable statutory payroll deductions (reserved for compliance add-ons)
     STATUTORY_CALCULATIONS_ENABLED: bool = False
@@ -93,6 +93,37 @@ class FeatureFlags(BaseSettings):
     # Enable dry-run mode for billing outbound sync (log only, no actual API calls)
     # When true with OUTBOUND_SYNC_ENABLED, logs sync intent but skips API push
     BILLING_OUTBOUND_DRY_RUN: bool = True
+
+    # =========================================================================
+    # GRANULAR RBAC FLAGS
+    # =========================================================================
+
+    # Enable granular RBAC permission resolution
+    # When true, uses new permission resolution with groups, direct permissions, etc.
+    RBAC_GRANULAR_ENABLED: bool = False
+
+    # Enable role hierarchy (permission inheritance from parent roles)
+    # When true, child roles inherit permissions from parent roles
+    RBAC_ROLE_HIERARCHY_ENABLED: bool = False
+
+    # Enable group-based permissions
+    # When true, users inherit roles from their group memberships
+    RBAC_GROUPS_ENABLED: bool = False
+
+    # Enable direct user permission grants (allow/deny)
+    # When true, users can have permissions granted/denied directly
+    RBAC_DIRECT_PERMISSIONS_ENABLED: bool = False
+
+    # Enable conditional permissions (time-based, own-only, etc.)
+    # When true, permission conditions are evaluated
+    RBAC_CONDITIONAL_ENABLED: bool = False
+
+    # Enable Redis caching for permission resolution
+    # When true, effective permissions are cached in Redis
+    RBAC_CACHE_ENABLED: bool = True
+
+    # Cache TTL for permission resolution in seconds
+    RBAC_CACHE_TTL: int = 300
 
     # =========================================================================
     # FUTURE FLAGS (not yet implemented)

@@ -86,9 +86,30 @@ export class BasePage {
    * Submit a form via HTMX.
    */
   async htmxSubmitForm(form: Locator): Promise<void> {
-    const submitBtn = form.locator('button[type="submit"]').first();
-    await submitBtn.click();
-    await this.waitForHtmxComplete();
+    const hasHtmx = await form.evaluate((el) => {
+      return Boolean(
+        el.getAttribute('hx-post')
+          || el.getAttribute('hx-put')
+          || el.getAttribute('hx-patch')
+          || el.getAttribute('hx-delete')
+          || el.getAttribute('hx-get')
+      );
+    });
+
+    const submitBtn = form.locator('button[type="submit"], input[type="submit"]').first();
+    if (hasHtmx) {
+      await submitBtn.click();
+      await this.waitForHtmxComplete();
+      return;
+    }
+
+    const navPromise = this.page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => null);
+    if (await submitBtn.count() > 0) {
+      await submitBtn.click();
+    } else {
+      await form.press('Enter');
+    }
+    await navPromise;
   }
 
   // =========================================================================
@@ -228,7 +249,9 @@ export class BasePage {
   // =========================================================================
 
   async search(query: string): Promise<void> {
-    const searchInput = this.page.locator('input[type="search"], input[name="search"], input[placeholder*="Search"]');
+    const searchInput = this.page.locator(
+      'input[type="search"], input[name="search"], input[name="q"], input[placeholder*="Search"], [data-testid$="search"]'
+    );
     await searchInput.fill(query);
 
     // HTMX search typically triggers on keyup with delay
@@ -237,7 +260,7 @@ export class BasePage {
   }
 
   async clearSearch(): Promise<void> {
-    const searchInput = this.page.locator('input[type="search"], input[name="search"]');
+    const searchInput = this.page.locator('input[type="search"], input[name="search"], input[name="q"], [data-testid$="search"]');
     await searchInput.clear();
     await this.page.waitForTimeout(500);
     await this.waitForHtmxComplete();

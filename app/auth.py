@@ -32,6 +32,7 @@ from app.config import settings
 from app.database import get_db
 from app.models.auth import User, ServiceToken, TokenDenylist
 from app.middleware.metrics import increment_contacts_auth_failure
+from app.feature_flags import feature_flags
 
 logger = structlog.get_logger()
 
@@ -116,22 +117,51 @@ class JWTClaims(BaseModel):
 
 
 class Principal(BaseModel):
-    """Authenticated principal (user or service token)."""
+    """Authenticated principal (user or service token).
+
+    Supports granular RBAC when feature_flags.RBAC_GRANULAR_ENABLED is True:
+    - effective_permissions: Resolved permissions with allow/deny/conditions
+    - groups: List of group IDs the user belongs to
+    - has_scope() checks granular permissions with optional context
+    """
+
     type: str  # "user" or "service_token"
     id: int  # User ID or ServiceToken ID
     external_id: Optional[str] = None  # better-auth user ID (for users)
     email: Optional[str] = None
     name: Optional[str] = None
     is_superuser: bool = False
-    scopes: set[str] = set()  # Available permission scopes
+    scopes: set[str] = set()  # Available permission scopes (legacy)
     raw_claims: Optional[dict] = None  # Original JWT claims (for users)
+
+    # Granular RBAC fields
+    effective_permissions: Optional[Any] = None  # EffectivePermissions from rbac_service
+    groups: list[int] = []  # Group IDs user belongs to
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    def has_scope(self, scope: str) -> bool:
-        """Check if principal has a specific permission scope."""
+    def has_scope(self, scope: str, context: Optional[dict] = None) -> bool:
+        """Check if principal has a specific permission scope.
+
+        Args:
+            scope: The permission scope to check (e.g., "customers:write")
+            context: Optional context for conditional permission evaluation
+
+        Returns:
+            True if the principal has the required scope
+        """
         if self.is_superuser:
             return True
+
+        # Use granular RBAC if enabled and we have effective permissions
+        if feature_flags.RBAC_GRANULAR_ENABLED and self.effective_permissions:
+            return self._check_granular_permission(scope, context)
+
+        # Fall back to legacy scope checking
+        return self._check_legacy_scope(scope)
+
+    def _check_legacy_scope(self, scope: str) -> bool:
+        """Legacy scope checking without granular RBAC."""
         if "*" in self.scopes:
             return True
         if scope in self.scopes:
@@ -143,6 +173,57 @@ class Principal(BaseModel):
                 if scope.startswith(prefix):
                     return True
         return False
+
+    def _check_granular_permission(self, scope: str, context: Optional[dict] = None) -> bool:
+        """Check permission using granular RBAC with conditions."""
+        ep = self.effective_permissions
+
+        # Check explicit denies first
+        if scope in ep.denied_scopes:
+            return False
+
+        # Check wildcard denies
+        for denied in ep.denied_scopes:
+            if denied.endswith(":*") and scope.startswith(denied[:-1]):
+                return False
+
+        # Check allowed scopes
+        if scope in ep.allowed_scopes:
+            # Check conditions if present
+            conditions = ep.conditional_permissions.get(scope)
+            if conditions and context:
+                return self._evaluate_conditions(conditions, context)
+            return True
+
+        # Check wildcard allows
+        for allowed in ep.allowed_scopes:
+            if allowed == "*":
+                return True
+            if allowed.endswith(":*") and scope.startswith(allowed[:-1]):
+                return True
+
+        return False
+
+    def _evaluate_conditions(self, conditions: dict, context: dict) -> bool:
+        """Evaluate permission conditions against context."""
+        try:
+            from app.services.rbac_conditions import PermissionContext, evaluate_conditions
+
+            # Build PermissionContext from the provided context dict
+            perm_context = PermissionContext(
+                user_id=self.id,
+                resource_owner_id=context.get("owner_id"),
+                department_id=context.get("department_id"),
+                department_ids=context.get("department_ids", []),
+                client_ip=context.get("client_ip"),
+                resource=context.get("resource"),
+                request_path=context.get("request_path"),
+                request_method=context.get("request_method"),
+            )
+            return evaluate_conditions(conditions, perm_context)
+        except Exception as e:
+            logger.error("condition_evaluation_failed", scope=conditions, error=str(e))
+            return False  # Fail closed on condition evaluation errors - deny access
 
 
 # ============================================================================
@@ -445,7 +526,13 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
     # Security: Email fallback is ONLY allowed in E2E test mode
     # In production, users must match by external_id to prevent account takeover
     # via misconfigured OAuth provider email claims
-    if not user and claims.email and settings.e2e_auth_enabled and settings.e2e_jwt_secret:
+    if (
+        not user
+        and claims.email
+        and settings.e2e_auth_enabled
+        and settings.e2e_jwt_secret
+        and settings.environment in {"development", "test"}
+    ):
         user = db.query(User).filter(User.email == claims.email).first()
         if user:
             # Update external_id to match current token (for E2E tests only)
@@ -521,6 +608,11 @@ async def get_current_principal(
         HTTPException: If no valid authentication provided
     """
     if settings.auth_disabled:
+        if settings.environment not in {"development", "test"}:
+            raise HTTPException(
+                status_code=403,
+                detail="Auth disabled is only allowed in development or test environments.",
+            )
         claims = JWTClaims(
             sub="auth-disabled",
             email="auth-disabled@local",

@@ -2,19 +2,19 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Promotion Date</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">New Designation</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('employee')" x-cloak>Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('date')" x-cloak>Promotion Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('designation')" x-cloak>New Designation</th>
             <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for promotion in promotions %}
             <tr class="group hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('employee')" x-cloak>
                     <a href="/hr/lifecycle/promotions/{{ promotion.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ promotion.employee_name or 'Unknown' }}</a>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ promotion.promotion_date.strftime('%b %d, %Y') if promotion.promotion_date else '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ promotion.designation or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('date')" x-cloak>{{ promotion.promotion_date.strftime('%b %d, %Y') if promotion.promotion_date else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('designation')" x-cloak>{{ promotion.designation or '-' }}</td>
                 <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
                     <a href="/hr/lifecycle/promotions/{{ promotion.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View</a>
                 </td>

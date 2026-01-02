@@ -3,24 +3,24 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Applicant</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Job Opening</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Scheduled</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Interviewer</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('applicant')" x-cloak>Applicant</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('opening')" x-cloak>Job Opening</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('scheduled')" x-cloak>Scheduled</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('interviewer')" x-cloak>Interviewer</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('status')" x-cloak>Status</th>
             <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for interview in interviews %}
             <tr class="group hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('applicant')" x-cloak>
                     <a href="/hr/recruitment/interviews/{{ interview.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ interview.applicant_name or interview.job_applicant }}</a>
                     <p class="text-xs text-gray-500 mt-0.5">{{ interview.interview_round or 'Round 1' }}</p>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ interview.job_opening or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ interview.scheduled_on or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">{{ interview.interviewer or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('opening')" x-cloak>{{ interview.job_opening or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('scheduled')" x-cloak>{{ interview.scheduled_on or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell" x-show="isVisible('interviewer')" x-cloak>{{ interview.interviewer or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('status')" x-cloak>
                     {% set status_colors = {
                         'Pending': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
                         'Scheduled': 'bg-blue-50 text-blue-700 ring-blue-600/20',

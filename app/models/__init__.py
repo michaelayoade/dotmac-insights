@@ -62,6 +62,20 @@ from app.models.customer_note import CustomerNote
 from app.models.administrator import Administrator
 from app.models.network_monitor import NetworkMonitor
 from app.models.lead import Lead
+from app.models.party import (
+    Party,
+    PartyRole,
+    PartyRelation,
+    PartyExternalId,
+    CustomerAccount,
+    CustomerAccountContact,
+    CustomerAccountTeam,
+    CustomerAccountReseller,
+    Credential,
+    Membership,
+    RefPartyRoleType,
+    RefRelationType,
+)
 from app.models.ipv4_address import IPv4Address
 from app.models.ticket_message import TicketMessage
 from app.models.transaction_category import TransactionCategory
@@ -96,6 +110,14 @@ from app.models.auth import (
     RolePermission,
     ServiceToken,
     TokenDenylist,
+    # Granular RBAC models
+    PermissionCategory,
+    Group,
+    GroupMember,
+    GroupRole,
+    UserPermission,
+    UserSession,
+    RBACAuditLog,
 )
 from app.models.sync_cursor import SyncCursor, FailedSyncRecord
 from app.models.sync_schedule import SyncSchedule
@@ -355,6 +377,19 @@ from app.models.provisioning_log import (
     ProvisioningAction,
     ProvisioningStatus,
 )
+from app.models.cleanup import (
+    CleanupRule,
+    CleanupScan,
+    CleanupIssue,
+    CleanupJob,
+    CleanupIssueType,
+    CleanupActionType,
+    IssueSeverity,
+    IssueStatus,
+    CleanupScanStatus,
+    CleanupJobStatus,
+    CleanupEntityType,
+)
 
 __all__ = [
     "Customer",
@@ -448,6 +483,14 @@ __all__ = [
     "RolePermission",
     "ServiceToken",
     "TokenDenylist",
+    # Granular RBAC models
+    "PermissionCategory",
+    "Group",
+    "GroupMember",
+    "GroupRole",
+    "UserPermission",
+    "UserSession",
+    "RBACAuditLog",
     # Sync infrastructure
     "SyncCursor",
     "FailedSyncRecord",
@@ -567,7 +610,7 @@ __all__ = [
     "CustomerNotificationPreference",
     "TimeEntryType",
     "PhotoType",
-    # Contact model (replaces UnifiedContact)
+    # Contact model
     "Contact",
     "ContactType",
     "ContactCategory",
@@ -689,4 +732,16 @@ __all__ = [
     "ProvisioningLog",
     "ProvisioningAction",
     "ProvisioningStatus",
+    # Cleanup models
+    "CleanupRule",
+    "CleanupScan",
+    "CleanupIssue",
+    "CleanupJob",
+    "CleanupIssueType",
+    "CleanupActionType",
+    "IssueSeverity",
+    "IssueStatus",
+    "CleanupScanStatus",
+    "CleanupJobStatus",
+    "CleanupEntityType",
 ]

@@ -103,6 +103,9 @@ class CSATResponse(Base):
         ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
+    # Chatwoot sync
+    chatwoot_conversation_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+
     # Primary rating (depends on survey type)
     # CSAT: 1-5, NPS: 0-10, CES: 1-7
     rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)

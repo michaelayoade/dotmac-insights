@@ -66,7 +66,8 @@ class PurchaseOrder(Base):
 
     # Status
     status: Mapped[PurchaseOrderStatus] = mapped_column(
-        Enum(PurchaseOrderStatus), default=PurchaseOrderStatus.DRAFT, index=True
+        Enum(PurchaseOrderStatus, values_callable=lambda x: [e.value for e in x]),
+        default=PurchaseOrderStatus.DRAFT, index=True
     )
     docstatus: Mapped[int] = mapped_column(default=0)
 

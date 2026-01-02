@@ -73,6 +73,8 @@ BOOKS_TABS = [
     {"id": "general", "label": "General", "href": "/settings/books"},
     {"id": "documents", "label": "Document Numbers", "href": "/settings/books/documents"},
     {"id": "currencies", "label": "Currencies", "href": "/settings/books/currencies"},
+    {"id": "payment-terms", "label": "Payment Terms", "href": "/settings/books/payment-terms"},
+    {"id": "payment-modes", "label": "Payment Modes", "href": "/settings/books/payment-modes"},
 ]
 
 
@@ -229,4 +231,70 @@ async def currencies_list(
     context["can_edit"] = user.has_scope("books:settings:write")
 
     template = templates.get_template("modules/settings/templates/pages/books/currencies.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/payment-terms", response_class=HTMLResponse, dependencies=[RequireBooksSettingsRead])
+async def payment_terms_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Payment terms configuration."""
+    from app.models.payment_terms import PaymentTermsTemplate
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["settings_nav"] = get_settings_nav(user, "books")
+    context["books_tabs"] = BOOKS_TABS
+    context["current_tab"] = "payment-terms"
+
+    terms = db.query(PaymentTermsTemplate).order_by(PaymentTermsTemplate.template_name).all()
+
+    context["page_title"] = "Payment Terms"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Settings", "href": "/settings"},
+        {"label": "Accounting", "href": "/settings/books"},
+        {"label": "Payment Terms"},
+    ])
+
+    context["payment_terms"] = terms
+    context["can_edit"] = user.has_scope("books:settings:write")
+
+    template = templates.get_template("modules/settings/templates/pages/books/payment_terms.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/payment-modes", response_class=HTMLResponse, dependencies=[RequireBooksSettingsRead])
+async def payment_modes_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Payment modes configuration."""
+    from app.models.accounting import ModeOfPayment
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["settings_nav"] = get_settings_nav(user, "books")
+    context["books_tabs"] = BOOKS_TABS
+    context["current_tab"] = "payment-modes"
+
+    modes = db.query(ModeOfPayment).order_by(ModeOfPayment.mode_of_payment).all()
+
+    context["page_title"] = "Payment Modes"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Settings", "href": "/settings"},
+        {"label": "Accounting", "href": "/settings/books"},
+        {"label": "Payment Modes"},
+    ])
+
+    context["payment_modes"] = modes
+    context["can_edit"] = user.has_scope("books:settings:write")
+
+    template = templates.get_template("modules/settings/templates/pages/books/payment_modes.html")
     return HTMLResponse(template.render(context))

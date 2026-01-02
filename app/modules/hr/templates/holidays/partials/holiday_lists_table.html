@@ -2,25 +2,25 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Holiday List</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Period</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Holidays</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('list')" x-cloak>Holiday List</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('period')" x-cloak>Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('holidays')" x-cloak>Holidays</th>
             <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for hl in holiday_lists %}
             <tr class="group hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('list')" x-cloak>
                     <a href="/hr/holidays/{{ hl.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ hl.holiday_list_name }}</a>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('period')" x-cloak>
                     {% if hl.from_date and hl.to_date %}
                     {{ hl.from_date.strftime('%b %d, %Y') }} - {{ hl.to_date.strftime('%b %d, %Y') }}
                     {% else %}
                     -
                     {% endif %}
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('holidays')" x-cloak>
                     {{ hl.total_holidays or 0 }} holiday(s)
                 </td>
                 <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">

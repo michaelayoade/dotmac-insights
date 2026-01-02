@@ -120,12 +120,13 @@ def get_contact_type_options():
 
 def get_owner_options(db):
     """Get active employees for owner assignment dropdown."""
+    from app.models.employee import EmploymentStatus
     employees = db.query(Employee).filter(
         Employee.is_deleted == False,
-        Employee.status == "active"
-    ).order_by(Employee.first_name).all()
+        Employee.status == EmploymentStatus.ACTIVE
+    ).order_by(Employee.name).all()
     return [
-        {"value": str(e.id), "label": f"{e.first_name} {e.last_name}".strip() or e.email}
+        {"value": str(e.id), "label": e.name or e.email}
         for e in employees
     ]
 
@@ -134,9 +135,9 @@ def get_customer_options(db):
     """Get customers for linking dropdown."""
     customers = db.query(Customer).filter(
         Customer.is_deleted == False
-    ).order_by(Customer.customer_name).limit(100).all()
+    ).order_by(Customer.name).limit(100).all()
     return [
-        {"value": str(c.id), "label": c.customer_name}
+        {"value": str(c.id), "label": c.name}
         for c in customers
     ]
 

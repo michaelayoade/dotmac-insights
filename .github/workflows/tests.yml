@@ -208,6 +208,208 @@ jobs:
           fail_ci_if_error: false
 
   # ===========================================================================
+  # PLAYWRIGHT BROWSER TESTS
+  # ===========================================================================
+  browser-tests:
+    name: Browser Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: [integration-tests]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: browser_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -e ".[test]"
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run database migrations
+        run: |
+          alembic upgrade head
+        env:
+          DATABASE_URL: "postgresql+psycopg://test:test@localhost:5432/browser_db"
+
+      - name: Seed test data
+        run: |
+          python scripts/seed_test_data.py || true
+        env:
+          DATABASE_URL: "postgresql+psycopg://test:test@localhost:5432/browser_db"
+
+      - name: Start application server
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+          curl --retry 10 --retry-delay 2 --retry-connrefused http://localhost:8000/health || true
+        env:
+          DATABASE_URL: "postgresql+psycopg://test:test@localhost:5432/browser_db"
+          REDIS_URL: "redis://localhost:6379/0"
+          SECRET_KEY: "test-secret-key-for-browser-tests"
+          AUTH_DISABLED: "false"
+          E2E_AUTH_ENABLED: "true"
+          E2E_JWT_SECRET: "test-jwt-secret"
+          E2E_SUPERUSER_EMAIL: "admin@dotmac.ng"
+          E2E_SUPERUSER_PASSWORD: "admin123"
+
+      - name: Run Smoke Browser Tests
+        run: |
+          npx playwright test --grep @smoke --project=chromium
+        env:
+          BASE_URL: "http://localhost:8000"
+          E2E_SUPERUSER_EMAIL: "admin@dotmac.ng"
+          E2E_SUPERUSER_PASSWORD: "admin123"
+
+      - name: Run Critical Browser Tests
+        run: |
+          npx playwright test --grep @critical --project=chromium
+        env:
+          BASE_URL: "http://localhost:8000"
+          E2E_SUPERUSER_EMAIL: "admin@dotmac.ng"
+          E2E_SUPERUSER_PASSWORD: "admin123"
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload Test Screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-screenshots
+          path: test-results/
+          retention-days: 7
+
+  # ===========================================================================
+  # BROWSER TESTS - FULL SUITE (Manual/Scheduled)
+  # ===========================================================================
+  browser-tests-full:
+    name: Full Browser Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: browser_full_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[test]"
+          npm ci
+
+      - name: Install Playwright browsers (all)
+        run: npx playwright install --with-deps
+
+      - name: Run database migrations
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: "postgresql+psycopg://test:test@localhost:5432/browser_full_db"
+
+      - name: Seed test data
+        run: python scripts/seed_test_data.py || true
+        env:
+          DATABASE_URL: "postgresql+psycopg://test:test@localhost:5432/browser_full_db"
+
+      - name: Start application
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 5
+        env:
+          DATABASE_URL: "postgresql+psycopg://test:test@localhost:5432/browser_full_db"
+          REDIS_URL: "redis://localhost:6379/0"
+          SECRET_KEY: "test-secret-key"
+          E2E_AUTH_ENABLED: "true"
+          E2E_JWT_SECRET: "test-jwt-secret"
+
+      - name: Run Full Browser Test Suite
+        run: npx playwright test
+        env:
+          BASE_URL: "http://localhost:8000"
+          E2E_SUPERUSER_EMAIL: "admin@dotmac.ng"
+          E2E_SUPERUSER_PASSWORD: "admin123"
+
+      - name: Upload Playwright Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-full
+          path: playwright-report/
+          retention-days: 14
+
+  # ===========================================================================
   # CRITICAL PATH TESTS (GATE)
   # ===========================================================================
   critical-tests:
@@ -303,7 +505,7 @@ jobs:
   test-summary:
     name: Test Summary
     runs-on: ubuntu-latest
-    needs: [lint, unit-tests, integration-tests, critical-tests]
+    needs: [lint, unit-tests, integration-tests, critical-tests, browser-tests]
     if: always()
     steps:
       - name: Check Results
@@ -316,10 +518,12 @@ jobs:
           echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Critical Tests | ${{ needs.critical-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Browser Tests | ${{ needs.browser-tests.result }} |" >> $GITHUB_STEP_SUMMARY
 
       - name: Fail if any required job failed
         if: |
           needs.lint.result == 'failure' ||
           needs.unit-tests.result == 'failure' ||
-          needs.critical-tests.result == 'failure'
+          needs.critical-tests.result == 'failure' ||
+          needs.browser-tests.result == 'failure'
         run: exit 1

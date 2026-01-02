@@ -1,0 +1,54 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Sales</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Quotations, Orders, Invoices & Subscriptions</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {% for stat in stats %}
+        <a href="{{ stat.href }}" class="block bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow group">
+            <div class="flex items-center gap-4">
+                <div class="flex-shrink-0 w-12 h-12 rounded-xl {{ stat.icon_bg }} flex items-center justify-center group-hover:scale-105 transition-transform">
+                    {% include "components/icons/" ~ stat.icon ~ ".html" ignore missing %}
+                </div>
+                <div class="min-w-0">
+                    <p class="text-2xl font-display font-bold text-gray-900">{{ stat.value }}</p>
+                    <p class="text-sm text-gray-500 truncate">{{ stat.label }}</p>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+
+    <!-- Quick Links -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Sales Modules</h2>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for link in quick_links %}
+            <a href="{{ link.href }}" class="flex items-center gap-4 px-6 py-4 hover:bg-surface-50 transition-colors group">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
+                    {% include "components/icons/" ~ link.icon ~ ".html" ignore missing %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-gray-900 group-hover:text-primary-600 transition-colors">{{ link.label }}</p>
+                    <p class="text-sm text-gray-500">{{ link.description }}</p>
+                </div>
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

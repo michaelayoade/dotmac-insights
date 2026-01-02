@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, case, or_
+from sqlalchemy import func, case, or_, and_
 from sqlalchemy.orm import Session, selectinload
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
@@ -827,4 +827,113 @@ async def network_analytics(
     ]
 
     template = templates.get_template("modules/network/templates/pages/analytics.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# NETWORK HEALTH INSIGHTS
+# =============================================================================
+
+@router.get("/health", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
+async def network_health(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Network health insights - infrastructure issues and recommendations."""
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+
+    # POPs without routers
+    pops_without_routers = db.query(Pop).outerjoin(
+        Router, Pop.id == Router.pop_id
+    ).filter(
+        Pop.is_active.is_(True),
+        Router.id.is_(None)
+    ).all()
+
+    # POPs with high ticket counts (potential issues)
+    high_ticket_pops = db.query(
+        Pop.id,
+        Pop.name,
+        Pop.city,
+        func.count(Ticket.id).label("ticket_count"),
+        func.count(Customer.id).label("customer_count"),
+    ).outerjoin(Customer, Customer.pop_id == Pop.id).outerjoin(
+        Ticket, Ticket.customer_id == Customer.id
+    ).filter(
+        Pop.is_active.is_(True),
+        Ticket.created_at >= thirty_days_ago
+    ).group_by(Pop.id, Pop.name, Pop.city).having(
+        func.count(Ticket.id) > 10
+    ).order_by(func.count(Ticket.id).desc()).limit(10).all()
+
+    # Networks with high utilization (>80%)
+    high_util_networks = db.query(IPv4Network).filter(
+        IPv4Network.network_type == "endnet",
+        IPv4Network.total > 0,
+        IPv4Network.used > 0,
+        (IPv4Network.used * 100 / IPv4Network.total) > 80
+    ).order_by((IPv4Network.used * 100 / IPv4Network.total).desc()).limit(15).all()
+
+    # Routers with no active subscriptions (underutilized)
+    routers_no_subs = db.query(Router).outerjoin(
+        Subscription, and_(
+            Subscription.router_id == Router.id,
+            Subscription.status == SubscriptionStatus.ACTIVE
+        )
+    ).filter(
+        Subscription.id.is_(None)
+    ).limit(20).all()
+
+    # Customers without POP assignment
+    customers_no_pop = db.query(func.count(Customer.id)).filter(
+        Customer.status == CustomerStatus.ACTIVE,
+        Customer.pop_id.is_(None)
+    ).scalar() or 0
+
+    # Overall health score
+    issues = []
+    if pops_without_routers:
+        issues.append({"type": "critical", "message": f"{len(pops_without_routers)} POPs have no routers"})
+    if high_util_networks:
+        issues.append({"type": "warning", "message": f"{len(high_util_networks)} networks above 80% utilization"})
+    if customers_no_pop > 0:
+        issues.append({"type": "info", "message": f"{customers_no_pop} active customers have no POP assignment"})
+    if routers_no_subs:
+        issues.append({"type": "info", "message": f"{len(routers_no_subs)} routers have no active subscriptions"})
+
+    # Calculate health score (simplified)
+    critical_count = sum(1 for i in issues if i["type"] == "critical")
+    warning_count = sum(1 for i in issues if i["type"] == "warning")
+    health_score = max(0, 100 - (critical_count * 20) - (warning_count * 10))
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Network Health"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Network", "url": "/network"},
+        {"label": "Health"},
+    ])
+
+    context["health_score"] = health_score
+    context["issues"] = issues
+    context["pops_without_routers"] = pops_without_routers
+    context["high_ticket_pops"] = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "city": p.city,
+            "ticket_count": p.ticket_count,
+            "customer_count": p.customer_count,
+            "ticket_ratio": round(p.ticket_count / max(p.customer_count, 1), 2),
+        }
+        for p in high_ticket_pops
+    ]
+    context["high_util_networks"] = high_util_networks
+    context["routers_no_subs"] = routers_no_subs
+    context["customers_no_pop"] = customers_no_pop
+
+    template = templates.get_template("modules/network/templates/pages/health.html")
     return HTMLResponse(template.render(context))

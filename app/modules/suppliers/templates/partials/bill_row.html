@@ -8,8 +8,8 @@
     </td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ bill.posting_date.strftime('%b %d, %Y') if bill.posting_date else '-' }}</td>
     <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell {{ 'text-red-600 font-medium' if bill.is_overdue else 'text-gray-600' }}">{{ bill.due_date.strftime('%b %d, %Y') if bill.due_date else '-' }}</td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-right hidden xl:table-cell">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or 'USD' }}</td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-right {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or 'USD' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-right hidden xl:table-cell">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or base_currency }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-right {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or base_currency }}</td>
     <td class="whitespace-nowrap px-3 py-4">
         {% set status_colors = {
             'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',

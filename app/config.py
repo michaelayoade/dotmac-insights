@@ -183,6 +183,8 @@ if settings.is_production and settings.auth_disabled:
 
 # Production safety checks
 if settings.is_production and not os.getenv("PYTEST_CURRENT_TEST"):
+    if not (os.getenv("CONFIG_ENCRYPTION_KEY") or os.getenv("SECRET_KEY")):
+        raise ValueError("CONFIG_ENCRYPTION_KEY or SECRET_KEY must be set in production")
     if not settings.database_url or settings.database_url.startswith("sqlite"):
         raise ValueError("DATABASE_URL must be set to a non-sqlite database in production")
     if not settings.cors_origins_list:

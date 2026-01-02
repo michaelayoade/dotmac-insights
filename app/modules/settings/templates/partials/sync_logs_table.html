@@ -4,19 +4,19 @@
 <table class="min-w-full divide-y divide-gray-100">
     <thead>
         <tr class="bg-surface-50">
-            <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('status')" x-cloak>
                 Status
             </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('type')" x-cloak>
                 Type
             </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('records')" x-cloak>
                 Records
             </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('duration')" x-cloak>
                 Duration
             </th>
-            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+            <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('started')" x-cloak>
                 Started
             </th>
         </tr>
@@ -25,7 +25,7 @@
         {% for log in logs %}
         <tr class="hover:bg-surface-50/50 transition-colors">
             <!-- Status -->
-            <td class="py-4 pl-6 pr-3">
+            <td class="py-4 pl-6 pr-3" x-show="isVisible('status')" x-cloak>
                 {% set status_colors = {
                     'completed': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
                     'failed': 'bg-red-50 text-red-700 ring-red-600/20',
@@ -38,12 +38,12 @@
             </td>
 
             <!-- Type -->
-            <td class="px-3 py-4">
+            <td class="px-3 py-4" x-show="isVisible('type')" x-cloak>
                 <span class="text-sm text-gray-900">{{ log.sync_type | title }}</span>
             </td>
 
             <!-- Records -->
-            <td class="px-3 py-4">
+            <td class="px-3 py-4" x-show="isVisible('records')" x-cloak>
                 <div class="flex items-center gap-3 text-xs">
                     <span class="text-emerald-600" title="Created">+{{ log.records_created }}</span>
                     <span class="text-blue-600" title="Updated">{{ log.records_updated }}</span>
@@ -54,7 +54,7 @@
             </td>
 
             <!-- Duration -->
-            <td class="px-3 py-4">
+            <td class="px-3 py-4" x-show="isVisible('duration')" x-cloak>
                 {% if log.duration_seconds %}
                 <span class="text-sm text-gray-600 tabular-nums">{{ log.duration_seconds }}s</span>
                 {% elif log.status.value == 'started' %}
@@ -71,7 +71,7 @@
             </td>
 
             <!-- Started -->
-            <td class="px-3 py-4">
+            <td class="px-3 py-4" x-show="isVisible('started')" x-cloak>
                 <div>
                     <p class="text-sm text-gray-900">{{ log.started_at.strftime('%d %b %Y') }}</p>
                     <p class="text-xs text-gray-500">{{ log.started_at.strftime('%H:%M:%S') }}</p>

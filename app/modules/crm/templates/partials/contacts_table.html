@@ -15,7 +15,7 @@
                         data-testid="select-all-checkbox"
                     >
                 </th>
-                <th scope="col" class="py-3.5 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                <th scope="col" class="py-3.5 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('name')" x-cloak>
                     <a
                         href="#"
                         class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
@@ -37,16 +37,16 @@
                         {% endif %}
                     </a>
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('email')" x-cloak>
                     Email
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell" x-show="isVisible('phone')" x-cloak>
                     Phone
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell" x-show="isVisible('type')" x-cloak>
                     Type
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('status')" x-cloak>
                     Status
                 </th>
                 <th scope="col" class="relative py-3.5 pl-3 pr-6">

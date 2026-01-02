@@ -49,16 +49,16 @@ export class TicketsPage extends BasePage {
     super(page);
 
     // List page
-    this.ticketsTable = page.locator('#tickets-table, table[data-testid="tickets-table"]');
+    this.ticketsTable = page.locator('[data-testid="tickets-table"] table, #tickets-table');
     this.ticketCards = page.locator('.ticket-card, [data-testid="ticket-card"]');
-    this.searchInput = page.locator('input[name="search"], input[hx-get*="search"]');
-    this.statusFilter = page.locator('select[name="status"], [data-filter="status"]');
-    this.priorityFilter = page.locator('select[name="priority"], [data-filter="priority"]');
-    this.assigneeFilter = page.locator('select[name="assignee"], [data-filter="assignee"]');
-    this.createButton = page.locator('a[href*="/new"], button:has-text("New Ticket")');
+    this.searchInput = page.locator('[data-testid="ticket-search"], input[name="q"]');
+    this.statusFilter = page.locator('[data-testid="status-filter"], select[name="status"]');
+    this.priorityFilter = page.locator('[data-testid="priority-filter"], select[name="priority"]');
+    this.assigneeFilter = page.locator('[data-testid="my-tickets-filter"], select[name="assignee"]');
+    this.createButton = page.locator('[data-testid="new-ticket-btn"], a[href*="/new"], button:has-text("New Ticket")');
 
     // Form
-    this.ticketForm = page.locator('form[hx-post*="tickets"]');
+    this.ticketForm = page.locator('[data-testid="ticket-form"], form[action*="/support/tickets"]');
     this.subjectInput = page.locator('input[name="subject"]');
     this.descriptionInput = page.locator('textarea[name="description"]');
     this.prioritySelect = page.locator('select[name="priority"]');
@@ -106,18 +106,53 @@ export class TicketsPage extends BasePage {
   }
 
   async filterByStatus(status: 'open' | 'replied' | 'on_hold' | 'resolved' | 'closed'): Promise<void> {
-    await this.statusFilter.selectOption(status);
-    await this.waitForHtmxComplete();
+    const select = this.page.locator('select[name="status"]');
+    if (await select.count() > 0) {
+      await select.selectOption(status);
+      await this.waitForHtmxComplete();
+      return;
+    }
+
+    await this.openDropdownAndSelect(this.statusFilter, this.toTitleCase(status));
   }
 
   async filterByPriority(priority: 'low' | 'medium' | 'high' | 'urgent'): Promise<void> {
-    await this.priorityFilter.selectOption(priority);
-    await this.waitForHtmxComplete();
+    const select = this.page.locator('select[name="priority"]');
+    if (await select.count() > 0) {
+      await select.selectOption(priority);
+      await this.waitForHtmxComplete();
+      return;
+    }
+
+    await this.openDropdownAndSelect(this.priorityFilter, this.toTitleCase(priority));
   }
 
   async filterByAssignee(assigneeId: string): Promise<void> {
-    await this.assigneeFilter.selectOption(assigneeId);
-    await this.waitForHtmxComplete();
+    const select = this.page.locator('select[name="assignee"]');
+    if (await select.count() > 0) {
+      await select.selectOption(assigneeId);
+      await this.waitForHtmxComplete();
+      return;
+    }
+
+    const checkbox = this.page.locator('[data-testid="my-tickets-filter"]');
+    if (await checkbox.count() > 0 && ['me', 'self'].includes(assigneeId)) {
+      await checkbox.check();
+      await this.waitForHtmxComplete();
+    }
+  }
+
+  private toTitleCase(value: string): string {
+    return value
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  private async openDropdownAndSelect(dropdownButton: Locator, label: string): Promise<void> {
+    await dropdownButton.click();
+    const container = dropdownButton.locator('..');
+    const option = container.locator('a', { hasText: label }).first();
+    await this.htmxClick(option);
   }
 
   // =========================================================================
@@ -133,6 +168,22 @@ export class TicketsPage extends BasePage {
 
   async getTicketRowBySubject(subject: string): Promise<Locator> {
     return this.ticketsTable.locator(`tbody tr:has-text("${subject}")`);
+  }
+
+  async hasTickets(): Promise<boolean> {
+    return (await this.ticketsTable.locator('tbody tr').count()) > 0;
+  }
+
+  async ensureHasTickets(): Promise<boolean> {
+    if (await this.hasTickets()) {
+      return true;
+    }
+    const emptyState = this.page.locator('[data-testid="tickets-empty-state"], [data-testid="empty-state"]');
+    if (await emptyState.count() > 0) {
+      return false;
+    }
+    await this.page.waitForTimeout(300);
+    return await this.hasTickets();
   }
 
   async clickTicket(subject: string): Promise<void> {
@@ -255,7 +306,7 @@ export class TicketsPage extends BasePage {
   }
 
   async expectEmptyState(): Promise<void> {
-    const emptyState = this.page.locator('.empty-state, [data-testid="empty-state"]');
+    const emptyState = this.page.locator('.empty-state, [data-testid="tickets-empty-state"], [data-testid="empty-state"]');
     await expect(emptyState).toBeVisible();
   }
 }

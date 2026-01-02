@@ -3,6 +3,7 @@ import structlog
 
 from app.models.payment import Payment, PaymentMethod, PaymentSource
 from app.models.customer import Customer
+from app.models.party import CustomerAccount, PartyExternalId
 from app.models.invoice import Invoice, InvoiceSource
 from app.config import settings
 
@@ -27,6 +28,15 @@ async def sync_payments(sync_client, client, full_sync: bool):
             inv.splynx_id: inv.id
             for inv in sync_client.db.query(Invoice).filter(Invoice.source == InvoiceSource.SPLYNX).all()
         }
+        account_by_splynx_id = {
+            pe.external_id: ca.id
+            for pe, ca in (
+                sync_client.db.query(PartyExternalId, CustomerAccount)
+                .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
+                .filter(PartyExternalId.system == "splynx")
+                .all()
+            )
+        }
 
         for i, pay_data in enumerate(payments, 1):
             splynx_id = pay_data.get("id")
@@ -38,6 +48,9 @@ async def sync_payments(sync_client, client, full_sync: bool):
             # Find customer using pre-fetched map
             customer_splynx_id = pay_data.get("customer_id")
             customer_id = customers_by_splynx_id.get(customer_splynx_id)
+            customer_account_id = None
+            if customer_splynx_id is not None:
+                customer_account_id = account_by_splynx_id.get(str(customer_splynx_id))
 
             # Find invoice using pre-fetched map
             invoice_id = None
@@ -61,6 +74,7 @@ async def sync_payments(sync_client, client, full_sync: bool):
 
             if existing:
                 existing.customer_id = customer_id
+                existing.customer_account_id = customer_account_id
                 existing.invoice_id = invoice_id
                 existing.amount = amount
                 existing.payment_method = payment_method
@@ -81,6 +95,7 @@ async def sync_payments(sync_client, client, full_sync: bool):
                     splynx_id=splynx_id,
                     source=PaymentSource.SPLYNX,
                     customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     invoice_id=invoice_id,
                     amount=amount,
                     payment_method=payment_method,

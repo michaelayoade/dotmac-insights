@@ -3,18 +3,18 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Shift Name</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Start Time</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">End Time</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Status</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('shift')" x-cloak>Shift Name</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('start')" x-cloak>Start Time</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('end')" x-cloak>End Time</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('status')" x-cloak>Status</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for shift in shifts %}
             <tr class="hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-gray-900">{{ shift.shift_type_name or shift.name }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ shift.start_time }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ shift.end_time }}</td>
-                <td class="whitespace-nowrap px-3 py-4 hidden lg:table-cell">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-gray-900" x-show="isVisible('shift')" x-cloak>{{ shift.shift_type_name or shift.name }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('start')" x-cloak>{{ shift.start_time }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('end')" x-cloak>{{ shift.end_time }}</td>
+                <td class="whitespace-nowrap px-3 py-4 hidden lg:table-cell" x-show="isVisible('status')" x-cloak>
                     <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ 'bg-green-50 text-green-700 ring-green-600/20' if shift.enabled else 'bg-gray-50 text-gray-700 ring-gray-600/20' }}">
                         {{ 'Active' if shift.enabled else 'Inactive' }}
                     </span>

@@ -65,92 +65,138 @@ async def get_data_completeness(
     """
     Comprehensive data completeness analysis across all entities.
     Shows what data is available, missing, and the quality score.
+
+    Performance: Consolidated from 30+ queries to 5 aggregate queries.
     """
     _apply_statement_timeout(db)
-    total_customers = db.query(Customer).count()
 
+    # Single query for all customer field counts using CASE WHEN aggregation
+    customer_stats = db.query(
+        func.count(Customer.id).label("total"),
+        func.count(case((and_(Customer.email.isnot(None), Customer.email != ""), 1))).label("email"),
+        func.count(case((Customer.billing_email.isnot(None), 1))).label("billing_email"),
+        func.count(case((and_(Customer.phone.isnot(None), Customer.phone != ""), 1))).label("phone"),
+        func.count(case((Customer.phone_secondary.isnot(None), 1))).label("phone_secondary"),
+        func.count(case((and_(Customer.address.isnot(None), Customer.address != ""), 1))).label("address"),
+        func.count(case((and_(Customer.city.isnot(None), Customer.city != ""), 1))).label("city"),
+        func.count(case((and_(Customer.state.isnot(None), Customer.state != ""), 1))).label("state"),
+        func.count(case((Customer.zip_code.isnot(None), 1))).label("zip_code"),
+        func.count(case((and_(Customer.latitude.isnot(None), Customer.longitude.isnot(None)), 1))).label("gps_coordinates"),
+        func.count(case((Customer.pop_id.isnot(None), 1))).label("pop_assigned"),
+        func.count(case((Customer.account_number.isnot(None), 1))).label("account_number"),
+        func.count(case((Customer.signup_date.isnot(None), 1))).label("signup_date"),
+        # System linkage
+        func.count(case((Customer.splynx_id.isnot(None), 1))).label("splynx_linked"),
+        func.count(case((Customer.erpnext_id.isnot(None), 1))).label("erpnext_linked"),
+        func.count(case((Customer.chatwoot_contact_id.isnot(None), 1))).label("chatwoot_linked"),
+        func.count(case((Customer.zoho_id.isnot(None), 1))).label("zoho_linked"),
+    ).first()
+
+    total_customers = customer_stats.total
     if total_customers == 0:
         return {"error": "No customer data available", "total_customers": 0}
 
-    # Customer field completeness
+    # Extract customer field completeness from single query result
     customer_fields = {
-        "email": db.query(Customer).filter(Customer.email.isnot(None), Customer.email != "").count(),
-        "billing_email": db.query(Customer).filter(Customer.billing_email.isnot(None)).count(),
-        "phone": db.query(Customer).filter(Customer.phone.isnot(None), Customer.phone != "").count(),
-        "phone_secondary": db.query(Customer).filter(Customer.phone_secondary.isnot(None)).count(),
-        "address": db.query(Customer).filter(Customer.address.isnot(None), Customer.address != "").count(),
-        "city": db.query(Customer).filter(Customer.city.isnot(None), Customer.city != "").count(),
-        "state": db.query(Customer).filter(Customer.state.isnot(None), Customer.state != "").count(),
-        "zip_code": db.query(Customer).filter(Customer.zip_code.isnot(None)).count(),
-        "gps_coordinates": db.query(Customer).filter(
-            and_(Customer.latitude.isnot(None), Customer.longitude.isnot(None))
-        ).count(),
-        "pop_assigned": db.query(Customer).filter(Customer.pop_id.isnot(None)).count(),
-        "account_number": db.query(Customer).filter(Customer.account_number.isnot(None)).count(),
-        "signup_date": db.query(Customer).filter(Customer.signup_date.isnot(None)).count(),
+        "email": customer_stats.email,
+        "billing_email": customer_stats.billing_email,
+        "phone": customer_stats.phone,
+        "phone_secondary": customer_stats.phone_secondary,
+        "address": customer_stats.address,
+        "city": customer_stats.city,
+        "state": customer_stats.state,
+        "zip_code": customer_stats.zip_code,
+        "gps_coordinates": customer_stats.gps_coordinates,
+        "pop_assigned": customer_stats.pop_assigned,
+        "account_number": customer_stats.account_number,
+        "signup_date": customer_stats.signup_date,
     }
 
-    # System linkage
+    # Extract system linkage from same query result
     system_linkage = {
-        "splynx_linked": db.query(Customer).filter(Customer.splynx_id.isnot(None)).count(),
-        "erpnext_linked": db.query(Customer).filter(Customer.erpnext_id.isnot(None)).count(),
-        "chatwoot_linked": db.query(Customer).filter(Customer.chatwoot_contact_id.isnot(None)).count(),
-        "zoho_linked": db.query(Customer).filter(Customer.zoho_id.isnot(None)).count(),
+        "splynx_linked": customer_stats.splynx_linked,
+        "erpnext_linked": customer_stats.erpnext_linked,
+        "chatwoot_linked": customer_stats.chatwoot_linked,
+        "zoho_linked": customer_stats.zoho_linked,
     }
 
     # Calculate completeness percentages
     critical_fields = ["email", "phone", "address", "city"]
     critical_score = sum(customer_fields[f] for f in critical_fields) / (len(critical_fields) * total_customers) * 100
-
     all_fields_score = sum(customer_fields.values()) / (len(customer_fields) * total_customers) * 100
 
-    # Subscription completeness
-    total_subs = db.query(Subscription).count()
+    # Single query for subscription completeness
+    sub_stats = db.query(
+        func.count(Subscription.id).label("total"),
+        func.count(case((Subscription.tariff_id.isnot(None), 1))).label("with_tariff"),
+        func.count(case((Subscription.router_id.isnot(None), 1))).label("with_router"),
+        func.count(case((or_(Subscription.ipv4_address.isnot(None), Subscription.ipv6_address.isnot(None)), 1))).label("with_ip"),
+        func.count(case((Subscription.mac_address.isnot(None), 1))).label("with_mac"),
+    ).first()
+
     sub_completeness = {
-        "total": total_subs,
-        "with_tariff": db.query(Subscription).filter(Subscription.tariff_id.isnot(None)).count(),
-        "with_router": db.query(Subscription).filter(Subscription.router_id.isnot(None)).count(),
-        "with_ip_assigned": db.query(Subscription).filter(
-            or_(Subscription.ipv4_address.isnot(None), Subscription.ipv6_address.isnot(None))
-        ).count(),
-        "with_mac_address": db.query(Subscription).filter(Subscription.mac_address.isnot(None)).count(),
+        "total": sub_stats.total,
+        "with_tariff": sub_stats.with_tariff,
+        "with_router": sub_stats.with_router,
+        "with_ip_assigned": sub_stats.with_ip,
+        "with_mac_address": sub_stats.with_mac,
     }
 
-    # Invoice/Payment linking
-    total_invoices = db.query(Invoice).count()
-    total_payments = db.query(Payment).count()
+    # Single query for invoice quality
+    invoice_stats = db.query(
+        func.count(Invoice.id).label("total"),
+        func.count(case((Invoice.customer_id.isnot(None), 1))).label("with_customer"),
+        func.count(case((Invoice.customer_id.is_(None), 1))).label("orphaned"),
+        func.count(case((Invoice.due_date.isnot(None), 1))).label("with_due_date"),
+    ).first()
 
     invoice_quality = {
-        "total": total_invoices,
-        "with_customer": db.query(Invoice).filter(Invoice.customer_id.isnot(None)).count(),
-        "orphaned": db.query(Invoice).filter(Invoice.customer_id.is_(None)).count(),
-        "with_due_date": db.query(Invoice).filter(Invoice.due_date.isnot(None)).count(),
+        "total": invoice_stats.total,
+        "with_customer": invoice_stats.with_customer,
+        "orphaned": invoice_stats.orphaned,
+        "with_due_date": invoice_stats.with_due_date,
     }
+
+    # Single query for payment quality
+    payment_stats = db.query(
+        func.count(Payment.id).label("total"),
+        func.count(case((Payment.customer_id.isnot(None), 1))).label("with_customer"),
+        func.count(case((Payment.invoice_id.isnot(None), 1))).label("with_invoice"),
+        func.count(case((and_(Payment.customer_id.is_(None), Payment.invoice_id.is_(None)), 1))).label("orphaned"),
+    ).first()
 
     payment_quality = {
-        "total": total_payments,
-        "with_customer": db.query(Payment).filter(Payment.customer_id.isnot(None)).count(),
-        "with_invoice": db.query(Payment).filter(Payment.invoice_id.isnot(None)).count(),
-        "orphaned": db.query(Payment).filter(
-            and_(Payment.customer_id.is_(None), Payment.invoice_id.is_(None))
-        ).count(),
+        "total": payment_stats.total,
+        "with_customer": payment_stats.with_customer,
+        "with_invoice": payment_stats.with_invoice,
+        "orphaned": payment_stats.orphaned,
     }
 
-    # Conversation/Ticket linking
-    total_convos = db.query(Conversation).count()
-    total_tickets = db.query(Ticket).count()
+    # Single query for support quality (conversations + tickets)
+    convo_stats = db.query(
+        func.count(Conversation.id).label("total"),
+        func.count(case((Conversation.customer_id.isnot(None), 1))).label("linked"),
+        func.count(case((Conversation.customer_id.is_(None), 1))).label("orphaned"),
+    ).first()
+
+    ticket_stats = db.query(
+        func.count(Ticket.id).label("total"),
+        func.count(case((Ticket.customer_id.isnot(None), 1))).label("linked"),
+        func.count(case((Ticket.customer_id.is_(None), 1))).label("orphaned"),
+        func.count(case((Ticket.assigned_employee_id.isnot(None), 1))).label("assigned"),
+    ).first()
 
     support_quality = {
         "conversations": {
-            "total": total_convos,
-            "linked_to_customer": db.query(Conversation).filter(Conversation.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Conversation).filter(Conversation.customer_id.is_(None)).count(),
+            "total": convo_stats.total,
+            "linked_to_customer": convo_stats.linked,
+            "orphaned": convo_stats.orphaned,
         },
         "tickets": {
-            "total": total_tickets,
-            "linked_to_customer": db.query(Ticket).filter(Ticket.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Ticket).filter(Ticket.customer_id.is_(None)).count(),
-            "assigned_to_employee": db.query(Ticket).filter(Ticket.assigned_employee_id.isnot(None)).count(),
+            "total": ticket_stats.total,
+            "linked_to_customer": ticket_stats.linked,
+            "orphaned": ticket_stats.orphaned,
+            "assigned_to_employee": ticket_stats.assigned,
         }
     }
 

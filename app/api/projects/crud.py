@@ -11,7 +11,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models import (
     Project,
@@ -55,7 +55,7 @@ def _decimal_or_default(val: Optional[Decimal], default: Decimal = Decimal("0"))
 async def create_project(
     payload: ProjectCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new project with optional team members."""
     project = Project(
@@ -110,7 +110,7 @@ async def create_project(
                 project_status=user.project_status,
                 view_attachments=user.view_attachments if user.view_attachments is not None else True,
                 welcome_email_sent=user.welcome_email_sent if user.welcome_email_sent is not None else False,
-                idx=user.idx if user.idx is not None else idx,
+                idx=principal.idx if principal.idx is not None else idx,
                 erpnext_name=None,
             )
             db.add(project_user)
@@ -243,7 +243,7 @@ async def update_project(
                 project_status=user.project_status,
                 view_attachments=user.view_attachments if user.view_attachments is not None else True,
                 welcome_email_sent=user.welcome_email_sent if user.welcome_email_sent is not None else False,
-                idx=user.idx if user.idx is not None else idx,
+                idx=principal.idx if principal.idx is not None else idx,
                 erpnext_name=None,
             )
             db.add(project_user)

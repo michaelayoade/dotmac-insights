@@ -45,15 +45,15 @@ export class ContactsPage extends BasePage {
     super(page);
 
     // List page
-    this.contactsTable = page.locator('#contacts-table, table[data-testid="contacts-table"]');
-    this.searchInput = page.locator('input[name="search"], input[hx-get*="search"]');
-    this.typeFilter = page.locator('select[name="contact_type"], [data-filter="type"]');
-    this.statusFilter = page.locator('select[name="status"], [data-filter="status"]');
-    this.createButton = page.locator('a[href*="/new"], button:has-text("New Contact")');
-    this.bulkActions = page.locator('.bulk-actions, [data-bulk-actions]');
+    this.contactsTable = page.locator('[data-testid="contacts-table"] table, #contacts-table');
+    this.searchInput = page.locator('[data-testid="contacts-search"], input[name="q"]');
+    this.typeFilter = page.locator('[data-testid="type-filter-button"], select[name="contact_type"]');
+    this.statusFilter = page.locator('[data-testid="status-filter-button"], select[name="status"]');
+    this.createButton = page.locator('[data-testid="new-contact-button"], a[href*="/new"], button:has-text("New Contact")');
+    this.bulkActions = page.locator('[data-testid="bulk-actions-bar"], .bulk-actions, [data-bulk-actions]');
 
     // Form
-    this.contactForm = page.locator('form[hx-post*="contacts"], form[hx-put*="contacts"]');
+    this.contactForm = page.locator('[data-testid="contact-form"], form[action*="/crm/contacts"]');
     this.nameInput = page.locator('input[name="name"]');
     this.emailInput = page.locator('input[name="email"]');
     this.phoneInput = page.locator('input[name="phone"]');
@@ -99,20 +99,53 @@ export class ContactsPage extends BasePage {
   }
 
   async filterByType(type: 'lead' | 'prospect' | 'customer' | 'churned'): Promise<void> {
-    await this.typeFilter.selectOption(type);
-    await this.waitForHtmxComplete();
+    const select = this.page.locator('select[name="contact_type"]');
+    if (await select.count() > 0) {
+      await select.selectOption(type);
+      await this.waitForHtmxComplete();
+      return;
+    }
+
+    await this.openDropdownAndSelect(this.typeFilter, this.toTitleCase(type));
   }
 
   async filterByStatus(status: 'active' | 'inactive' | 'suspended'): Promise<void> {
-    await this.statusFilter.selectOption(status);
-    await this.waitForHtmxComplete();
+    const select = this.page.locator('select[name="status"]');
+    if (await select.count() > 0) {
+      await select.selectOption(status);
+      await this.waitForHtmxComplete();
+      return;
+    }
+
+    await this.openDropdownAndSelect(this.statusFilter, this.toTitleCase(status));
   }
 
   async clearFilters(): Promise<void> {
     await this.searchInput.clear();
-    await this.typeFilter.selectOption('');
-    await this.statusFilter.selectOption('');
+    const clearBtn = this.page.locator('button:has-text("Clear all")');
+    if (await clearBtn.count() > 0) {
+      await this.htmxClick(clearBtn.first());
+      return;
+    }
+
+    const typeSelect = this.page.locator('select[name="contact_type"]');
+    const statusSelect = this.page.locator('select[name="status"]');
+    if (await typeSelect.count() > 0) await typeSelect.selectOption('');
+    if (await statusSelect.count() > 0) await statusSelect.selectOption('');
     await this.waitForHtmxComplete();
+  }
+
+  private toTitleCase(value: string): string {
+    return value
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  private async openDropdownAndSelect(dropdownButton: Locator, label: string): Promise<void> {
+    await dropdownButton.click();
+    const container = dropdownButton.locator('..');
+    const option = container.locator('a', { hasText: label }).first();
+    await this.htmxClick(option);
   }
 
   // =========================================================================
@@ -125,6 +158,22 @@ export class ContactsPage extends BasePage {
 
   async getContactRowByName(name: string): Promise<Locator> {
     return this.contactsTable.locator(`tbody tr:has-text("${name}")`);
+  }
+
+  async hasContacts(): Promise<boolean> {
+    return (await this.contactsTable.locator('tbody tr').count()) > 0;
+  }
+
+  async ensureHasContacts(): Promise<boolean> {
+    if (await this.hasContacts()) {
+      return true;
+    }
+    const emptyState = this.page.locator('[data-testid="contacts-empty-state"], [data-testid="empty-state"]');
+    if (await emptyState.count() > 0) {
+      return false;
+    }
+    await this.page.waitForTimeout(300);
+    return await this.hasContacts();
   }
 
   async clickContact(name: string): Promise<void> {
@@ -164,8 +213,12 @@ export class ContactsPage extends BasePage {
     if (data.email) await this.emailInput.fill(data.email);
     if (data.phone) await this.phoneInput.fill(data.phone);
     if (data.type) await this.typeSelect.selectOption(data.type);
-    if (data.category) await this.categorySelect.selectOption(data.category);
-    if (data.company) await this.companyInput.fill(data.company);
+    if (data.category && await this.categorySelect.count() > 0) {
+      await this.categorySelect.selectOption(data.category);
+    }
+    if (data.company && await this.companyInput.count() > 0) {
+      await this.companyInput.fill(data.company);
+    }
   }
 
   async createContact(data: {
@@ -266,12 +319,14 @@ export class ContactsPage extends BasePage {
   }
 
   async expectEmptyState(): Promise<void> {
-    const emptyState = this.page.locator('.empty-state, [data-testid="empty-state"]');
+    const emptyState = this.page.locator('.empty-state, [data-testid="contacts-empty-state"], [data-testid="empty-state"]');
     await expect(emptyState).toBeVisible();
   }
 
   async expectFormError(field: string, message?: string): Promise<void> {
-    const error = this.page.locator(`[data-error="${field}"], .field-error:near(input[name="${field}"])`);
+    const error = this.page.locator(
+      `[data-error="${field}"], [data-testid="${field}-error"], .field-error:near(input[name="${field}"])`
+    );
     if (message) {
       await expect(error).toContainText(message);
     } else {

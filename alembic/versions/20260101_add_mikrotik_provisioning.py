@@ -11,6 +11,7 @@ This migration adds:
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -80,6 +81,16 @@ def upgrade():
     )
 
     # Create provisioning_logs table
+    # Use postgresql.ENUM with create_type=False since enums are already created above
+    action_enum = postgresql.ENUM(
+        'create', 'update', 'delete', 'disconnect', 'suspend', 'unsuspend',
+        name='provisioningaction', create_type=False
+    )
+    status_enum = postgresql.ENUM(
+        'pending', 'success', 'failed', 'retrying',
+        name='provisioningstatus', create_type=False
+    )
+
     op.create_table(
         'provisioning_logs',
         sa.Column('id', sa.Integer, primary_key=True, index=True),
@@ -87,14 +98,14 @@ def upgrade():
         sa.Column('router_id', sa.Integer, sa.ForeignKey('routers.id'), nullable=False, index=True),
         sa.Column(
             'action',
-            sa.Enum('create', 'update', 'delete', 'disconnect', 'suspend', 'unsuspend', name='provisioningaction'),
+            action_enum,
             nullable=False,
             index=True,
         ),
         sa.Column('access_method', sa.String(50), nullable=False),
         sa.Column(
             'status',
-            sa.Enum('pending', 'success', 'failed', 'retrying', name='provisioningstatus'),
+            status_enum,
             default='pending',
             nullable=False,
             index=True,

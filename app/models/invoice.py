@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index, text, Numeric, and_
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Index, text, Numeric, and_
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -13,6 +13,7 @@ from app.models.payment_allocation import PaymentAllocation, AllocationType
 if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.contact import Contact
+    from app.models.party import CustomerAccount
     from app.models.payment import Payment
     from app.models.credit_note import CreditNote
 
@@ -52,6 +53,14 @@ class Invoice(SoftDeleteMixin, Base):
 
     # Contact link (primary - replaces customer_id)
     contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id"), nullable=True, index=True)
+
+    # Customer account link (party-based identity)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Invoice details
     invoice_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
@@ -99,7 +108,11 @@ class Invoice(SoftDeleteMixin, Base):
     # Additional links
     fiscal_period_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fiscal_periods.id"), nullable=True)
     journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+
+    # Audit columns
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    # deleted_by_id provided by SoftDeleteMixin
 
     # Company scope
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -115,6 +128,7 @@ class Invoice(SoftDeleteMixin, Base):
     # Relationships
     customer: Mapped[Optional[Customer]] = relationship(back_populates="invoices")
     contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
     payments: Mapped[List[Payment]] = relationship(back_populates="invoice")
     credit_notes: Mapped[List[CreditNote]] = relationship(back_populates="invoice")
     lines: Mapped[List[InvoiceLine]] = relationship(
@@ -133,6 +147,23 @@ class Invoice(SoftDeleteMixin, Base):
 
     __table_args__ = (
         Index(
+            "ix_invoices_status_currency",
+            "status",
+            "currency",
+        ),
+        Index(
+            "ix_invoices_due_status_currency",
+            "due_date",
+            "status",
+            "currency",
+            postgresql_where=text(
+                "status IN ('pending','overdue','partially_paid')"
+            ),
+        ),
+        Index("ix_invoices_payment_terms_id", "payment_terms_id"),
+        Index("ix_invoices_fiscal_period_id", "fiscal_period_id"),
+        Index("ix_invoices_journal_entry_id", "journal_entry_id"),
+        Index(
             "uq_invoices_splynx_id_not_null",
             "splynx_id",
             unique=True,
@@ -144,6 +175,10 @@ class Invoice(SoftDeleteMixin, Base):
             unique=True,
             postgresql_where=text("erpnext_id IS NOT NULL"),
         ),
+        # Audit column indexes
+        Index("ix_invoices_created_by_id", "created_by_id"),
+        Index("ix_invoices_updated_by_id", "updated_by_id"),
+        Index("ix_invoices_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:

@@ -7,7 +7,7 @@ Provides circular reference detection for hierarchical data structures
 Usage:
     from app.validators.hierarchy import validate_no_circular_reference, HierarchyTable
 
-    if not validate_no_circular_reference(db, HierarchyTable.UNIFIED_CONTACTS, contact.id, new_parent_id):
+    if not validate_no_circular_reference(db, HierarchyTable.CONTACTS, contact.id, new_parent_id):
         raise HTTPException(400, "Cannot set parent: would create circular reference")
 
 Security:
@@ -31,7 +31,7 @@ class HierarchyTable(Enum):
 
     Format: (table_name, parent_field, has_deleted_at)
     """
-    UNIFIED_CONTACTS = ("unified_contacts", "parent_id", False)
+    CONTACTS = ("contacts", "parent_id", False)
     TASKS = ("tasks", "parent_task_id", False)
     TICKETS = ("tickets", "parent_ticket_id", True)   # has deleted_at
     EMPLOYEES = ("employees", "reports_to_id", True)  # has deleted_at

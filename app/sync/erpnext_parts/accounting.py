@@ -38,6 +38,7 @@ from app.models.accounting import (
     Supplier,
 )
 from app.models.customer import Customer
+from app.models.party import CustomerAccount, PartyExternalId
 from app.models.employee import Employee
 from app.models.expense import Expense, ExpenseStatus
 from app.models.invoice import Invoice, InvoiceSource, InvoiceStatus
@@ -856,7 +857,7 @@ async def sync_invoices(
             fields=[
                 "name", "customer", "posting_date", "due_date",
                 "grand_total", "outstanding_amount", "status",
-                "paid_amount", "currency",
+                "paid_amount", "currency", "company",
                 "custom_splynx_invoice_id",
             ],
             filters=filters,
@@ -887,12 +888,30 @@ async def sync_invoices(
                 Invoice.erpnext_id == erpnext_id
             ).first()
 
-            # Find customer
+            # Find customer (legacy) and customer account (party-based)
             customer_erpnext_id = inv_data.get("customer")
             customer = sync_client.db.query(Customer).filter(
                 Customer.erpnext_id == customer_erpnext_id
             ).first()
             customer_id = customer.id if customer else None
+            customer_account_id = None
+            if customer_erpnext_id:
+                party_ext = (
+                    sync_client.db.query(PartyExternalId)
+                    .filter(
+                        PartyExternalId.system == "erpnext",
+                        PartyExternalId.external_id == str(customer_erpnext_id),
+                    )
+                    .first()
+                )
+                if party_ext:
+                    account = (
+                        sync_client.db.query(CustomerAccount)
+                        .filter(CustomerAccount.party_id == party_ext.party_id)
+                        .first()
+                    )
+                    if account:
+                        customer_account_id = account.id
 
             # Map status
             status_str = (inv_data.get("status", "") or "").lower()
@@ -967,12 +986,14 @@ async def sync_invoices(
 
                 target_invoice.erpnext_id = erpnext_id
                 target_invoice.customer_id = customer_id
+                target_invoice.customer_account_id = customer_account_id
                 target_invoice.total_amount = Decimal(str(total_amount))
                 target_invoice.amount = Decimal(str(total_amount))
                 target_invoice.amount_paid = Decimal(str(paid_amount))
                 target_invoice.balance = Decimal(str(outstanding))
                 target_invoice.status = status
                 target_invoice.currency = inv_data.get("currency", "NGN")
+                target_invoice.company = inv_data.get("company") or target_invoice.company or "DotMac Limited"
                 target_invoice.last_synced_at = datetime.now(timezone.utc)
 
                 posting_dt = sync_client._parse_iso_date(inv_data.get("posting_date"))
@@ -996,6 +1017,7 @@ async def sync_invoices(
                     erpnext_id=erpnext_id,
                     source=InvoiceSource.ERPNEXT,
                     customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     invoice_number=erpnext_id,
                     total_amount=total_amount,
                     amount=total_amount,
@@ -1003,6 +1025,7 @@ async def sync_invoices(
                     balance=outstanding,
                     status=status,
                     currency=inv_data.get("currency", "NGN"),
+                    company=inv_data.get("company", "DotMac Limited"),
                     invoice_date=datetime.now(timezone.utc),
                 )
 
@@ -1079,12 +1102,30 @@ async def sync_payments(
                 Payment.erpnext_id == erpnext_id
             ).first()
 
-            # Find customer
+            # Find customer (legacy) and customer account (party-based)
             customer_erpnext_id = pay_data.get("party")
             customer = sync_client.db.query(Customer).filter(
                 Customer.erpnext_id == customer_erpnext_id
             ).first()
             customer_id = customer.id if customer else None
+            customer_account_id = None
+            if customer_erpnext_id:
+                party_ext = (
+                    sync_client.db.query(PartyExternalId)
+                    .filter(
+                        PartyExternalId.system == "erpnext",
+                        PartyExternalId.external_id == str(customer_erpnext_id),
+                    )
+                    .first()
+                )
+                if party_ext:
+                    account = (
+                        sync_client.db.query(CustomerAccount)
+                        .filter(CustomerAccount.party_id == party_ext.party_id)
+                        .first()
+                    )
+                    if account:
+                        customer_account_id = account.id
 
             amount = float(pay_data.get("paid_amount", 0) or 0)
 
@@ -1159,6 +1200,7 @@ async def sync_payments(
 
                 target_payment.erpnext_id = erpnext_id
                 target_payment.customer_id = customer_id
+                target_payment.customer_account_id = customer_account_id
                 target_payment.amount = Decimal(str(amount))
                 target_payment.payment_method = payment_method
                 target_payment.transaction_reference = pay_data.get("reference_no")
@@ -1190,6 +1232,7 @@ async def sync_payments(
                     erpnext_id=erpnext_id,
                     source=PaymentSource.ERPNEXT,
                     customer_id=customer_id,
+                    customer_account_id=customer_account_id,
                     amount=amount,
                     payment_method=payment_method,
                     receipt_number=erpnext_id,

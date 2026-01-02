@@ -27,7 +27,7 @@ Usage:
             {% if required %}required{% endif %}
             {% if disabled %}disabled{% endif %}
             {% if readonly %}readonly{% endif %}
-            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
+            class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
                    {% if error %}border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500{% endif %}
                    {% if disabled or readonly %}bg-gray-50 text-gray-500{% endif %}"
             {% if testid %}data-testid="{{ testid }}"{% else %}data-testid="input-{{ name }}"{% endif %}
@@ -57,7 +57,7 @@ Usage:
             {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
             {% if required %}required{% endif %}
             {% if disabled %}disabled{% endif %}
-            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
+            class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
                    {% if error %}border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500{% endif %}
                    {% if disabled %}bg-gray-50 text-gray-500{% endif %}"
             {% if testid %}data-testid="{{ testid }}"{% else %}data-testid="textarea-{{ name }}"{% endif %}
@@ -84,7 +84,7 @@ Usage:
             id="{{ name }}"
             {% if required %}required{% endif %}
             {% if disabled %}disabled{% endif %}
-            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
+            class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
                    {% if error %}border-red-300 text-red-900 focus:border-red-500 focus:ring-red-500{% endif %}
                    {% if disabled %}bg-gray-50 text-gray-500{% endif %}"
             {% if testid %}data-testid="{{ testid }}"{% else %}data-testid="select-{{ name }}"{% endif %}
@@ -191,7 +191,7 @@ Usage:
             {% if disabled %}disabled{% endif %}
             {% if min %}min="{{ min }}"{% endif %}
             {% if max %}max="{{ max }}"{% endif %}
-            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
+            class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
                    {% if error %}border-red-300{% endif %}
                    {% if disabled %}bg-gray-50 text-gray-500{% endif %}"
             {% if testid %}data-testid="{{ testid }}"{% else %}data-testid="date-{{ name }}"{% endif %}
@@ -223,7 +223,7 @@ Usage:
             {% if step %}step="{{ step }}"{% endif %}
             {% if required %}required{% endif %}
             {% if disabled %}disabled{% endif %}
-            class="block w-full rounded-lg border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
+            class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm
                    {% if error %}border-red-300{% endif %}
                    {% if disabled %}bg-gray-50 text-gray-500{% endif %}"
             {% if testid %}data-testid="{{ testid }}"{% else %}data-testid="number-{{ name }}"{% endif %}
@@ -257,7 +257,7 @@ Usage:
             min="0"
             {% if required %}required{% endif %}
             {% if disabled %}disabled{% endif %}
-            class="block w-full rounded-lg border-gray-300 pl-8 focus:border-primary-500 focus:ring-primary-500 sm:text-sm
+            class="block w-full rounded-xl border-gray-300 pl-8 focus:border-primary-500 focus:ring-primary-500 sm:text-sm
                    {% if error %}border-red-300{% endif %}
                    {% if disabled %}bg-gray-50 text-gray-500{% endif %}"
             {% if testid %}data-testid="{{ testid }}"{% else %}data-testid="currency-{{ name }}"{% endif %}
@@ -285,7 +285,7 @@ Usage:
         name="{{ name }}"
         value="{{ value }}"
         placeholder="{{ placeholder }}"
-        class="block w-full rounded-lg border-gray-300 pl-10 focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+        class="block w-full rounded-xl border-gray-300 pl-10 focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
         {% if hx_get %}hx-get="{{ hx_get }}"{% endif %}
         {% if hx_target %}hx-target="{{ hx_target }}"{% endif %}
         {% if hx_trigger %}hx-trigger="{{ hx_trigger }}"{% endif %}
@@ -307,7 +307,7 @@ Usage:
 {% macro submit(label="Submit", variant="primary", loading_label="Saving...", full_width=false, testid=none) %}
 <button
     type="submit"
-    class="inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold shadow-sm transition-colors
+    class="inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors
            {% if variant == 'primary' %}bg-primary-600 text-white hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600{% endif %}
            {% if variant == 'secondary' %}bg-white text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50{% endif %}
            {% if full_width %}w-full{% endif %}"
@@ -499,7 +499,7 @@ Usage:
 <button
     type="button"
     class="inline-flex items-center justify-center rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors
-           {% if size == 'sm' %}w-8 h-8{% else %}px-3 py-2 gap-2{% endif %}"
+           {% if size == 'sm' %}min-w-[44px] min-h-[44px]{% else %}px-3 py-2 gap-2{% endif %}"
     title="Delete"
     hx-delete="{{ endpoint }}"
     hx-confirm="Are you sure?"

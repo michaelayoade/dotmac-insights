@@ -25,8 +25,12 @@ templates = get_template_env()
 RequirePurchasingRead = Depends(require_scope("purchasing:read"))
 RequirePurchasingWrite = Depends(require_scope("purchasing:write"))
 
+# Allowed sort columns to prevent SQL injection via getattr
+ALLOWED_PO_SORTS = {"transaction_date", "name", "supplier_name", "status", "grand_total"}
+ALLOWED_PI_SORTS = {"posting_date", "name", "supplier_name", "status", "grand_total", "due_date"}
 
-@router.get("/dashboard", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+
+@router.get("", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
 async def purchasing_dashboard(
     request: Request,
     response: Response,
@@ -185,12 +189,13 @@ async def purchasing_dashboard(
         "to_receive": po_stats.to_receive if po_stats else 0,
         "completed": po_stats.completed if po_stats else 0,
     }
+    context["today"] = today
 
     template = templates.get_template("modules/purchasing/templates/pages/dashboard.html")
     return HTMLResponse(template.render(context))
 
 
-@router.get("", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+@router.get("/orders", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
 async def purchase_orders_list(
     request: Request,
     response: Response,
@@ -235,7 +240,9 @@ async def purchase_orders_list(
     count_query = select(func.count()).select_from(query.subquery())
     total = db.scalar(count_query) or 0
 
-    # Sorting
+    # Sorting - validate sort column against whitelist to prevent SQL injection
+    if sort not in ALLOWED_PO_SORTS:
+        sort = "transaction_date"
     sort_column = getattr(PurchaseOrder, sort, PurchaseOrder.transaction_date)
     if dir == "desc":
         query = query.order_by(sort_column.desc())
@@ -279,7 +286,7 @@ async def purchase_orders_list(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/table", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+@router.get("/orders/table", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
 async def purchase_orders_table(
     request: Request,
     response: Response,
@@ -302,7 +309,7 @@ async def purchase_orders_table(
     )
 
 
-@router.get("/{order_id}", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+@router.get("/orders/{order_id}", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
 async def purchase_order_detail(
     order_id: int,
     request: Request,
@@ -391,7 +398,9 @@ async def bills_list(
     count_query = select(func.count()).select_from(query.subquery())
     total = db.scalar(count_query) or 0
 
-    # Sorting
+    # Sorting - validate sort column against whitelist to prevent SQL injection
+    if sort not in ALLOWED_PI_SORTS:
+        sort = "posting_date"
     sort_column = getattr(PurchaseInvoice, sort, PurchaseInvoice.posting_date)
     if dir == "desc":
         query = query.order_by(sort_column.desc())
@@ -554,4 +563,427 @@ async def bill_detail(
     context["today"] = today
 
     template = templates.get_template("modules/purchasing/templates/pages/bill_detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# ============= AGING REPORT =============
+
+@router.get("/aging", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+async def ap_aging_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """AP Aging Report - aged payables by supplier."""
+    today = date.today()
+
+    # Get all unpaid bills grouped by supplier with aging buckets
+    aging_case_current = case(
+        (PurchaseInvoice.due_date >= today, PurchaseInvoice.outstanding_amount),
+        else_=Decimal("0")
+    )
+    aging_case_1_30 = case(
+        (and_(PurchaseInvoice.due_date < today, PurchaseInvoice.due_date >= today - timedelta(days=30)), PurchaseInvoice.outstanding_amount),
+        else_=Decimal("0")
+    )
+    aging_case_31_60 = case(
+        (and_(PurchaseInvoice.due_date < today - timedelta(days=30), PurchaseInvoice.due_date >= today - timedelta(days=60)), PurchaseInvoice.outstanding_amount),
+        else_=Decimal("0")
+    )
+    aging_case_61_90 = case(
+        (and_(PurchaseInvoice.due_date < today - timedelta(days=60), PurchaseInvoice.due_date >= today - timedelta(days=90)), PurchaseInvoice.outstanding_amount),
+        else_=Decimal("0")
+    )
+    aging_case_over_90 = case(
+        (PurchaseInvoice.due_date < today - timedelta(days=90), PurchaseInvoice.outstanding_amount),
+        else_=Decimal("0")
+    )
+
+    aging_by_supplier = db.execute(
+        select(
+            PurchaseInvoice.supplier_name,
+            func.count(PurchaseInvoice.id).label("bill_count"),
+            func.sum(PurchaseInvoice.outstanding_amount).label("total"),
+            func.sum(aging_case_current).label("current"),
+            func.sum(aging_case_1_30).label("days_1_30"),
+            func.sum(aging_case_31_60).label("days_31_60"),
+            func.sum(aging_case_61_90).label("days_61_90"),
+            func.sum(aging_case_over_90).label("over_90"),
+        ).where(
+            PurchaseInvoice.outstanding_amount > 0,
+        ).group_by(
+            PurchaseInvoice.supplier_name
+        ).order_by(
+            func.sum(PurchaseInvoice.outstanding_amount).desc()
+        )
+    ).all()
+
+    # Summary totals
+    summary = db.execute(
+        select(
+            func.count(PurchaseInvoice.id).label("total_bills"),
+            func.sum(PurchaseInvoice.outstanding_amount).label("total"),
+            func.sum(aging_case_current).label("current"),
+            func.sum(aging_case_1_30).label("days_1_30"),
+            func.sum(aging_case_31_60).label("days_31_60"),
+            func.sum(aging_case_61_90).label("days_61_90"),
+            func.sum(aging_case_over_90).label("over_90"),
+        ).where(
+            PurchaseInvoice.outstanding_amount > 0,
+        )
+    ).first()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "AP Aging Report"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Purchasing", "href": "/purchasing"},
+        {"label": "Aging Report"},
+    ])
+
+    context["aging_data"] = [
+        {
+            "supplier": row.supplier_name or "Unknown",
+            "bill_count": row.bill_count,
+            "total": float(row.total or 0),
+            "current": float(row.current or 0),
+            "days_1_30": float(row.days_1_30 or 0),
+            "days_31_60": float(row.days_31_60 or 0),
+            "days_61_90": float(row.days_61_90 or 0),
+            "over_90": float(row.over_90 or 0),
+        }
+        for row in aging_by_supplier
+    ]
+
+    context["summary"] = {
+        "total_bills": summary.total_bills if summary else 0,
+        "total": float(summary.total or 0) if summary else 0,
+        "current": float(summary.current or 0) if summary else 0,
+        "days_1_30": float(summary.days_1_30 or 0) if summary else 0,
+        "days_31_60": float(summary.days_31_60 or 0) if summary else 0,
+        "days_61_90": float(summary.days_61_90 or 0) if summary else 0,
+        "over_90": float(summary.over_90 or 0) if summary else 0,
+    }
+
+    context["today"] = today
+
+    template = templates.get_template("modules/purchasing/templates/pages/aging.html")
+    return HTMLResponse(template.render(context))
+
+
+# ============= EXPENSES =============
+
+@router.get("/expenses", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+async def expenses_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Expenses list - categorized purchasing expenses."""
+    from app.models.expense import Expense
+
+    today = date.today()
+    start_of_month = today.replace(day=1)
+    start_of_year = today.replace(month=1, day=1)
+
+    # Query expenses
+    query = select(Expense).order_by(Expense.posting_date.desc())
+    count_query = select(func.count()).select_from(Expense)
+    total = db.scalar(count_query) or 0
+
+    offset = (page - 1) * per_page
+    expenses = db.execute(query.offset(offset).limit(per_page)).scalars().all()
+
+    # Stats
+    mtd_total = db.execute(
+        select(func.sum(Expense.total_claimed_amount)).where(
+            Expense.posting_date >= start_of_month
+        )
+    ).scalar() or Decimal("0")
+
+    ytd_total = db.execute(
+        select(func.sum(Expense.total_claimed_amount)).where(
+            Expense.posting_date >= start_of_year
+        )
+    ).scalar() or Decimal("0")
+
+    # By category (top 10)
+    by_category = db.execute(
+        select(
+            Expense.expense_type,
+            func.count(Expense.id).label("count"),
+            func.sum(Expense.total_claimed_amount).label("total"),
+        ).where(
+            Expense.posting_date >= start_of_year
+        ).group_by(Expense.expense_type).order_by(
+            func.sum(Expense.total_claimed_amount).desc()
+        ).limit(10)
+    ).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Expenses"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Purchasing", "href": "/purchasing"},
+        {"label": "Expenses"},
+    ])
+
+    context["expenses"] = expenses
+    context["total"] = total
+    context["page"] = page
+    context["per_page"] = per_page
+    context["total_pages"] = (total + per_page - 1) // per_page
+
+    context["stats"] = {
+        "mtd_total": mtd_total,
+        "ytd_total": ytd_total,
+        "total_expenses": total,
+    }
+
+    context["by_category"] = [
+        {"category": row.expense_type or "Uncategorized", "count": row.count, "total": float(row.total or 0)}
+        for row in by_category
+    ]
+
+    template = templates.get_template("modules/purchasing/templates/pages/expenses.html")
+    return HTMLResponse(template.render(context))
+
+
+# ============= DEBIT NOTES =============
+
+@router.get("/debit-notes", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+async def debit_notes_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Debit Notes list - supplier returns and adjustments."""
+    from app.models.books_settings import DebitNote
+
+    query = select(DebitNote).order_by(DebitNote.posting_date.desc())
+    count_query = select(func.count()).select_from(DebitNote)
+    total = db.scalar(count_query) or 0
+
+    offset = (page - 1) * per_page
+    notes = db.execute(query.offset(offset).limit(per_page)).scalars().all()
+
+    # Stats
+    total_amount = db.execute(
+        select(func.sum(DebitNote.total_amount))
+    ).scalar() or Decimal("0")
+
+    outstanding = db.execute(
+        select(func.sum(DebitNote.outstanding_amount)).where(
+            DebitNote.outstanding_amount > 0
+        )
+    ).scalar() or Decimal("0")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Debit Notes"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Purchasing", "href": "/purchasing"},
+        {"label": "Debit Notes"},
+    ])
+
+    context["notes"] = notes
+    context["total"] = total
+    context["page"] = page
+    context["per_page"] = per_page
+    context["total_pages"] = (total + per_page - 1) // per_page
+
+    context["stats"] = {
+        "total_notes": total,
+        "total_amount": total_amount,
+        "outstanding": outstanding,
+    }
+
+    template = templates.get_template("modules/purchasing/templates/pages/debit_notes.html")
+    return HTMLResponse(template.render(context))
+
+
+# ============= PAYMENTS =============
+
+@router.get("/payments", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+async def purchasing_payments(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Purchase Payments list - payments made to suppliers."""
+    from app.models.supplier_payment import SupplierPayment
+
+    today = date.today()
+    start_of_month = today.replace(day=1)
+
+    # Query payments where payment_type is "Pay"
+    query = select(SupplierPayment).order_by(SupplierPayment.posting_date.desc())
+
+    count_query = select(func.count()).select_from(SupplierPayment)
+    total = db.scalar(count_query) or 0
+
+    offset = (page - 1) * per_page
+    payments = db.execute(query.offset(offset).limit(per_page)).scalars().all()
+
+    # Stats
+    mtd_paid = db.execute(
+        select(func.sum(SupplierPayment.paid_amount)).where(
+            SupplierPayment.posting_date >= start_of_month
+        )
+    ).scalar() or Decimal("0")
+
+    total_paid = db.execute(
+        select(func.sum(SupplierPayment.paid_amount))
+    ).scalar() or Decimal("0")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Purchase Payments"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Purchasing", "href": "/purchasing"},
+        {"label": "Payments"},
+    ])
+
+    context["payments"] = payments
+    context["total"] = total
+    context["page"] = page
+    context["per_page"] = per_page
+    context["total_pages"] = (total + per_page - 1) // per_page
+
+    context["stats"] = {
+        "mtd_paid": mtd_paid,
+        "total_paid": total_paid,
+        "total_count": total,
+    }
+
+    template = templates.get_template("modules/purchasing/templates/pages/payments.html")
+    return HTMLResponse(template.render(context))
+
+
+# ============= ANALYTICS =============
+
+@router.get("/analytics", response_class=HTMLResponse, dependencies=[RequirePurchasingRead])
+async def purchasing_analytics(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Purchasing analytics - spend analysis and trends."""
+    from sqlalchemy import extract
+
+    today = date.today()
+    start_of_year = today.replace(month=1, day=1)
+    twelve_months_ago = today - timedelta(days=365)
+
+    # Monthly spend trend
+    monthly_spend = db.execute(
+        select(
+            extract('year', PurchaseInvoice.posting_date).label('year'),
+            extract('month', PurchaseInvoice.posting_date).label('month'),
+            func.sum(PurchaseInvoice.grand_total).label('total'),
+            func.count(PurchaseInvoice.id).label('count'),
+        ).where(
+            PurchaseInvoice.posting_date >= twelve_months_ago
+        ).group_by(
+            extract('year', PurchaseInvoice.posting_date),
+            extract('month', PurchaseInvoice.posting_date)
+        ).order_by(
+            extract('year', PurchaseInvoice.posting_date),
+            extract('month', PurchaseInvoice.posting_date)
+        )
+    ).all()
+
+    # Top suppliers by spend YTD
+    top_suppliers = db.execute(
+        select(
+            PurchaseInvoice.supplier_name,
+            func.sum(PurchaseInvoice.grand_total).label('total'),
+            func.count(PurchaseInvoice.id).label('bill_count'),
+        ).where(
+            PurchaseInvoice.posting_date >= start_of_year
+        ).group_by(
+            PurchaseInvoice.supplier_name
+        ).order_by(
+            func.sum(PurchaseInvoice.grand_total).desc()
+        ).limit(10)
+    ).all()
+
+    # YTD totals
+    ytd_total = db.execute(
+        select(func.sum(PurchaseInvoice.grand_total)).where(
+            PurchaseInvoice.posting_date >= start_of_year
+        )
+    ).scalar() or Decimal("0")
+
+    ytd_count = db.execute(
+        select(func.count(PurchaseInvoice.id)).where(
+            PurchaseInvoice.posting_date >= start_of_year
+        )
+    ).scalar() or 0
+
+    # Active supplier count
+    active_suppliers = db.execute(
+        select(func.count(func.distinct(PurchaseInvoice.supplier_name))).where(
+            PurchaseInvoice.posting_date >= start_of_year
+        )
+    ).scalar() or 0
+
+    # Outstanding AP
+    total_outstanding = db.execute(
+        select(func.sum(PurchaseInvoice.outstanding_amount)).where(
+            PurchaseInvoice.outstanding_amount > 0
+        )
+    ).scalar() or Decimal("0")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Purchasing Analytics"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Purchasing", "href": "/purchasing"},
+        {"label": "Analytics"},
+    ])
+
+    context["monthly_spend"] = [
+        {
+            "period": f"{int(row.year)}-{int(row.month):02d}",
+            "total": float(row.total or 0),
+            "count": row.count,
+        }
+        for row in monthly_spend
+    ]
+
+    context["top_suppliers"] = [
+        {
+            "name": row.supplier_name or "Unknown",
+            "total": float(row.total or 0),
+            "bill_count": row.bill_count,
+        }
+        for row in top_suppliers
+    ]
+
+    context["stats"] = {
+        "ytd_total": ytd_total,
+        "ytd_count": ytd_count,
+        "active_suppliers": active_suppliers,
+        "total_outstanding": total_outstanding,
+        "avg_bill": round(float(ytd_total / ytd_count), 2) if ytd_count > 0 else 0,
+    }
+
+    template = templates.get_template("modules/purchasing/templates/pages/analytics.html")
     return HTMLResponse(template.render(context))

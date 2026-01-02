@@ -23,9 +23,7 @@ from .helpers import parse_date, paginate, invalidate_report_cache
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
 
 class JournalEntryAccountCreate(BaseModel):
     """Schema for creating a journal entry account line."""
@@ -51,9 +49,7 @@ class JournalEntryCreate(BaseModel):
     lines: Optional[List[JournalEntryAccountCreate]] = None
 
 
-# =============================================================================
 # JOURNAL ENTRIES LIST & DETAIL
-# =============================================================================
 
 @router.get("/journal-entries", dependencies=[Depends(Require("accounting:read"))])
 def get_journal_entries(
@@ -192,9 +188,7 @@ def get_journal_entry_detail(
     }
 
 
-# =============================================================================
 # JOURNAL ENTRY CRUD
-# =============================================================================
 
 @router.post("/journal-entries", dependencies=[Depends(Require("books:write"))])
 async def create_journal_entry(
@@ -319,7 +313,7 @@ def update_journal_entry(
     posting_date: Optional[str] = None,
     user_remark: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a draft journal entry.
 
@@ -355,7 +349,7 @@ def update_journal_entry(
     audit.log_update(
         doctype="journal_entry",
         document_id=je.id,
-        user_id=user.id,
+        user_id=principal.id,
         old_values=old_values,
         new_values=serialize_for_audit(je),
     )
@@ -372,7 +366,7 @@ def update_journal_entry(
 def delete_journal_entry(
     je_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a draft journal entry.
 
@@ -398,7 +392,7 @@ def delete_journal_entry(
     audit.log_delete(
         doctype="journal_entry",
         document_id=je.id,
-        user_id=user.id,
+        user_id=principal.id,
         old_values=old_values,
     )
 
@@ -408,15 +402,13 @@ def delete_journal_entry(
     return {"message": "Journal entry deleted"}
 
 
-# =============================================================================
 # JOURNAL ENTRY WORKFLOW ACTIONS
-# =============================================================================
 
 @router.post("/journal-entries/{je_id}/submit", dependencies=[Depends(Require("books:write"))])
 async def submit_journal_entry(
     je_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit a journal entry for approval.
 
@@ -437,7 +429,7 @@ async def submit_journal_entry(
         approval = engine.submit_document(
             doctype="journal_entry",
             document_id=je_id,
-            user_id=user.id,
+            user_id=principal.id,
             amount=je.total_debit,
             document_name=je.erpnext_id,
         )
@@ -457,7 +449,7 @@ async def approve_journal_entry(
     je_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Approve a journal entry at the current step.
 
@@ -475,7 +467,7 @@ async def approve_journal_entry(
         approval = engine.approve_document(
             doctype="journal_entry",
             document_id=je_id,
-            user_id=user.id,
+            user_id=principal.id,
             remarks=remarks,
         )
         db.commit()
@@ -494,7 +486,7 @@ async def reject_journal_entry(
     je_id: int,
     reason: str = Query(..., description="Reason for rejection"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Reject a journal entry.
 
@@ -512,7 +504,7 @@ async def reject_journal_entry(
         approval = engine.reject_document(
             doctype="journal_entry",
             document_id=je_id,
-            user_id=user.id,
+            user_id=principal.id,
             reason=reason,
         )
         db.commit()
@@ -531,7 +523,7 @@ async def post_journal_entry(
     je_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Post an approved journal entry to the GL.
 
@@ -549,7 +541,7 @@ async def post_journal_entry(
         approval = engine.post_document(
             doctype="journal_entry",
             document_id=je_id,
-            user_id=user.id,
+            user_id=principal.id,
             remarks=remarks,
         )
 

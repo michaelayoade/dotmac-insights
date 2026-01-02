@@ -1,6 +1,6 @@
 {# Single ticket row - used in table and for HTMX row updates #}
 <tr id="ticket-row-{{ ticket.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="ticket-row-{{ ticket.id }}">
-    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('ticket')" x-cloak>
         <div class="flex flex-col gap-1">
             <a
                 href="/support/tickets/{{ ticket.id }}"
@@ -23,7 +23,7 @@
             {% endif %}
         </div>
     </td>
-    <td class="whitespace-nowrap px-3 py-4">
+    <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('priority')" x-cloak>
         {% set priority_styles = {
             'low': 'bg-gray-50 text-gray-600 ring-gray-500/20',
             'medium': 'bg-blue-50 text-blue-700 ring-blue-600/20',
@@ -40,7 +40,7 @@
             {{ ticket.priority.value | title }}
         </span>
     </td>
-    <td class="whitespace-nowrap px-3 py-4 hidden md:table-cell">
+    <td class="whitespace-nowrap px-3 py-4 hidden md:table-cell" x-show="isVisible('contact')" x-cloak>
         {% if ticket.contact_name %}
         <div class="flex items-center gap-2">
             <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 ring-1 ring-gray-200/50">
@@ -61,7 +61,7 @@
         <span class="text-gray-400">-</span>
         {% endif %}
     </td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell">
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell" x-show="isVisible('assignee')" x-cloak>
         {% if ticket.assigned_to %}
         <div class="flex items-center gap-2">
             <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 ring-1 ring-primary-200/50">
@@ -84,7 +84,7 @@
         <span class="text-gray-400 italic">Unassigned</span>
         {% endif %}
     </td>
-    <td class="whitespace-nowrap px-3 py-4">
+    <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('status')" x-cloak>
         {% set status_styles = {
             'open': 'bg-blue-500',
             'in_progress': 'bg-amber-500',
@@ -102,7 +102,7 @@
         <span class="ml-2 text-xs text-red-600 font-medium">SLA Breached</span>
         {% endif %}
     </td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 hidden sm:table-cell">
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 hidden sm:table-cell" x-show="isVisible('created')" x-cloak>
         <div class="flex flex-col gap-0.5">
             <span class="font-body" data-testid="ticket-created-{{ ticket.id }}">
                 {{ ticket.created_at | timeago }}
@@ -118,7 +118,7 @@
         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <a
                 href="/support/tickets/{{ ticket.id }}"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
                 title="View"
                 data-testid="ticket-view-{{ ticket.id }}"
             >
@@ -129,7 +129,7 @@
             </a>
             <a
                 href="/support/tickets/{{ ticket.id }}/edit"
-                class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                 title="Edit"
                 data-testid="ticket-edit-{{ ticket.id }}"
             >
@@ -143,7 +143,7 @@
                     @click="open = !open"
                     @click.outside="open = false"
                     type="button"
-                    class="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                    class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
                     title="Change Status"
                     data-testid="ticket-status-menu-{{ ticket.id }}"
                 >

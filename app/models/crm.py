@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from app.models.customer import Customer
     from app.models.sales import ERPNextLead, Quotation, SalesOrder, SalesPerson
     from app.models.employee import Employee
-    from app.models.unified_contact import UnifiedContact
+    from app.models.party import Party
 
 
 # ============= OPPORTUNITY STAGE =============
@@ -73,11 +73,11 @@ class Opportunity(Base):
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
     customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
 
-    # Link to unified contact (replaces lead_id/customer_id after migration)
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Link to party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
 
     # Pipeline
@@ -126,7 +126,7 @@ class Opportunity(Base):
     # Relationships
     lead: Mapped[Optional["ERPNextLead"]] = relationship()
     customer: Mapped[Optional["Customer"]] = relationship()
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     stage_rel: Mapped[Optional["OpportunityStage"]] = relationship(back_populates="opportunities")
     owner: Mapped[Optional["Employee"]] = relationship()
     sales_person: Mapped[Optional["SalesPerson"]] = relationship()

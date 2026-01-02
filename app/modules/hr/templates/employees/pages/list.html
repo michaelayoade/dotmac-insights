@@ -25,6 +25,14 @@
 {% endblock %}
 
 {% block content %}
+{% set employee_columns = [
+    {'key': 'employee', 'label': 'Employee', 'required': True},
+    {'key': 'email', 'label': 'Email'},
+    {'key': 'department', 'label': 'Department'},
+    {'key': 'designation', 'label': 'Designation'},
+    {'key': 'status', 'label': 'Status'},
+] %}
+<div x-data="columnPicker('employees-table', {{ employee_columns  | tojson | e }})">
 <!-- Filters and Search -->
 <div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="employees-filters">
     <div class="flex flex-col sm:flex-row gap-4">
@@ -58,7 +66,7 @@
         </div>
 
         <!-- Filters -->
-        <div class="flex gap-3">
+        <div class="flex gap-3 flex-wrap items-center">
             <!-- Status filter -->
             <div class="relative" x-data="{ open: false }">
                 <button
@@ -163,6 +171,53 @@
                     {% endfor %}
                 </div>
             </div>
+
+            <div class="relative" x-data="{ open: false }" @click.away="open = false">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 border-0 rounded-xl hover:bg-surface-100 focus:ring-2 focus:ring-primary-100 transition-all duration-200"
+                    @click="open = !open"
+                >
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                    <span>Columns</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div
+                    x-show="open"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="absolute right-0 z-10 mt-2 w-52 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+                >
+                    <template x-for="col in columns" :key="col.key">
+                        <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                            <input
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                :checked="isVisible(col.key)"
+                                :disabled="col.required"
+                                @change="toggleColumn(col.key)"
+                            >
+                            <span x-text="col.label"></span>
+                        </label>
+                    </template>
+                    <button
+                        type="button"
+                        class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                        @click="resetColumns()"
+                    >
+                        Reset columns
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -224,7 +279,7 @@
         {% endif %}
         <button
             type="button"
-            class="text-xs text-primary-600 hover:text-primary-500 font-medium transition-colors"
+            class="text-xs text-primary-600 hover:text-primary-500 font-medium transition-colors px-2.5 py-1 rounded-lg bg-primary-50 hover:bg-primary-100"
             hx-get="/hr/employees/table"
             hx-target="#employees-table-container"
             hx-push-url="/hr/employees"
@@ -239,5 +294,6 @@
 <!-- Employees Table -->
 <div id="employees-table-container">
     {% include "modules/hr/templates/employees/partials/employees_table.html" %}
+</div>
 </div>
 {% endblock %}

@@ -95,7 +95,7 @@ CRM_ENTITIES: dict[str, EntityConfig] = {
             "name": {"type": FieldType.STRING, "required": True, "max_length": 255, "description": "Opportunity name"},
             "customer_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customers", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
             "lead_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "leads", "fk_lookup_fields": ["id", "email", "name"], "description": "Source lead"},
-            "unified_contact_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "contacts", "fk_lookup_fields": ["id", "email", "name"], "description": "Unified contact"},
+            "party_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "parties", "fk_lookup_fields": ["id", "name"], "description": "Party (person or organization)"},
             "stage_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "opportunity_stages", "fk_lookup_fields": ["id", "name"], "description": "Pipeline stage"},
             "owner_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "employees", "fk_lookup_fields": ["id", "email"], "description": "Owner"},
             "status": {"type": FieldType.ENUM, "enum_values": ["open", "won", "lost"], "default": "open", "description": "Status"},

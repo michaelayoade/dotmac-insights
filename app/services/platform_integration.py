@@ -25,8 +25,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.feature_flags import feature_flags
-from app.models.unified_contact import UnifiedContact
 from app.models.invoice import Invoice
+from app.models.party import PartyRole
 from app.middleware.metrics import CONTACTS_DUAL_WRITE_FAILURES
 
 logger = logging.getLogger(__name__)
@@ -424,7 +424,15 @@ async def report_usage_async(db: Session) -> None:
         logger.warning("usage_report_skipped_async reason=no_tenant_id")
         return
 
-    active_contacts = db.execute(select(func.count(UnifiedContact.id))).scalar() or 0
+    active_contacts = (
+        db.execute(
+            select(func.count(func.distinct(PartyRole.party_id))).where(
+                PartyRole.role.in_(["lead", "prospect", "customer", "churned"]),
+                PartyRole.until.is_(None),
+            )
+        ).scalar()
+        or 0
+    )
     invoices_count = db.execute(select(func.count(Invoice.id))).scalar() or 0
     dual_write_failures = 0
     try:
@@ -481,7 +489,7 @@ async def send_heartbeat_async(db: Session) -> None:
     # Simple DB check
     db_ok = True
     try:
-        db.execute(select(func.count(UnifiedContact.id)).limit(1))
+        db.execute(select(func.count(PartyRole.id)).limit(1))
     except Exception:
         db_ok = False
 

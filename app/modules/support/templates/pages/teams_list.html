@@ -1,0 +1,60 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Support Teams</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage support team structure</p>
+        </div>
+        <a href="/support/dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+            Dashboard
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Total Teams</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ summary.total_teams | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Active Teams</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ summary.active_teams | format_number }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for team in teams %}
+        <a href="/support/teams/{{ team.id }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm transition-shadow block">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">{{ team.name }}</h3>
+                {% if team.is_active %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
+                {% else %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                {% endif %}
+            </div>
+            <p class="text-sm text-gray-500 mb-4">{{ team.description or 'No description' }}</p>
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-lg font-bold text-gray-900">{{ team_stats[team.id].member_count }}</p>
+                    <p class="text-xs text-gray-500">Members</p>
+                </div>
+                <div>
+                    <p class="text-lg font-bold text-emerald-600">{{ team_stats[team.id].active_agents }}</p>
+                    <p class="text-xs text-gray-500">Active</p>
+                </div>
+                <div>
+                    <p class="text-lg font-bold text-blue-600">{{ team_stats[team.id].total_capacity }}</p>
+                    <p class="text-xs text-gray-500">Capacity</p>
+                </div>
+            </div>
+        </a>
+        {% else %}
+        <div class="col-span-full bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center text-gray-500">
+            No teams found
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

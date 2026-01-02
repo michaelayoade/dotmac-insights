@@ -2,21 +2,21 @@
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
-            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Separation Date</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Reason</th>
-            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('employee')" x-cloak>Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('date')" x-cloak>Separation Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('reason')" x-cloak>Reason</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('status')" x-cloak>Status</th>
             <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
             {% for separation in separations %}
             <tr class="group hover:bg-surface-50">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('employee')" x-cloak>
                     <a href="/hr/lifecycle/separation/{{ separation.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ separation.employee_name or 'Unknown' }}</a>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ separation.separation_date.strftime('%b %d, %Y') if separation.separation_date else '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">{{ separation.reason_for_leaving or '-' }}</td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('date')" x-cloak>{{ separation.separation_date.strftime('%b %d, %Y') if separation.separation_date else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('reason')" x-cloak>{{ separation.reason_for_leaving or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('status')" x-cloak>
                     {% set status = separation.boarding_status.value if separation.boarding_status else 'pending' %}
                     {% if status == 'completed' %}
                     <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Completed</span>

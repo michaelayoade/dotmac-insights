@@ -78,7 +78,8 @@
                             name="currency"
                             class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors w-24"
                         >
-                            <option value="USD" {{ 'selected' if (form_data.currency if form_data else (advance.currency if advance else 'USD')) == 'USD' else '' }}>USD</option>
+                            <option value="NGN" {{ 'selected' if (form_data.currency if form_data else (advance.currency if advance else base_currency)) == 'NGN' else '' }}>NGN</option>
+                            <option value="USD" {{ 'selected' if (form_data.currency if form_data else (advance.currency if advance else base_currency)) == 'USD' else '' }}>USD</option>
                             <option value="EUR" {{ 'selected' if (form_data.currency if form_data else (advance.currency if advance else '')) == 'EUR' else '' }}>EUR</option>
                             <option value="GBP" {{ 'selected' if (form_data.currency if form_data else (advance.currency if advance else '')) == 'GBP' else '' }}>GBP</option>
                         </select>

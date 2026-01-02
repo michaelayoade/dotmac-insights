@@ -11,7 +11,7 @@ from ._deps import (
     # Types
     Optional, date, datetime,
     # Context helpers
-    get_base_context, build_breadcrumbs, build_pagination_context,
+    get_base_context, build_breadcrumbs, build_pagination_context, get_navigation_context,
     # Dependencies
     SessionUser, CSRFToken, CSRFProtect, DB,
     RequireCRMRead, RequireCRMWrite,
@@ -92,6 +92,7 @@ async def activities_list(
 
     context = {
         **get_base_context(request, response, user, csrf_token),
+        "navigation": get_navigation_context(user),
         "page_title": "Activities",
         "breadcrumbs": build_breadcrumbs([
             {"label": "CRM"},
@@ -115,46 +116,10 @@ async def activities_list(
     }
 
     if is_htmx_request(request):
-        template = templates.get_template("modules/crm/activities/partials/activities_table.html")
+        template = templates.get_template("modules/crm/templates/activities/partials/activities_table.html")
         return HTMLResponse(template.render(context))
 
-    template = templates.get_template("modules/crm/activities/pages/list.html")
-    return HTMLResponse(template.render(context))
-
-
-# =============================================================================
-# ACTIVITY DETAIL
-# =============================================================================
-
-@router.get("/{activity_id}", response_class=HTMLResponse, dependencies=[RequireCRMRead])
-async def activity_detail(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    activity_id: int,
-):
-    """View activity details."""
-    service = CRMWebService(db, user_id=user.id)
-    activity = service.get_activity(activity_id)
-
-    if not activity:
-        set_flash(response, "Activity not found", "error")
-        return RedirectResponse("/crm/activities", status_code=303)
-
-    context = {
-        **get_base_context(request, response, user, csrf_token),
-        "page_title": activity.subject,
-        "breadcrumbs": build_breadcrumbs([
-            {"label": "CRM"},
-            {"label": "Activities", "url": "/crm/activities"},
-            {"label": activity.subject},
-        ]),
-        "activity": activity,
-    }
-
-    template = templates.get_template("modules/crm/activities/pages/detail.html")
+    template = templates.get_template("modules/crm/templates/activities/pages/list.html")
     return HTMLResponse(template.render(context))
 
 
@@ -179,6 +144,7 @@ async def activity_new(
 
     context = {
         **get_base_context(request, response, user, csrf_token),
+        "navigation": get_navigation_context(user),
         "page_title": "New Activity",
         "breadcrumbs": build_breadcrumbs([
             {"label": "CRM"},
@@ -203,7 +169,7 @@ async def activity_new(
         "opportunity_options": service.get_opportunity_options(),
     }
 
-    template = templates.get_template("modules/crm/activities/pages/form.html")
+    template = templates.get_template("modules/crm/templates/activities/pages/form.html")
     return HTMLResponse(template.render(context))
 
 
@@ -228,6 +194,7 @@ async def activity_create(
     if errors:
         context = {
             **get_base_context(request, response, user, csrf_token),
+            "navigation": get_navigation_context(user),
             "page_title": "New Activity",
             "breadcrumbs": build_breadcrumbs([
                 {"label": "CRM"},
@@ -283,6 +250,43 @@ async def activity_create(
 
 
 # =============================================================================
+# ACTIVITY DETAIL
+# =============================================================================
+
+@router.get("/{activity_id}", response_class=HTMLResponse, dependencies=[RequireCRMRead])
+async def activity_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    activity_id: int,
+):
+    """View activity details."""
+    service = CRMWebService(db, user_id=user.id)
+    activity = service.get_activity(activity_id)
+
+    if not activity:
+        set_flash(response, "Activity not found", "error")
+        return RedirectResponse("/crm/activities", status_code=303)
+
+    context = {
+        **get_base_context(request, response, user, csrf_token),
+        "navigation": get_navigation_context(user),
+        "page_title": activity.subject,
+        "breadcrumbs": build_breadcrumbs([
+            {"label": "CRM"},
+            {"label": "Activities", "url": "/crm/activities"},
+            {"label": activity.subject},
+        ]),
+        "activity": activity,
+    }
+
+    template = templates.get_template("modules/crm/templates/activities/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
 # EDIT ACTIVITY
 # =============================================================================
 
@@ -305,6 +309,7 @@ async def activity_edit(
 
     context = {
         **get_base_context(request, response, user, csrf_token),
+        "navigation": get_navigation_context(user),
         "page_title": f"Edit: {activity.subject}",
         "breadcrumbs": build_breadcrumbs([
             {"label": "CRM"},
@@ -325,7 +330,7 @@ async def activity_edit(
         "opportunity_options": service.get_opportunity_options(),
     }
 
-    template = templates.get_template("modules/crm/activities/pages/form.html")
+    template = templates.get_template("modules/crm/templates/activities/pages/form.html")
     return HTMLResponse(template.render(context))
 
 
@@ -356,6 +361,7 @@ async def activity_update(
     if errors:
         context = {
             **get_base_context(request, response, user, csrf_token),
+            "navigation": get_navigation_context(user),
             "page_title": f"Edit: {activity.subject}",
             "breadcrumbs": build_breadcrumbs([
                 {"label": "CRM"},
@@ -538,5 +544,5 @@ async def activity_row(
         "activity": activity,
     }
 
-    template = templates.get_template("modules/crm/activities/partials/activity_row.html")
+    template = templates.get_template("modules/crm/templates/activities/partials/activity_row.html")
     return HTMLResponse(template.render(context))

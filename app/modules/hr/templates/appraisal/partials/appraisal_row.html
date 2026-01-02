@@ -1,18 +1,18 @@
 {# Single appraisal row #}
 <tr class="group hover:bg-surface-50" id="appraisal-row-{{ appraisal.id }}">
-    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('employee')" x-cloak>
         <a href="/hr/appraisal/{{ appraisal.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ appraisal.employee_name or appraisal.employee }}</a>
     </td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">{{ appraisal.appraisal_template or '-' }}</td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ appraisal.start_date }} - {{ appraisal.end_date }}</td>
-    <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell">
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('template')" x-cloak>{{ appraisal.appraisal_template or '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('period')" x-cloak>{{ appraisal.start_date }} - {{ appraisal.end_date }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell" x-show="isVisible('score')" x-cloak>
         {% if appraisal.total_score %}
         <span class="font-medium {{ 'text-green-600' if appraisal.total_score >= 4 else ('text-yellow-600' if appraisal.total_score >= 3 else 'text-red-600') }}">{{ appraisal.total_score|round(1) }}/5</span>
         {% else %}
         <span class="text-gray-400">-</span>
         {% endif %}
     </td>
-    <td class="whitespace-nowrap px-3 py-4">
+    <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('status')" x-cloak>
         {% set status_colors = {
             'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
             'Submitted': 'bg-blue-50 text-blue-700 ring-blue-600/20',

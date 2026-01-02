@@ -3,28 +3,28 @@
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
-                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Timestamp</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">User</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Group</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Action</th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Details</th>
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('timestamp')" x-cloak>Timestamp</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('user')" x-cloak>User</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('group')" x-cloak>Group</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('action')" x-cloak>Action</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('details')" x-cloak>Details</th>
             </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
             {% for entry in entries %}
             <tr class="hover:bg-surface-50 transition-colors" x-data="{ expanded: false }">
-                <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-600">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-600" x-show="isVisible('timestamp')" x-cloak>
                     {{ entry.created_at | format_datetime }}
                 </td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('user')" x-cloak>
                     <span class="text-sm font-medium text-gray-900">{{ entry.user_email }}</span>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('group')" x-cloak>
                     <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium bg-surface-100 text-gray-700">
                         {{ entry.group_name | title }}
                     </span>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4">
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('action')" x-cloak>
                     {% set action_styles = {
                         'create': 'bg-emerald-50 text-emerald-700',
                         'update': 'bg-blue-50 text-blue-700',
@@ -35,7 +35,7 @@
                         {{ entry.action | title }}
                     </span>
                 </td>
-                <td class="px-3 py-4 text-sm text-gray-500 hidden lg:table-cell">
+                <td class="px-3 py-4 text-sm text-gray-500 hidden lg:table-cell" x-show="isVisible('details')" x-cloak>
                     <button
                         type="button"
                         class="text-primary-600 hover:text-primary-500 text-xs font-medium"

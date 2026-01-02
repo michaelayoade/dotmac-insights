@@ -15,6 +15,13 @@ import httpx
 import structlog
 
 from app.models.customer import Customer
+from app.models.party import (
+    CustomerAccount,
+    Party,
+    PartyExternalId,
+    PartyRole,
+    PartyType,
+)
 from app.models.sales import (
     CustomerGroup,
     ERPNextLead,
@@ -61,6 +68,18 @@ async def sync_customers(
             c.splynx_id: c
             for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
         }
+        # Pre-fetch party external IDs for erpnext/splynx lookups
+        party_ext_ids = (
+            sync_client.db.query(PartyExternalId)
+            .filter(PartyExternalId.system.in_(["erpnext", "splynx"]))
+            .all()
+        )
+        party_by_ext = {(p.system, p.external_id): p.party_id for p in party_ext_ids}
+
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
 
         batch_size = 500
         for i, cust_data in enumerate(customers, 1):
@@ -75,7 +94,124 @@ async def sync_customers(
                 except (ValueError, TypeError):
                     pass
 
-            existing = None
+            # Ensure party-based identity records exist
+            party = None
+            if erpnext_id:
+                party_id = party_by_ext.get(("erpnext", str(erpnext_id)))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
+
+            if not party and splynx_id is not None:
+                party_id = party_by_ext.get(("splynx", str(splynx_id)))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
+
+            if not party:
+                email = (cust_data.get("email_id") or "").strip().lower()
+                if email:
+                    party = party_email_index.get(email)
+
+            if not party:
+                customer_type = (cust_data.get("customer_type") or "").strip().lower()
+                party_type = PartyType.ORGANIZATION.value if customer_type == "company" else PartyType.PERSON.value
+                party = Party(
+                    type=party_type,
+                    name=cust_data.get("customer_name", "") or None,
+                    emails=[],
+                    phones=[],
+                )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+
+            email = cust_data.get("email_id")
+            if email:
+                email_norm = email.strip().lower()
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email_norm for e in emails):
+                    emails.append(
+                        {
+                            "address": email_norm,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+
+            phone = cust_data.get("mobile_no") or cust_data.get("custom_phone_numbers")
+            if phone:
+                phones = list(party.phones or [])
+                if not any((p.get("number") or "") == phone for p in phones):
+                    phones.append(
+                        {
+                            "number": phone,
+                            "label": "primary",
+                            "is_primary": len(phones) == 0,
+                            "can_sms": False,
+                            "can_whatsapp": False,
+                        }
+                    )
+                    party.phones = phones
+
+            if not party.name:
+                party.name = cust_data.get("customer_name") or party.name
+
+            # External ID mappings for party
+            if erpnext_id and ("erpnext", str(erpnext_id)) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="erpnext",
+                        external_id=str(erpnext_id),
+                        external_key_type="customer_id",
+                    )
+                )
+                party_by_ext[("erpnext", str(erpnext_id))] = party.id
+
+            if splynx_id is not None and ("splynx", str(splynx_id)) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="splynx",
+                        external_id=str(splynx_id),
+                        external_key_type="customer_id",
+                    )
+                )
+                party_by_ext[("splynx", str(splynx_id))] = party.id
+
+            # Ensure customer role exists
+            has_customer_role = (
+                sync_client.db.query(PartyRole)
+                .filter(PartyRole.party_id == party.id, PartyRole.role == "customer", PartyRole.until.is_(None))
+                .first()
+            )
+            if not has_customer_role:
+                sync_client.db.add(PartyRole(party_id=party.id, role="customer"))
+
+            # Ensure customer account exists
+            account = (
+                sync_client.db.query(CustomerAccount)
+                .filter(CustomerAccount.party_id == party.id)
+                .first()
+            )
+            if not account:
+                status = "suspended" if cust_data.get("disabled") else "active"
+                account = CustomerAccount(
+                    party_id=party.id,
+                    account_number=str(erpnext_id or party.id),
+                    status=status,
+                    external_ids={
+                        "erpnext_id": erpnext_id,
+                        "splynx_id": splynx_id,
+                    },
+                    billing_email=cust_data.get("email_id"),
+                )
+                sync_client.db.add(account)
+            else:
+                if cust_data.get("disabled"):
+                    account.status = "suspended"
+                if not account.billing_email:
+                    account.billing_email = cust_data.get("email_id")
 
             # Priority 1: Match by erpnext_id
             existing = sync_client.db.query(Customer).filter(

@@ -1,0 +1,189 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                {% if period.tax_type.value == 'vat' %}bg-blue-100 text-blue-700
+                {% elif period.tax_type.value == 'wht' %}bg-amber-100 text-amber-700
+                {% elif period.tax_type.value == 'cit' %}bg-purple-100 text-purple-700
+                {% elif period.tax_type.value == 'paye' %}bg-emerald-100 text-emerald-700
+                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                {{ period.tax_type.value | upper }}
+            </span>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ period.period_name }}</h1>
+        </div>
+        <p class="mt-1.5 text-gray-500 font-body">{{ period.period_start }} to {{ period.period_end }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if period.status.value == 'open' %}
+        <form method="POST" action="/accounting/tax/filing/{{ period.id }}/file" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button
+                type="submit"
+                onclick="return confirm('Mark this period as filed?')"
+                class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors duration-200"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Mark as Filed
+            </button>
+        </form>
+        {% endif %}
+        {% if period.outstanding_amount > 0 %}
+        <a
+            href="/accounting/tax/filing/{{ period.id }}/pay"
+            class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 transition-colors duration-200"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+            Record Payment
+        </a>
+        {% endif %}
+        <a
+            href="/accounting/tax/filing"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors duration-200"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to List
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Details -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Amount</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900">{{ base_currency }} {{ "{:,.2f}".format(period.tax_amount) }}</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Amount Paid</p>
+                <p class="mt-1 text-2xl font-bold text-emerald-600">{{ base_currency }} {{ "{:,.2f}".format(period.amount_paid) }}</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Outstanding</p>
+                <p class="mt-1 text-2xl font-bold {{ 'text-red-600' if period.outstanding_amount > 0 else 'text-gray-600' }}">{{ base_currency }} {{ "{:,.2f}".format(period.outstanding_amount) }}</p>
+            </div>
+        </div>
+
+        <!-- Payments -->
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900">Payments</h2>
+            </div>
+            {% if payments %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50/50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Amount</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Reference</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Method</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% for p in payments %}
+                        <tr class="hover:bg-gray-50/50 transition-colors duration-150">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ p.payment_date }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">{{ base_currency }} {{ "{:,.2f}".format(p.amount) }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ p.payment_reference or '-' }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ p.payment_method or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="px-6 py-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <p class="mt-4 text-sm text-gray-500">No payments recorded yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Status</h2>
+            <div class="space-y-4">
+                <div>
+                    <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">Filing Status</span>
+                    <div class="mt-1">
+                        {% if period.status.value == 'open' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">Open</span>
+                        {% elif period.status.value == 'filed' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">Filed</span>
+                        {% elif period.status.value == 'paid' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Paid</span>
+                        {% elif period.status.value == 'closed' %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Closed</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if period.is_overdue %}
+                <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <div class="flex items-center gap-2 text-red-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <span class="text-sm font-medium">Overdue</span>
+                    </div>
+                    <p class="mt-1 text-xs text-red-600">{{ (today - period.due_date).days }} days past due date</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Dates</h2>
+            <dl class="space-y-4">
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Period Start</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ period.period_start }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Period End</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ period.period_end }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</dt>
+                    <dd class="mt-1 text-sm {{ 'text-red-600 font-semibold' if period.is_overdue else 'text-gray-900' }}">{{ period.due_date }}</dd>
+                </div>
+                {% if period.filed_at %}
+                <div>
+                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Filed At</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ period.filed_at }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+
+        {% if period.filing_reference %}
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Filing Reference</h2>
+            <p class="text-sm text-gray-900 font-mono">{{ period.filing_reference }}</p>
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Tax Base</h2>
+            <p class="text-2xl font-bold text-gray-900">{{ base_currency }} {{ "{:,.2f}".format(period.tax_base) }}</p>
+            <p class="mt-1 text-xs text-gray-500">Taxable amount for this period</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

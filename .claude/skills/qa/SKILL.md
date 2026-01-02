@@ -19,21 +19,26 @@ Review code for issues. Automatically reads the target file or git diff.
 - Pattern violations (deviation from project conventions)
 - Edge cases not handled
 
-**Output format:**
+**Required evidence:**
+- Provide file/line references for each finding.
+- Classify severity (Critical/High/Medium/Low).
+- State the specific impact or failure mode.
+
+**Output format (standardized):**
 ```
 ## Code Review: [filename]
 
-### Critical Issues
-- [Issue with line reference and fix suggestion]
+### Findings
+- [Severity][file:line] Issue summary + impact
 
-### Warnings
-- [Potential problems]
+### Risks
+- [What could break or regress]
 
-### Suggestions
-- [Improvements, not required]
+### Fixes
+- [Concrete fix or mitigation]
 
-### Summary
-[1-2 sentence overview]
+### Tests
+- [Specific tests to add or run]
 ```
 
 ---
@@ -140,6 +145,13 @@ This skill activates automatically when:
 - Creating tests for existing code
 - Asked about edge cases or what could go wrong
 
+## Review Checklist
+- Verify auth/RBAC and permission scopes.
+- Check validation and error handling.
+- Confirm DB access is safe and efficient (no N+1, indexes).
+- Confirm response serialization and pagination format.
+- Call out missing tests or verification steps.
+
 ## Integration with Project
 
 **Test Framework Detection:**
@@ -159,8 +171,8 @@ When reviewing, I apply these severity levels:
 | Severity | Criteria | Action |
 |----------|----------|--------|
 | Critical | Security flaw, data loss, crash | Must fix before merge |
-| High | Logic error, missing validation | Should fix |
-| Medium | Code smell, missing edge case | Consider fixing |
+| High | Incorrect results or broken core behavior | Should fix |
+| Medium | Edge-case, performance, or maintainability risk | Consider fixing |
 | Low | Style, minor improvement | Optional |
 
 ## Anti-Patterns I Avoid
@@ -170,3 +182,6 @@ When reviewing, I apply these severity levels:
 - Over-testing implementation details vs behavior
 - Suggesting changes outside the scope of review
 - False positives on intentional patterns
+
+## References
+- See `reference.md` for concrete review patterns and test examples.

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.accounting import (
     Account,
@@ -64,9 +64,7 @@ class CostCenterUpdateRequest(BaseModel):
     rgt: Optional[int] = None
 
 
-# =============================================================================
 # FISCAL YEARS
-# =============================================================================
 
 @router.get("/fiscal-years", dependencies=[Depends(Require("accounting:read"))])
 def get_fiscal_years(
@@ -149,9 +147,7 @@ def delete_fiscal_year(
     return {"status": "disabled", "fiscal_year_id": fiscal_year_id}
 
 
-# =============================================================================
 # FISCAL PERIODS
-# =============================================================================
 
 @router.get("/fiscal-periods", dependencies=[Depends(Require("books:read"))])
 def list_fiscal_periods(
@@ -230,7 +226,7 @@ async def create_fiscal_periods(
     fiscal_year_id: int = Query(..., description="ID of the fiscal year"),
     period_type: str = Query("month", description="Period type: month or quarter"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Auto-create fiscal periods for a fiscal year.
 
@@ -254,7 +250,7 @@ async def create_fiscal_periods(
         periods = manager.create_fiscal_periods_for_year(
             fiscal_year_id=fiscal_year_id,
             period_type=ptype,
-            user_id=user.id,
+            user_id=principal.id,
         )
         db.commit()
         return {
@@ -280,7 +276,7 @@ async def close_fiscal_period(
     soft_close: bool = Query(True, description="Soft close (can be reopened) vs hard close"),
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:close")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Close a fiscal period.
 
@@ -298,7 +294,7 @@ async def close_fiscal_period(
     try:
         period = manager.close_period(
             period_id=period_id,
-            user_id=user.id,
+            user_id=principal.id,
             soft_close=soft_close,
             remarks=remarks,
         )
@@ -323,7 +319,7 @@ async def reopen_fiscal_period(
     period_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:close")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Reopen a soft-closed fiscal period.
 
@@ -340,7 +336,7 @@ async def reopen_fiscal_period(
     try:
         period = manager.reopen_period(
             period_id=period_id,
-            user_id=user.id,
+            user_id=principal.id,
             remarks=remarks,
         )
         db.commit()
@@ -360,7 +356,7 @@ async def generate_closing_entries(
     retained_earnings_account: Optional[str] = None,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:close")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Generate closing journal entries for a fiscal period.
 
@@ -378,7 +374,7 @@ async def generate_closing_entries(
     try:
         je = manager.generate_closing_entries(
             period_id=period_id,
-            user_id=user.id,
+            user_id=principal.id,
             retained_earnings_account=retained_earnings_account,
             remarks=remarks,
         )
@@ -398,9 +394,7 @@ async def generate_closing_entries(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # COST CENTERS
-# =============================================================================
 
 @router.get("/cost-centers", dependencies=[Depends(Require("accounting:read"))])
 def get_cost_centers(

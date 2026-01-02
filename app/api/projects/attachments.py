@@ -11,7 +11,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models import (
     Project,
@@ -104,7 +104,7 @@ async def upload_entity_attachment(
     description: Optional[str] = Form(None),
     is_primary: bool = Form(False),
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Upload an attachment for a project entity."""
     if entity_type not in ATTACHMENT_ENTITY_TYPES:
@@ -178,7 +178,7 @@ async def upload_entity_attachment(
         attachment_type=attachment_type,
         is_primary=is_primary,
         description=description,
-        uploaded_by_id=user.id if hasattr(user, "id") else None,
+        uploaded_by_id=principal.id,
     )
     db.add(attachment)
 
@@ -189,7 +189,7 @@ async def upload_entity_attachment(
         entity_id=entity_id,
         activity_type=ProjectActivityType.ATTACHMENT_ADDED,
         description=f"Attachment '{file.filename}' added",
-        actor_id=user.id if hasattr(user, "id") else None,
+        actor_id=principal.id,
         actor_name=user.name if hasattr(user, "name") else None,
         actor_email=user.email if hasattr(user, "email") else None,
     )
@@ -239,7 +239,7 @@ async def get_attachment(
 async def delete_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("projects:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an attachment."""
     attachment = db.query(DocumentAttachment).filter(

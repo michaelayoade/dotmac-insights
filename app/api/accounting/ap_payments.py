@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
@@ -20,26 +20,12 @@ from app.services.payment_allocation_service import (
 )
 
 from .helpers import parse_date, paginate
+from .schemas.allocation import AllocationCreate
 
 router = APIRouter()
 
 
-# =============================================================================
 # PYDANTIC SCHEMAS
-# =============================================================================
-
-class AllocationCreate(BaseModel):
-    """Schema for creating a payment allocation."""
-    document_type: str  # bill, debit_note
-    document_id: int
-    allocated_amount: float
-    discount_amount: float = 0
-    write_off_amount: float = 0
-    discount_type: Optional[str] = None
-    discount_account: Optional[str] = None
-    write_off_account: Optional[str] = None
-    write_off_reason: Optional[str] = None
-
 
 class SupplierPaymentCreate(BaseModel):
     """Schema for creating a supplier payment."""
@@ -50,8 +36,8 @@ class SupplierPaymentCreate(BaseModel):
     mode_of_payment: Optional[str] = None
     bank_account_id: Optional[int] = None
     currency: str = "NGN"
-    paid_amount: float
-    conversion_rate: float = 1
+    paid_amount: float = Field(..., gt=0, description="Payment amount must be positive")
+    conversion_rate: float = Field(default=1, gt=0, description="Conversion rate must be positive")
     reference_number: Optional[str] = None
     reference_date: Optional[str] = None
     remarks: Optional[str] = None
@@ -65,16 +51,14 @@ class SupplierPaymentUpdate(BaseModel):
     posting_date: Optional[str] = None
     mode_of_payment: Optional[str] = None
     bank_account_id: Optional[int] = None
-    paid_amount: Optional[float] = None
-    conversion_rate: Optional[float] = None
+    paid_amount: Optional[float] = Field(default=None, gt=0, description="Payment amount must be positive")
+    conversion_rate: Optional[float] = Field(default=None, gt=0, description="Conversion rate must be positive")
     reference_number: Optional[str] = None
     reference_date: Optional[str] = None
     remarks: Optional[str] = None
 
 
-# =============================================================================
 # AP PAYMENTS LIST & DETAIL
-# =============================================================================
 
 @router.get("/ap-payments", dependencies=[Depends(Require("accounting:read"))])
 def list_ap_payments(
@@ -97,7 +81,11 @@ def list_ap_payments(
             status_enum = SupplierPaymentStatus(status.lower())
             query = query.filter(SupplierPayment.status == status_enum)
         except ValueError:
-            pass
+            valid_statuses = [s.value for s in SupplierPaymentStatus]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{status}'. Valid values: {valid_statuses}"
+            )
 
     if start_date:
         query = query.filter(SupplierPayment.payment_date >= parse_date(start_date, "start_date"))
@@ -185,15 +173,13 @@ def get_ap_payment(
     }
 
 
-# =============================================================================
 # AP PAYMENTS CRUD
-# =============================================================================
 
 @router.post("/ap-payments", dependencies=[Depends(Require("books:write"))])
 def create_ap_payment(
     data: SupplierPaymentCreate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new supplier payment."""
     # Generate payment number
@@ -221,7 +207,7 @@ def create_ap_payment(
         remarks=data.remarks,
         company=data.company,
         status=SupplierPaymentStatus.DRAFT,
-        created_by_id=user.id,
+        created_by_id=principal.id,
     )
 
     # Calculate base amount
@@ -253,7 +239,7 @@ def create_ap_payment(
             alloc_service.allocate_payment(
                 payment_id=payment.id,
                 allocations=alloc_requests,
-                user_id=user.id,
+                user_id=principal.id,
                 is_supplier_payment=True,
             )
         except PaymentAllocationError as e:
@@ -275,10 +261,11 @@ def update_ap_payment(
     payment_id: int,
     data: SupplierPaymentUpdate,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a draft supplier payment."""
-    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
+    # Use SELECT FOR UPDATE to prevent race conditions on concurrent updates
+    payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).with_for_update().first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
@@ -341,16 +328,14 @@ def delete_ap_payment(
     return {"message": "Payment deleted"}
 
 
-# =============================================================================
 # ALLOCATIONS
-# =============================================================================
 
 @router.post("/ap-payments/{payment_id}/allocations", dependencies=[Depends(Require("books:write"))])
 def add_payment_allocations(
     payment_id: int,
     allocations: List[AllocationCreate],
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Add allocations to a supplier payment."""
     payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
@@ -380,7 +365,7 @@ def add_payment_allocations(
         created = alloc_service.allocate_payment(
             payment_id=payment_id,
             allocations=alloc_requests,
-            user_id=user.id,
+            user_id=principal.id,
             is_supplier_payment=True,
         )
         db.commit()
@@ -397,7 +382,7 @@ def remove_payment_allocation(
     payment_id: int,
     allocation_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Remove an allocation from a supplier payment."""
     payment = db.query(SupplierPayment).filter(SupplierPayment.id == payment_id).first()
@@ -409,22 +394,20 @@ def remove_payment_allocation(
 
     alloc_service = PaymentAllocationService(db)
     try:
-        alloc_service.remove_allocation(allocation_id, user.id)
+        alloc_service.remove_allocation(allocation_id, principal.id)
         db.commit()
         return {"message": "Allocation removed"}
     except PaymentAllocationError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # WORKFLOW
-# =============================================================================
 
 @router.post("/ap-payments/{payment_id}/submit", dependencies=[Depends(Require("books:write"))])
 def submit_ap_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit a supplier payment for approval."""
     from app.services.approval_engine import ApprovalEngine, ApprovalError
@@ -441,7 +424,7 @@ def submit_ap_payment(
         approval = engine.submit_document(
             doctype="supplier_payment",
             document_id=payment_id,
-            user_id=user.id,
+            user_id=principal.id,
             amount=payment.paid_amount,
             document_name=payment.payment_number,
         )
@@ -462,7 +445,7 @@ def approve_ap_payment(
     payment_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Approve a supplier payment."""
     from app.services.approval_engine import ApprovalEngine, ApprovalError
@@ -476,7 +459,7 @@ def approve_ap_payment(
         approval = engine.approve_document(
             doctype="supplier_payment",
             document_id=payment_id,
-            user_id=user.id,
+            user_id=principal.id,
             remarks=remarks,
         )
         payment.status = SupplierPaymentStatus.APPROVED
@@ -496,7 +479,7 @@ def reject_ap_payment(
     payment_id: int,
     reason: str = Query(..., description="Reason for rejection"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Reject a supplier payment."""
     from app.services.approval_engine import ApprovalEngine, ApprovalError
@@ -510,7 +493,7 @@ def reject_ap_payment(
         approval = engine.reject_document(
             doctype="supplier_payment",
             document_id=payment_id,
-            user_id=user.id,
+            user_id=principal.id,
             reason=reason,
         )
         payment.status = SupplierPaymentStatus.DRAFT
@@ -530,7 +513,7 @@ async def post_ap_payment(
     payment_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Post an approved supplier payment to the GL."""
     from app.services.document_posting import DocumentPostingService, PostingError
@@ -545,7 +528,7 @@ async def post_ap_payment(
 
     posting_service = DocumentPostingService(db)
     try:
-        je = posting_service.post_supplier_payment(payment_id, user.id)
+        je = posting_service.post_supplier_payment(payment_id, principal.id)
         payment.status = SupplierPaymentStatus.POSTED
         payment.workflow_status = "posted"
         db.commit()
@@ -561,9 +544,7 @@ async def post_ap_payment(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
 # OUTSTANDING BILLS
-# =============================================================================
 
 @router.get("/ap-payments/outstanding-bills", dependencies=[Depends(Require("accounting:read"))])
 def get_outstanding_bills(

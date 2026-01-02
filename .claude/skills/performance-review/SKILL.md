@@ -7,6 +7,18 @@ description: Database and query performance optimization skill. Detects N+1 quer
 
 Analyze and optimize database performance in this FastAPI/SQLAlchemy application.
 
+## Automatic Activation
+- Trigger when editing routes, queries, or models that add filters, joins, or ordering.
+- Require index checks for new filter/order_by fields.
+
+## Severity Levels
+| Severity | Criteria | Action |
+|----------|----------|--------|
+| Critical | Security flaw, data loss, crash | Must fix before merge |
+| High | Incorrect results or broken core behavior | Should fix |
+| Medium | Edge-case, performance, or maintainability risk | Consider fixing |
+| Low | Style or minor improvement | Optional |
+
 ## Commands
 
 ### `/performance-review scan [file_or_module]`
@@ -23,21 +35,21 @@ Scan code for performance anti-patterns.
 | Count + Query | Medium | Separate `.count()` then `.all()` on same query |
 | In-Memory Filter | Low | Python filtering after fetching all rows |
 
-**Output format:**
+**Output format (standardized):**
 ```
 ## Performance Scan: [target]
 
-### Critical Issues
-- [N+1 at file:line - fix suggestion]
+### Findings
+- [Severity][file:line] Issue summary + impact
 
-### High Priority
-- [Missing index recommendations]
+### Risks
+- [Perf risk and scale impact]
 
-### Optimizations
-- [Other improvements]
+### Fixes
+- [Index/eager-load/pagination changes]
 
-### Summary
-[Performance impact estimate]
+### Tests
+- [Bench or regression checks]
 ```
 
 ---
@@ -198,6 +210,11 @@ __table_args__ = (
           postgresql_where=text("status = 'pending'")),
 )
 ```
+
+## Required Checks
+- N+1 risks and relationship loading strategy.
+- Index coverage for filter/order_by fields.
+- Pagination on list endpoints.
 
 ### Query Optimization Patterns
 

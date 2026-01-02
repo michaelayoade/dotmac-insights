@@ -102,9 +102,9 @@ async def suppliers_list(
     context["supplier_groups"] = supplier_groups
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("suppliers/partials/suppliers_table.html")
+        template = templates.get_template("modules/suppliers/templates/partials/suppliers_table.html")
     else:
-        template = templates.get_template("suppliers/pages/list.html")
+        template = templates.get_template("modules/suppliers/templates/pages/list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -204,9 +204,9 @@ async def bills_list(
     ]
 
     if request.headers.get("HX-Request"):
-        template = templates.get_template("suppliers/partials/bills_table.html")
+        template = templates.get_template("modules/suppliers/templates/partials/bills_table.html")
     else:
-        template = templates.get_template("suppliers/pages/bills_list.html")
+        template = templates.get_template("modules/suppliers/templates/pages/bills_list.html")
 
     return HTMLResponse(template.render(context))
 
@@ -260,7 +260,7 @@ async def supplier_detail(
     context["recent_bills"] = recent_bills
     context["outstanding_amount"] = outstanding
 
-    template = templates.get_template("suppliers/pages/detail.html")
+    template = templates.get_template("modules/suppliers/templates/pages/detail.html")
     return HTMLResponse(template.render(context))
 
 
@@ -293,5 +293,5 @@ async def bill_detail(
     context["page_title"] = f"Bill: {bill.erpnext_id or bill.id}"
     context["bill"] = bill
 
-    template = templates.get_template("suppliers/pages/bill_detail.html")
+    template = templates.get_template("modules/suppliers/templates/pages/bill_detail.html")
     return HTMLResponse(template.render(context))

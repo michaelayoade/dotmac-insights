@@ -5,7 +5,7 @@
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
-                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('ticket')" x-cloak>
                     <a
                         href="#"
                         class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
@@ -27,19 +27,19 @@
                         {% endif %}
                     </a>
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('priority')" x-cloak>
                     Priority
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell" x-show="isVisible('contact')" x-cloak>
                     Contact
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell" x-show="isVisible('assignee')" x-cloak>
                     Assigned To
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('status')" x-cloak>
                     Status
                 </th>
-                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell" x-show="isVisible('created')" x-cloak>
                     <a
                         href="#"
                         class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"

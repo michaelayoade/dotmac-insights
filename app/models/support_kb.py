@@ -60,6 +60,11 @@ class KBCategory(Base):
     # Flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
+    # Chatwoot sync
+    chatwoot_portal_slug: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    chatwoot_category_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -126,6 +131,10 @@ class KBArticle(Base):
 
     # Related articles (JSON array of article IDs)
     related_article_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
+
+    # Chatwoot sync
+    chatwoot_article_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

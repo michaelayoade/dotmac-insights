@@ -2,8 +2,10 @@
 HR Routes Aggregation.
 
 Combines all HR sub-module routers into a single router.
+Also provides redirects to expenses and performance modules.
 """
 from fastapi import APIRouter
+from fastapi.responses import RedirectResponse
 
 from .dashboard import router as dashboard_router
 from .employees import router as employees_router
@@ -33,3 +35,28 @@ router.include_router(appraisal_router)
 router.include_router(recruitment_router)
 router.include_router(lifecycle_router)
 router.include_router(holidays_router)
+
+
+# Redirects for consolidated modules
+@router.get("/expenses")
+async def hr_expenses_redirect():
+    """Redirect to expenses module."""
+    return RedirectResponse(url="/expenses", status_code=302)
+
+
+@router.get("/expenses/{path:path}")
+async def hr_expenses_path_redirect(path: str):
+    """Redirect expense sub-paths."""
+    return RedirectResponse(url=f"/expenses/{path}", status_code=302)
+
+
+@router.get("/performance")
+async def hr_performance_redirect():
+    """Redirect to performance module."""
+    return RedirectResponse(url="/performance", status_code=302)
+
+
+@router.get("/performance/{path:path}")
+async def hr_performance_path_redirect(path: str):
+    """Redirect performance sub-paths."""
+    return RedirectResponse(url=f"/performance/{path}", status_code=302)

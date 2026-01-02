@@ -3,19 +3,19 @@
     <table class="min-w-full divide-y divide-gray-100" data-testid="routers-table">
         <thead>
             <tr class="bg-gradient-to-r from-surface-50 to-surface-100/50">
-                <th class="py-3.5 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                <th class="py-3.5 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display" x-show="isVisible('router')" x-cloak>
                     Router
                 </th>
-                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell">
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell" x-show="isVisible('ip')" x-cloak>
                     IP Address
                 </th>
-                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell">
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell" x-show="isVisible('nas')" x-cloak>
                     NAS IP
                 </th>
-                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden lg:table-cell">
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden lg:table-cell" x-show="isVisible('pop')" x-cloak>
                     POP
                 </th>
-                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display" x-show="isVisible('status')" x-cloak>
                     Status
                 </th>
                 <th class="py-3.5 pl-3 pr-6 w-24">
@@ -27,7 +27,7 @@
             {% if routers %}
                 {% for router in routers %}
                 <tr class="group hover:bg-surface-50 transition-all duration-200" data-testid="router-row-{{ router.id }}">
-                    <td class="py-4 pl-6 pr-3">
+                    <td class="py-4 pl-6 pr-3" x-show="isVisible('router')" x-cloak>
                         <div class="flex items-center gap-3">
                             <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-indigo-50 to-violet-100 rounded-xl flex items-center justify-center ring-1 ring-indigo-200/50 group-hover:scale-105 transition-transform">
                                 <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,21 +44,21 @@
                             </div>
                         </div>
                     </td>
-                    <td class="px-3 py-4 hidden md:table-cell">
+                    <td class="px-3 py-4 hidden md:table-cell" x-show="isVisible('ip')" x-cloak>
                         {% if router.ip %}
                         <code class="text-sm text-gray-700 font-mono bg-gray-50 px-2 py-0.5 rounded">{{ router.ip }}</code>
                         {% else %}
                         <span class="text-xs text-gray-300">—</span>
                         {% endif %}
                     </td>
-                    <td class="px-3 py-4 hidden sm:table-cell">
+                    <td class="px-3 py-4 hidden sm:table-cell" x-show="isVisible('nas')" x-cloak>
                         {% if router.nas_ip %}
                         <code class="text-sm text-gray-700 font-mono bg-gray-50 px-2 py-0.5 rounded">{{ router.nas_ip }}</code>
                         {% else %}
                         <span class="text-xs text-gray-300">—</span>
                         {% endif %}
                     </td>
-                    <td class="px-3 py-4 hidden lg:table-cell">
+                    <td class="px-3 py-4 hidden lg:table-cell" x-show="isVisible('pop')" x-cloak>
                         {% if router.pop %}
                         <a href="/network/pops/{{ router.pop.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
                             {{ router.pop.name }}
@@ -67,7 +67,7 @@
                         <span class="text-xs text-gray-300">Unassigned</span>
                         {% endif %}
                     </td>
-                    <td class="px-3 py-4">
+                    <td class="px-3 py-4" x-show="isVisible('status')" x-cloak>
                         {% if router.status == 'active' or router.status == 'online' %}
                         <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 ring-1 ring-emerald-300/50">
                             <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>

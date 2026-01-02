@@ -44,6 +44,10 @@ class TicketTag(Base):
     # Flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
+    # Chatwoot sync
+    chatwoot_label_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -96,6 +100,9 @@ class TicketCustomField(Base):
 
     # Flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+    # Chatwoot sync
+    chatwoot_attribute_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
 
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

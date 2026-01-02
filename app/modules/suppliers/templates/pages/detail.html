@@ -32,11 +32,11 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <p class="text-sm text-gray-500 mb-1">Outstanding Balance</p>
-            <p class="text-3xl font-bold {{ 'text-red-600' if outstanding_amount > 0 else 'text-gray-900' }}">{{ outstanding_amount|round(2) }} {{ supplier.default_currency or 'USD' }}</p>
+            <p class="text-3xl font-bold {{ 'text-red-600' if outstanding_amount > 0 else 'text-gray-900' }}">{{ outstanding_amount|round(2) }} {{ supplier.default_currency or base_currency }}</p>
         </div>
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <p class="text-sm text-gray-500 mb-1">Default Currency</p>
-            <p class="text-3xl font-bold text-gray-900">{{ supplier.default_currency or 'USD' }}</p>
+            <p class="text-3xl font-bold text-gray-900">{{ supplier.default_currency or base_currency }}</p>
         </div>
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <p class="text-sm text-gray-500 mb-1">Payment Terms</p>

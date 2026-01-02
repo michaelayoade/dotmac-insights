@@ -56,6 +56,10 @@ class Team(Base):
     assignment_rule: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    # Chatwoot sync
+    chatwoot_team_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 

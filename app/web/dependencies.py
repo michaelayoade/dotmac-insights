@@ -2,14 +2,14 @@
 FastAPI dependencies for SSR web routes.
 
 Provides typed dependencies for:
-- Session-based authentication
+- Session-based authentication (with granular RBAC support)
 - CSRF protection
 - Database access
 - Template context
 """
 from __future__ import annotations
 
-from typing import Optional, Annotated
+from typing import Optional, Annotated, Callable
 
 from fastapi import Depends, Request, Response, HTTPException
 from fastapi.responses import RedirectResponse
@@ -32,6 +32,7 @@ from app.core.security import (
     build_login_url,
     is_htmx_request,
 )
+from app.feature_flags import feature_flags
 
 
 async def get_session_user(
@@ -43,6 +44,9 @@ async def get_session_user(
 
     Returns None if not authenticated (for optional auth routes).
     Does not raise - use require_session_user for protected routes.
+
+    When RBAC_GRANULAR_ENABLED is True, loads effective permissions
+    including group memberships and direct permission grants.
     """
     token = request.cookies.get(AUTH_COOKIE_NAME)
     if not token:
@@ -59,6 +63,22 @@ async def get_session_user(
         if not user or not user.is_active:
             return None
 
+        # Load effective permissions if granular RBAC is enabled
+        effective_permissions = None
+        groups = []
+
+        if feature_flags.RBAC_GRANULAR_ENABLED:
+            try:
+                from app.services.rbac_service import RBACService
+                rbac_service = RBACService(db)
+                effective_permissions = await rbac_service.get_effective_permissions(user.id)
+
+                # Get group IDs
+                groups = [gm.group_id for gm in user.group_memberships]
+            except Exception:
+                # Fall back to legacy permissions on error
+                pass
+
         return Principal(
             type="user",
             id=user.id,
@@ -68,6 +88,8 @@ async def get_session_user(
             is_superuser=user.is_superuser,
             scopes=user.all_permissions,
             raw_claims=claims.model_dump(),
+            effective_permissions=effective_permissions,
+            groups=groups,
         )
     except HTTPException:
         return None
@@ -157,6 +179,107 @@ def require_scope(scope: str):
             raise HTTPException(
                 status_code=403,
                 detail=f"Permission denied: requires {scope}",
+            )
+        return user
+
+    return check_scope
+
+
+def require_scope_with_context(
+    scope: str,
+    context_builder: Optional[Callable[[Request], dict]] = None,
+):
+    """Create a dependency that requires a permission scope with context.
+
+    This allows conditional permissions to be evaluated using request context.
+
+    Usage:
+        def build_context(request: Request) -> dict:
+            return {
+                "client_ip": request.client.host,
+                "request_path": str(request.url.path),
+            }
+
+        @router.get(
+            "/resource/{id}",
+            dependencies=[Depends(require_scope_with_context("resource:read", build_context))]
+        )
+        async def get_resource(...): ...
+    """
+    async def check_scope(
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+    ) -> Principal:
+        user = await require_session_user(request, response, db)
+
+        # Build context if builder is provided
+        context = None
+        if context_builder:
+            try:
+                context = context_builder(request)
+            except Exception:
+                pass
+
+        if not user.has_scope(scope, context):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied: requires {scope}",
+            )
+        return user
+
+    return check_scope
+
+
+def require_any_scope(*scopes: str):
+    """Create a dependency that requires at least one of the specified scopes.
+
+    Usage:
+        @router.get(
+            "/dashboard",
+            dependencies=[Depends(require_any_scope("admin:read", "analytics:read"))]
+        )
+        async def dashboard(...): ...
+    """
+    async def check_scope(
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+    ) -> Principal:
+        user = await require_session_user(request, response, db)
+
+        if not any(user.has_scope(scope) for scope in scopes):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied: requires one of {', '.join(scopes)}",
+            )
+        return user
+
+    return check_scope
+
+
+def require_all_scopes(*scopes: str):
+    """Create a dependency that requires all of the specified scopes.
+
+    Usage:
+        @router.post(
+            "/dangerous-action",
+            dependencies=[Depends(require_all_scopes("admin:write", "audit:write"))]
+        )
+        async def dangerous_action(...): ...
+    """
+    async def check_scope(
+        request: Request,
+        response: Response,
+        db: Session = Depends(get_db),
+    ) -> Principal:
+        user = await require_session_user(request, response, db)
+
+        missing = [scope for scope in scopes if not user.has_scope(scope)]
+        if missing:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Permission denied: requires {', '.join(missing)}",
             )
         return user
 

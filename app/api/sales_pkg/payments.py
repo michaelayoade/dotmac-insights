@@ -1,154 +1,305 @@
 """
-Payments Endpoints
+Payments Read-Only Endpoints
+
+NOTE: For creating/updating/deleting payments, use the accounting module:
+  - POST   /api/v1/accounting/ar-payments
+  - PATCH  /api/v1/accounting/ar-payments/{id}
+  - DELETE /api/v1/accounting/ar-payments/{id}
+
+The accounting module is the single source of truth for payment writes,
+ensuring proper workflow (pending → approved → posted) and GL integration.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, desc
-from typing import Dict, Any, Optional, List, cast
-from datetime import datetime, date, timedelta, timezone
-from decimal import Decimal
+from sqlalchemy import or_
+from typing import Dict, Any, Optional
 
 from app.database import get_db
 from app.auth import Require
-from app.cache import cached, CACHE_TTL
-from app.models.invoice import Invoice, InvoiceStatus
+from app.models.invoice import Invoice
 from app.models.payment import Payment, PaymentStatus
 from app.models.credit_note import CreditNote
-from app.models.customer import Customer, CustomerStatus
-from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.sales import (
-    ERPNextLead, SalesOrder, Quotation, CustomerGroup, 
-    Territory, SalesPerson
-)
+from app.models.customer import Customer
 from app.api.sales_pkg.common import (
-    PaymentRequest,
-    PaymentUpdateRequest,
-    PaymentSource,
     PaymentMethod,
-    Principal,
-    get_current_principal,
-    NotificationEventType,
-    NotificationService,
-    _ensure_utc,
-    _parse_payment_method,
-    _parse_payment_status,
-    _serialize_payment,
+    _parse_iso_utc,
+    _resolve_currency_or_raise,
 )
 
 router = APIRouter()
 
-@router.post("/payments", dependencies=[Depends(Require("sales:write"))])
-async def create_payment(
-    payload: PaymentRequest,
+
+@router.get("/payments", dependencies=[Depends(Require("explorer:read"))])
+async def list_payments(
+    status: Optional[str] = None,
+    payment_method: Optional[str] = None,
+    customer_id: Optional[int] = None,
+    invoice_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    currency: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = Query(default=None, description="payment_date,amount,customer_id,invoice_id,status"),
+    sort_dir: Optional[str] = Query(default="desc", description="asc or desc"),
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Create a payment in the local database."""
-    if payload.customer_id:
-        if not db.query(Customer.id).filter(Customer.id == payload.customer_id).first():
-            raise HTTPException(status_code=400, detail=f"Customer {payload.customer_id} not found")
-    if payload.invoice_id:
-        if not db.query(Invoice.id).filter(Invoice.id == payload.invoice_id).first():
-            raise HTTPException(status_code=400, detail=f"Invoice {payload.invoice_id} not found")
+    """List payments with filtering, search, sort, and pagination (single-currency only)."""
+    query = db.query(Payment).filter(Payment.is_deleted == False)
 
-    payment = Payment(
-        source=PaymentSource.ERPNEXT,
-        receipt_number=payload.receipt_number,
-        customer_id=payload.customer_id,
-        invoice_id=payload.invoice_id,
-        amount=payload.amount,
-        currency=payload.currency,
-        payment_method=_parse_payment_method(payload.payment_method) or PaymentMethod.BANK_TRANSFER,
-        status=_parse_payment_status(payload.status) or PaymentStatus.COMPLETED,
-        payment_date=_ensure_utc(payload.payment_date),
-        transaction_reference=payload.transaction_reference,
-        gateway_reference=payload.gateway_reference,
-        notes=payload.notes,
-    )
-    db.add(payment)
-    db.commit()
-    db.refresh(payment)
+    if status:
+        try:
+            status_enum = PaymentStatus(status)
+            query = query.filter(Payment.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
-    # Emit payment received notification
-    if payment.status in {PaymentStatus.COMPLETED, PaymentStatus.POSTED}:
-        customer = db.query(Customer).filter(Customer.id == payment.customer_id).first() if payment.customer_id else None
-        invoice = db.query(Invoice).filter(Invoice.id == payment.invoice_id).first() if payment.invoice_id else None
-        NotificationService(db).emit_event(
-            event_type=NotificationEventType.PAYMENT_RECEIVED,
-            payload={
-                "payment_id": payment.id,
-                "receipt_number": payment.receipt_number,
-                "amount": float(payment.amount) if payment.amount else 0,
-                "currency": payment.currency,
-                "customer_id": payment.customer_id,
-                "customer_name": customer.name if customer else None,
-                "invoice_id": payment.invoice_id,
-                "invoice_number": invoice.invoice_number if invoice else None,
-            },
-            entity_type="payment",
-            entity_id=payment.id,
+    if payment_method:
+        try:
+            method_enum = PaymentMethod(payment_method)
+            query = query.filter(Payment.payment_method == method_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid payment_method: {payment_method}")
+
+    if customer_id:
+        query = query.filter(Payment.customer_id == customer_id)
+
+    if invoice_id:
+        query = query.filter(Payment.invoice_id == invoice_id)
+
+    start_dt = _parse_iso_utc(start_date, "start_date")
+    end_dt = _parse_iso_utc(end_date, "end_date")
+
+    if start_dt:
+        query = query.filter(Payment.payment_date >= start_dt)
+
+    if end_dt:
+        query = query.filter(Payment.payment_date <= end_dt)
+
+    if min_amount:
+        query = query.filter(Payment.amount >= min_amount)
+
+    if max_amount:
+        query = query.filter(Payment.amount <= max_amount)
+
+    currency = _resolve_currency_or_raise(db, Payment.currency, currency)
+    if currency:
+        query = query.filter(Payment.currency == currency)
+
+    if search:
+        like = f"%{search}%"
+        query = query.filter(
+            or_(
+                Payment.receipt_number.ilike(like),
+                Payment.transaction_reference.ilike(like),
+                Payment.gateway_reference.ilike(like),
+                Payment.notes.ilike(like),
+            )
         )
 
-    return _serialize_payment(payment)
+    sort_map = {
+        "payment_date": Payment.payment_date,
+        "amount": Payment.amount,
+        "customer_id": Payment.customer_id,
+        "invoice_id": Payment.invoice_id,
+        "status": Payment.status,
+    }
+    if sort_by and sort_by not in sort_map:
+        raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
+    sort_column = sort_map.get(sort_by or "payment_date")
+    if sort_column is None:
+        sort_column = Payment.payment_date
+    sort_order = sort_dir.lower() if sort_dir else "desc"
+    if sort_order not in ("asc", "desc"):
+        raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
+    order_clause = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+
+    total = query.count()
+    payment_rows = (
+        query.outerjoin(Customer, Payment.customer_id == Customer.id)
+        .add_columns(Customer.name.label("customer_name"))
+        .order_by(order_clause, Payment.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [
+            {
+                "id": p.id,
+                "receipt_number": p.receipt_number,
+                "customer_id": p.customer_id,
+                "customer_name": customer_name,
+                "invoice_id": p.invoice_id,
+                "amount": float(p.amount),
+                "currency": p.currency,
+                "payment_method": p.payment_method.value if p.payment_method else None,
+                "status": p.status.value if p.status else None,
+                "payment_date": p.payment_date.isoformat() if p.payment_date else None,
+                "transaction_reference": p.transaction_reference,
+                "gateway_reference": p.gateway_reference,
+                "notes": p.notes,
+                "source": p.source.value if p.source else None,
+                "write_back_status": getattr(p, "write_back_status", None),
+            }
+            for p, customer_name in payment_rows
+        ],
+    }
 
 
-@router.patch("/payments/{payment_id}", dependencies=[Depends(Require("sales:write"))])
-async def update_payment(
+@router.get("/payments/{payment_id}", dependencies=[Depends(Require("explorer:read"))])
+async def get_payment(
     payment_id: int,
-    payload: PaymentUpdateRequest,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Update a payment in the local database."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payload.customer_id is not None:
-        if not db.query(Customer.id).filter(Customer.id == payload.customer_id).first():
-            raise HTTPException(status_code=400, detail=f"Customer {payload.customer_id} not found")
-        payment.customer_id = payload.customer_id
-    if payload.invoice_id is not None:
-        if payload.invoice_id and not db.query(Invoice.id).filter(Invoice.id == payload.invoice_id).first():
-            raise HTTPException(status_code=400, detail=f"Invoice {payload.invoice_id} not found")
-        payment.invoice_id = payload.invoice_id
-    if payload.receipt_number is not None:
-        payment.receipt_number = payload.receipt_number
-    if payload.amount is not None:
-        payment.amount = payload.amount
-    if payload.currency is not None:
-        payment.currency = payload.currency
-    if payload.payment_method is not None:
-        payment.payment_method = _parse_payment_method(payload.payment_method) or payment.payment_method
-    if payload.status is not None:
-        payment.status = _parse_payment_status(payload.status) or payment.status
-    if payload.payment_date is not None:
-        payment.payment_date = cast(datetime, _ensure_utc(payload.payment_date))
-    if payload.transaction_reference is not None:
-        payment.transaction_reference = payload.transaction_reference
-    if payload.gateway_reference is not None:
-        payment.gateway_reference = payload.gateway_reference
-    if payload.notes is not None:
-        payment.notes = payload.notes
-
-    db.commit()
-    db.refresh(payment)
-    return _serialize_payment(payment)
-
-
-@router.delete("/payments/{payment_id}", dependencies=[Depends(Require("sales:write"))])
-async def delete_payment(
-    payment_id: int,
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Soft delete a payment."""
+    """Get detailed payment information."""
     payment = db.query(Payment).filter(Payment.id == payment_id, Payment.is_deleted == False).first()
+
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
-    payment.is_deleted = True
-    payment.deleted_at = datetime.now(timezone.utc)
-    payment.deleted_by_id = principal.id
-    db.commit()
-    return {"status": "disabled", "payment_id": payment_id}
+    customer = None
+    if payment.customer_id:
+        cust = db.query(Customer).filter(Customer.id == payment.customer_id).first()
+        if cust:
+            customer = {"id": cust.id, "name": cust.name, "email": cust.email}
 
+    invoice = None
+    if payment.invoice_id:
+        inv = db.query(Invoice).filter(Invoice.id == payment.invoice_id).first()
+        if inv:
+            invoice = {"id": inv.id, "invoice_number": inv.invoice_number, "total_amount": float(inv.total_amount)}
+
+    return {
+        "id": payment.id,
+        "receipt_number": payment.receipt_number,
+        "amount": float(payment.amount),
+        "currency": payment.currency,
+        "payment_method": payment.payment_method.value if payment.payment_method else None,
+        "status": payment.status.value if payment.status else None,
+        "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+        "transaction_reference": payment.transaction_reference,
+        "gateway_reference": payment.gateway_reference,
+        "notes": payment.notes,
+        "source": payment.source.value if payment.source else None,
+        "external_ids": {
+            "splynx_id": payment.splynx_id,
+            "erpnext_id": payment.erpnext_id,
+        },
+        "customer": customer,
+        "invoice": invoice,
+        "references": [
+            {
+                "id": ref.id,
+                "allocation_type": ref.allocation_type.value,
+                "document_id": ref.document_id,
+                "allocated_amount": float(ref.allocated_amount or 0),
+                "discount_amount": float(ref.discount_amount or 0),
+                "write_off_amount": float(ref.write_off_amount or 0),
+                "exchange_gain_loss": float(ref.exchange_gain_loss or 0),
+                "conversion_rate": float(ref.conversion_rate or 1),
+            }
+            for ref in payment.allocations
+        ],
+    }
+
+
+@router.get("/credit-notes", dependencies=[Depends(Require("explorer:read"))])
+async def list_credit_notes(
+    customer_id: Optional[int] = None,
+    invoice_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    currency: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = Query(default=None, description="issue_date,amount,customer_id,invoice_id,status"),
+    sort_dir: Optional[str] = Query(default="desc", description="asc or desc"),
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """List credit notes with filtering, search, sort, and pagination (single-currency only)."""
+    currency = _resolve_currency_or_raise(db, CreditNote.currency, currency)
+    query = db.query(CreditNote).filter(CreditNote.is_deleted == False)
+
+    if customer_id:
+        query = query.filter(CreditNote.customer_id == customer_id)
+
+    if invoice_id:
+        query = query.filter(CreditNote.invoice_id == invoice_id)
+
+    start_dt = _parse_iso_utc(start_date, "start_date")
+    end_dt = _parse_iso_utc(end_date, "end_date")
+
+    if start_dt:
+        query = query.filter(CreditNote.issue_date >= start_dt)
+
+    if end_dt:
+        query = query.filter(CreditNote.issue_date <= end_dt)
+
+    if currency:
+        query = query.filter(CreditNote.currency == currency)
+
+    if search:
+        like = f"%{search}%"
+        query = query.filter(or_(CreditNote.credit_number.ilike(like), CreditNote.description.ilike(like)))
+
+    sort_map = {
+        "issue_date": CreditNote.issue_date,
+        "amount": CreditNote.amount,
+        "customer_id": CreditNote.customer_id,
+        "invoice_id": CreditNote.invoice_id,
+        "status": CreditNote.status,
+    }
+    if sort_by and sort_by not in sort_map:
+        raise HTTPException(status_code=400, detail=f"Invalid sort_by: {sort_by}")
+    sort_column = sort_map.get(sort_by or "issue_date")
+    if sort_column is None:
+        sort_column = CreditNote.issue_date
+    sort_order = sort_dir.lower() if sort_dir else "desc"
+    if sort_order not in ("asc", "desc"):
+        raise HTTPException(status_code=400, detail="sort_dir must be 'asc' or 'desc'")
+    order_clause = sort_column.asc() if sort_order == "asc" else sort_column.desc()
+
+    total = query.count()
+    credit_note_rows = (
+        query.outerjoin(Customer, CreditNote.customer_id == Customer.id)
+        .add_columns(Customer.name.label("customer_name"))
+        .order_by(order_clause, CreditNote.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [
+            {
+                "id": cn.id,
+                "credit_note_number": cn.credit_number,
+                "customer_id": cn.customer_id,
+                "customer_name": customer_name,
+                "invoice_id": cn.invoice_id,
+                "amount": float(cn.amount) if cn.amount else 0,
+                "currency": cn.currency,
+                "date": cn.issue_date.isoformat() if cn.issue_date else None,
+                "reason": cn.description,
+                "status": cn.status.value if cn.status else None,
+                "source": "splynx",
+                "external_ids": {
+                    "splynx_id": cn.splynx_id,
+                },
+            }
+            for cn, customer_name in credit_note_rows
+        ],
+    }
