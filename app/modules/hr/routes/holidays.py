@@ -4,6 +4,8 @@ HR Holiday Routes - Holiday Lists with SSR + HTMX.
 Permission Requirements:
 - hr:read - View holiday lists
 - hr:write - Create, update, delete holiday lists
+
+Uses LeaveService for all business logic.
 """
 from __future__ import annotations
 
@@ -21,8 +23,14 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.hr_leave import HolidayList, Holiday
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.hr.leave import LeaveService
+from app.services.hr.leave_types import (
+    HolidayListCreateData,
+    HolidayListUpdateData,
+    HolidayData,
+)
+from app.services.hr.errors import ValidationError as HRValidationError
 
 RequireHRRead = Depends(require_scope("hr:read"))
 RequireHRWrite = Depends(require_scope("hr:write"))
@@ -52,17 +60,25 @@ async def holiday_lists(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Holiday lists page."""
-    query = db.query(HolidayList)
+    service = LeaveService(db, user)
 
+    # Get all holiday lists (service doesn't support pagination for holiday lists)
+    all_lists = service.list_holiday_lists()
+
+    # Apply search filter
     if q:
-        query = query.filter(HolidayList.holiday_list_name.ilike(f"%{q}%"))
+        all_lists = [
+            hl for hl in all_lists
+            if q.lower() in (hl.holiday_list_name or "").lower()
+        ]
 
-    total = query.count()
+    # Manual pagination
+    total = len(all_lists)
     offset = (page - 1) * per_page
-    holiday_lists = query.order_by(HolidayList.holiday_list_name).offset(offset).limit(per_page).all()
+    holiday_lists_page = all_lists[offset:offset + per_page]
 
     context = get_base_context(request, response, user, csrf_token)
-    context["holiday_lists"] = holiday_lists
+    context["holiday_lists"] = holiday_lists_page
     context["search_query"] = q or ""
     context["pagination"] = build_pagination_context(page, per_page, total)
 
@@ -115,6 +131,7 @@ async def holiday_list_create(
     db: DB,
 ):
     """Create a new holiday list."""
+    service = LeaveService(db, user)
     form = await request.form()
 
     errors = {}
@@ -125,25 +142,23 @@ async def holiday_list_create(
     if not holiday_list_name:
         errors["holiday_list_name"] = "Holiday list name is required"
 
-    from_date = None
-    to_date = None
+    from_date_val = None
+    to_date_val = None
     if from_date_str:
         try:
-            from_date = date.fromisoformat(from_date_str)
+            from_date_val = date.fromisoformat(from_date_str)
         except ValueError:
             errors["from_date"] = "Invalid date format"
+    else:
+        errors["from_date"] = "From date is required"
+
     if to_date_str:
         try:
-            to_date = date.fromisoformat(to_date_str)
+            to_date_val = date.fromisoformat(to_date_str)
         except ValueError:
             errors["to_date"] = "Invalid date format"
-
-    # Check for duplicates
-    existing = db.query(HolidayList).filter(
-        HolidayList.holiday_list_name == holiday_list_name
-    ).first()
-    if existing:
-        errors["holiday_list_name"] = "A holiday list with this name already exists"
+    else:
+        errors["to_date"] = "To date is required"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -161,15 +176,31 @@ async def holiday_list_create(
         template = templates.get_template("modules/hr/templates/holidays/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    holiday_list = HolidayList(
-        holiday_list_name=holiday_list_name,
-        from_date=from_date,
-        to_date=to_date,
-        total_holidays=0,
-    )
-    db.add(holiday_list)
-    db.commit()
-    db.refresh(holiday_list)
+    try:
+        data = HolidayListCreateData(
+            holiday_list_name=holiday_list_name,
+            from_date=from_date_val,
+            to_date=to_date_val,
+        )
+        holiday_list = service.create_holiday_list(data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        errors["holiday_list_name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Holiday List"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr"},
+            {"label": "Holiday Lists", "href": "/hr/holidays"},
+            {"label": "New Holiday List"},
+        ])
+        context["holiday_list"] = None
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/hr/templates/holidays/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, "Holiday list created successfully.", "success")
     return RedirectResponse(url=f"/hr/holidays/{holiday_list.id}", status_code=303)
@@ -185,13 +216,15 @@ async def holiday_list_detail(
     list_id: int,
 ):
     """Holiday list detail page."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
+    service = LeaveService(db, user)
 
-    if not holiday_list:
+    try:
+        holiday_list = service.get_holiday_list(list_id)
+    except HRValidationError:
         raise HTTPException(status_code=404, detail="Holiday list not found")
 
-    # Get holidays
-    holidays = db.query(Holiday).filter(Holiday.holiday_list_id == list_id).order_by(Holiday.holiday_date).all()
+    # Get holidays (holiday_list has a holidays relationship loaded)
+    holidays = sorted(holiday_list.holidays or [], key=lambda h: h.holiday_date or date.min)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -218,9 +251,11 @@ async def holiday_list_edit(
     list_id: int,
 ):
     """Edit holiday list form."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
+    service = LeaveService(db, user)
 
-    if not holiday_list:
+    try:
+        holiday_list = service.get_holiday_list(list_id)
+    except HRValidationError:
         raise HTTPException(status_code=404, detail="Holiday list not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -250,9 +285,11 @@ async def holiday_list_update(
     list_id: int,
 ):
     """Update a holiday list."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
+    service = LeaveService(db, user)
 
-    if not holiday_list:
+    try:
+        holiday_list = service.get_holiday_list(list_id)
+    except HRValidationError:
         raise HTTPException(status_code=404, detail="Holiday list not found")
 
     form = await request.form()
@@ -265,26 +302,18 @@ async def holiday_list_update(
     if not holiday_list_name:
         errors["holiday_list_name"] = "Holiday list name is required"
 
-    from_date = None
-    to_date = None
+    from_date_val = None
+    to_date_val = None
     if from_date_str:
         try:
-            from_date = date.fromisoformat(from_date_str)
+            from_date_val = date.fromisoformat(from_date_str)
         except ValueError:
             errors["from_date"] = "Invalid date format"
     if to_date_str:
         try:
-            to_date = date.fromisoformat(to_date_str)
+            to_date_val = date.fromisoformat(to_date_str)
         except ValueError:
             errors["to_date"] = "Invalid date format"
-
-    # Check for duplicates (excluding self)
-    existing = db.query(HolidayList).filter(
-        HolidayList.holiday_list_name == holiday_list_name,
-        HolidayList.id != list_id
-    ).first()
-    if existing:
-        errors["holiday_list_name"] = "A holiday list with this name already exists"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -303,10 +332,32 @@ async def holiday_list_update(
         template = templates.get_template("modules/hr/templates/holidays/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    holiday_list.holiday_list_name = holiday_list_name
-    holiday_list.from_date = from_date
-    holiday_list.to_date = to_date
-    db.commit()
+    try:
+        data = HolidayListUpdateData(
+            holiday_list_name=holiday_list_name,
+            from_date=from_date_val,
+            to_date=to_date_val,
+        )
+        holiday_list = service.update_holiday_list(list_id, data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        errors["holiday_list_name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {holiday_list.holiday_list_name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr"},
+            {"label": "Holiday Lists", "href": "/hr/holidays"},
+            {"label": holiday_list.holiday_list_name, "href": f"/hr/holidays/{holiday_list.id}"},
+            {"label": "Edit"},
+        ])
+        context["holiday_list"] = holiday_list
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/hr/templates/holidays/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, "Holiday list updated successfully.", "success")
     return RedirectResponse(url=f"/hr/holidays/{holiday_list.id}", status_code=303)
@@ -322,15 +373,14 @@ async def holiday_list_delete(
     list_id: int,
 ):
     """Delete a holiday list."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
+    service = LeaveService(db, user)
 
-    if not holiday_list:
+    try:
+        service.delete_holiday_list(list_id)
+        db.commit()
+    except HRValidationError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Holiday list not found")
-
-    # Delete associated holidays
-    db.query(Holiday).filter(Holiday.holiday_list_id == list_id).delete()
-    db.delete(holiday_list)
-    db.commit()
 
     if is_htmx_request(request):
         htmx_toast(response, "Holiday list deleted.", "success")
@@ -355,10 +405,7 @@ async def add_holiday(
     list_id: int,
 ):
     """Add a holiday to the list."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
-
-    if not holiday_list:
-        raise HTTPException(status_code=404, detail="Holiday list not found")
+    service = LeaveService(db, user)
 
     form = await request.form()
     holiday_date_str = _form_str(form, "holiday_date")
@@ -378,16 +425,19 @@ async def add_holiday(
             return HTMLResponse("", headers=dict(response.headers))
         raise HTTPException(status_code=400, detail="Invalid date format")
 
-    holiday = Holiday(
-        holiday_list_id=list_id,
-        holiday_date=holiday_date,
-        description=description or None,
-    )
-    db.add(holiday)
-
-    # Update total holidays count
-    holiday_list.total_holidays = (holiday_list.total_holidays or 0) + 1
-    db.commit()
+    try:
+        data = HolidayData(
+            holiday_date=holiday_date,
+            description=description or "",
+        )
+        service.add_holiday(list_id, data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        raise HTTPException(status_code=400, detail=str(e))
 
     if is_htmx_request(request):
         htmx_toast(response, "Holiday added.", "success")
@@ -409,22 +459,17 @@ async def remove_holiday(
     holiday_id: int,
 ):
     """Remove a holiday from the list."""
-    holiday = db.query(Holiday).filter(
-        Holiday.id == holiday_id,
-        Holiday.holiday_list_id == list_id
-    ).first()
+    service = LeaveService(db, user)
 
-    if not holiday:
-        raise HTTPException(status_code=404, detail="Holiday not found")
-
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
-
-    db.delete(holiday)
-
-    # Update total holidays count
-    if holiday_list and holiday_list.total_holidays:
-        holiday_list.total_holidays = max(0, holiday_list.total_holidays - 1)
-    db.commit()
+    try:
+        service.remove_holiday(list_id, holiday_id)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        raise HTTPException(status_code=404, detail=str(e))
 
     if is_htmx_request(request):
         htmx_toast(response, "Holiday removed.", "success")

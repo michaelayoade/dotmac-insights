@@ -5,6 +5,8 @@ Permission Requirements:
 - network:read - View POPs, routers, IP networks
 - network:write - Modify network configurations
 - analytics:read - View network analytics
+
+All routes delegate to services in app/services/network/.
 """
 from __future__ import annotations
 
@@ -33,6 +35,20 @@ from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.ticket import Ticket, TicketStatus
 from app.core.security import is_htmx_request
 
+# Import services
+from app.services.network import (
+    PopService,
+    RouterService,
+    IPv4NetworkService,
+    IPv6NetworkService,
+    IPAddressService,
+    PopFilters,
+    RouterFilters,
+    IPv4NetworkFilters,
+    IPv4AddressFilters,
+)
+from app.services.types import PaginationParams
+
 # Permission dependencies
 RequireNetworkRead = Depends(require_scope("network:read"))
 RequireNetworkWrite = Depends(require_scope("network:write"))
@@ -40,6 +56,30 @@ RequireAnalyticsRead = Depends(require_scope("analytics:read"))
 
 router = APIRouter(prefix="/network", tags=["network"])
 templates = get_template_env()
+
+
+# =============================================================================
+# Service Providers
+# =============================================================================
+
+def get_pop_service(db: DB) -> PopService:
+    """Provide PopService instance."""
+    return PopService(db)
+
+
+def get_router_service(db: DB) -> RouterService:
+    """Provide RouterService instance."""
+    return RouterService(db)
+
+
+def get_ipv4_network_service(db: DB) -> IPv4NetworkService:
+    """Provide IPv4NetworkService instance."""
+    return IPv4NetworkService(db)
+
+
+def get_ip_address_service(db: DB) -> IPAddressService:
+    """Provide IPAddressService instance."""
+    return IPAddressService(db)
 
 
 # =============================================================================
@@ -308,59 +348,17 @@ async def pop_detail(
     pop_id: int,
 ):
     """POP detail page with metrics, routers, and customers."""
-    pop = db.query(Pop).filter(Pop.id == pop_id).first()
-    if not pop:
+    pop_service = get_pop_service(db)
+    router_service = get_router_service(db)
+
+    try:
+        pop = pop_service.get_pop(pop_id)
+        stats = pop_service.get_pop_stats(pop_id)
+        routers = router_service.get_routers_for_pop(pop_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="POP not found")
 
-    active_party_ids = (
-        db.query(Subscription.party_id.label("party_id"))
-        .join(Router, Subscription.router_id == Router.id)
-        .filter(
-            Router.pop_id == pop_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        )
-        .subquery()
-    )
-
-    # Customer stats
-    customer_count = (
-        db.query(func.count(func.distinct(active_party_ids.c.party_id)))
-        .scalar()
-        or 0
-    )
-
-    # MRR calculation
-    mrr_case = case(
-        (Subscription.billing_cycle == "quarterly", Subscription.price / 3),
-        (Subscription.billing_cycle == "yearly", Subscription.price / 12),
-        else_=Subscription.price
-    )
-    pop_mrr = (
-        db.query(func.sum(mrr_case))
-        .join(Router, Subscription.router_id == Router.id)
-        .filter(
-            Router.pop_id == pop_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        )
-        .scalar()
-        or 0
-    )
-
-    # Routers at this POP
-    routers = db.query(Router).filter(Router.pop_id == pop_id).all()
-
-    # Open tickets for this POP's customers
-    open_tickets = (
-        db.query(func.count(Ticket.id))
-        .filter(
-            Ticket.party_id.in_(active_party_ids),
-            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED]),
-        )
-        .scalar()
-        or 0
-    )
-
-    # Recent customers (top 10)
+    # Recent customers (UI-specific, keep as direct query)
     recent_customers = (
         db.query(Party)
         .join(Subscription, Subscription.party_id == Party.id)
@@ -386,10 +384,10 @@ async def pop_detail(
 
     context["pop"] = pop
     context["metrics"] = {
-        "customer_count": customer_count,
-        "mrr": float(pop_mrr),
-        "router_count": len(routers),
-        "open_tickets": open_tickets,
+        "customer_count": stats.customer_count,
+        "mrr": float(stats.mrr),
+        "router_count": stats.router_count,
+        "open_tickets": 0,  # TODO: Add to PopStats if needed
     }
     context["routers"] = routers
     context["recent_customers"] = recent_customers

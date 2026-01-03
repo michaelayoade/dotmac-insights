@@ -22,6 +22,8 @@ from app.models.accounting import (
     FiscalYear,
     GLEntry,
 )
+from app.models.accounting_ext import FiscalPeriod, FiscalPeriodStatus
+from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
 
@@ -30,6 +32,7 @@ from .fiscal_types import (
     CostCenterExpenseBreakdown,
     CostCenterUpdateData,
     ExpenseByAccount,
+    FiscalPeriodFilters,
     FiscalYearCreateData,
     FiscalYearUpdateData,
 )
@@ -149,6 +152,90 @@ class FiscalService:
         fiscal_year.disabled = True
         self.db.flush()
 
+    def get_fiscal_year_by_year(self, year: str) -> Optional[FiscalYear]:
+        """Get a fiscal year by its year value."""
+        return self.db.query(FiscalYear).filter(FiscalYear.year == year).first()
+
+    # ============= FISCAL PERIODS =============
+
+    def list_fiscal_periods(self, filters: FiscalPeriodFilters) -> List[FiscalPeriod]:
+        """List fiscal periods with optional filters."""
+        query = self.db.query(FiscalPeriod)
+
+        if filters.year:
+            fiscal_year = self.get_fiscal_year_by_year(filters.year)
+            if fiscal_year:
+                query = query.filter(FiscalPeriod.fiscal_year_id == fiscal_year.id)
+
+        if filters.status:
+            try:
+                period_status = FiscalPeriodStatus(filters.status)
+                query = query.filter(FiscalPeriod.status == period_status)
+            except ValueError:
+                raise ValidationError(f"Invalid fiscal period status: {filters.status}")
+
+        return query.order_by(FiscalPeriod.start_date.desc()).all()
+
+    def get_fiscal_period(self, period_id: int) -> FiscalPeriod:
+        """Get a fiscal period by ID."""
+        period = self.db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
+        if not period:
+            raise NotFoundError("Fiscal period not found")
+        return period
+
+    def get_fiscal_period_stats(self) -> Dict[str, Any]:
+        """Get fiscal period statistics for the list view."""
+        now = date.today()
+
+        total_periods = self.db.query(func.count(FiscalPeriod.id)).scalar() or 0
+        open_periods = self.db.query(func.count(FiscalPeriod.id)).filter(
+            FiscalPeriod.status == FiscalPeriodStatus.OPEN
+        ).scalar() or 0
+        closed_periods = self.db.query(func.count(FiscalPeriod.id)).filter(
+            FiscalPeriod.status.in_([
+                FiscalPeriodStatus.SOFT_CLOSED,
+                FiscalPeriodStatus.HARD_CLOSED,
+            ])
+        ).scalar() or 0
+
+        current_period = self.db.query(FiscalPeriod).filter(
+            FiscalPeriod.start_date <= now,
+            FiscalPeriod.end_date >= now,
+        ).first()
+
+        return {
+            "total_periods": total_periods,
+            "open_periods": open_periods,
+            "closed_periods": closed_periods,
+            "current_period": current_period,
+        }
+
+    def get_fiscal_period_totals(self, period: FiscalPeriod) -> Dict[str, Any]:
+        """Get GL totals and entry counts for a fiscal period."""
+        gl_count = self.db.query(func.count(GLEntry.id)).filter(
+            GLEntry.posting_date >= period.start_date,
+            GLEntry.posting_date <= period.end_date,
+            GLEntry.is_cancelled == False,
+        ).scalar() or 0
+
+        period_debit = self.db.query(func.sum(GLEntry.debit)).filter(
+            GLEntry.posting_date >= period.start_date,
+            GLEntry.posting_date <= period.end_date,
+            GLEntry.is_cancelled == False,
+        ).scalar() or Decimal("0")
+
+        period_credit = self.db.query(func.sum(GLEntry.credit)).filter(
+            GLEntry.posting_date >= period.start_date,
+            GLEntry.posting_date <= period.end_date,
+            GLEntry.is_cancelled == False,
+        ).scalar() or Decimal("0")
+
+        return {
+            "gl_count": gl_count,
+            "period_debit": period_debit,
+            "period_credit": period_credit,
+        }
+
     # ============= COST CENTERS =============
 
     def list_cost_centers(self, include_disabled: bool = False) -> List[CostCenter]:
@@ -164,6 +251,53 @@ class FiscalService:
         if not include_disabled:
             query = query.filter(CostCenter.disabled == False)
         return query.all()
+
+    def list_cost_centers_paginated(
+        self,
+        search: Optional[str] = None,
+        include_disabled: bool = False,
+        pagination: Optional[PaginationParams] = None,
+    ) -> PaginatedResult[CostCenter]:
+        """List cost centers with optional search and pagination."""
+        if pagination is None:
+            pagination = PaginationParams()
+
+        query = self.db.query(CostCenter)
+        if not include_disabled:
+            query = query.filter(CostCenter.disabled == False)
+
+        if search:
+            if len(search) < 2:
+                raise ValidationError("Search query must be at least 2 characters")
+            query = query.filter(
+                CostCenter.cost_center_name.ilike(f"%{search}%")
+                | CostCenter.cost_center_number.ilike(f"%{search}%")
+            )
+
+        query = query.order_by(CostCenter.cost_center_name)
+        return paginate(query, pagination)
+
+    def list_parent_cost_centers(self, exclude_id: Optional[int] = None) -> List[CostCenter]:
+        """List active parent cost centers (groups)."""
+        query = self.db.query(CostCenter).filter(
+            CostCenter.disabled == False,
+            CostCenter.is_group == True,
+        )
+        if exclude_id:
+            query = query.filter(CostCenter.id != exclude_id)
+        return query.order_by(CostCenter.cost_center_name).all()
+
+    def get_cost_center_stats(self) -> Dict[str, int]:
+        """Get summary stats for cost centers list view."""
+        total = self.db.query(func.count(CostCenter.id)).scalar() or 0
+        active = (
+            self.db.query(func.count(CostCenter.id))
+            .filter(CostCenter.disabled == False)
+            .scalar()
+            or 0
+        )
+        inactive = total - active
+        return {"total": total, "active": active, "inactive": inactive}
 
     def get_cost_center(self, center_id: int) -> CostCenter:
         """Get a cost center by ID.

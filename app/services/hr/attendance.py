@@ -831,6 +831,16 @@ class AttendanceService:
         self.db.flush()
         return request
 
+    def delete_attendance_request(self, request_id: int) -> None:
+        """Delete an attendance request."""
+        request = self.get_attendance_request(request_id)
+
+        if self.principal and self.principal.user_id:
+            request.deleted_by_id = self.principal.user_id
+
+        self.db.delete(request)
+        self.db.flush()
+
     def _process_approved_request(self, request: AttendanceRequest) -> None:
         """Process an approved attendance request by creating/updating records."""
         current_date = request.from_date

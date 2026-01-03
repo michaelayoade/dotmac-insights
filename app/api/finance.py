@@ -22,7 +22,6 @@ from app.database import get_db
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.customer import Customer
 from app.auth import Require
 from app.cache import cached, CACHE_TTL
 
@@ -480,21 +479,21 @@ async def get_payment_behavior_insights(
     currency = _resolve_currency_or_raise(db, Payment.currency, currency)
     # Get customers with payment history
     customer_payments_query = db.query(
-        Payment.customer_id,
+        Payment.customer_account_id,
         func.count(Payment.id).label("total_payments"),
     ).filter(
         Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
-        Payment.customer_id.isnot(None),
+        Payment.customer_account_id.isnot(None),
     )
     if currency:
         customer_payments_query = customer_payments_query.filter(Payment.currency == currency)
-    customer_payments = customer_payments_query.group_by(Payment.customer_id).subquery()
+    customer_payments = customer_payments_query.group_by(Payment.customer_account_id).subquery()
 
     # Count customers by payment frequency
-    customers_with_payments = db.query(func.count(customer_payments.c.customer_id)).scalar() or 0
+    customers_with_payments = db.query(func.count(customer_payments.c.customer_account_id)).scalar() or 0
 
     # Customers with overdue invoices
-    customers_overdue_query = db.query(func.count(distinct(Invoice.customer_id))).filter(
+    customers_overdue_query = db.query(func.count(distinct(Invoice.customer_account_id))).filter(
         Invoice.status == InvoiceStatus.OVERDUE
     )
     if currency:

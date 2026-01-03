@@ -4,7 +4,7 @@
         <a href="/invoices/{{ invoice.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ invoice.invoice_number or 'INV-' ~ invoice.id }}</a>
     </td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
-        {{ invoice.contact.name if invoice.contact else (invoice.customer.customer_name if invoice.customer else '-') }}
+        {{ invoice.customer_account.party.name if invoice.customer_account and invoice.customer_account.party else '-' }}
     </td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ invoice.invoice_date.strftime('%b %d, %Y') if invoice.invoice_date else '-' }}</td>
     <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell {{ 'text-red-600 font-medium' if invoice.is_overdue else 'text-gray-600' }}">{{ invoice.due_date.strftime('%b %d, %Y') if invoice.due_date else '-' }}</td>

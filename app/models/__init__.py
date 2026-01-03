@@ -1,4 +1,3 @@
-from app.models.customer import Customer
 from app.models.customer_usage import CustomerUsage
 from app.models.pop import Pop
 from app.models.subscription import Subscription
@@ -244,14 +243,6 @@ from app.models.crm import (
     LeadSource,
     Campaign,
 )
-from app.models.contact import (
-    Contact,
-    ContactType,
-    ContactCategory,
-    ContactStatus,
-    BillingType,
-    LeadQualification,
-)
 from app.models.contact_list import ContactList
 from app.models.performance import (
     EvaluationPeriod,
@@ -378,6 +369,7 @@ from app.models.provisioning_log import (
     ProvisioningAction,
     ProvisioningStatus,
 )
+from app.models.radius_credential_sequence import RADIUSCredentialSequence
 from app.models.cleanup import (
     CleanupRule,
     CleanupScan,
@@ -391,9 +383,32 @@ from app.models.cleanup import (
     CleanupJobStatus,
     CleanupEntityType,
 )
+from app.models.data_bundle import (
+    DataBundleProduct,
+    CustomerBundle,
+    BundleUsageLog,
+    BundleTransaction,
+    BundleType,
+    ExpiryType,
+    ExhaustionAction,
+    BundleStatus,
+)
+from app.models.snmp_metrics import (
+    SNMPPollingConfig,
+    SNMPVersion,
+    SNMPAuthProtocol,
+    SNMPPrivProtocol,
+    PollStatus,
+    DeviceMetric,
+    InterfaceMetric,
+    InterfaceState,
+    InterfaceOperStatus,
+    InterfaceMetricRollup,
+    MetricAggregation,
+    SubscriptionUsageMetric,
+)
 
 __all__ = [
-    "Customer",
     "CustomerUsage",
     "Pop",
     "Subscription",
@@ -611,13 +626,6 @@ __all__ = [
     "CustomerNotificationPreference",
     "TimeEntryType",
     "PhotoType",
-    # Contact model
-    "Contact",
-    "ContactType",
-    "ContactCategory",
-    "ContactStatus",
-    "BillingType",
-    "LeadQualification",
     # Performance models
     "EvaluationPeriod",
     "EvaluationPeriodType",
@@ -733,6 +741,8 @@ __all__ = [
     "ProvisioningLog",
     "ProvisioningAction",
     "ProvisioningStatus",
+    # RADIUS credential sequence
+    "RADIUSCredentialSequence",
     # Cleanup models
     "CleanupRule",
     "CleanupScan",
@@ -745,4 +755,26 @@ __all__ = [
     "CleanupScanStatus",
     "CleanupJobStatus",
     "CleanupEntityType",
+    # Data Bundles
+    "DataBundleProduct",
+    "CustomerBundle",
+    "BundleUsageLog",
+    "BundleTransaction",
+    "BundleType",
+    "ExpiryType",
+    "ExhaustionAction",
+    "BundleStatus",
+    # SNMP Monitoring models
+    "SNMPPollingConfig",
+    "SNMPVersion",
+    "SNMPAuthProtocol",
+    "SNMPPrivProtocol",
+    "PollStatus",
+    "DeviceMetric",
+    "InterfaceMetric",
+    "InterfaceState",
+    "InterfaceOperStatus",
+    "InterfaceMetricRollup",
+    "MetricAggregation",
+    "SubscriptionUsageMetric",
 ]

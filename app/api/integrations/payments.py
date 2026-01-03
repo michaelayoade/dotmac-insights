@@ -44,7 +44,7 @@ class InitializePaymentSchema(BaseModel):
     reference: Optional[str] = None  # Auto-generated if not provided
     channels: Optional[List[str]] = None
     invoice_id: Optional[int] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     metadata: Optional[dict] = None
     provider: Optional[str] = None  # paystack or flutterwave
 
@@ -153,7 +153,7 @@ async def initialize_payment(
             metadata=request.metadata,
             channels=request.channels,
             invoice_id=request.invoice_id,
-            customer_id=request.customer_id,
+            customer_account_id=request.customer_account_id,
         )
 
         result = await client.initialize_payment(payment_request)
@@ -173,7 +173,7 @@ async def initialize_payment(
             currency=request.currency,
             status=GatewayTransactionStatus.PENDING,
             customer_email=request.email,
-            customer_id=request.customer_id,
+            customer_account_id=request.customer_account_id,
             invoice_id=request.invoice_id,
             authorization_url=result.authorization_url,
             access_code=result.access_code,
@@ -304,7 +304,7 @@ def get_payment(
 def list_payments(
     status_filter: Optional[str] = Query(None, alias="status"),
     provider_filter: Optional[str] = Query(None, alias="provider"),
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -332,8 +332,8 @@ def list_payments(
                 detail="Invalid provider filter",
             )
         query = query.filter(GatewayTransaction.provider == provider_enum)
-    if customer_id:
-        query = query.filter(GatewayTransaction.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(GatewayTransaction.customer_account_id == customer_account_id)
 
     query = query.order_by(GatewayTransaction.created_at.desc())
     transactions = query.offset(offset).limit(limit).all()

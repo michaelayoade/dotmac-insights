@@ -9,8 +9,8 @@ PROJECT_ENTITIES: dict[str, EntityConfig] = {
         "fields": {
             "id": {"type": FieldType.INTEGER, "description": "Internal ID"},
             "name": {"type": FieldType.STRING, "required": True, "max_length": 255, "description": "Project name"},
-            "customer_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customers", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
-            "contact_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "contacts", "fk_lookup_fields": ["id", "email", "name"], "description": "Contact"},
+            "customer_account_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customer_accounts", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
+            "party_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "parties", "fk_lookup_fields": ["id", "email", "name"], "description": "Contact"},
             "project_manager_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "employees", "fk_lookup_fields": ["id", "email"], "description": "Project manager"},
             "department": {"type": FieldType.STRING, "max_length": 100, "description": "Department"},
             "status": {"type": FieldType.ENUM, "enum_values": ["open", "completed", "cancelled", "on_hold"], "default": "open", "description": "Status"},

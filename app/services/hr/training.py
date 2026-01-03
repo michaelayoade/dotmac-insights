@@ -388,6 +388,12 @@ class TrainingService:
         self.db.flush()
         return event
 
+    def delete_event(self, event_id: int) -> None:
+        """Delete a training event."""
+        event = self.get_event(event_id)
+        self.db.delete(event)
+        self.db.flush()
+
     def _validate_event_status_transition(
         self,
         event: TrainingEvent,

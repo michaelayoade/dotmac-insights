@@ -20,7 +20,6 @@ from app.auth import Require
 from app.models.invoice import Invoice
 from app.models.payment import Payment, PaymentStatus
 from app.models.credit_note import CreditNote
-from app.models.customer import Customer
 from app.models.party import CustomerAccount, Party
 from app.api.sales_pkg.common import (
     PaymentMethod,

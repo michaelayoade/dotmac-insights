@@ -18,7 +18,7 @@ from app.templates.environment import get_template_env
 from app.models.payment import Payment, PaymentStatus, PaymentMethod
 from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
 from app.models.payment_allocation import PaymentAllocation
-from app.models.customer import Customer
+from app.models.party import CustomerAccount
 
 router = APIRouter(prefix="/payments", tags=["payments-web"])
 templates = get_template_env()
@@ -53,8 +53,7 @@ async def ar_payments_list(
 ):
     """AR (customer) payments list page."""
     query = select(Payment).options(
-        selectinload(Payment.customer),
-        selectinload(Payment.contact),
+        selectinload(Payment.customer_account).selectinload(CustomerAccount.party),
     )
 
     if q:
@@ -162,8 +161,7 @@ async def ar_payment_detail(
     query = (
         select(Payment)
         .options(
-            selectinload(Payment.customer),
-            selectinload(Payment.contact),
+            selectinload(Payment.customer_account).selectinload(CustomerAccount.party),
             selectinload(Payment.invoice),
             selectinload(Payment.allocations),
         )

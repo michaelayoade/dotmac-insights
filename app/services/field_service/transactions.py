@@ -27,7 +27,7 @@ from app.models.field_service import (
     TimeEntryType,
 )
 from app.models.invoice import Invoice, InvoiceStatus
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, Party
 from app.services.errors import NotFoundError, ValidationError
 
 from .service_types import (
@@ -104,14 +104,16 @@ class ServiceTransactionService:
         # Validate orders
         orders = self._validate_orders_for_billing(request.service_order_ids)
 
-        # Get customer
-        customer = (
-            self.db.query(Customer)
-            .filter(Customer.id == request.customer_id)
+        # Get customer account
+        customer_account = (
+            self.db.query(CustomerAccount)
+            .filter(CustomerAccount.id == request.customer_account_id)
             .first()
         )
-        if not customer:
-            raise ValidationError(f"Customer {request.customer_id} not found")
+        if not customer_account:
+            raise ValidationError(
+                f"Customer account {request.customer_account_id} not found"
+            )
 
         # Build line items from orders
         lines: List[InvoiceLineData] = []
@@ -152,8 +154,7 @@ class ServiceTransactionService:
         due_date = request.due_date or (invoice_date + timedelta(days=14))
 
         invoice_data = InvoiceCreateData(
-            customer_id=request.customer_id,
-            contact_id=request.party_id,
+            customer_account_id=request.customer_account_id,
             invoice_date=datetime.combine(invoice_date, datetime.min.time()),
             due_date=datetime.combine(due_date, datetime.min.time()),
             currency=request.currency,
@@ -207,8 +208,8 @@ class ServiceTransactionService:
 
         request = ServiceInvoiceRequest(
             service_order_ids=[order_id],
-            customer_id=order.customer_id,
-            party_id=None,  # Will lookup from customer
+            customer_account_id=order.customer_account_id,
+            party_id=None,
             notes=notes,
             auto_post=auto_post,
         )
@@ -217,14 +218,14 @@ class ServiceTransactionService:
 
     def get_unbilled_orders(
         self,
-        customer_id: Optional[int] = None,
+        customer_account_id: Optional[int] = None,
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
     ) -> List[ServiceOrder]:
         """Get completed orders that haven't been invoiced.
 
         Args:
-            customer_id: Optional customer filter.
+            customer_account_id: Optional customer account filter.
             date_from: Optional start date filter.
             date_to: Optional end date filter.
 
@@ -239,8 +240,10 @@ class ServiceTransactionService:
             )
         )
 
-        if customer_id:
-            query = query.filter(ServiceOrder.customer_id == customer_id)
+        if customer_account_id:
+            query = query.filter(
+                ServiceOrder.customer_account_id == customer_account_id
+            )
 
         if date_from:
             query = query.filter(
@@ -261,17 +264,17 @@ class ServiceTransactionService:
         return query.order_by(ServiceOrder.actual_end_time.desc()).all()
 
     def get_unbilled_summary(
-        self, customer_id: Optional[int] = None
+        self, customer_account_id: Optional[int] = None
     ) -> dict:
         """Get summary of unbilled service orders.
 
         Args:
-            customer_id: Optional customer filter.
+            customer_account_id: Optional customer account filter.
 
         Returns:
             Summary with counts and amounts.
         """
-        orders = self.get_unbilled_orders(customer_id)
+        orders = self.get_unbilled_orders(customer_account_id)
 
         total_amount = Decimal("0")
         by_type: Dict[str, Decimal] = {}
@@ -388,22 +391,23 @@ class ServiceTransactionService:
         """
         results = (
             self.db.query(
-                ServiceOrder.customer_id,
-                Customer.name,
+                ServiceOrder.customer_account_id,
+                Party.name,
                 func.count(ServiceOrder.id).label("order_count"),
                 func.sum(ServiceOrder.labor_cost).label("labor"),
                 func.sum(ServiceOrder.parts_cost).label("parts"),
                 func.sum(ServiceOrder.travel_cost).label("travel"),
                 func.sum(ServiceOrder.total_cost).label("total"),
             )
-            .join(Customer, ServiceOrder.customer_id == Customer.id)
+            .join(CustomerAccount, ServiceOrder.customer_account_id == CustomerAccount.id)
+            .join(Party, CustomerAccount.party_id == Party.id)
             .filter(
                 ServiceOrder.status == ServiceOrderStatus.COMPLETED,
                 ServiceOrder.is_billable == True,
                 func.date(ServiceOrder.actual_end_time) >= period_start,
                 func.date(ServiceOrder.actual_end_time) <= period_end,
             )
-            .group_by(ServiceOrder.customer_id, Customer.name)
+            .group_by(ServiceOrder.customer_account_id, Party.name)
             .order_by(func.sum(ServiceOrder.total_cost).desc())
             .limit(limit)
             .all()
@@ -411,7 +415,7 @@ class ServiceTransactionService:
 
         return [
             {
-                "customer_id": r.customer_id,
+                "customer_account_id": r.customer_account_id,
                 "customer_name": r.name,
                 "order_count": r.order_count,
                 "labor_revenue": float(r.labor or 0),

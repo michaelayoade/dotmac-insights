@@ -100,6 +100,7 @@ class Subscription(Base):
     party: Mapped[Party] = relationship(backref="subscriptions")
     tariff = relationship("Tariff", backref="subscriptions")
     router = relationship("Router", backref="subscriptions")
+    bundles = relationship("CustomerBundle", back_populates="subscription")
 
     __table_args__ = (
         Index("ix_subscriptions_status_currency", "status", "currency"),

@@ -113,8 +113,8 @@
                             <h4 class="font-medium text-gray-900">{{ interview.interview_round or 'Interview' }}</h4>
                             <p class="mt-1 text-sm text-gray-500">{{ interview.scheduled_on }} with {{ interview.interviewer or 'TBD' }}</p>
                         </div>
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium {{ 'bg-green-50 text-green-700' if interview.status == 'Completed' else 'bg-blue-50 text-blue-700' }}">
-                            {{ interview.status or 'Scheduled' }}
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium {{ 'bg-green-50 text-green-700' if interview.status_label == 'Completed' else 'bg-blue-50 text-blue-700' }}">
+                            {{ interview.status_label or 'Scheduled' }}
                         </span>
                     </div>
                 </div>

@@ -28,7 +28,6 @@ class OpportunityFilters:
     status: Optional[str] = None  # open, won, lost
     stage_id: Optional[int] = None
     party_id: Optional[int] = None
-    customer_id: Optional[int] = None
     owner_id: Optional[int] = None
     sales_person_id: Optional[int] = None
     min_value: Optional[Decimal] = None
@@ -57,7 +56,6 @@ class OpportunityCreateData:
     campaign: Optional[str] = None
     campaign_id: Optional[int] = None
     lead_id: Optional[int] = None
-    customer_id: Optional[int] = None
 
 
 @dataclass

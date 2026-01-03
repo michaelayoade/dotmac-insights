@@ -1,0 +1,69 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="{{ form_action }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ form_title }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ form_subtitle }}</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="applicant_id" class="block text-sm font-medium text-gray-700 mb-1.5">Applicant <span class="text-red-500">*</span></label>
+                <select name="applicant_id" id="applicant_id" {{ 'disabled' if interview else 'required' }} class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm {{ 'bg-gray-50 text-gray-500' if interview else '' }}">
+                    <option value="">Select applicant</option>
+                    {% for opt in applicant_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if (form_data and form_data.applicant_id == opt.value) or (selected_applicant_id == opt.value) else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.applicant_id %}<p class="mt-1.5 text-sm text-red-600">{{ errors.applicant_id }}</p>{% endif %}
+                {% if interview %}<p class="mt-1 text-xs text-gray-500">Applicant is locked once scheduled.</p>{% endif %}
+            </div>
+            <div>
+                <label for="scheduled_date" class="block text-sm font-medium text-gray-700 mb-1.5">Scheduled Date <span class="text-red-500">*</span></label>
+                <input type="datetime-local" name="scheduled_date" id="scheduled_date" required value="{{ form_data.scheduled_date if form_data else '' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                {% if errors.scheduled_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.scheduled_date }}</p>{% endif %}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="interview_type" class="block text-sm font-medium text-gray-700 mb-1.5">Interview Type</label>
+                    <select name="interview_type" id="interview_type" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select type</option>
+                        {% for t in ['Phone', 'Video', 'Onsite'] %}
+                        <option value="{{ t|lower }}" {{ 'selected' if form_data and form_data.interview_type == t|lower else '' }}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="duration_minutes" class="block text-sm font-medium text-gray-700 mb-1.5">Duration (minutes)</label>
+                    <input type="number" name="duration_minutes" id="duration_minutes" min="15" value="{{ form_data.duration_minutes if form_data and form_data.duration_minutes else '60' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+            </div>
+            <div>
+                <label for="interviewer_name" class="block text-sm font-medium text-gray-700 mb-1.5">Interviewer</label>
+                <input type="text" name="interviewer_name" id="interviewer_name" value="{{ form_data.interviewer_name if form_data else '' }}" placeholder="Interviewer name" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div>
+                <label for="location" class="block text-sm font-medium text-gray-700 mb-1.5">Location</label>
+                <input type="text" name="location" id="location" value="{{ form_data.location if form_data else '' }}" placeholder="Office, meeting room, or address" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div>
+                <label for="meeting_link" class="block text-sm font-medium text-gray-700 mb-1.5">Meeting Link</label>
+                <input type="url" name="meeting_link" id="meeting_link" value="{{ form_data.meeting_link if form_data else '' }}" placeholder="https://..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div>
+                <label for="notes" class="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+                <textarea name="notes" id="notes" rows="4" placeholder="Interview notes..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm resize-none">{{ form_data.notes if form_data else '' }}</textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="{{ cancel_href }}" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">{{ submit_label }}</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

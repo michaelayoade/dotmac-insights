@@ -7,15 +7,11 @@ Permission Requirements:
 """
 from __future__ import annotations
 
-from typing import Optional, Any, cast
-from datetime import datetime
-from decimal import Decimal
+from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
-from sqlalchemy.sql import ColumnElement
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -34,6 +30,12 @@ from app.models.gateway_transaction import GatewayProvider, GatewayTransaction
 from app.models.party import CustomerAccount
 from app.models.subscription import Subscription
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.errors import NotFoundError, ValidationError, ConflictError
+from app.services.subscriptions import (
+    PaymentSubscriptionService,
+    PaymentSubscriptionFilters,
+)
+from app.services.types import PaginationParams
 
 # Permission dependencies
 RequirePaymentsRead = Depends(require_scope("payments:read"))
@@ -76,32 +78,27 @@ def get_interval_options():
     ]
 
 
-def compute_stats(db) -> dict:
-    """Compute payment subscription stats."""
-    base = db.query(PaymentSubscription)
-
-    active = base.filter(PaymentSubscription.status == PaymentSubscriptionStatus.ACTIVE).count()
-    paused = base.filter(PaymentSubscription.status == PaymentSubscriptionStatus.PAUSED).count()
-    past_due = base.filter(PaymentSubscription.status == PaymentSubscriptionStatus.PAST_DUE).count()
-    total = base.count()
-
-    # Monthly revenue (from active monthly subscriptions)
-    monthly_revenue = db.query(func.sum(PaymentSubscription.amount)).filter(
-        PaymentSubscription.status == PaymentSubscriptionStatus.ACTIVE,
-        PaymentSubscription.interval == PaymentSubscriptionInterval.MONTHLY,
-    ).scalar() or Decimal("0")
-
-    # Total collected all-time
-    total_collected = db.query(func.sum(PaymentSubscription.total_collected)).scalar() or Decimal("0")
-
-    return {
-        "active": active,
-        "paused": paused,
-        "past_due": past_due,
-        "total": total,
-        "monthly_revenue": float(monthly_revenue),
-        "total_collected": float(total_collected),
+def get_available_actions(status: PaymentSubscriptionStatus) -> list:
+    """Get available actions for a payment subscription based on status."""
+    actions = {
+        PaymentSubscriptionStatus.ACTIVE: [
+            {"action": "pause", "label": "Pause", "color": "amber", "icon": "pause"},
+            {"action": "cancel", "label": "Cancel", "color": "red", "icon": "x"},
+        ],
+        PaymentSubscriptionStatus.PAUSED: [
+            {"action": "resume", "label": "Resume", "color": "emerald", "icon": "play"},
+            {"action": "cancel", "label": "Cancel", "color": "red", "icon": "x"},
+        ],
+        PaymentSubscriptionStatus.PAST_DUE: [
+            {"action": "retry", "label": "Retry Charge", "color": "blue", "icon": "refresh"},
+            {"action": "pause", "label": "Pause", "color": "amber", "icon": "pause"},
+            {"action": "cancel", "label": "Cancel", "color": "red", "icon": "x"},
+        ],
+        PaymentSubscriptionStatus.CANCELLED: [],
+        PaymentSubscriptionStatus.COMPLETED: [],
+        PaymentSubscriptionStatus.EXPIRED: [],
     }
+    return actions.get(status, [])
 
 
 # =============================================================================
@@ -125,63 +122,30 @@ async def payment_subscriptions_list(
     dir: str = Query("desc", description="Sort direction"),
 ):
     """Payment subscriptions list page."""
-    query = db.query(PaymentSubscription).options(
-        joinedload(PaymentSubscription.party),
+    svc = PaymentSubscriptionService(db, principal=user)
+
+    # Build filters
+    filters = PaymentSubscriptionFilters(
+        search=q,
+        status=status,
+        provider=provider,
+        party_id=party_id,
+    )
+    pagination = PaginationParams(page=page, per_page=per_page)
+
+    # Get payment subscriptions using service
+    result = svc.list_payment_subscriptions(
+        filters=filters,
+        pagination=pagination,
+        include_relations=True,
     )
 
-    # Search
-    if q:
-        search_filter = or_(
-            PaymentSubscription.plan_name.ilike(f"%{q}%"),
-            PaymentSubscription.customer_email.ilike(f"%{q}%"),
-            PaymentSubscription.provider_subscription_code.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if status:
-        try:
-            status_enum = PaymentSubscriptionStatus(status)
-            query = query.filter(PaymentSubscription.status == status_enum)
-        except ValueError:
-            pass
-
-    if provider:
-        try:
-            provider_enum = GatewayProvider(provider)
-            query = query.filter(PaymentSubscription.provider == provider_enum)
-        except ValueError:
-            pass
-
-    if party_id:
-        query = query.filter(PaymentSubscription.party_id == party_id)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_mapping = {
-        "created_at": PaymentSubscription.created_at,
-        "plan_name": PaymentSubscription.plan_name,
-        "amount": PaymentSubscription.amount,
-        "status": PaymentSubscription.status,
-        "next_billing_date": PaymentSubscription.next_billing_date,
-    }
-    order_column: ColumnElement[Any] = cast(ColumnElement[Any], sort_mapping.get(sort, PaymentSubscription.created_at))
-    if dir == "desc":
-        order_column = order_column.desc()
-    query = query.order_by(order_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    subscriptions = query.offset(offset).limit(per_page).all()
-
-    # Stats
-    stats = compute_stats(db)
+    # Get stats using service
+    stats = svc.get_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["subscriptions"] = subscriptions
+    context["subscriptions"] = result.items
     context["stats"] = stats
     context["search_query"] = q or ""
     context["current_status"] = status
@@ -191,7 +155,7 @@ async def payment_subscriptions_list(
     context["provider_options"] = get_provider_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -248,11 +212,11 @@ async def payment_subscription_detail(
     subscription_id: int,
 ):
     """Payment subscription detail page with transaction history."""
-    subscription = db.query(PaymentSubscription).options(
-        joinedload(PaymentSubscription.party),
-    ).filter(PaymentSubscription.id == subscription_id).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_payment_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
 
     # Get linked service subscription if any
@@ -300,29 +264,6 @@ async def payment_subscription_detail(
     return HTMLResponse(template.render(context))
 
 
-def get_available_actions(status: PaymentSubscriptionStatus) -> list:
-    """Get available actions for a payment subscription based on status."""
-    actions = {
-        PaymentSubscriptionStatus.ACTIVE: [
-            {"action": "pause", "label": "Pause", "color": "amber", "icon": "pause"},
-            {"action": "cancel", "label": "Cancel", "color": "red", "icon": "x"},
-        ],
-        PaymentSubscriptionStatus.PAUSED: [
-            {"action": "resume", "label": "Resume", "color": "emerald", "icon": "play"},
-            {"action": "cancel", "label": "Cancel", "color": "red", "icon": "x"},
-        ],
-        PaymentSubscriptionStatus.PAST_DUE: [
-            {"action": "retry", "label": "Retry Charge", "color": "blue", "icon": "refresh"},
-            {"action": "pause", "label": "Pause", "color": "amber", "icon": "pause"},
-            {"action": "cancel", "label": "Cancel", "color": "red", "icon": "x"},
-        ],
-        PaymentSubscriptionStatus.CANCELLED: [],
-        PaymentSubscriptionStatus.COMPLETED: [],
-        PaymentSubscriptionStatus.EXPIRED: [],
-    }
-    return actions.get(status, [])
-
-
 # =============================================================================
 # PAYMENT SUBSCRIPTION ACTIONS
 # =============================================================================
@@ -338,11 +279,11 @@ async def payment_subscription_action_modal(
     action: str = Query(...),
 ):
     """Action confirmation modal."""
-    subscription = db.query(PaymentSubscription).options(
-        joinedload(PaymentSubscription.party),
-    ).filter(PaymentSubscription.id == subscription_id).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_payment_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
 
     valid_actions = ["pause", "resume", "cancel", "retry"]
@@ -367,19 +308,15 @@ async def payment_subscription_pause(
     subscription_id: int,
 ):
     """Pause a payment subscription."""
-    subscription = db.query(PaymentSubscription).filter(
-        PaymentSubscription.id == subscription_id
-    ).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.pause(subscription_id)
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
-
-    if subscription.status not in [PaymentSubscriptionStatus.ACTIVE, PaymentSubscriptionStatus.PAST_DUE]:
-        raise HTTPException(status_code=400, detail="Cannot pause this subscription")
-
-    subscription.status = PaymentSubscriptionStatus.PAUSED
-    subscription.paused_at = datetime.utcnow()
-    db.commit()
+    except (ValidationError, ConflictError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, f"Payment subscription '{subscription.plan_name}' paused", "success")
@@ -400,20 +337,15 @@ async def payment_subscription_resume(
     subscription_id: int,
 ):
     """Resume a paused payment subscription."""
-    subscription = db.query(PaymentSubscription).filter(
-        PaymentSubscription.id == subscription_id
-    ).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.resume(subscription_id)
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
-
-    if subscription.status != PaymentSubscriptionStatus.PAUSED:
-        raise HTTPException(status_code=400, detail="Can only resume paused subscriptions")
-
-    subscription.status = PaymentSubscriptionStatus.ACTIVE
-    subscription.paused_at = None
-    subscription.retry_count = 0  # Reset retry count
-    db.commit()
+    except (ValidationError, ConflictError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, f"Payment subscription '{subscription.plan_name}' resumed", "success")
@@ -434,24 +366,18 @@ async def payment_subscription_cancel(
     subscription_id: int,
 ):
     """Cancel a payment subscription."""
-    subscription = db.query(PaymentSubscription).filter(
-        PaymentSubscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Payment subscription not found")
-
-    if subscription.status in [PaymentSubscriptionStatus.CANCELLED, PaymentSubscriptionStatus.COMPLETED]:
-        raise HTTPException(status_code=400, detail="Subscription already cancelled or completed")
+    svc = PaymentSubscriptionService(db, principal=user)
 
     form = await request.form()
-    reason = _form_str(form, "reason")
+    reason = _form_str(form, "reason") or None
 
-    subscription.status = PaymentSubscriptionStatus.CANCELLED
-    subscription.cancelled_at = datetime.utcnow()
-    subscription.cancellation_reason = reason if reason else None
-    subscription.ended_at = datetime.utcnow()
-    db.commit()
+    try:
+        subscription = svc.cancel(subscription_id, reason=reason)
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Payment subscription not found")
+    except (ValidationError, ConflictError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, f"Payment subscription '{subscription.plan_name}' cancelled", "success")
@@ -472,21 +398,16 @@ async def payment_subscription_retry(
     subscription_id: int,
 ):
     """Retry a failed charge for a payment subscription."""
-    subscription = db.query(PaymentSubscription).filter(
-        PaymentSubscription.id == subscription_id
-    ).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_payment_subscription(subscription_id)
+        svc.record_charge_attempt(subscription_id, success=False, reference=None, amount=subscription.amount)
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
-
-    if subscription.status not in [PaymentSubscriptionStatus.PAST_DUE, PaymentSubscriptionStatus.ACTIVE]:
-        raise HTTPException(status_code=400, detail="Cannot retry charge for this subscription")
-
-    # Note: In production, this would trigger an actual charge via the payment gateway
-    # For now, we'll just update the retry count and log the attempt
-    subscription.retry_count += 1
-    subscription.last_charge_date = datetime.utcnow()
-    db.commit()
+    except (ValidationError, ConflictError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, "Charge retry initiated. Check transaction history for results.", "info")
@@ -511,11 +432,11 @@ async def payment_subscription_link_modal(
     subscription_id: int,
 ):
     """Modal to link payment subscription to service subscription."""
-    subscription = db.query(PaymentSubscription).filter(
-        PaymentSubscription.id == subscription_id
-    ).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_payment_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
 
     # Get service subscriptions for the same customer
@@ -541,32 +462,28 @@ async def payment_subscription_link(
     subscription_id: int,
 ):
     """Link payment subscription to a service subscription."""
-    subscription = db.query(PaymentSubscription).filter(
-        PaymentSubscription.id == subscription_id
-    ).first()
+    svc = PaymentSubscriptionService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_payment_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
 
     form = await request.form()
     service_subscription_id = _form_str(form, "service_subscription_id")
 
-    if service_subscription_id and service_subscription_id.isdigit():
-        # Verify the service subscription belongs to the same customer
-        service_sub = db.query(Subscription).filter(
-            Subscription.id == int(service_subscription_id),
-            Subscription.party_id == subscription.party_id,
-        ).first()
-
-        if not service_sub:
-            raise HTTPException(status_code=400, detail="Invalid service subscription")
-
-        subscription.service_subscription_id = int(service_subscription_id)
-    else:
-        # Unlink
-        subscription.service_subscription_id = None
-
-    db.commit()
+    try:
+        if service_subscription_id and service_subscription_id.isdigit():
+            subscription = svc.link_to_service_subscription(
+                subscription_id,
+                int(service_subscription_id),
+            )
+        else:
+            # Unlink
+            subscription = svc.unlink_service_subscription(subscription_id)
+        db.commit()
+    except (ValidationError, NotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, "Service subscription link updated", "success")

@@ -311,6 +311,29 @@ class WebhookService:
             .first()
         )
 
+    def list_events(
+        self,
+        channel_id: Optional[int] = None,
+        processed: Optional[bool] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[OmniWebhookEvent], int]:
+        """List webhook events with filters."""
+        query = self.db.query(OmniWebhookEvent)
+        if channel_id:
+            query = query.filter(OmniWebhookEvent.channel_id == channel_id)
+        if processed is not None:
+            query = query.filter(OmniWebhookEvent.processed == processed)
+
+        total = query.count()
+        events = (
+            query.order_by(OmniWebhookEvent.received_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+        return events, total
+
     def retry_event(self, event_id: int) -> WebhookResult:
         """Retry processing a failed webhook event.
 
@@ -335,6 +358,9 @@ class WebhookService:
             )
 
         channel = self.channel_service.get(event.channel_id)
+        now = datetime.now(timezone.utc)
+        event.retry_count = (event.retry_count or 0) + 1
+        event.last_retry_at = now
 
         try:
             result = self._process_event(channel, event.payload, event.headers or {})

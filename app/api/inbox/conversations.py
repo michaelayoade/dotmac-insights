@@ -117,7 +117,6 @@ def serialize_conversation(conv: OmniConversation, include_messages: bool = Fals
         "subject": conv.subject,
         "status": conv.status or "open",
         "priority": conv.priority or "medium",
-        "customer_id": conv.customer_id,
         "ticket_id": conv.ticket_id,
         "lead_id": conv.lead_id,
         "party_id": conv.party_id,

@@ -9,38 +9,15 @@ from ._deps import (
     RequireAccountingRead, RequireAccountingWrite,
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs,
-    is_htmx_request, HTTPException, set_flash,
-    FiscalPeriod, FiscalPeriodStatus, FiscalYear, GLEntry,
-    func, datetime, Decimal, selectinload,
+    HTTPException, set_flash,
+    FiscalPeriodStatus,
 )
+from app.services.accounting import FiscalService
+from app.services.accounting.fiscal_types import FiscalPeriodFilters
+from app.services.errors import NotFoundError, ValidationError
+from app.services.period_manager import PeriodManager, PeriodError
 
 router = APIRouter()
-
-
-def get_fiscal_period_stats(db) -> dict:
-    """Calculate fiscal period statistics."""
-    now = datetime.utcnow().date()
-
-    total_periods = db.query(func.count(FiscalPeriod.id)).scalar() or 0
-    open_periods = db.query(func.count(FiscalPeriod.id)).filter(
-        FiscalPeriod.status == FiscalPeriodStatus.OPEN
-    ).scalar() or 0
-    closed_periods = db.query(func.count(FiscalPeriod.id)).filter(
-        FiscalPeriod.status.in_([FiscalPeriodStatus.SOFT_CLOSED, FiscalPeriodStatus.HARD_CLOSED])
-    ).scalar() or 0
-
-    # Current period
-    current_period = db.query(FiscalPeriod).filter(
-        FiscalPeriod.start_date <= now,
-        FiscalPeriod.end_date >= now,
-    ).first()
-
-    return {
-        "total_periods": total_periods,
-        "open_periods": open_periods,
-        "closed_periods": closed_periods,
-        "current_period": current_period,
-    }
 
 
 @router.get("/fiscal-periods", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -54,32 +31,23 @@ async def fiscal_periods_list(
     status: Optional[str] = Query(None, description="Filter by status"),
 ):
     """Fiscal periods list page."""
-    query = db.query(FiscalPeriod)
-
-    # Filter by year
-    if year:
-        fiscal_year = db.query(FiscalYear).filter(FiscalYear.year == year).first()
-        if fiscal_year:
-            query = query.filter(FiscalPeriod.fiscal_year_id == fiscal_year.id)
-
-    # Filter by status
-    if status:
-        try:
-            period_status = FiscalPeriodStatus(status)
-            query = query.filter(FiscalPeriod.status == period_status)
-        except ValueError:
-            pass
-
-    periods = query.order_by(FiscalPeriod.start_date.desc()).all()
+    fiscal_service = FiscalService(db, user)
+    filters = FiscalPeriodFilters(year=year, status=status)
+    try:
+        periods = fiscal_service.list_fiscal_periods(filters)
+    except ValidationError as exc:
+        set_flash(response, str(exc), "warning")
+        filters.status = None
+        periods = fiscal_service.list_fiscal_periods(filters)
 
     # Get fiscal years for filter
-    fiscal_years = db.query(FiscalYear).filter(FiscalYear.disabled == False).order_by(FiscalYear.year.desc()).all()
+    fiscal_years = fiscal_service.list_fiscal_years(include_disabled=False)
     year_options = [{"value": fy.year, "label": fy.year} for fy in fiscal_years]
 
     # Status options
     status_options = [{"value": s.value, "label": s.value.replace("_", " ").title()} for s in FiscalPeriodStatus]
 
-    stats = get_fiscal_period_stats(db)
+    stats = fiscal_service.get_fiscal_period_stats()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -108,30 +76,13 @@ async def fiscal_period_detail(
     period_id: int,
 ):
     """Fiscal period detail page."""
-    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
+    fiscal_service = FiscalService(db, user)
+    try:
+        period = fiscal_service.get_fiscal_period(period_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    if not period:
-        raise HTTPException(status_code=404, detail="Fiscal period not found")
-
-    # Get GL entry counts for this period
-    gl_count = db.query(func.count(GLEntry.id)).filter(
-        GLEntry.posting_date >= period.start_date,
-        GLEntry.posting_date <= period.end_date,
-        GLEntry.is_cancelled == False,
-    ).scalar() or 0
-
-    # Get totals for this period
-    period_debit = db.query(func.sum(GLEntry.debit)).filter(
-        GLEntry.posting_date >= period.start_date,
-        GLEntry.posting_date <= period.end_date,
-        GLEntry.is_cancelled == False,
-    ).scalar() or Decimal("0")
-
-    period_credit = db.query(func.sum(GLEntry.credit)).filter(
-        GLEntry.posting_date >= period.start_date,
-        GLEntry.posting_date <= period.end_date,
-        GLEntry.is_cancelled == False,
-    ).scalar() or Decimal("0")
+    totals = fiscal_service.get_fiscal_period_totals(period)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -141,9 +92,9 @@ async def fiscal_period_detail(
         {"label": period.period_name, "href": f"/accounting/fiscal-periods/{period_id}", "current": True},
     ])
     context["period"] = period
-    context["gl_count"] = gl_count
-    context["period_debit"] = period_debit
-    context["period_credit"] = period_credit
+    context["gl_count"] = totals["gl_count"]
+    context["period_debit"] = totals["period_debit"]
+    context["period_credit"] = totals["period_credit"]
 
     template = templates.get_template("modules/accounting/templates/fiscal_periods/pages/detail.html")
     return HTMLResponse(template.render(context))
@@ -160,17 +111,22 @@ async def fiscal_period_close(
     period_id: int,
 ):
     """Close a fiscal period (soft close)."""
-    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
-    if not period:
-        raise HTTPException(status_code=404, detail="Fiscal period not found")
+    fiscal_service = FiscalService(db, user)
+    try:
+        period = fiscal_service.get_fiscal_period(period_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     if period.status == FiscalPeriodStatus.HARD_CLOSED:
         set_flash(response, "This period is permanently closed and cannot be modified.", "error")
         return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
 
-    period.status = FiscalPeriodStatus.SOFT_CLOSED
-    period.closed_at = datetime.utcnow()
-    period.closed_by_id = user.id
+    manager = PeriodManager(db)
+    try:
+        manager.close_period(period_id, user.id, soft_close=True)
+    except PeriodError as exc:
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
     db.commit()
 
     set_flash(response, f"Period {period.period_name} has been closed.", "success")
@@ -188,9 +144,11 @@ async def fiscal_period_reopen(
     period_id: int,
 ):
     """Reopen a soft-closed fiscal period."""
-    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
-    if not period:
-        raise HTTPException(status_code=404, detail="Fiscal period not found")
+    fiscal_service = FiscalService(db, user)
+    try:
+        period = fiscal_service.get_fiscal_period(period_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     if period.status == FiscalPeriodStatus.HARD_CLOSED:
         set_flash(response, "This period is permanently closed and cannot be reopened.", "error")
@@ -200,9 +158,12 @@ async def fiscal_period_reopen(
         set_flash(response, "This period is already open.", "warning")
         return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
 
-    period.status = FiscalPeriodStatus.OPEN
-    period.closed_at = None
-    period.closed_by_id = None
+    manager = PeriodManager(db)
+    try:
+        manager.reopen_period(period_id, user.id)
+    except PeriodError as exc:
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
     db.commit()
 
     set_flash(response, f"Period {period.period_name} has been reopened.", "success")

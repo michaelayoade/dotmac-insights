@@ -36,7 +36,7 @@ router = APIRouter(prefix="/openbanking", tags=["openbanking"])
 
 class WidgetConfigRequest(BaseModel):
     """Request for widget configuration."""
-    customer_id: str
+    party_id: str
     redirect_url: str
     provider: Optional[str] = None  # mono or okra
     metadata: Optional[dict] = None
@@ -46,7 +46,7 @@ class WidgetConfigResponse(BaseModel):
     """Widget configuration response."""
     public_key: str
     provider: str
-    customer_id: str
+    party_id: str
     redirect_url: str
     widget_url: str
     metadata: Optional[dict] = None
@@ -56,7 +56,7 @@ class LinkAccountRequest(BaseModel):
     """Request to complete account linking."""
     code: str  # Authorization code from widget callback
     provider: str
-    customer_id: int
+    party_id: int
     customer_email: Optional[str] = None
 
 
@@ -126,7 +126,7 @@ async def get_widget_config(request: WidgetConfigRequest):
 
     try:
         config = await client.get_widget_token(
-            customer_id=request.customer_id,
+            customer_id=request.party_id,
             redirect_url=request.redirect_url,
             metadata=request.metadata,
         )
@@ -134,7 +134,7 @@ async def get_widget_config(request: WidgetConfigRequest):
         return WidgetConfigResponse(
             public_key=config["public_key"],
             provider=client.provider.value,
-            customer_id=request.customer_id,
+            party_id=request.party_id,
             redirect_url=request.redirect_url,
             widget_url=config["widget_url"],
             metadata=config.get("metadata"),
@@ -188,7 +188,7 @@ async def link_account(
             connection = OpenBankingConnection(
                 provider=provider_enum,
                 account_id=provider_account_id,
-                customer_id=request.customer_id,
+                party_id=request.party_id,
                 email=request.customer_email,
                 account_number=account.account_number,
                 bank_code=account.bank_code,
@@ -230,7 +230,7 @@ async def link_account(
 
 @router.get("/accounts", response_model=List[LinkedAccountResponse], dependencies=[Depends(Require("openbanking:read"))])
 def list_linked_accounts(
-    customer_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     provider: Optional[str] = None,
     connection_status: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -238,8 +238,8 @@ def list_linked_accounts(
     """List linked bank accounts."""
     query = db.query(OpenBankingConnection)
 
-    if customer_id:
-        query = query.filter(OpenBankingConnection.customer_id == customer_id)
+    if party_id:
+        query = query.filter(OpenBankingConnection.party_id == party_id)
     if provider:
         try:
             provider_enum = OBProvider(provider)
@@ -299,7 +299,7 @@ async def get_linked_account(
         "id": connection.id,
         "provider": connection.provider.value,
         "provider_account_id": connection.account_id,
-        "customer_id": connection.customer_id,
+        "party_id": connection.party_id,
         "account_number": connection.account_number,
         "bank_code": connection.bank_code,
         "bank_name": connection.bank_name,

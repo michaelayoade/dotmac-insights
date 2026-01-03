@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.api.projects.schemas import _log_activity
 
@@ -292,4 +291,3 @@ async def download_attachment(
         filename=attachment.file_name,
         media_type=attachment.file_type or "application/octet-stream",
     )
-

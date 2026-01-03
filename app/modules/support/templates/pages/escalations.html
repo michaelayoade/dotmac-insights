@@ -1,0 +1,75 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Escalations</h1>
+            <p class="mt-1 text-sm text-gray-500">Active escalation policies and lifecycle triggers</p>
+        </div>
+        <a href="/settings/support/escalations" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+            Manage Policies
+        </a>
+    </div>
+
+    <div class="space-y-4">
+        {% for policy in policies %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ policy.name }}</h2>
+                    {% if policy.description %}
+                    <p class="text-sm text-gray-500 mt-1">{{ policy.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full {{ 'bg-emerald-50 text-emerald-700' if policy.is_active else 'bg-gray-100 text-gray-600' }}">
+                        {{ 'Active' if policy.is_active else 'Inactive' }}
+                    </span>
+                    <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">
+                        {{ candidate_counts.get(policy.id, 0) }} overdue
+                    </span>
+                </div>
+            </div>
+            <div class="px-6 py-4">
+                {% if policy.levels %}
+                <div class="space-y-3">
+                    {% for level in policy.levels %}
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm text-gray-700">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-surface-50 text-gray-600 font-semibold">L{{ level.level }}</span>
+                            <span>{{ level.trigger.value | replace('_', ' ') | title }}</span>
+                            {% if level.trigger_hours %}
+                            <span class="text-gray-500">+ {{ level.trigger_hours }}h</span>
+                            {% endif %}
+                        </div>
+                        <div class="flex items-center gap-3 text-gray-500">
+                            {% if level.reassign_ticket %}
+                            <span>Reassign</span>
+                            {% endif %}
+                            {% if level.change_priority %}
+                            <span>Priority: {{ level.new_priority or 'set' }}</span>
+                            {% endif %}
+                            {% if level.escalate_to_team_id %}
+                            <span>Team #{{ level.escalate_to_team_id }}</span>
+                            {% endif %}
+                            {% if level.escalate_to_user_id %}
+                            <span>User #{{ level.escalate_to_user_id }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">No escalation levels configured.</p>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 text-sm text-gray-500">
+            No escalation policies found.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

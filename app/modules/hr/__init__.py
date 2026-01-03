@@ -46,6 +46,7 @@ NAVIGATION = [
         "order": 30,
         "links": [
             {"label": "Dashboard", "href": "/hr", "icon": "home"},
+            {"label": "My HR", "href": "/hr/my", "icon": "user"},
             {"label": "Employees", "href": "/hr/employees", "icon": "users"},
             {"label": "Departments", "href": "/hr/departments", "icon": "building"},
             {"label": "Designations", "href": "/hr/designations", "icon": "award"},

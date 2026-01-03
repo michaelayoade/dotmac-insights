@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 
 router = APIRouter()
@@ -253,4 +252,3 @@ async def get_department_summary(
         })
 
     return result
-

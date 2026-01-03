@@ -11,11 +11,26 @@ from sqlalchemy.orm import Session
 
 from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
-from app.models.payment_terms import PaymentTermsTemplate, PaymentTermsSchedule
+from app.services.accounting import PaymentTermsService
+from app.services.accounting.payment_terms_types import (
+    PaymentTermsFilters,
+    PaymentTermsCreateData,
+    PaymentTermsUpdateData,
+    ScheduleData,
+)
 from app.services.due_date_calculator import DueDateCalculator
-from .helpers import paginate
+from app.services.errors import NotFoundError, ValidationError as ServiceValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
+
+
+def get_payment_terms_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> PaymentTermsService:
+    """Dependency to get a PaymentTermsService instance."""
+    return PaymentTermsService(db, principal)
 
 
 # PYDANTIC SCHEMAS
@@ -69,22 +84,16 @@ def list_payment_terms(
     company: Optional[str] = None,
     limit: int = Query(default=50, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: PaymentTermsService = Depends(get_payment_terms_service),
 ) -> Dict[str, Any]:
     """List payment terms templates."""
-    query = db.query(PaymentTermsTemplate)
+    filters = PaymentTermsFilters(is_active=is_active, company=company)
+    pagination = PaginationParams(offset=offset, limit=limit)
 
-    if is_active is not None:
-        query = query.filter(PaymentTermsTemplate.is_active == is_active)
-
-    if company:
-        query = query.filter(PaymentTermsTemplate.company == company)
-
-    query = query.order_by(PaymentTermsTemplate.template_name)
-    total, terms = paginate(query, offset, limit)
+    result = service.list_payment_terms(filters, pagination)
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "payment_terms": [
@@ -95,7 +104,7 @@ def list_payment_terms(
                 "is_active": t.is_active,
                 "schedule_count": len(t.schedules) if t.schedules else 0,
             }
-            for t in terms
+            for t in result.items
         ],
     }
 
@@ -103,14 +112,13 @@ def list_payment_terms(
 @router.get("/payment-terms/{terms_id}", dependencies=[Depends(Require("accounting:read"))])
 def get_payment_terms(
     terms_id: int,
-    db: Session = Depends(get_db),
+    service: PaymentTermsService = Depends(get_payment_terms_service),
 ) -> Dict[str, Any]:
     """Get payment terms detail with schedules."""
-    terms = db.query(PaymentTermsTemplate).filter(
-        PaymentTermsTemplate.id == terms_id
-    ).first()
-    if not terms:
-        raise HTTPException(status_code=404, detail="Payment terms not found")
+    try:
+        terms = service.get_payment_terms(terms_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     return {
         "id": terms.id,
@@ -138,64 +146,45 @@ def get_payment_terms(
 
 # PAYMENT TERMS CRUD
 
+def _convert_schedule(sched: PaymentScheduleCreate) -> ScheduleData:
+    """Convert Pydantic schedule to service dataclass."""
+    return ScheduleData(
+        credit_days=sched.credit_days,
+        credit_months=sched.credit_months,
+        day_of_month=sched.day_of_month,
+        payment_percentage=Decimal(str(sched.payment_percentage)),
+        discount_percentage=Decimal(str(sched.discount_percentage)),
+        discount_days=sched.discount_days,
+        description=sched.description,
+    )
+
+
 @router.post("/payment-terms", dependencies=[Depends(Require("books:write"))])
 def create_payment_terms(
     data: PaymentTermsCreate,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: PaymentTermsService = Depends(get_payment_terms_service),
 ) -> Dict[str, Any]:
     """Create new payment terms."""
-    # Check for duplicate
-    existing = db.query(PaymentTermsTemplate).filter(
-        PaymentTermsTemplate.template_name == data.template_name
-    ).first()
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Payment terms '{data.template_name}' already exists"
+    try:
+        create_data = PaymentTermsCreateData(
+            template_name=data.template_name,
+            description=data.description,
+            company=data.company,
+            schedules=[_convert_schedule(s) for s in data.schedules],
         )
+        terms = service.create_payment_terms(create_data)
+        db.commit()
+        db.refresh(terms)
 
-    # Validate schedules sum to 100%
-    if data.schedules:
-        total_pct = sum(s.payment_percentage for s in data.schedules)
-        if abs(total_pct - 100) > 0.01:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Payment percentages must sum to 100%, got {total_pct}%"
-            )
-
-    terms = PaymentTermsTemplate(
-        template_name=data.template_name,
-        description=data.description,
-        company=data.company,
-        created_by_id=principal.id,
-    )
-    db.add(terms)
-    db.flush()
-
-    # Add schedules
-    for idx, sched in enumerate(data.schedules):
-        schedule = PaymentTermsSchedule(
-            template_id=terms.id,
-            credit_days=sched.credit_days,
-            credit_months=sched.credit_months,
-            day_of_month=sched.day_of_month,
-            payment_percentage=Decimal(str(sched.payment_percentage)),
-            discount_percentage=Decimal(str(sched.discount_percentage)),
-            discount_days=sched.discount_days,
-            description=sched.description,
-            idx=idx,
-        )
-        db.add(schedule)
-
-    db.commit()
-    db.refresh(terms)
-
-    return {
-        "message": "Payment terms created",
-        "id": terms.id,
-        "template_name": terms.template_name,
-    }
+        return {
+            "message": "Payment terms created",
+            "id": terms.id,
+            "template_name": terms.template_name,
+        }
+    except ServiceValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=e.http_code, detail=e.message)
 
 
 @router.patch("/payment-terms/{terms_id}", dependencies=[Depends(Require("books:write"))])
@@ -203,70 +192,28 @@ def update_payment_terms(
     terms_id: int,
     data: PaymentTermsUpdate,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: PaymentTermsService = Depends(get_payment_terms_service),
 ) -> Dict[str, Any]:
     """Update payment terms."""
-    terms = db.query(PaymentTermsTemplate).filter(
-        PaymentTermsTemplate.id == terms_id
-    ).first()
-    if not terms:
-        raise HTTPException(status_code=404, detail="Payment terms not found")
+    try:
+        update_data = PaymentTermsUpdateData(
+            template_name=data.template_name,
+            description=data.description,
+            is_active=data.is_active,
+            schedules=[_convert_schedule(s) for s in data.schedules] if data.schedules is not None else None,
+        )
+        terms = service.update_payment_terms(terms_id, update_data)
+        db.commit()
 
-    if data.template_name is not None:
-        # Check for duplicate
-        existing = db.query(PaymentTermsTemplate).filter(
-            PaymentTermsTemplate.template_name == data.template_name,
-            PaymentTermsTemplate.id != terms_id,
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Payment terms '{data.template_name}' already exists"
-            )
-        terms.template_name = data.template_name
-
-    if data.description is not None:
-        terms.description = data.description
-
-    if data.is_active is not None:
-        terms.is_active = data.is_active
-
-    if data.schedules is not None:
-        # Validate schedules sum to 100%
-        if data.schedules:
-            total_pct = sum(s.payment_percentage for s in data.schedules)
-            if abs(total_pct - 100) > 0.01:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Payment percentages must sum to 100%, got {total_pct}%"
-                )
-
-        # Remove existing schedules
-        db.query(PaymentTermsSchedule).filter(
-            PaymentTermsSchedule.template_id == terms_id
-        ).delete()
-
-        # Add new schedules
-        for idx, sched in enumerate(data.schedules):
-            schedule = PaymentTermsSchedule(
-                template_id=terms.id,
-                credit_days=sched.credit_days,
-                credit_months=sched.credit_months,
-                day_of_month=sched.day_of_month,
-                payment_percentage=Decimal(str(sched.payment_percentage)),
-                discount_percentage=Decimal(str(sched.discount_percentage)),
-                discount_days=sched.discount_days,
-                description=sched.description,
-                idx=idx,
-            )
-            db.add(schedule)
-
-    db.commit()
-
-    return {
-        "message": "Payment terms updated",
-        "id": terms.id,
-    }
+        return {
+            "message": "Payment terms updated",
+            "id": terms.id,
+        }
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ServiceValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=e.http_code, detail=e.message)
 
 
 # DUE DATE CALCULATION

@@ -1,0 +1,88 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Payment Modes</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage payment methods (Cash, Bank Transfer, etc.)</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/accounting/payment-modes/new"
+            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            New Payment Mode
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Search and Filters -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <div class="relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ current_search or '' }}"
+                    placeholder="Search payment modes..."
+                    class="block w-full rounded-xl border-0 py-2.5 pl-10 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    hx-get="/accounting/payment-modes/table"
+                    hx-target="#modes-table"
+                    hx-include="[name='include_disabled'], [name='mode_type']"
+                    hx-push-url="true"
+                    hx-trigger="input changed delay:300ms, search"
+                >
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="sm:w-40">
+            <select
+                name="mode_type"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/payment-modes/table"
+                hx-target="#modes-table"
+                hx-include="[name='q'], [name='include_disabled']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+                <option value="">All Types</option>
+                <option value="cash" {{ 'selected' if current_mode_type == 'cash' else '' }}>Cash</option>
+                <option value="bank" {{ 'selected' if current_mode_type == 'bank' else '' }}>Bank</option>
+                <option value="general" {{ 'selected' if current_mode_type == 'general' else '' }}>General</option>
+            </select>
+        </div>
+        <div class="flex items-center gap-2">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input
+                    type="checkbox"
+                    name="include_disabled"
+                    value="true"
+                    {{ 'checked' if current_include_disabled else '' }}
+                    class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    hx-get="/accounting/payment-modes/table"
+                    hx-target="#modes-table"
+                    hx-include="[name='q'], [name='mode_type']"
+                    hx-push-url="true"
+                    hx-trigger="change"
+                >
+                <span class="text-sm text-gray-600">Show disabled</span>
+            </label>
+        </div>
+    </form>
+</div>
+
+<!-- Modes Table -->
+<div id="modes-table">
+    {% include "modules/accounting/templates/payment_modes/partials/modes_table.html" %}
+</div>
+{% endblock %}

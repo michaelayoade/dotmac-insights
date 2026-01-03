@@ -55,7 +55,9 @@ class JobOpeningFilters:
     """Filters for listing job openings."""
 
     status: Optional[JobOpeningStatus] = None
+    department: Optional[str] = None
     department_id: Optional[int] = None
+    designation: Optional[str] = None
     designation_id: Optional[int] = None
     company: Optional[str] = None
     publish: Optional[bool] = None

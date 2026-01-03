@@ -79,6 +79,20 @@ from .radius_settings_types import (
     RADIUSHealthStatus,
 )
 
+# RADIUS credential generation
+from .radius_credentials import RADIUSCredentialService
+from .radius_credentials_config import RADIUSCredentialConfigService, get_radius_credential_config
+from .radius_credentials_types import (
+    RADIUSCredentialConfig,
+    PasswordComplexityConfig,
+    UsernameTemplateConfig,
+    SequentialConfig,
+    GeneratedCredentials,
+    CredentialGenerationContext,
+    UsernameFormatType,
+    RADIUS_CREDENTIAL_CONFIG_SCHEMA,
+)
+
 # Reports and analytics
 from .reports import (
     SubscriptionReportsService,
@@ -294,4 +308,16 @@ __all__ = [
     "RADIUSTestResult",
     "CoATestResult",
     "RADIUSHealthStatus",
+    # RADIUS credential generation
+    "RADIUSCredentialService",
+    "RADIUSCredentialConfigService",
+    "get_radius_credential_config",
+    "RADIUSCredentialConfig",
+    "PasswordComplexityConfig",
+    "UsernameTemplateConfig",
+    "SequentialConfig",
+    "GeneratedCredentials",
+    "CredentialGenerationContext",
+    "UsernameFormatType",
+    "RADIUS_CREDENTIAL_CONFIG_SCHEMA",
 ]

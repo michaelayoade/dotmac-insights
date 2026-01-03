@@ -1,0 +1,56 @@
+{# Activity timeline partial for HTMX #}
+<div class="flow-root" id="activity-timeline">
+    {% if timeline %}
+    <ul role="list" class="-mb-8">
+        {% for item in timeline %}
+        <li>
+            <div class="relative pb-8">
+                {% if not loop.last %}
+                <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                {% endif %}
+                <div class="relative flex space-x-3">
+                    <div>
+                        {% if item.type == 'comment' %}
+                        <span class="h-8 w-8 rounded-full bg-{% if item.is_public %}primary{% else %}yellow{% endif %}-100 flex items-center justify-center ring-8 ring-white">
+                            <svg class="h-4 w-4 text-{% if item.is_public %}primary{% else %}yellow{% endif %}-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                        </span>
+                        {% else %}
+                        <span class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center ring-8 ring-white">
+                            <svg class="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="flex min-w-0 flex-1 justify-between space-x-4 pt-1.5">
+                        <div>
+                            <p class="text-sm text-gray-900">
+                                <span class="font-medium">{{ item.author }}</span>
+                                {% if item.type == 'comment' %}
+                                    {% if not item.is_public %}<span class="text-yellow-600">(internal note)</span>{% endif %}
+                                {% endif %}
+                            </p>
+                            <p class="mt-1 text-sm text-gray-600">{{ item.content|truncate(200) }}</p>
+                        </div>
+                        <div class="whitespace-nowrap text-right text-sm text-gray-500">
+                            <time datetime="{{ item.created_at.isoformat() if item.created_at else '' }}">
+                                {{ item.created_at.strftime('%b %d, %H:%M') if item.created_at else 'Unknown' }}
+                            </time>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="text-center py-8 text-gray-500">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="mt-2">No activity yet</p>
+    </div>
+    {% endif %}
+</div>

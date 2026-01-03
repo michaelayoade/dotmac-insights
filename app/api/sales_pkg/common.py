@@ -21,7 +21,7 @@ from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
 from app.models.payment import Payment, PaymentStatus, PaymentMethod, PaymentSource
 from app.models.credit_note import CreditNote, CreditNoteStatus
 from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.customer import Customer, CustomerStatus, CustomerType, BillingType
+from app.models.party import CustomerAccount, PartyRole
 from app.models.sales import (
     SalesOrder,
     SalesOrderStatus,
@@ -155,40 +155,29 @@ def _parse_credit_note_status(status: Optional[str]) -> Optional[CreditNoteStatu
         )
 
 
-def _parse_customer_status(status: Optional[str]) -> Optional[CustomerStatus]:
+def _parse_customer_status(status: Optional[str]) -> Optional[str]:
     if status is None:
         return None
-    try:
-        return CustomerStatus(status.lower())
-    except ValueError:
+    normalized = status.lower()
+    allowed = {"active", "suspended", "cancelled", "pending"}
+    if normalized not in allowed:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid customer status: {status}. Allowed: {', '.join(s.value for s in CustomerStatus)}",
+            detail=f"Invalid customer status: {status}. Allowed: {', '.join(sorted(allowed))}",
         )
+    return normalized
 
 
-def _parse_customer_type(value: Optional[str]) -> Optional[CustomerType]:
+def _parse_customer_type(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
-    try:
-        return CustomerType(value.lower())
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid customer type: {value}. Allowed: {', '.join(s.value for s in CustomerType)}",
-        )
+    return value.lower()
 
 
-def _parse_billing_type(value: Optional[str]) -> Optional[BillingType]:
+def _parse_billing_type(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
-    try:
-        return BillingType(value.lower())
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid billing type: {value}. Allowed: {', '.join(s.value for s in BillingType)}",
-        )
+    return value.lower()
 
 
 def _parse_date_only(value: Optional[date]) -> Optional[date]:
@@ -203,7 +192,7 @@ def _generate_local_external_id() -> int:
 
 class InvoiceBaseRequest(BaseModel):
     invoice_number: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     description: Optional[str] = None
     amount: Decimal
     tax_amount: Decimal = Decimal("0")
@@ -231,7 +220,7 @@ class InvoiceCreateRequest(InvoiceBaseRequest):
 
 class InvoiceUpdateRequest(BaseModel):
     invoice_number: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     description: Optional[str] = None
     amount: Optional[Decimal] = None
     tax_amount: Optional[Decimal] = None
@@ -255,7 +244,7 @@ class InvoiceUpdateRequest(BaseModel):
 
 class PaymentRequest(BaseModel):
     receipt_number: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     invoice_id: Optional[int] = None
     amount: Decimal
     currency: str = "NGN"
@@ -277,7 +266,7 @@ class PaymentRequest(BaseModel):
 
 class PaymentUpdateRequest(BaseModel):
     receipt_number: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     invoice_id: Optional[int] = None
     amount: Optional[Decimal] = None
     currency: Optional[str] = None
@@ -298,7 +287,7 @@ class PaymentUpdateRequest(BaseModel):
 
 
 class SalesOrderRequest(BaseModel):
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_type: Optional[str] = None
     company: Optional[str] = None
@@ -341,7 +330,7 @@ class SalesOrderRequest(BaseModel):
 
 
 class SalesOrderUpdateRequest(BaseModel):
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_type: Optional[str] = None
     company: Optional[str] = None
@@ -535,7 +524,7 @@ class SalesPersonUpdateRequest(BaseModel):
 
 class CreditNoteRequest(BaseModel):
     credit_number: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     invoice_id: Optional[int] = None
     description: Optional[str] = None
     amount: Decimal
@@ -555,7 +544,7 @@ class CreditNoteRequest(BaseModel):
 
 class CreditNoteUpdateRequest(BaseModel):
     credit_number: Optional[str] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     invoice_id: Optional[int] = None
     description: Optional[str] = None
     amount: Optional[Decimal] = None
@@ -573,44 +562,29 @@ class CreditNoteUpdateRequest(BaseModel):
         return value.upper() if value else value
 
 
-class CustomerRequest(BaseModel):
-    name: str
-    email: Optional[str] = None
+class CustomerAccountRequest(BaseModel):
+    """Customer account (Party-based) request payload."""
+    account_number: Optional[str] = None
     billing_email: Optional[str] = None
-    phone: Optional[str] = None
-    phone_secondary: Optional[str] = None
-    address: Optional[str] = None
-    address_2: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = "Nigeria"
-    customer_type: Optional[str] = CustomerType.RESIDENTIAL.value
-    status: Optional[str] = CustomerStatus.ACTIVE.value
     billing_type: Optional[str] = None
-    gps: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-
-
-class CustomerUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    billing_email: Optional[str] = None
-    phone: Optional[str] = None
-    phone_secondary: Optional[str] = None
-    address: Optional[str] = None
-    address_2: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    zip_code: Optional[str] = None
-    country: Optional[str] = None
+    billing_cycle: Optional[str] = None
+    currency: Optional[str] = "NGN"
+    status: Optional[str] = "active"
+    tier: Optional[str] = "standard"
+    party_id: Optional[int] = None
     customer_type: Optional[str] = None
-    status: Optional[str] = None
+
+
+class CustomerAccountUpdateRequest(BaseModel):
+    account_number: Optional[str] = None
+    billing_email: Optional[str] = None
     billing_type: Optional[str] = None
-    gps: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    billing_cycle: Optional[str] = None
+    currency: Optional[str] = None
+    status: Optional[str] = None
+    tier: Optional[str] = None
+    party_id: Optional[int] = None
+    customer_type: Optional[str] = None
 
 
 def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
@@ -764,7 +738,7 @@ def _serialize_sales_order(order: SalesOrder) -> Dict[str, Any]:
     return {
         "id": order.id,
         "erpnext_id": order.erpnext_id,
-        "customer_id": order.customer_id,
+        "customer_account_id": order.customer_account_id,
         "customer_name": order.customer_name,
         "order_type": order.order_type,
         "company": order.company,
@@ -849,7 +823,7 @@ def _serialize_credit_note(note: CreditNote) -> Dict[str, Any]:
         "id": note.id,
         "splynx_id": note.splynx_id,
         "credit_number": note.credit_number,
-        "customer_id": note.customer_id,
+        "customer_account_id": note.customer_account_id,
         "invoice_id": note.invoice_id,
         "description": note.description,
         "amount": float(note.amount),
@@ -859,29 +833,3 @@ def _serialize_credit_note(note: CreditNote) -> Dict[str, Any]:
         "applied_date": note.applied_date.isoformat() if note.applied_date else None,
         "write_back_status": getattr(note, "write_back_status", None),
     }
-
-
-def _serialize_customer(customer: Customer) -> Dict[str, Any]:
-    return {
-        "id": customer.id,
-        "name": customer.name,
-        "email": customer.email,
-        "billing_email": customer.billing_email,
-        "phone": customer.phone,
-        "phone_secondary": customer.phone_secondary,
-        "address": customer.address,
-        "address_2": customer.address_2,
-        "city": customer.city,
-        "state": customer.state,
-        "zip_code": customer.zip_code,
-        "country": customer.country,
-        "customer_type": customer.customer_type.value if customer.customer_type else None,
-        "status": customer.status.value if customer.status else None,
-        "billing_type": customer.billing_type.value if customer.billing_type else None,
-        "gps": customer.gps,
-        "latitude": customer.latitude,
-        "longitude": customer.longitude,
-        "splynx_id": customer.splynx_id,
-        "erpnext_id": customer.erpnext_id,
-    }
-

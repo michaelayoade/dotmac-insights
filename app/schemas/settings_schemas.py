@@ -573,6 +573,194 @@ SETTING_SCHEMAS: dict[str, dict[int, dict[str, Any]]] = {
             "required": [],
         },
     },
+
+    "subscriptions": {
+        1: {
+            "label": "Subscription Settings",
+            "description": "Subscription lifecycle, billing, and bundle configuration",
+            "type": "object",
+            "properties": {
+                # Billing Settings
+                "default_currency": {
+                    "type": "string",
+                    "default": "NGN",
+                    "description": "Default currency for subscriptions",
+                },
+                "invoice_due_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90,
+                    "default": 7,
+                    "description": "Days until invoice is due",
+                },
+                "daily_billing_invoice_due_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 1,
+                    "description": "Days until daily billing invoice is due",
+                },
+                "billing_lookback_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7,
+                    "default": 1,
+                    "description": "Days to look back for billing",
+                },
+                "max_billing_day_of_month": {
+                    "type": "integer",
+                    "minimum": 28,
+                    "maximum": 31,
+                    "default": 28,
+                    "description": "Max day of month for billing anchor (handles Feb)",
+                },
+
+                # Bundle Settings
+                "bundle_expiry_warning_days": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "default": [7, 3, 1],
+                    "description": "Days before expiry to send warnings",
+                },
+                "bundle_cleanup_retention_days": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 365,
+                    "default": 90,
+                    "description": "Days to retain expired/cancelled bundles",
+                },
+                "bundle_default_throttle_speed_kbps": {
+                    "type": "integer",
+                    "minimum": 32,
+                    "maximum": 1024,
+                    "default": 128,
+                    "description": "Default throttle speed when bundle exhausted",
+                },
+                "bundle_expiring_soon_threshold_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 7,
+                    "description": "Days to consider bundle 'expiring soon'",
+                },
+
+                # Usage Alert Thresholds
+                "bundle_alert_threshold_1": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 90,
+                    "default": 50,
+                    "description": "First usage alert threshold (%)",
+                },
+                "bundle_alert_threshold_2": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "Second usage alert threshold (%)",
+                },
+                "bundle_alert_threshold_3": {
+                    "type": "integer",
+                    "minimum": 80,
+                    "maximum": 99,
+                    "default": 95,
+                    "description": "Final usage alert threshold (%)",
+                },
+
+                # RADIUS Settings
+                "radius_username_max_collision_attempts": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 500,
+                    "default": 100,
+                    "description": "Max attempts to resolve username collisions",
+                },
+                "radius_subscription_prefix": {
+                    "type": "string",
+                    "default": "SUB",
+                    "description": "Prefix for subscription-based usernames",
+                },
+
+                # Provisioning Settings
+                "provisioning_retry_attempts": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Number of provisioning retry attempts",
+                },
+                "provisioning_retry_delay_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 300,
+                    "default": 30,
+                    "description": "Delay between provisioning retries",
+                },
+
+                # Lifecycle Settings
+                "auto_suspend_after_grace_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 90,
+                    "default": 0,
+                    "description": "Days after grace period to auto-suspend (0=disabled)",
+                },
+                "auto_cancel_after_suspend_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 365,
+                    "default": 30,
+                    "description": "Days after suspension to auto-cancel (0=disabled)",
+                },
+
+                # Session Settings
+                "max_concurrent_sessions": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 1,
+                    "description": "Max concurrent RADIUS sessions per subscription",
+                },
+                "session_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 300,
+                    "maximum": 86400,
+                    "default": 3600,
+                    "description": "Default RADIUS session timeout",
+                },
+                "idle_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "default": 300,
+                    "description": "Default RADIUS idle timeout",
+                },
+
+                # Notification Settings
+                "notify_on_bundle_purchase": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification on bundle purchase",
+                },
+                "notify_on_bundle_exhaustion": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification when bundle exhausted",
+                },
+                "notify_on_bundle_expiry": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification on bundle expiry",
+                },
+                "notify_on_subscription_status_change": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification on status changes",
+                },
+            },
+            "required": [],
+        },
+    },
 }
 
 

@@ -450,3 +450,69 @@ class BulkSlipResult:
     cancelled_count: int = 0
     failed_ids: List[int] = field(default_factory=list)
     errors: List[str] = field(default_factory=list)
+
+
+@dataclass
+class CreatedSlipDetail:
+    """Details of a created salary slip."""
+
+    id: int
+    employee: str
+    employee_id: int
+    gross_pay: Decimal
+    net_pay: Decimal
+    paye: Decimal = Decimal("0")
+    pension: Decimal = Decimal("0")
+    is_paye_exempt: bool = False
+
+
+@dataclass
+class SkippedSlipDetail:
+    """Details of a skipped salary slip."""
+
+    employee_id: int
+    employee: str
+    reason: str
+
+
+@dataclass
+class SlipGenerationDetailResult:
+    """Detailed result of generating salary slips with Nigerian tax compliance."""
+
+    payroll_entry_id: int
+    created_count: int = 0
+    skipped_count: int = 0
+    created_details: List[CreatedSlipDetail] = field(default_factory=list)
+    skipped_details: List[SkippedSlipDetail] = field(default_factory=list)
+    deleted_drafts: int = 0  # For regeneration
+
+
+@dataclass
+class PayoutItem:
+    """Data for a single payout."""
+
+    salary_slip_id: int
+    account_number: str
+    bank_code: str
+    account_name: Optional[str] = None
+
+
+@dataclass
+class PayoutResult:
+    """Result of a payout operation."""
+
+    reference: str
+    provider_reference: Optional[str]
+    status: str
+    amount: Decimal
+    salary_slip_id: int
+    fee: Optional[Decimal] = None
+
+
+@dataclass
+class PayoutBatchResult:
+    """Result of batch payout operations."""
+
+    count: int
+    transfers: List[PayoutResult] = field(default_factory=list)
+    drafts: List[Dict[str, Any]] = field(default_factory=list)  # For handoff

@@ -16,13 +16,18 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.omni import InboxRoutingRule, OmniConversation
-from app.models.ticket import Ticket
+from app.models.ticket import Ticket, TicketStatus
 from app.models.agent import Agent, Team, TeamMember
+from app.models.support_sla import RoutingRule, RoutingRoundRobinState, RoutingStrategy
 
 from .types import (
     RoutingMatch,
     RoutingRuleCreate,
     RoutingRuleUpdate,
+    TicketRoutingRuleCreate,
+    TicketRoutingRuleUpdate,
+    AgentWorkload,
+    QueueHealth,
 )
 from .errors import (
     NoMatchingRuleError,
@@ -533,3 +538,625 @@ class RoutingService:
         rule.updated_at = datetime.now(timezone.utc)
         self.db.flush()
         return rule
+
+    # -------------------------------------------------------------------------
+    # Ticket Routing Rules (RoutingRule model from support_sla)
+    # -------------------------------------------------------------------------
+
+    def list_ticket_routing_rules(
+        self,
+        team_id: Optional[int] = None,
+        active_only: bool = False,
+    ) -> List[RoutingRule]:
+        """List ticket routing rules.
+
+        Args:
+            team_id: Filter by team.
+            active_only: Only return active rules.
+
+        Returns:
+            List of RoutingRule instances.
+        """
+        query = self.db.query(RoutingRule)
+
+        if team_id:
+            query = query.filter(RoutingRule.team_id == team_id)
+        if active_only:
+            query = query.filter(RoutingRule.is_active == True)
+
+        return query.order_by(RoutingRule.priority, RoutingRule.name).all()
+
+    def get_ticket_routing_rule(self, rule_id: int) -> RoutingRule:
+        """Get a ticket routing rule by ID.
+
+        Args:
+            rule_id: The rule ID.
+
+        Returns:
+            RoutingRule instance.
+
+        Raises:
+            RoutingRuleNotFoundError: If rule not found.
+        """
+        rule = (
+            self.db.query(RoutingRule)
+            .filter(RoutingRule.id == rule_id)
+            .first()
+        )
+        if not rule:
+            raise RoutingRuleNotFoundError(rule_id)
+        return rule
+
+    def create_ticket_routing_rule(
+        self,
+        data: TicketRoutingRuleCreate,
+    ) -> RoutingRule:
+        """Create a new ticket routing rule.
+
+        Args:
+            data: Rule creation data.
+
+        Returns:
+            Created RoutingRule instance.
+
+        Raises:
+            ValidationError: If team_id or fallback_team_id is invalid.
+        """
+        # Validate team_id if provided
+        if data.team_id:
+            team = self.db.query(Team).filter(Team.id == data.team_id).first()
+            if not team:
+                raise ValidationError(f"Invalid team_id: {data.team_id}")
+
+        # Validate fallback_team_id if provided
+        if data.fallback_team_id:
+            fallback = self.db.query(Team).filter(Team.id == data.fallback_team_id).first()
+            if not fallback:
+                raise ValidationError(f"Invalid fallback_team_id: {data.fallback_team_id}")
+
+        # Validate strategy
+        valid_strategies = {s.value for s in RoutingStrategy}
+        if data.strategy not in valid_strategies:
+            raise ValidationError(f"Invalid strategy: {data.strategy}")
+
+        rule = RoutingRule(
+            name=data.name,
+            description=data.description,
+            team_id=data.team_id,
+            strategy=data.strategy,
+            conditions=data.conditions,
+            priority=data.priority,
+            is_active=data.is_active,
+            fallback_team_id=data.fallback_team_id,
+        )
+        self.db.add(rule)
+        self.db.flush()
+        return rule
+
+    def update_ticket_routing_rule(
+        self,
+        rule_id: int,
+        data: TicketRoutingRuleUpdate,
+    ) -> RoutingRule:
+        """Update a ticket routing rule.
+
+        Args:
+            rule_id: The rule ID.
+            data: Update data.
+
+        Returns:
+            Updated RoutingRule instance.
+
+        Raises:
+            RoutingRuleNotFoundError: If rule not found.
+            ValidationError: If team_id or fallback_team_id is invalid.
+        """
+        rule = self.get_ticket_routing_rule(rule_id)
+
+        if data.name is not None:
+            rule.name = data.name
+        if data.description is not None:
+            rule.description = data.description
+        if data.team_id is not None:
+            if data.team_id:
+                team = self.db.query(Team).filter(Team.id == data.team_id).first()
+                if not team:
+                    raise ValidationError(f"Invalid team_id: {data.team_id}")
+            rule.team_id = data.team_id
+        if data.strategy is not None:
+            valid_strategies = {s.value for s in RoutingStrategy}
+            if data.strategy not in valid_strategies:
+                raise ValidationError(f"Invalid strategy: {data.strategy}")
+            rule.strategy = data.strategy
+        if data.conditions is not None:
+            rule.conditions = data.conditions
+        if data.priority is not None:
+            rule.priority = data.priority
+        if data.is_active is not None:
+            rule.is_active = data.is_active
+        if data.fallback_team_id is not None:
+            if data.fallback_team_id:
+                fallback = self.db.query(Team).filter(Team.id == data.fallback_team_id).first()
+                if not fallback:
+                    raise ValidationError(f"Invalid fallback_team_id: {data.fallback_team_id}")
+            rule.fallback_team_id = data.fallback_team_id
+
+        self.db.flush()
+        return rule
+
+    def delete_ticket_routing_rule(self, rule_id: int) -> bool:
+        """Delete a ticket routing rule.
+
+        Args:
+            rule_id: The rule ID.
+
+        Returns:
+            True if deleted.
+
+        Raises:
+            RoutingRuleNotFoundError: If rule not found.
+        """
+        rule = self.get_ticket_routing_rule(rule_id)
+        self.db.delete(rule)
+        self.db.flush()
+        return True
+
+    # -------------------------------------------------------------------------
+    # Ticket Auto-Assignment
+    # -------------------------------------------------------------------------
+
+    def auto_assign_ticket_by_rules(self, ticket_id: int) -> Dict[str, Any]:
+        """Auto-assign a ticket based on routing rules.
+
+        Args:
+            ticket_id: The ticket ID.
+
+        Returns:
+            Assignment result dict.
+        """
+        ticket = self.db.query(Ticket).filter(Ticket.id == ticket_id).first()
+        if not ticket:
+            raise ValidationError(f"Ticket not found: {ticket_id}")
+
+        if ticket.assigned_to:
+            return {
+                "ticket_id": ticket.id,
+                "assigned": False,
+                "message": "Ticket is already assigned",
+                "current_assignee": ticket.assigned_to,
+            }
+
+        # Find matching routing rule
+        rules = self.list_ticket_routing_rules(active_only=True)
+
+        matched_rule = None
+        for rule in rules:
+            if self._evaluate_ticket_conditions(rule.conditions, ticket):
+                matched_rule = rule
+                break
+
+        if not matched_rule:
+            return {
+                "ticket_id": ticket.id,
+                "assigned": False,
+                "message": "No matching routing rule found",
+            }
+
+        if matched_rule.strategy == RoutingStrategy.MANUAL.value:
+            return {
+                "ticket_id": ticket.id,
+                "assigned": False,
+                "message": "Routing rule uses manual strategy",
+                "rule_id": matched_rule.id,
+                "rule_name": matched_rule.name,
+            }
+
+        # Get team members
+        team_id = matched_rule.team_id
+        if not team_id:
+            return {
+                "ticket_id": ticket.id,
+                "assigned": False,
+                "message": "Routing rule has no team configured",
+                "rule_id": matched_rule.id,
+            }
+
+        agents = self._get_available_agents_for_team(team_id)
+
+        # Try fallback team if no agents
+        if not agents and matched_rule.fallback_team_id:
+            agents = self._get_available_agents_for_team(matched_rule.fallback_team_id)
+            team_id = matched_rule.fallback_team_id
+
+        if not agents:
+            return {
+                "ticket_id": ticket.id,
+                "assigned": False,
+                "message": "No available agents in team",
+                "rule_id": matched_rule.id,
+            }
+
+        # Select agent based on strategy
+        selected_agent = self._select_agent_by_strategy(
+            matched_rule.strategy, team_id, agents, ticket
+        )
+
+        if not selected_agent:
+            return {
+                "ticket_id": ticket.id,
+                "assigned": False,
+                "message": "Could not select an agent",
+                "rule_id": matched_rule.id,
+            }
+
+        # Assign the ticket
+        ticket.assigned_to = selected_agent.display_name or selected_agent.email
+        team = self.db.query(Team).filter(Team.id == team_id).first()
+        if team:
+            ticket.resolution_team = team.name
+        ticket.updated_at = datetime.now(timezone.utc)
+        self.db.flush()
+
+        return {
+            "ticket_id": ticket.id,
+            "assigned": True,
+            "agent_id": selected_agent.id,
+            "agent_name": selected_agent.display_name,
+            "team_id": team_id,
+            "rule_id": matched_rule.id,
+            "rule_name": matched_rule.name,
+            "strategy": matched_rule.strategy,
+        }
+
+    def _evaluate_ticket_conditions(
+        self,
+        conditions: Optional[List[Dict[str, Any]]],
+        ticket: Ticket,
+    ) -> bool:
+        """Evaluate if ticket matches routing conditions."""
+        if not conditions:
+            return True  # No conditions = match all
+
+        from enum import Enum as EnumType
+
+        for condition in conditions:
+            field = condition.get("field", "")
+            operator = condition.get("operator", "")
+            value = condition.get("value")
+
+            ticket_value = getattr(ticket, field, None)
+            if isinstance(ticket_value, EnumType):
+                ticket_value = ticket_value.value
+
+            if operator == "equals":
+                if str(ticket_value) != str(value):
+                    return False
+            elif operator == "not_equals":
+                if str(ticket_value) == str(value):
+                    return False
+            elif operator == "contains":
+                if str(value) not in str(ticket_value or ""):
+                    return False
+            elif operator == "in_list":
+                val_list = value if isinstance(value, list) else [value]
+                if str(ticket_value) not in [str(v) for v in val_list]:
+                    return False
+            elif operator == "is_empty":
+                if ticket_value is not None and ticket_value != "":
+                    return False
+            elif operator == "is_not_empty":
+                if ticket_value is None or ticket_value == "":
+                    return False
+
+        return True
+
+    def _get_available_agents_for_team(self, team_id: int) -> List[Agent]:
+        """Get active agents for a team."""
+        members = self.db.query(TeamMember).filter(
+            TeamMember.team_id == team_id,
+            TeamMember.is_active == True
+        ).all()
+
+        if not members:
+            return []
+
+        agent_ids = [m.agent_id for m in members]
+        return self.db.query(Agent).filter(
+            Agent.id.in_(agent_ids),
+            Agent.is_active == True
+        ).all()
+
+    def _select_agent_by_strategy(
+        self,
+        strategy: str,
+        team_id: int,
+        agents: List[Agent],
+        ticket: Ticket,
+    ) -> Optional[Agent]:
+        """Select agent based on routing strategy."""
+        if strategy == RoutingStrategy.ROUND_ROBIN.value:
+            return self._ticket_round_robin_select(team_id, agents)
+        elif strategy == RoutingStrategy.LEAST_BUSY.value:
+            return self._ticket_least_busy_select(agents)
+        elif strategy == RoutingStrategy.SKILL_BASED.value:
+            return self._ticket_skill_based_select(ticket, agents)
+        elif strategy == RoutingStrategy.LOAD_BALANCED.value:
+            return self._ticket_load_balanced_select(agents)
+        else:
+            return agents[0] if agents else None
+
+    def _ticket_round_robin_select(
+        self,
+        team_id: int,
+        agents: List[Agent],
+    ) -> Optional[Agent]:
+        """Select next agent in round-robin rotation."""
+        state = self.db.query(RoutingRoundRobinState).filter(
+            RoutingRoundRobinState.team_id == team_id
+        ).first()
+
+        agent_ids = [a.id for a in agents]
+
+        if not state:
+            selected = agents[0]
+            state = RoutingRoundRobinState(team_id=team_id, last_agent_id=selected.id)
+            self.db.add(state)
+            self.db.flush()
+            return selected
+
+        if state.last_agent_id is None:
+            next_idx = 0
+        else:
+            try:
+                last_idx = agent_ids.index(state.last_agent_id)
+                next_idx = (last_idx + 1) % len(agents)
+            except ValueError:
+                next_idx = 0
+
+        selected = agents[next_idx]
+        state.last_agent_id = selected.id
+        self.db.flush()
+        return selected
+
+    def _ticket_least_busy_select(self, agents: List[Agent]) -> Optional[Agent]:
+        """Select agent with fewest open tickets."""
+        ticket_counts = {}
+        for agent in agents:
+            name = agent.display_name or agent.email
+            count = self.db.query(func.count(Ticket.id)).filter(
+                Ticket.assigned_to == name,
+                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+            ).scalar() or 0
+            ticket_counts[agent.id] = count
+
+        min_count = min(ticket_counts.values())
+        for agent in agents:
+            if ticket_counts[agent.id] == min_count:
+                return agent
+
+        return agents[0] if agents else None
+
+    def _ticket_skill_based_select(
+        self,
+        ticket: Ticket,
+        agents: List[Agent],
+    ) -> Optional[Agent]:
+        """Select agent based on skill matching."""
+        ticket_type = ticket.ticket_type or ""
+        issue_type = ticket.issue_type or ""
+
+        best_match = None
+        best_score = -1
+
+        for agent in agents:
+            score = 0
+            skills = agent.skills or {}
+            domains = agent.domains or {}
+
+            if ticket_type.lower() in [k.lower() for k in skills.keys()]:
+                score += 2
+            if ticket_type.lower() in [k.lower() for k in domains.keys()]:
+                score += 1
+            if issue_type.lower() in [k.lower() for k in skills.keys()]:
+                score += 2
+
+            if score > best_score:
+                best_score = score
+                best_match = agent
+
+        return best_match or (agents[0] if agents else None)
+
+    def _ticket_load_balanced_select(self, agents: List[Agent]) -> Optional[Agent]:
+        """Select agent based on capacity utilization."""
+        best_agent = None
+        lowest_utilization = float('inf')
+
+        for agent in agents:
+            capacity = agent.capacity or 10
+            name = agent.display_name or agent.email
+
+            current_load = self.db.query(func.count(Ticket.id)).filter(
+                Ticket.assigned_to == name,
+                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+            ).scalar() or 0
+
+            utilization = current_load / capacity if capacity > 0 else float('inf')
+
+            if utilization < lowest_utilization:
+                lowest_utilization = utilization
+                best_agent = agent
+
+        return best_agent
+
+    # -------------------------------------------------------------------------
+    # Workload & Metrics
+    # -------------------------------------------------------------------------
+
+    def get_agent_workloads(
+        self,
+        team_id: Optional[int] = None,
+    ) -> List[AgentWorkload]:
+        """Get workload for all agents.
+
+        Args:
+            team_id: Filter by team.
+
+        Returns:
+            List of AgentWorkload instances.
+        """
+        query = self.db.query(Agent).filter(Agent.is_active == True)
+
+        if team_id:
+            member_agent_ids = self.db.query(TeamMember.agent_id).filter(
+                TeamMember.team_id == team_id,
+                TeamMember.is_active == True
+            ).all()
+            agent_ids = [m[0] for m in member_agent_ids]
+            query = query.filter(Agent.id.in_(agent_ids))
+
+        agents = query.all()
+
+        result = []
+        for agent in agents:
+            name = agent.display_name or agent.email
+            open_tickets = self.db.query(func.count(Ticket.id)).filter(
+                Ticket.assigned_to == name,
+                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+            ).scalar() or 0
+
+            capacity = agent.capacity or 10
+            utilization = (open_tickets / capacity * 100) if capacity > 0 else 0
+
+            result.append(AgentWorkload(
+                agent_id=agent.id,
+                agent_name=name,
+                open_tickets=open_tickets,
+                capacity=capacity,
+                utilization_pct=round(utilization, 1),
+            ))
+
+        return result
+
+    def get_queue_health(self) -> QueueHealth:
+        """Get queue health metrics.
+
+        Returns:
+            QueueHealth instance.
+        """
+        from datetime import timedelta
+
+        # Total open tickets
+        total_open = self.db.query(func.count(Ticket.id)).filter(
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+        ).scalar() or 0
+
+        # By status
+        status_counts = self.db.query(
+            Ticket.status,
+            func.count(Ticket.id)
+        ).filter(
+            Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+        ).group_by(Ticket.status).all()
+
+        by_status = {
+            str(s.value) if hasattr(s, 'value') else str(s): c
+            for s, c in status_counts
+        }
+
+        # Average wait time (time since creation for unassigned tickets)
+        now = datetime.now(timezone.utc)
+        unassigned = self.db.query(Ticket).filter(
+            Ticket.status == TicketStatus.OPEN,
+            Ticket.assigned_to == None
+        ).all()
+
+        if unassigned:
+            total_wait = sum(
+                (now - t.created_at).total_seconds() / 60
+                for t in unassigned if t.created_at
+            )
+            avg_wait = total_wait / len(unassigned)
+        else:
+            avg_wait = 0.0
+
+        # Agent counts
+        agents_active = self.db.query(func.count(Agent.id)).filter(
+            Agent.is_active == True
+        ).scalar() or 0
+
+        # Count agents at capacity
+        agents_at_capacity = 0
+        agents = self.db.query(Agent).filter(Agent.is_active == True).all()
+        for agent in agents:
+            name = agent.display_name or agent.email
+            capacity = agent.capacity or 10
+            current = self.db.query(func.count(Ticket.id)).filter(
+                Ticket.assigned_to == name,
+                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
+            ).scalar() or 0
+            if current >= capacity:
+                agents_at_capacity += 1
+
+        return QueueHealth(
+            total_open=total_open,
+            by_status=by_status,
+            avg_wait_minutes=round(avg_wait, 1),
+            agents_active=agents_active,
+            agents_at_capacity=agents_at_capacity,
+        )
+
+    def rebalance_tickets(
+        self,
+        team_id: Optional[int] = None,
+        max_per_agent: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Rebalance tickets among agents.
+
+        Args:
+            team_id: Team to rebalance (optional).
+            max_per_agent: Max tickets per agent.
+
+        Returns:
+            Rebalance result dict.
+        """
+        # Get workloads
+        workloads = self.get_agent_workloads(team_id)
+
+        if not workloads:
+            return {"rebalanced": 0, "message": "No agents available"}
+
+        # Find overloaded and underloaded agents
+        max_cap = max_per_agent or 10
+        overloaded = [w for w in workloads if w.open_tickets > max_cap]
+        underloaded = [w for w in workloads if w.open_tickets < max_cap]
+
+        if not overloaded or not underloaded:
+            return {"rebalanced": 0, "message": "No rebalancing needed"}
+
+        rebalanced = 0
+
+        for over_agent in overloaded:
+            excess = over_agent.open_tickets - max_cap
+
+            # Get tickets to reassign
+            tickets = self.db.query(Ticket).filter(
+                Ticket.assigned_to == over_agent.agent_name,
+                Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED])
+            ).order_by(Ticket.created_at.desc()).limit(excess).all()
+
+            for ticket in tickets:
+                # Find agent with capacity
+                for under_agent in underloaded:
+                    if under_agent.open_tickets < max_cap:
+                        ticket.assigned_to = under_agent.agent_name
+                        ticket.updated_at = datetime.now(timezone.utc)
+                        under_agent.open_tickets += 1
+                        rebalanced += 1
+                        break
+
+        self.db.flush()
+
+        return {
+            "rebalanced": rebalanced,
+            "message": f"Rebalanced {rebalanced} tickets",
+        }

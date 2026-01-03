@@ -4,124 +4,51 @@ Subscriptions Routes - Service Subscription Management with SSR + HTMX.
 Permission Requirements:
 - subscriptions:read - View subscriptions and tariffs
 - subscriptions:write - Create, update, delete, status changes
+- network:write - Network assignment and provisioning
 """
 from __future__ import annotations
 
-from typing import Optional, Any
-from datetime import datetime
-from decimal import Decimal
+from fastapi import APIRouter, Request, Response, Query, HTTPException, Path
 
-from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_, and_
-from sqlalchemy.orm import joinedload
-
-from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
-from app.web.context import (
-    get_base_context,
-    get_navigation_context,
-    build_breadcrumbs,
-    build_pagination_context,
+from ._deps import (
+    # Types
+    Optional, Any, Decimal, datetime, date,
+    # FastAPI
+    HTMLResponse, RedirectResponse,
+    # Dependencies
+    SessionUser, CSRFToken, CSRFProtect, DB,
+    RequireSubscriptionsRead, RequireSubscriptionsWrite, RequireNetworkWrite,
+    # Context helpers
+    get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
+    # Template
+    templates,
+    # Security helpers
+    is_htmx_request, htmx_toast, set_flash,
+    # Models
+    Subscription, SubscriptionStatus, SubscriptionType,
+    Tariff, TariffType, Party, Router,
+    # Services and errors
+    NotFoundError, ValidationError, ConflictError,
+    SubscriptionService, ServiceTypeConfigService, SubscriptionFilters,
+    SubscriptionCreateData, SubscriptionUpdateData, NetworkAssignmentData, ProvisioningConfigData,
+    # Form helpers
+    _form_str, _form_int, _form_decimal, _form_bool, _form_date,
+    # Option helpers
+    get_status_options, get_service_type_options, get_billing_cycle_options,
+    get_router_options, get_tariff_options, get_party_options, get_access_method_options,
+    # Status helpers
+    get_status_style, get_available_transitions, can_transition,
+    # Formatting helpers
+    format_speed, format_currency,
+    # Stats
+    compute_subscription_stats,
+    # Pagination
+    PaginationParams,
 )
-from app.templates.environment import get_template_env
-from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionType
-from app.models.tariff import Tariff, TariffType
-from app.models.party import Party, PartyRole, PartyStatus
-from app.models.router import Router
-from app.core.security import is_htmx_request, htmx_toast, set_flash
-from app.integrations.mikrotik.access_methods import ACCESS_METHODS, get_access_method_options
 
-# Permission dependencies
-RequireSubscriptionsRead = Depends(require_scope("subscriptions:read"))
-RequireSubscriptionsWrite = Depends(require_scope("subscriptions:write"))
+from ._services import SubscriptionWebService
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
-templates = get_template_env()
-
-
-def _form_str(form: Any, key: str, default: str = "") -> str:
-    value = form.get(key, default)
-    if isinstance(value, UploadFile):
-        return default
-    if value is None:
-        return default
-    return str(value).strip()
-
-
-def get_status_options():
-    """Get subscription status options for filter dropdown."""
-    return [
-        {"value": s.value, "label": s.value.title()}
-        for s in SubscriptionStatus
-    ]
-
-
-def get_service_type_options():
-    """Get service type options for filter dropdown."""
-    return [
-        {"value": t.value, "label": t.value.title()}
-        for t in SubscriptionType
-    ]
-
-
-def get_billing_cycle_options():
-    """Get billing cycle options."""
-    return [
-        {"value": "monthly", "label": "Monthly"},
-        {"value": "quarterly", "label": "Quarterly"},
-        {"value": "yearly", "label": "Yearly"},
-    ]
-
-
-def format_speed(speed: Optional[int]) -> str:
-    """Format speed in Mbps or Gbps."""
-    if not speed:
-        return "-"
-    if speed >= 1000:
-        return f"{speed / 1000:.0f} Gbps"
-    return f"{speed} Mbps"
-
-
-def compute_stats(db, status_filter=None, service_type_filter=None) -> dict:
-    """Compute subscription stats for dashboard cards."""
-    base_query = db.query(Subscription)
-
-    active = base_query.filter(Subscription.status == SubscriptionStatus.ACTIVE).count()
-    suspended = base_query.filter(Subscription.status == SubscriptionStatus.SUSPENDED).count()
-    pending = base_query.filter(Subscription.status == SubscriptionStatus.PENDING).count()
-    total = base_query.count()
-
-    # MRR calculation (sum of active subscriptions)
-    mrr_result = db.query(func.sum(Subscription.price)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "monthly"
-    ).scalar() or Decimal("0")
-
-    # Quarterly and yearly contributions to MRR
-    quarterly_mrr = db.query(func.sum(Subscription.price / 3)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "quarterly"
-    ).scalar() or Decimal("0")
-
-    yearly_mrr = db.query(func.sum(Subscription.price / 12)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "yearly"
-    ).scalar() or Decimal("0")
-
-    total_mrr = float(mrr_result) + float(quarterly_mrr) + float(yearly_mrr)
-
-    # New this month
-    start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    new_this_month = base_query.filter(Subscription.created_at >= start_of_month).count()
-
-    return {
-        "active": active,
-        "suspended": suspended,
-        "pending": pending,
-        "total": total,
-        "mrr": total_mrr,
-        "new_this_month": new_this_month,
-    }
 
 
 # =============================================================================
@@ -145,65 +72,31 @@ async def subscriptions_list(
     dir: str = Query("desc", description="Sort direction"),
 ):
     """Subscriptions list page with stats and filters."""
-    query = db.query(Subscription).options(
-        joinedload(Subscription.party),
-        joinedload(Subscription.tariff),
-        joinedload(Subscription.router),
+    svc = SubscriptionWebService(db, principal=user)
+
+    # Build filters
+    filters = SubscriptionFilters(
+        search=q,
+        status=status,
+        service_type=service_type,
+        party_id=party_id,
+    )
+    pagination = PaginationParams(page=page, per_page=per_page)
+
+    # Get subscriptions with pagination
+    result = svc.list_subscriptions(
+        filters=filters,
+        pagination=pagination,
+        sort_by=sort,
+        sort_dir=dir,
     )
 
-    # Search
-    if q:
-        search_filter = or_(
-            Subscription.plan_name.ilike(f"%{q}%"),
-            Subscription.ipv4_address.ilike(f"%{q}%"),
-            Subscription.mac_address.ilike(f"%{q}%"),
-            Subscription.party.has(Party.name.ilike(f"%{q}%")),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if status:
-        try:
-            status_enum = SubscriptionStatus(status)
-            query = query.filter(Subscription.status == status_enum)
-        except ValueError:
-            pass
-
-    if service_type:
-        try:
-            type_enum = SubscriptionType(service_type)
-            query = query.filter(Subscription.service_type == type_enum)
-        except ValueError:
-            pass
-
-    if party_id:
-        query = query.filter(Subscription.party_id == party_id)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_mapping = {
-        "created_at": Subscription.created_at,
-        "plan_name": Subscription.plan_name,
-        "price": Subscription.price,
-        "status": Subscription.status,
-        "start_date": Subscription.start_date,
-    }
-    sort_column = sort_mapping.get(sort, Subscription.created_at)
-    order_column = sort_column.desc() if dir == "desc" else sort_column.asc()
-    query = query.order_by(order_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    subscriptions = query.offset(offset).limit(per_page).all()
-
-    # Stats
-    stats = compute_stats(db)
+    # Compute stats
+    stats = compute_subscription_stats(db)
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["subscriptions"] = subscriptions
+    context["subscriptions"] = result.items
     context["stats"] = stats
     context["search_query"] = q or ""
     context["current_status"] = status
@@ -213,8 +106,9 @@ async def subscriptions_list(
     context["service_type_options"] = get_service_type_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
     context["format_speed"] = format_speed
+    context["get_status_style"] = get_status_style
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -260,24 +154,33 @@ async def subscriptions_table(
 # SUBSCRIPTION DETAIL
 # =============================================================================
 
-@router.get("/{subscription_id}", response_class=HTMLResponse, dependencies=[RequireSubscriptionsRead])
+@router.get("/{subscription_id:int}", response_class=HTMLResponse, dependencies=[RequireSubscriptionsRead])
 async def subscription_detail(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Subscription detail page with usage stats and actions."""
-    subscription = db.query(Subscription).options(
-        joinedload(Subscription.party),
-        joinedload(Subscription.tariff),
-        joinedload(Subscription.router),
-    ).filter(Subscription.id == subscription_id).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
+
+    # Get configuration and lifecycle info
+    config_service = ServiceTypeConfigService(db, principal=user)
+    config = config_service.get_config()
+    grace_period_days = config_service.get_grace_period_days(
+        subscription.service_type.value
+    )
+    early_termination_fee = svc._subscription_svc.calculate_early_termination_fee(subscription.id)
+
+    # Get available status transitions
+    transitions = svc.get_status_transitions(subscription_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -289,33 +192,16 @@ async def subscription_detail(
     ])
     context["subscription"] = subscription
     context["format_speed"] = format_speed
-
-    # Available status transitions
-    transitions = get_available_transitions(subscription.status)
+    context["format_currency"] = format_currency
+    context["get_status_style"] = get_status_style
+    context["plan_change_settings"] = config.plan_changes
+    context["lifecycle_settings"] = config.lifecycle
+    context["grace_period_days"] = grace_period_days
+    context["early_termination_fee"] = early_termination_fee
     context["status_transitions"] = transitions
 
     template = templates.get_template("modules/subscriptions/templates/pages/detail.html")
     return HTMLResponse(template.render(context))
-
-
-def get_available_transitions(current_status: SubscriptionStatus) -> list:
-    """Get available status transitions for a subscription."""
-    transitions = {
-        SubscriptionStatus.PENDING: [
-            {"status": "active", "label": "Activate", "color": "emerald"},
-            {"status": "cancelled", "label": "Cancel", "color": "red"},
-        ],
-        SubscriptionStatus.ACTIVE: [
-            {"status": "suspended", "label": "Suspend", "color": "amber"},
-            {"status": "cancelled", "label": "Cancel", "color": "red"},
-        ],
-        SubscriptionStatus.SUSPENDED: [
-            {"status": "active", "label": "Reactivate", "color": "emerald"},
-            {"status": "cancelled", "label": "Cancel", "color": "red"},
-        ],
-        SubscriptionStatus.CANCELLED: [],
-    }
-    return transitions.get(current_status, [])
 
 
 # =============================================================================
@@ -332,30 +218,10 @@ async def subscription_new(
     party_id: Optional[int] = Query(None),
 ):
     """New subscription form page."""
-    # Get tariffs for selection
-    tariffs = db.query(Tariff).filter(
-        Tariff.enabled == True,
-        Tariff.available_for_services == True,
-    ).order_by(Tariff.title).all()
-
-    # Get routers for network assignment
-    routers = db.query(Router).filter(
-        Router.status == "active",
-    ).order_by(Router.title).all()
-
-    # Get customer parties for selection
-    customers = (
-        db.query(Party)
-        .join(PartyRole, PartyRole.party_id == Party.id)
-        .filter(
-            Party.status == PartyStatus.ACTIVE,
-            PartyRole.role == "customer",
-            PartyRole.until.is_(None),
-        )
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
+    # Get options for dropdowns
+    tariffs = get_tariff_options(db)
+    routers = get_router_options(db)
+    customers = get_party_options(db)
 
     # Pre-selected party if provided
     selected_customer = None
@@ -395,54 +261,30 @@ async def subscription_create(
 ):
     """Create a new subscription."""
     form = await request.form()
+    svc = SubscriptionWebService(db, principal=user)
 
     # Validation
     errors = {}
     party_id = _form_str(form, "party_id")
     plan_name = _form_str(form, "plan_name")
-    price_str = _form_str(form, "price")
+    price = _form_decimal(form, "price")
 
-    if not party_id:
+    if not party_id or not party_id.isdigit():
         errors["party_id"] = "Customer is required"
-    elif not party_id.isdigit():
-        errors["party_id"] = "Invalid customer"
 
     if not plan_name:
         errors["plan_name"] = "Plan name is required"
 
-    if not price_str:
+    if price is None:
         errors["price"] = "Price is required"
-    else:
-        try:
-            price = Decimal(price_str)
-            if price < 0:
-                errors["price"] = "Price must be positive"
-        except:
-            errors["price"] = "Invalid price format"
+    elif price < 0:
+        errors["price"] = "Price must be positive"
 
     if errors:
-        # Get form context again
-        tariffs = db.query(Tariff).filter(
-            Tariff.enabled == True,
-            Tariff.available_for_services == True,
-        ).order_by(Tariff.title).all()
-
-        routers = db.query(Router).filter(
-            Router.status == "active",
-        ).order_by(Router.title).all()
-
-        customers = (
-            db.query(Party)
-            .join(PartyRole, PartyRole.party_id == Party.id)
-            .filter(
-                Party.status == PartyStatus.ACTIVE,
-                PartyRole.role == "customer",
-                PartyRole.until.is_(None),
-            )
-            .order_by(Party.name)
-            .limit(100)
-            .all()
-        )
+        # Return form with errors
+        tariffs = get_tariff_options(db)
+        routers = get_router_options(db)
+        customers = get_party_options(db)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -466,113 +308,86 @@ async def subscription_create(
         template = templates.get_template("modules/subscriptions/templates/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Parse service type
-    service_type_str = form.get("service_type", "internet")
-    try:
-        service_type = SubscriptionType(service_type_str)
-    except ValueError:
-        service_type = SubscriptionType.INTERNET
-
-    # Parse dates
-    start_date = None
-    start_date_str = _form_str(form, "start_date")
-    if start_date_str:
-        try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-        except ValueError:
-            pass
-
-    # Parse tariff_id
-    tariff_id = None
-    tariff_id_str = _form_str(form, "tariff_id")
-    if tariff_id_str and tariff_id_str.isdigit():
-        tariff_id = int(tariff_id_str)
-
-    # Parse router_id
-    router_id = None
-    router_id_str = _form_str(form, "router_id")
-    if router_id_str and router_id_str.isdigit():
-        router_id = int(router_id_str)
-
-    # Parse speeds
-    download_speed = None
-    download_str = _form_str(form, "download_speed")
-    if download_str and download_str.isdigit():
-        download_speed = int(download_str)
-
-    upload_speed = None
-    upload_str = _form_str(form, "upload_speed")
-    if upload_str and upload_str.isdigit():
-        upload_speed = int(upload_str)
-
-    # Parse access method and PPP credentials
-    access_method = _form_str(form, "access_method") or None
-    if access_method and access_method not in ACCESS_METHODS:
-        access_method = None
-
-    ppp_username = _form_str(form, "ppp_username") or None
-    ppp_password = _form_str(form, "ppp_password") or None
-
-    # Create subscription
-    subscription = Subscription(
+    # Build create data
+    create_data = SubscriptionCreateData(
         party_id=int(party_id),
-        tariff_id=tariff_id,
-        service_type=service_type,
+        tariff_id=_form_int(form, "tariff_id"),
+        service_type=_form_str(form, "service_type", "internet"),
         plan_name=plan_name,
         plan_code=_form_str(form, "plan_code") or None,
         description=_form_str(form, "description") or None,
-        price=Decimal(price_str),
-        currency=_form_str(form, "currency", "NGN") or "NGN",
-        billing_cycle=_form_str(form, "billing_cycle", "monthly") or "monthly",
-        download_speed=download_speed,
-        upload_speed=upload_speed,
-        router_id=router_id,
+        price=price,
+        currency=_form_str(form, "currency", "NGN"),
+        billing_cycle=_form_str(form, "billing_cycle", "monthly"),
+        download_speed=_form_int(form, "download_speed"),
+        upload_speed=_form_int(form, "upload_speed"),
+        router_id=_form_int(form, "router_id"),
         ipv4_address=_form_str(form, "ipv4_address") or None,
         ipv6_address=_form_str(form, "ipv6_address") or None,
         mac_address=_form_str(form, "mac_address") or None,
-        access_method=access_method,
-        ppp_username=ppp_username,
-        ppp_password=ppp_password,
-        status=SubscriptionStatus.PENDING,
-        start_date=start_date,
+        access_method=_form_str(form, "access_method") or None,
+        ppp_username=_form_str(form, "ppp_username") or None,
+        ppp_password=_form_str(form, "ppp_password") or None,
+        start_date=_form_date(form, "start_date"),
+        end_date=_form_date(form, "end_date"),
     )
-    db.add(subscription)
-    db.commit()
-    db.refresh(subscription)
+
+    try:
+        subscription = svc.create_subscription(create_data)
+        db.commit()
+    except ValidationError as exc:
+        errors["_general"] = str(exc)
+        # Return form with errors
+        tariffs = get_tariff_options(db)
+        routers = get_router_options(db)
+        customers = get_party_options(db)
+
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Subscription"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Services"},
+            {"label": "Subscriptions", "href": "/subscriptions"},
+            {"label": "New Subscription"},
+        ])
+        context["subscription"] = None
+        context["tariffs"] = tariffs
+        context["routers"] = routers
+        context["customers"] = customers
+        context["selected_customer"] = None
+        context["service_type_options"] = get_service_type_options()
+        context["billing_cycle_options"] = get_billing_cycle_options()
+        context["access_method_options"] = get_access_method_options()
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/subscriptions/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, f"Subscription '{subscription.plan_name}' created successfully.", "success")
     return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
 
 
-@router.get("/{subscription_id}/edit", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.get("/{subscription_id:int}/edit", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
 async def subscription_edit(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Subscription edit form page."""
-    subscription = db.query(Subscription).options(
-        joinedload(Subscription.party),
-        joinedload(Subscription.tariff),
-        joinedload(Subscription.router),
-    ).filter(Subscription.id == subscription_id).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    # Get tariffs for selection
-    tariffs = db.query(Tariff).filter(
-        Tariff.enabled == True,
-        Tariff.available_for_services == True,
-    ).order_by(Tariff.title).all()
-
-    # Get routers for network assignment
-    routers = db.query(Router).filter(
-        Router.status == "active",
-    ).order_by(Router.title).all()
+    # Get options for dropdowns
+    tariffs = get_tariff_options(db)
+    routers = get_router_options(db)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -587,7 +402,7 @@ async def subscription_edit(
     context["tariffs"] = tariffs
     context["routers"] = routers
     context["customers"] = []  # Not changeable on edit
-    context["selected_customer"] = subscription.customer
+    context["selected_customer"] = subscription.party
     context["service_type_options"] = get_service_type_options()
     context["billing_cycle_options"] = get_billing_cycle_options()
     context["access_method_options"] = get_access_method_options()
@@ -598,7 +413,7 @@ async def subscription_edit(
     return HTMLResponse(template.render(context))
 
 
-@router.post("/{subscription_id}", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.post("/{subscription_id:int}", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
 async def subscription_update(
     request: Request,
     response: Response,
@@ -606,14 +421,14 @@ async def subscription_update(
     csrf_token: CSRFToken,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Update a subscription."""
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     form = await request.form()
@@ -621,30 +436,19 @@ async def subscription_update(
     # Validation
     errors = {}
     plan_name = _form_str(form, "plan_name")
-    price_str = _form_str(form, "price")
+    price = _form_decimal(form, "price")
 
     if not plan_name:
         errors["plan_name"] = "Plan name is required"
 
-    if not price_str:
+    if price is None:
         errors["price"] = "Price is required"
-    else:
-        try:
-            price = Decimal(price_str)
-            if price < 0:
-                errors["price"] = "Price must be positive"
-        except:
-            errors["price"] = "Invalid price format"
+    elif price < 0:
+        errors["price"] = "Price must be positive"
 
     if errors:
-        tariffs = db.query(Tariff).filter(
-            Tariff.enabled == True,
-            Tariff.available_for_services == True,
-        ).order_by(Tariff.title).all()
-
-        routers = db.query(Router).filter(
-            Router.status == "active",
-        ).order_by(Router.title).all()
+        tariffs = get_tariff_options(db)
+        routers = get_router_options(db)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -659,7 +463,7 @@ async def subscription_update(
         context["tariffs"] = tariffs
         context["routers"] = routers
         context["customers"] = []
-        context["selected_customer"] = subscription.customer
+        context["selected_customer"] = subscription.party
         context["service_type_options"] = get_service_type_options()
         context["billing_cycle_options"] = get_billing_cycle_options()
         context["access_method_options"] = get_access_method_options()
@@ -669,78 +473,34 @@ async def subscription_update(
         template = templates.get_template("modules/subscriptions/templates/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Parse service type
-    service_type_str = form.get("service_type", subscription.service_type.value)
+    # Build update data
+    update_data = SubscriptionUpdateData(
+        tariff_id=_form_int(form, "tariff_id"),
+        service_type=_form_str(form, "service_type") or None,
+        plan_name=plan_name,
+        plan_code=_form_str(form, "plan_code") or None,
+        description=_form_str(form, "description") or None,
+        price=price,
+        currency=_form_str(form, "currency", "NGN"),
+        billing_cycle=_form_str(form, "billing_cycle", "monthly"),
+        download_speed=_form_int(form, "download_speed"),
+        upload_speed=_form_int(form, "upload_speed"),
+        router_id=_form_int(form, "router_id"),
+        ipv4_address=_form_str(form, "ipv4_address") or None,
+        ipv6_address=_form_str(form, "ipv6_address") or None,
+        mac_address=_form_str(form, "mac_address") or None,
+        access_method=_form_str(form, "access_method") or None,
+        ppp_username=_form_str(form, "ppp_username") or None,
+        ppp_password=_form_str(form, "ppp_password") or None,
+        start_date=_form_date(form, "start_date"),
+        end_date=_form_date(form, "end_date"),
+    )
+
     try:
-        service_type = SubscriptionType(service_type_str)
-    except ValueError:
-        service_type = subscription.service_type
-
-    # Parse dates
-    start_date = subscription.start_date
-    start_date_str = _form_str(form, "start_date")
-    if start_date_str:
-        try:
-            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
-        except ValueError:
-            pass
-
-    # Parse tariff_id
-    tariff_id = subscription.tariff_id
-    tariff_id_str = _form_str(form, "tariff_id")
-    if tariff_id_str and tariff_id_str.isdigit():
-        tariff_id = int(tariff_id_str)
-
-    # Parse router_id
-    router_id = subscription.router_id
-    router_id_str = _form_str(form, "router_id")
-    if router_id_str and router_id_str.isdigit():
-        router_id = int(router_id_str)
-    elif router_id_str == "":
-        router_id = None
-
-    # Parse speeds
-    download_speed = subscription.download_speed
-    download_str = _form_str(form, "download_speed")
-    if download_str and download_str.isdigit():
-        download_speed = int(download_str)
-
-    upload_speed = subscription.upload_speed
-    upload_str = _form_str(form, "upload_speed")
-    if upload_str and upload_str.isdigit():
-        upload_speed = int(upload_str)
-
-    # Parse access method and PPP credentials
-    access_method = _form_str(form, "access_method")
-    if access_method and access_method in ACCESS_METHODS:
-        subscription.access_method = access_method
-    elif access_method == "":
-        subscription.access_method = None
-
-    ppp_username = _form_str(form, "ppp_username")
-    ppp_password = _form_str(form, "ppp_password")
-    if ppp_username:
-        subscription.ppp_username = ppp_username
-    if ppp_password:  # Only update if a new password is provided
-        subscription.ppp_password = ppp_password
-
-    # Update subscription
-    subscription.tariff_id = tariff_id
-    subscription.service_type = service_type
-    subscription.plan_name = plan_name
-    subscription.plan_code = _form_str(form, "plan_code") or None
-    subscription.description = _form_str(form, "description") or None
-    subscription.price = Decimal(price_str)
-    subscription.currency = _form_str(form, "currency", "NGN") or "NGN"
-    subscription.billing_cycle = _form_str(form, "billing_cycle", "monthly") or "monthly"
-    subscription.download_speed = download_speed
-    subscription.upload_speed = upload_speed
-    subscription.router_id = router_id
-    subscription.ipv4_address = _form_str(form, "ipv4_address") or None
-    subscription.ipv6_address = _form_str(form, "ipv6_address") or None
-    subscription.mac_address = _form_str(form, "mac_address") or None
-    subscription.start_date = start_date
-    db.commit()
+        subscription = svc.update_subscription(subscription_id, update_data)
+        db.commit()
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     set_flash(response, f"Subscription '{subscription.plan_name}' updated successfully.", "success")
     return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
@@ -750,22 +510,22 @@ async def subscription_update(
 # STATUS CHANGE
 # =============================================================================
 
-@router.get("/{subscription_id}/status-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.get("/{subscription_id:int}/status-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
 async def subscription_status_modal(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
     target_status: str = Query(...),
 ):
     """Status change confirmation modal."""
-    subscription = db.query(Subscription).options(
-        joinedload(Subscription.party),
-    ).filter(Subscription.id == subscription_id).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     try:
@@ -773,32 +533,31 @@ async def subscription_status_modal(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid status")
 
+    # Validate transition
+    if not can_transition(subscription.status, new_status):
+        raise HTTPException(status_code=400, detail=f"Cannot transition from {subscription.status.value} to {target_status}")
+
     context = get_base_context(request, response, user, csrf_token)
     context["subscription"] = subscription
     context["target_status"] = target_status
-    context["target_status_label"] = target_status.title()
+    context["target_status_label"] = target_status.replace("_", " ").title()
+    context["get_status_style"] = get_status_style
 
     template = templates.get_template("modules/subscriptions/templates/partials/status_modal.html")
     return HTMLResponse(template.render(context))
 
 
-@router.patch("/{subscription_id}/status", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.patch("/{subscription_id:int}/status", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
 async def subscription_status_change(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Change subscription status."""
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
-
+    svc = SubscriptionWebService(db, principal=user)
     form = await request.form()
     new_status_str = _form_str(form, "status")
 
@@ -810,57 +569,346 @@ async def subscription_status_change(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid status")
 
-    # Validate transition
-    allowed = get_available_transitions(subscription.status)
-    allowed_statuses = [t["status"] for t in allowed]
-    if new_status.value not in allowed_statuses:
-        raise HTTPException(status_code=400, detail="Invalid status transition")
+    try:
+        subscription = svc.get_subscription(subscription_id)
+        old_status = subscription.status
 
-    old_status = subscription.status
-    subscription.status = new_status
+        if new_status == SubscriptionStatus.ACTIVE:
+            if old_status == SubscriptionStatus.SUSPENDED:
+                subscription = svc.reactivate(subscription_id)
+            else:
+                subscription = svc.activate(subscription_id)
+        elif new_status == SubscriptionStatus.SUSPENDED:
+            subscription = svc.suspend(subscription_id)
+        elif new_status == SubscriptionStatus.CANCELLED:
+            subscription = svc.cancel(subscription_id)
+        else:
+            subscription = svc.change_status(subscription_id, new_status.value)
 
-    # Set cancelled date if cancelling
-    if new_status == SubscriptionStatus.CANCELLED:
-        subscription.cancelled_date = datetime.utcnow()
-
-    db.commit()
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
-        htmx_toast(response, f"Status changed from {old_status.value.title()} to {new_status.value.title()}", "success")
-        # Return updated row or redirect
+        htmx_toast(response, f"Status changed from {old_status.value.replace('_', ' ').title()} to {new_status.value.replace('_', ' ').title()}", "success")
         response.headers["HX-Redirect"] = f"/subscriptions/{subscription.id}"
         return HTMLResponse("", headers=dict(response.headers))
 
-    set_flash(response, f"Status changed to {new_status.value.title()}", "success")
+    set_flash(response, f"Status changed to {new_status.value.replace('_', ' ').title()}", "success")
     return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
+
+
+# =============================================================================
+# LIFECYCLE ACTIONS (PLAN CHANGES, RENEWALS, GRACE)
+# =============================================================================
+
+@router.get("/{subscription_id:int}/plan-change-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_plan_change_modal(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+    mode: str = Query("upgrade", description="upgrade or downgrade"),
+):
+    """Plan change modal (upgrade/downgrade)."""
+    if mode not in {"upgrade", "downgrade"}:
+        mode = "upgrade"
+
+    svc = SubscriptionWebService(db, principal=user)
+
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    # Get available tariffs
+    all_tariffs = db.query(Tariff).filter(
+        Tariff.enabled == True,
+        Tariff.available_for_services == True,
+    ).order_by(Tariff.price.asc()).all()
+
+    upgrade_tariffs = [
+        t for t in all_tariffs
+        if t.id != subscription.tariff_id and t.price > subscription.price
+    ]
+    downgrade_tariffs = [
+        t for t in all_tariffs
+        if t.id != subscription.tariff_id and t.price < subscription.price
+    ]
+
+    config_service = ServiceTypeConfigService(db, principal=user)
+    config = config_service.get_config()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["subscription"] = subscription
+    context["mode"] = mode
+    context["upgrade_tariffs"] = upgrade_tariffs
+    context["downgrade_tariffs"] = downgrade_tariffs
+    context["plan_change_settings"] = config.plan_changes
+    context["format_currency"] = format_currency
+
+    template = templates.get_template("modules/subscriptions/templates/partials/plan_change_modal.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{subscription_id:int}/upgrade", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_upgrade(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """Upgrade a subscription to a higher plan."""
+    form = await request.form()
+    new_tariff_id = _form_int(form, "new_tariff_id")
+
+    if not new_tariff_id:
+        raise HTTPException(status_code=400, detail="Valid plan is required")
+
+    config_service = ServiceTypeConfigService(db, principal=user)
+    config = config_service.get_config()
+
+    effective = _form_str(form, "effective") or config.plan_changes.upgrade_effective
+    prorate = _form_bool(form, "prorate")
+
+    svc = SubscriptionWebService(db, principal=user)
+    try:
+        result = svc.execute_upgrade(
+            subscription_id=subscription_id,
+            new_tariff_id=new_tariff_id,
+            effective=effective,
+            prorate=prorate,
+        )
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    message = f"Upgraded from {result.old_plan} to {result.new_plan}"
+    if is_htmx_request(request):
+        htmx_toast(response, message, "success")
+        response.headers["HX-Redirect"] = f"/subscriptions/{subscription_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, message, "success")
+    return RedirectResponse(url=f"/subscriptions/{subscription_id}", status_code=303)
+
+
+@router.post("/{subscription_id:int}/downgrade", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_downgrade(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """Downgrade a subscription to a lower plan."""
+    form = await request.form()
+    new_tariff_id = _form_int(form, "new_tariff_id")
+
+    if not new_tariff_id:
+        raise HTTPException(status_code=400, detail="Valid plan is required")
+
+    config_service = ServiceTypeConfigService(db, principal=user)
+    config = config_service.get_config()
+
+    effective = _form_str(form, "effective") or config.plan_changes.downgrade_effective
+    prorate = _form_bool(form, "prorate")
+
+    svc = SubscriptionWebService(db, principal=user)
+    try:
+        result = svc.execute_downgrade(
+            subscription_id=subscription_id,
+            new_tariff_id=new_tariff_id,
+            effective=effective,
+            prorate=prorate,
+        )
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    message = f"Downgraded from {result.old_plan} to {result.new_plan}"
+    if is_htmx_request(request):
+        htmx_toast(response, message, "success")
+        response.headers["HX-Redirect"] = f"/subscriptions/{subscription_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, message, "success")
+    return RedirectResponse(url=f"/subscriptions/{subscription_id}", status_code=303)
+
+
+@router.get("/{subscription_id:int}/renew-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_renew_modal(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """Renewal modal for subscriptions."""
+    svc = SubscriptionWebService(db, principal=user)
+
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    renewal_info = svc.get_renewal_info(subscription_id)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["subscription"] = subscription
+    context["renewal_info"] = renewal_info
+    context["format_currency"] = format_currency
+
+    template = templates.get_template("modules/subscriptions/templates/partials/renew_modal.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{subscription_id:int}/renew", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_renew(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """Renew a subscription for additional periods."""
+    form = await request.form()
+    periods = _form_int(form, "periods", 1)
+    new_end_date = _form_date(form, "new_end_date")
+
+    if periods < 1:
+        periods = 1
+
+    svc = SubscriptionWebService(db, principal=user)
+    try:
+        result = svc.execute_renewal(
+            subscription_id=subscription_id,
+            periods=periods,
+            new_end_date=new_end_date,
+        )
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    message = f"Renewed for {result.periods} period(s)"
+    if is_htmx_request(request):
+        htmx_toast(response, message, "success")
+        response.headers["HX-Redirect"] = f"/subscriptions/{subscription_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, message, "success")
+    return RedirectResponse(url=f"/subscriptions/{subscription_id}", status_code=303)
+
+
+@router.get("/{subscription_id:int}/grace-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_grace_modal(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """Grace period extension modal."""
+    svc = SubscriptionWebService(db, principal=user)
+
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    config_service = ServiceTypeConfigService(db, principal=user)
+    grace_period_days = config_service.get_grace_period_days(
+        subscription.service_type.value
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["subscription"] = subscription
+    context["grace_period_days"] = grace_period_days
+
+    template = templates.get_template("modules/subscriptions/templates/partials/grace_modal.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{subscription_id:int}/grace", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+async def subscription_extend_grace(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """Extend grace period for a suspended subscription."""
+    form = await request.form()
+    days = _form_int(form, "days", 0)
+    reason = _form_str(form, "reason")
+
+    if days <= 0:
+        raise HTTPException(status_code=400, detail="Grace period must be greater than zero")
+
+    svc = SubscriptionWebService(db, principal=user)
+    try:
+        svc.extend_grace_period(
+            subscription_id=subscription_id,
+            days=days,
+            reason=reason,
+        )
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    message = f"Extended grace period by {days} day(s)"
+    if is_htmx_request(request):
+        htmx_toast(response, message, "success")
+        response.headers["HX-Redirect"] = f"/subscriptions/{subscription_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, message, "success")
+    return RedirectResponse(url=f"/subscriptions/{subscription_id}", status_code=303)
 
 
 # =============================================================================
 # NETWORK ASSIGNMENT
 # =============================================================================
 
-@router.get("/{subscription_id}/network-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.get("/{subscription_id:int}/network-modal", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_network_modal(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Network assignment modal."""
-    subscription = db.query(Subscription).options(
-        joinedload(Subscription.party),
-        joinedload(Subscription.router),
-    ).filter(Subscription.id == subscription_id).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    # Get routers
-    routers = db.query(Router).filter(
-        Router.status == "active",
-    ).order_by(Router.title).all()
+    routers = get_router_options(db)
 
     context = get_base_context(request, response, user, csrf_token)
     context["subscription"] = subscription
@@ -870,39 +918,33 @@ async def subscription_network_modal(
     return HTMLResponse(template.render(context))
 
 
-@router.patch("/{subscription_id}/network", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.patch("/{subscription_id:int}/network", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_network_update(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Update subscription network assignment."""
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
-
     form = await request.form()
+    svc = SubscriptionWebService(db, principal=user)
 
-    # Parse router_id
-    router_id = subscription.router_id
-    router_id_str = _form_str(form, "router_id")
-    if router_id_str and router_id_str.isdigit():
-        router_id = int(router_id_str)
-    elif router_id_str == "":
-        router_id = None
+    network_data = NetworkAssignmentData(
+        router_id=_form_int(form, "router_id"),
+        ipv4_address=_form_str(form, "ipv4_address") or None,
+        ipv6_address=_form_str(form, "ipv6_address") or None,
+        mac_address=_form_str(form, "mac_address") or None,
+    )
 
-    # Update network fields
-    subscription.router_id = router_id
-    subscription.ipv4_address = _form_str(form, "ipv4_address") or None
-    subscription.ipv6_address = _form_str(form, "ipv6_address") or None
-    subscription.mac_address = _form_str(form, "mac_address") or None
-    db.commit()
+    try:
+        subscription = svc.assign_network(subscription_id, network_data)
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, "Network assignment updated", "success")
@@ -917,27 +959,32 @@ async def subscription_network_update(
 # DELETE
 # =============================================================================
 
-@router.delete("/{subscription_id}", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.delete("/{subscription_id:int}", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
 async def subscription_delete(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Delete a subscription (cancel and mark as deleted)."""
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     name = subscription.plan_name
-    subscription.status = SubscriptionStatus.CANCELLED
-    subscription.cancelled_date = datetime.utcnow()
-    db.commit()
+    try:
+        if subscription.status != SubscriptionStatus.CANCELLED:
+            svc.cancel(subscription_id)
+        db.commit()
+    except ConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, f"Subscription '{name}' cancelled.", "success")
@@ -952,28 +999,27 @@ async def subscription_delete(
 # ROW PARTIAL
 # =============================================================================
 
-@router.get("/{subscription_id}/row", response_class=HTMLResponse, dependencies=[RequireSubscriptionsRead])
+@router.get("/{subscription_id:int}/row", response_class=HTMLResponse, dependencies=[RequireSubscriptionsRead])
 async def subscription_row(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Single subscription row partial for HTMX updates."""
-    subscription = db.query(Subscription).options(
-        joinedload(Subscription.party),
-        joinedload(Subscription.tariff),
-        joinedload(Subscription.router),
-    ).filter(Subscription.id == subscription_id).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)
     context["subscription"] = subscription
     context["format_speed"] = format_speed
+    context["get_status_style"] = get_status_style
 
     template = templates.get_template("modules/subscriptions/templates/partials/subscription_row.html")
     return HTMLResponse(template.render(context))
@@ -983,25 +1029,25 @@ async def subscription_row(
 # MIKROTIK PROVISIONING
 # =============================================================================
 
-@router.post("/{subscription_id}/provision", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.post("/{subscription_id:int}/provision", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_provision(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """
     Manually trigger provisioning for a subscription.
 
     This queues a Celery task to provision the subscription on its assigned router.
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     if not subscription.router_id:
@@ -1016,22 +1062,15 @@ async def subscription_provision(
             return HTMLResponse("", headers=dict(response.headers))
         raise HTTPException(status_code=400, detail="No access method configured")
 
-    # Queue provisioning task
     try:
-        from app.tasks.provisioning_tasks import provision_subscription
-
-        result = provision_subscription.delay(
-            subscription_id=subscription.id,
-            triggered_by=user.name or "manual",
-            force=True,
-        )
+        task_id = svc.queue_provision(subscription_id, triggered_by=user.name or "manual", force=True)
 
         if is_htmx_request(request):
-            htmx_toast(response, f"Provisioning task queued (task_id: {result.id[:8]}...)", "info")
+            htmx_toast(response, f"Provisioning task queued (task_id: {task_id[:8]}...)", "info")
             response.headers["HX-Redirect"] = f"/subscriptions/{subscription.id}"
             return HTMLResponse("", headers=dict(response.headers))
 
-        set_flash(response, f"Provisioning task queued (task_id: {result.id})", "info")
+        set_flash(response, f"Provisioning task queued (task_id: {task_id})", "info")
         return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
 
     except Exception as e:
@@ -1041,25 +1080,25 @@ async def subscription_provision(
         raise HTTPException(status_code=500, detail=f"Failed to queue provisioning: {str(e)}")
 
 
-@router.post("/{subscription_id}/disconnect", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.post("/{subscription_id:int}/disconnect", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_disconnect(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """
     Force disconnect an active session for a subscription.
 
     This disconnects any active PPPoE/Hotspot session, forcing the customer to reconnect.
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     if not subscription.router_id:
@@ -1068,21 +1107,15 @@ async def subscription_disconnect(
             return HTMLResponse("", headers=dict(response.headers))
         raise HTTPException(status_code=400, detail="No router assigned")
 
-    # Queue disconnect task
     try:
-        from app.tasks.provisioning_tasks import disconnect_subscription_session
-
-        result = disconnect_subscription_session.delay(
-            subscription_id=subscription.id,
-            triggered_by=user.name or "manual",
-        )
+        result = svc.disconnect_subscription_sessions(subscription_id, triggered_by=user.name or "manual")
 
         if is_htmx_request(request):
-            htmx_toast(response, f"Disconnect task queued (task_id: {result.id[:8]}...)", "info")
+            htmx_toast(response, f"Disconnect task queued (task_id: {result[:8]}...)", "info")
             response.headers["HX-Redirect"] = f"/subscriptions/{subscription.id}"
             return HTMLResponse("", headers=dict(response.headers))
 
-        set_flash(response, f"Disconnect task queued (task_id: {result.id})", "info")
+        set_flash(response, f"Disconnect task queued (task_id: {result})", "info")
         return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
 
     except Exception as e:
@@ -1092,25 +1125,25 @@ async def subscription_disconnect(
         raise HTTPException(status_code=500, detail=f"Failed to queue disconnect: {str(e)}")
 
 
-@router.post("/{subscription_id}/deprovision", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.post("/{subscription_id:int}/deprovision", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_deprovision(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """
     Remove subscription provisioning from router.
 
     This removes PPPoE secrets, Hotspot users, DHCP bindings, etc.
     """
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
     if not subscription.router_id:
@@ -1119,21 +1152,15 @@ async def subscription_deprovision(
             return HTMLResponse("", headers=dict(response.headers))
         raise HTTPException(status_code=400, detail="No router assigned")
 
-    # Queue deprovisioning task
     try:
-        from app.tasks.provisioning_tasks import deprovision_subscription
-
-        result = deprovision_subscription.delay(
-            subscription_id=subscription.id,
-            triggered_by=user.name or "manual",
-        )
+        task_id = svc.queue_deprovision(subscription_id, triggered_by=user.name or "manual")
 
         if is_htmx_request(request):
-            htmx_toast(response, f"Deprovisioning task queued (task_id: {result.id[:8]}...)", "info")
+            htmx_toast(response, f"Deprovisioning task queued (task_id: {task_id[:8]}...)", "info")
             response.headers["HX-Redirect"] = f"/subscriptions/{subscription.id}"
             return HTMLResponse("", headers=dict(response.headers))
 
-        set_flash(response, f"Deprovisioning task queued (task_id: {result.id})", "info")
+        set_flash(response, f"Deprovisioning task queued (task_id: {task_id})", "info")
         return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
 
     except Exception as e:
@@ -1143,28 +1170,69 @@ async def subscription_deprovision(
         raise HTTPException(status_code=500, detail=f"Failed to queue deprovisioning: {str(e)}")
 
 
-@router.get("/{subscription_id}/provisioning-modal", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.post("/{subscription_id:int}/provision-update", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
+async def subscription_provision_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    subscription_id: int = Path(..., description="Subscription ID"),
+):
+    """
+    Queue a provisioning update for a subscription.
+
+    Used when speed/IP details change for a provisioned service.
+    """
+    svc = SubscriptionWebService(db, principal=user)
+
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+
+    if not subscription.router_id:
+        if is_htmx_request(request):
+            htmx_toast(response, "No router assigned. Cannot update provisioning.", "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        raise HTTPException(status_code=400, detail="No router assigned")
+
+    try:
+        task_id = svc.queue_provision_update(subscription_id, triggered_by=user.name or "manual")
+
+        if is_htmx_request(request):
+            htmx_toast(response, f"Update task queued (task_id: {task_id[:8]}...)", "info")
+            response.headers["HX-Redirect"] = f"/subscriptions/{subscription.id}"
+            return HTMLResponse("", headers=dict(response.headers))
+
+        set_flash(response, f"Update task queued (task_id: {task_id})", "info")
+        return RedirectResponse(url=f"/subscriptions/{subscription.id}", status_code=303)
+
+    except Exception as e:
+        if is_htmx_request(request):
+            htmx_toast(response, f"Failed to queue update: {str(e)}", "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        raise HTTPException(status_code=500, detail=f"Failed to queue update: {str(e)}")
+
+
+@router.get("/{subscription_id:int}/provisioning-modal", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_provisioning_modal(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Provisioning configuration modal."""
-    subscription = db.query(Subscription).options(
-        joinedload(Subscription.customer),
-        joinedload(Subscription.router),
-    ).filter(Subscription.id == subscription_id).first()
+    svc = SubscriptionWebService(db, principal=user)
 
-    if not subscription:
+    try:
+        subscription = svc.get_subscription(subscription_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    # Get routers for selection
-    routers = db.query(Router).filter(
-        Router.status == "active",
-    ).order_by(Router.title).all()
+    routers = get_router_options(db)
 
     context = get_base_context(request, response, user, csrf_token)
     context["subscription"] = subscription
@@ -1175,49 +1243,33 @@ async def subscription_provisioning_modal(
     return HTMLResponse(template.render(context))
 
 
-@router.patch("/{subscription_id}/provisioning", response_class=HTMLResponse, dependencies=[RequireSubscriptionsWrite])
+@router.patch("/{subscription_id:int}/provisioning", response_class=HTMLResponse, dependencies=[RequireNetworkWrite])
 async def subscription_provisioning_update(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf: CSRFProtect,
     db: DB,
-    subscription_id: int,
+    subscription_id: int = Path(..., description="Subscription ID"),
 ):
     """Update subscription provisioning configuration."""
-    subscription = db.query(Subscription).filter(
-        Subscription.id == subscription_id
-    ).first()
-
-    if not subscription:
-        raise HTTPException(status_code=404, detail="Subscription not found")
-
     form = await request.form()
+    svc = SubscriptionWebService(db, principal=user)
 
-    # Update provisioning fields
-    access_method = _form_str(form, "access_method")
-    if access_method and access_method in ACCESS_METHODS:
-        subscription.access_method = access_method
-    elif access_method == "":
-        subscription.access_method = None
+    provisioning_data = ProvisioningConfigData(
+        access_method=_form_str(form, "access_method") or None,
+        ppp_username=_form_str(form, "ppp_username") or None,
+        ppp_password=_form_str(form, "ppp_password") or None,
+        router_id=_form_int(form, "router_id"),
+    )
 
-    # Update PPP credentials if provided
-    ppp_username = _form_str(form, "ppp_username")
-    ppp_password = _form_str(form, "ppp_password")
-
-    if ppp_username:
-        subscription.ppp_username = ppp_username
-    if ppp_password:
-        subscription.ppp_password = ppp_password
-
-    # Update router if provided
-    router_id_str = _form_str(form, "router_id")
-    if router_id_str and router_id_str.isdigit():
-        subscription.router_id = int(router_id_str)
-    elif router_id_str == "":
-        subscription.router_id = None
-
-    db.commit()
+    try:
+        subscription = svc.configure_provisioning(subscription_id, provisioning_data)
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if is_htmx_request(request):
         htmx_toast(response, "Provisioning configuration updated", "success")

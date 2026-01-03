@@ -1,5 +1,7 @@
 """
 Payroll Entries Endpoints
+
+Uses PayrollService for all business logic.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,15 +12,23 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.auth import Require
-from app.models.hr_payroll import PayrollEntry, SalarySlip
-from .helpers import decimal_or_default, validate_date_order
+from app.auth import Require, get_current_principal
+from app.models.auth import User
+from app.services.hr.payroll import PayrollService
+from app.services.hr.payroll_types import (
+    PayrollEntryFilters,
+    PayrollEntryCreateData,
+    PayrollEntryUpdateData,
+)
+from app.services.types import PaginationParams
+from app.services.hr.errors import PayrollEntryNotFoundError, ValidationError as HRValidationError
 
 router = APIRouter()
 
 # =============================================================================
 # PAYROLL ENTRY
 # =============================================================================
+
 
 class PayrollEntryCreate(BaseModel):
     posting_date: date
@@ -54,6 +64,33 @@ class PayrollEntryUpdate(BaseModel):
     docstatus: Optional[int] = None
 
 
+def _serialize_entry(e, include_timestamps: bool = False) -> Dict[str, Any]:
+    """Serialize a PayrollEntry model to dict."""
+    result = {
+        "id": e.id,
+        "erpnext_id": e.erpnext_id,
+        "posting_date": e.posting_date.isoformat() if e.posting_date else None,
+        "payroll_frequency": e.payroll_frequency,
+        "start_date": e.start_date.isoformat() if e.start_date else None,
+        "end_date": e.end_date.isoformat() if e.end_date else None,
+        "company": e.company,
+        "salary_slips_created": e.salary_slips_created,
+        "salary_slips_submitted": e.salary_slips_submitted,
+    }
+    if include_timestamps:
+        result["department"] = e.department
+        result["branch"] = e.branch
+        result["designation"] = e.designation
+        result["currency"] = e.currency
+        result["exchange_rate"] = float(e.exchange_rate) if e.exchange_rate else 1
+        result["payment_account"] = e.payment_account
+        result["bank_account"] = e.bank_account
+        result["docstatus"] = e.docstatus
+        result["created_at"] = e.created_at.isoformat() if e.created_at else None
+        result["updated_at"] = e.updated_at.isoformat() if e.updated_at else None
+    return result
+
+
 @router.get("/payroll-entries", dependencies=[Depends(Require("hr:read"))])
 def list_payroll_entries(
     company: Optional[str] = None,
@@ -64,36 +101,22 @@ def list_payroll_entries(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List payroll entries with filtering."""
-    query = db.query(PayrollEntry)
+    service = PayrollService(db)
 
-    if company:
-        query = query.filter(PayrollEntry.company.ilike(f"%{company}%"))
-    if from_date:
-        query = query.filter(PayrollEntry.start_date >= from_date)
-    if to_date:
-        query = query.filter(PayrollEntry.end_date <= to_date)
+    filters = PayrollEntryFilters(
+        company=company,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    pagination = PaginationParams(offset=offset, limit=limit)
 
-    total = query.count()
-    entries = query.order_by(PayrollEntry.posting_date.desc()).offset(offset).limit(limit).all()
+    result = service.list_payroll_entries(filters, pagination)
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": e.id,
-                "erpnext_id": e.erpnext_id,
-                "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-                "payroll_frequency": e.payroll_frequency,
-                "start_date": e.start_date.isoformat() if e.start_date else None,
-                "end_date": e.end_date.isoformat() if e.end_date else None,
-                "company": e.company,
-                "salary_slips_created": e.salary_slips_created,
-                "salary_slips_submitted": e.salary_slips_submitted,
-            }
-            for e in entries
-        ],
+        "data": [_serialize_entry(e) for e in result.items],
     }
 
 
@@ -103,42 +126,29 @@ def get_payroll_entry(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get payroll entry detail."""
-    e = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id).first()
-    if not e:
+    service = PayrollService(db)
+    try:
+        e = service.get_payroll_entry(entry_id)
+    except PayrollEntryNotFoundError:
         raise HTTPException(status_code=404, detail="Payroll entry not found")
 
-    return {
-        "id": e.id,
-        "erpnext_id": e.erpnext_id,
-        "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-        "payroll_frequency": e.payroll_frequency,
-        "start_date": e.start_date.isoformat() if e.start_date else None,
-        "end_date": e.end_date.isoformat() if e.end_date else None,
-        "company": e.company,
-        "department": e.department,
-        "branch": e.branch,
-        "designation": e.designation,
-        "currency": e.currency,
-        "exchange_rate": float(e.exchange_rate) if e.exchange_rate else 1,
-        "payment_account": e.payment_account,
-        "bank_account": e.bank_account,
-        "salary_slips_created": e.salary_slips_created,
-        "salary_slips_submitted": e.salary_slips_submitted,
-        "docstatus": e.docstatus,
-        "created_at": e.created_at.isoformat() if e.created_at else None,
-        "updated_at": e.updated_at.isoformat() if e.updated_at else None,
-    }
+    return _serialize_entry(e, include_timestamps=True)
 
 
 @router.post("/payroll-entries", dependencies=[Depends(Require("hr:write"))])
 def create_payroll_entry(
     payload: PayrollEntryCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new payroll entry."""
-    validate_date_order(payload.start_date, payload.end_date)
+    service = PayrollService(db, current_user)
 
-    entry = PayrollEntry(
+    # Validate date order
+    if payload.start_date > payload.end_date:
+        raise HTTPException(status_code=400, detail="start_date must be on or before end_date")
+
+    create_data = PayrollEntryCreateData(
         posting_date=payload.posting_date,
         payroll_frequency=payload.payroll_frequency,
         start_date=payload.start_date,
@@ -148,13 +158,18 @@ def create_payroll_entry(
         branch=payload.branch,
         designation=payload.designation,
         currency=payload.currency or "USD",
-        exchange_rate=decimal_or_default(payload.exchange_rate, Decimal("1")),
+        exchange_rate=payload.exchange_rate or Decimal("1"),
         payment_account=payload.payment_account,
         bank_account=payload.bank_account,
-        docstatus=payload.docstatus or 0,
     )
-    db.add(entry)
-    db.commit()
+
+    try:
+        entry = service.create_payroll_entry(create_data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return get_payroll_entry(entry.id, db)
 
 
@@ -163,36 +178,53 @@ def update_payroll_entry(
     entry_id: int,
     payload: PayrollEntryUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a payroll entry."""
-    entry = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id).first()
-    if not entry:
+    service = PayrollService(db, current_user)
+
+    update_data = PayrollEntryUpdateData(
+        posting_date=payload.posting_date,
+        payroll_frequency=payload.payroll_frequency,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        company=payload.company,
+        department=payload.department,
+        branch=payload.branch,
+        designation=payload.designation,
+        currency=payload.currency,
+        exchange_rate=payload.exchange_rate,
+        payment_account=payload.payment_account,
+        bank_account=payload.bank_account,
+    )
+
+    try:
+        service.update_payroll_entry(entry_id, update_data)
+        db.commit()
+    except PayrollEntryNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Payroll entry not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            if field == "exchange_rate":
-                setattr(entry, field, decimal_or_default(value, Decimal("1")))
-            else:
-                setattr(entry, field, value)
-
-    validate_date_order(entry.start_date, entry.end_date)
-
-    db.commit()
-    return get_payroll_entry(entry.id, db)
+    return get_payroll_entry(entry_id, db)
 
 
 @router.delete("/payroll-entries/{entry_id}", dependencies=[Depends(Require("hr:write"))])
 def delete_payroll_entry(
     entry_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a payroll entry."""
-    entry = db.query(PayrollEntry).filter(PayrollEntry.id == entry_id).first()
-    if not entry:
+    service = PayrollService(db, current_user)
+
+    try:
+        service.delete_payroll_entry(entry_id)
+        db.commit()
+    except PayrollEntryNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Payroll entry not found")
 
-    db.delete(entry)
-    db.commit()
     return {"message": "Payroll entry deleted", "id": entry_id}
-

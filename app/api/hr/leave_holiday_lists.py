@@ -1,23 +1,28 @@
 """
 Holiday Lists Endpoints
+
+Uses LeaveService for all business logic.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from typing import Dict, Any, Optional, List
 from datetime import date
 from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import Require
-from app.models.hr_leave import HolidayList, Holiday
+from app.services.hr.leave import LeaveService
+from app.services.hr.leave_types import HolidayListCreateData, HolidayData
+from app.services.hr.errors import ValidationError as HRValidationError
+from app.models.hr_leave import Holiday
 
 router = APIRouter()
 
 # =============================================================================
 # HOLIDAY LIST
 # =============================================================================
+
 
 class HolidayPayload(BaseModel):
     holiday_date: date
@@ -44,6 +49,35 @@ class HolidayListUpdate(BaseModel):
     holidays: Optional[List[HolidayPayload]] = Field(default=None)
 
 
+def _serialize_holiday_list(h, include_holidays: bool = False) -> Dict[str, Any]:
+    """Serialize a HolidayList model to dict."""
+    result = {
+        "id": h.id,
+        "erpnext_id": h.erpnext_id,
+        "holiday_list_name": h.holiday_list_name,
+        "from_date": h.from_date.isoformat() if h.from_date else None,
+        "to_date": h.to_date.isoformat() if h.to_date else None,
+        "total_holidays": h.total_holidays,
+        "company": h.company,
+        "weekly_off": h.weekly_off,
+        "holiday_count": len(h.holidays) if h.holidays else 0,
+    }
+    if include_holidays:
+        result["holidays"] = [
+            {
+                "id": hd.id,
+                "holiday_date": hd.holiday_date.isoformat() if hd.holiday_date else None,
+                "description": hd.description,
+                "weekly_off": hd.weekly_off,
+                "idx": hd.idx,
+            }
+            for hd in sorted(h.holidays, key=lambda x: x.idx)
+        ]
+        result["created_at"] = h.created_at.isoformat() if h.created_at else None
+        result["updated_at"] = h.updated_at.isoformat() if h.updated_at else None
+    return result
+
+
 @router.get("/holiday-lists", dependencies=[Depends(Require("hr:read"))])
 def list_holiday_lists(
     company: Optional[str] = None,
@@ -54,36 +88,28 @@ def list_holiday_lists(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List holiday lists with filtering."""
-    query = db.query(HolidayList)
+    service = LeaveService(db)
+    lists = service.list_holiday_lists(year=year)
 
+    # Apply additional filters
     if company:
-        query = query.filter(HolidayList.company.ilike(f"%{company}%"))
-    if year:
-        query = query.filter(func.extract("year", HolidayList.from_date) == year)
+        company_lower = company.lower()
+        lists = [h for h in lists if h.company and company_lower in h.company.lower()]
     if search:
-        query = query.filter(HolidayList.holiday_list_name.ilike(f"%{search}%"))
+        search_lower = search.lower()
+        lists = [h for h in lists if search_lower in h.holiday_list_name.lower()]
 
-    total = query.count()
-    lists = query.order_by(HolidayList.from_date.desc()).offset(offset).limit(limit).all()
+    # Sort by from_date descending
+    lists = sorted(lists, key=lambda x: x.from_date or date.min, reverse=True)
+
+    total = len(lists)
+    lists = lists[offset : offset + limit]
 
     return {
         "total": total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": h.id,
-                "erpnext_id": h.erpnext_id,
-                "holiday_list_name": h.holiday_list_name,
-                "from_date": h.from_date.isoformat() if h.from_date else None,
-                "to_date": h.to_date.isoformat() if h.to_date else None,
-                "total_holidays": h.total_holidays,
-                "company": h.company,
-                "weekly_off": h.weekly_off,
-                "holiday_count": len(h.holidays),
-            }
-            for h in lists
-        ],
+        "data": [_serialize_holiday_list(h) for h in lists],
     }
 
 
@@ -93,34 +119,13 @@ def get_holiday_list(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get holiday list detail with holidays."""
-    h = db.query(HolidayList).filter(HolidayList.id == list_id).first()
-    if not h:
+    service = LeaveService(db)
+    try:
+        h = service.get_holiday_list(list_id)
+    except HRValidationError:
         raise HTTPException(status_code=404, detail="Holiday list not found")
 
-    holidays = [
-        {
-            "id": hd.id,
-            "holiday_date": hd.holiday_date.isoformat() if hd.holiday_date else None,
-            "description": hd.description,
-            "weekly_off": hd.weekly_off,
-            "idx": hd.idx,
-        }
-        for hd in sorted(h.holidays, key=lambda x: x.idx)
-    ]
-
-    return {
-        "id": h.id,
-        "erpnext_id": h.erpnext_id,
-        "holiday_list_name": h.holiday_list_name,
-        "from_date": h.from_date.isoformat() if h.from_date else None,
-        "to_date": h.to_date.isoformat() if h.to_date else None,
-        "total_holidays": h.total_holidays,
-        "company": h.company,
-        "weekly_off": h.weekly_off,
-        "holidays": holidays,
-        "created_at": h.created_at.isoformat() if h.created_at else None,
-        "updated_at": h.updated_at.isoformat() if h.updated_at else None,
-    }
+    return _serialize_holiday_list(h, include_holidays=True)
 
 
 @router.post("/holiday-lists", dependencies=[Depends(Require("hr:write"))])
@@ -129,29 +134,41 @@ def create_holiday_list(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new holiday list with holidays."""
-    holiday_list = HolidayList(
+    service = LeaveService(db)
+
+    # Require from_date and to_date for service
+    if not payload.from_date or not payload.to_date:
+        raise HTTPException(status_code=400, detail="from_date and to_date are required")
+
+    create_data = HolidayListCreateData(
         holiday_list_name=payload.holiday_list_name,
         from_date=payload.from_date,
         to_date=payload.to_date,
         company=payload.company,
         weekly_off=payload.weekly_off,
-        total_holidays=len(payload.holidays) if payload.holidays else 0,
     )
-    db.add(holiday_list)
-    db.flush()
 
-    if payload.holidays:
-        for idx, h in enumerate(payload.holidays):
-            holiday = Holiday(
-                holiday_list_id=holiday_list.id,
-                holiday_date=h.holiday_date,
-                description=h.description,
-                weekly_off=h.weekly_off or False,
-                idx=h.idx if h.idx is not None else idx,
-            )
-            db.add(holiday)
+    try:
+        holiday_list = service.create_holiday_list(create_data)
 
-    db.commit()
+        # Add holidays if provided
+        if payload.holidays:
+            for idx, h in enumerate(payload.holidays):
+                holiday = Holiday(
+                    holiday_list_id=holiday_list.id,
+                    holiday_date=h.holiday_date,
+                    description=h.description or "",
+                    weekly_off=h.weekly_off or False,
+                    idx=h.idx if h.idx is not None else idx,
+                )
+                db.add(holiday)
+            holiday_list.total_holidays = len(payload.holidays)
+
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return get_holiday_list(holiday_list.id, db)
 
 
@@ -162,10 +179,14 @@ def update_holiday_list(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Update a holiday list and optionally replace holidays."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
-    if not holiday_list:
+    service = LeaveService(db)
+
+    try:
+        holiday_list = service.get_holiday_list(list_id)
+    except HRValidationError:
         raise HTTPException(status_code=404, detail="Holiday list not found")
 
+    # Update fields
     if payload.holiday_list_name is not None:
         holiday_list.holiday_list_name = payload.holiday_list_name
     if payload.from_date is not None:
@@ -177,13 +198,19 @@ def update_holiday_list(
     if payload.weekly_off is not None:
         holiday_list.weekly_off = payload.weekly_off
 
+    # Replace holidays if provided
     if payload.holidays is not None:
-        db.query(Holiday).filter(Holiday.holiday_list_id == holiday_list.id).delete(synchronize_session=False)
+        # Remove existing holidays
+        for existing in list(holiday_list.holidays):
+            db.delete(existing)
+        db.flush()
+
+        # Add new holidays
         for idx, h in enumerate(payload.holidays):
             holiday = Holiday(
                 holiday_list_id=holiday_list.id,
                 holiday_date=h.holiday_date,
-                description=h.description,
+                description=h.description or "",
                 weekly_off=h.weekly_off or False,
                 idx=h.idx if h.idx is not None else idx,
             )
@@ -200,12 +227,15 @@ def delete_holiday_list(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Delete a holiday list and its holidays."""
-    holiday_list = db.query(HolidayList).filter(HolidayList.id == list_id).first()
-    if not holiday_list:
+    service = LeaveService(db)
+    try:
+        holiday_list = service.get_holiday_list(list_id)
+        db.delete(holiday_list)
+        db.commit()
+    except HRValidationError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Holiday list not found")
 
-    db.delete(holiday_list)
-    db.commit()
     return {"message": "Holiday list deleted", "id": list_id}
 
 

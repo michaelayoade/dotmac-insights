@@ -473,8 +473,8 @@ class MigrationValidator:
         """Get database table name for an entity type."""
         # Map entity types to table names
         table_map = {
-            "contacts": "contacts",
-            "customers": "customers",
+            "parties": "parties",
+            "customer_accounts": "customer_accounts",
             "employees": "employees",
             "invoices": "invoices",
             "payments": "payments",

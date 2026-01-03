@@ -20,6 +20,11 @@ from .recruitment import router as recruitment_router
 from .lifecycle import router as lifecycle_router
 from .holidays import router as holidays_router
 from .my import router as my_router
+from .leave_types import router as leave_types_router
+from .leave_policies import router as leave_policies_router
+from .salary_components import router as salary_components_router
+from .teams import router as teams_router
+from .org_chart import router as org_chart_router
 
 router = APIRouter(prefix="/hr", tags=["hr"])
 
@@ -30,14 +35,19 @@ router.include_router(my_router)
 router.include_router(employees_router)
 router.include_router(departments_router)
 router.include_router(designations_router)
+router.include_router(leave_types_router)  # Before leave_router for path specificity
+router.include_router(leave_policies_router)  # Before leave_router for path specificity
 router.include_router(leave_router)
 router.include_router(attendance_router)
+router.include_router(salary_components_router)  # Before payroll_router for path specificity
 router.include_router(payroll_router)
 router.include_router(training_router)
 router.include_router(appraisal_router)
 router.include_router(recruitment_router)
 router.include_router(lifecycle_router)
 router.include_router(holidays_router)
+router.include_router(teams_router)
+router.include_router(org_chart_router)
 
 
 # Redirects for consolidated modules

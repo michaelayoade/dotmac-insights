@@ -1,0 +1,499 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+    <div class="flex items-start gap-4">
+        <!-- Avatar -->
+        <div class="flex-shrink-0">
+            {% if subscriber.avatar_url %}
+            <img class="h-16 w-16 rounded-2xl object-cover ring-4 ring-white shadow-lg" src="{{ subscriber.avatar_url }}" alt="">
+            {% else %}
+            <div class="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center ring-4 ring-white shadow-lg">
+                <span class="text-2xl font-bold text-white">
+                    {{ (subscriber.name or 'U')[0].upper() }}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">
+                    {{ subscriber.name or 'Subscriber' }}
+                </h1>
+                {% set style = get_status_style(subscriber.status) %}
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium {{ style.bg }} {{ style.text }}">
+                    <span class="w-2 h-2 rounded-full {{ style.dot }}"></span>
+                    {{ subscriber.status.title() }}
+                </span>
+            </div>
+            <div class="mt-1 flex items-center gap-4 text-sm text-gray-500">
+                <span class="capitalize">{{ subscriber.type }}</span>
+                {% if account %}
+                <span class="text-gray-300">•</span>
+                <span class="font-mono">{{ account.account_number }}</span>
+                <span class="text-gray-300">•</span>
+                <span class="capitalize">{{ account.tier }} tier</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if subscriber.status == 'blocked' %}
+        <button
+            hx-patch="/subscribers/{{ subscriber.id }}/unblock"
+            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-all"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+            </svg>
+            Unblock
+        </button>
+        {% else %}
+        <button
+            hx-patch="/subscribers/{{ subscriber.id }}/block"
+            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+            hx-confirm="Are you sure you want to block this subscriber?"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-all"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+            Block
+        </button>
+        {% endif %}
+        <a
+            href="/subscribers/{{ subscriber.id }}/edit"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 transition-all"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+            </svg>
+            Edit
+        </a>
+        <a
+            href="/subscriptions/new?party_id={{ subscriber.id }}"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Service
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column: Main Info -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Service Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <div class="text-3xl font-bold text-gray-900">{{ service_summary.active_subscriptions }}</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">Active Services</div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <div class="text-3xl font-bold text-gray-900">{{ format_currency(service_summary.total_mrr, 'NGN') }}</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">Monthly Revenue</div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <div class="text-3xl font-bold text-gray-900">{{ format_currency(financial_summary.outstanding_balance, 'NGN') }}</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">Outstanding</div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <div class="text-3xl font-bold text-gray-900">{{ support_summary.open_tickets }}</div>
+                <div class="text-xs text-gray-500 uppercase tracking-wide mt-1">Open Tickets</div>
+            </div>
+        </div>
+
+        <!-- Services Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">Services</h2>
+                <a href="/subscriptions/new?party_id={{ subscriber.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                    + Add Service
+                </a>
+            </div>
+            <div class="divide-y divide-gray-50">
+                {% for sub in subscriptions %}
+                <div class="px-6 py-4 hover:bg-surface-50/50 transition-colors group">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center">
+                                {% if sub.service_type.value == 'internet' %}
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                                </svg>
+                                {% elif sub.service_type.value == 'voice' %}
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                                </svg>
+                                {% else %}
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                                </svg>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="/subscriptions/{{ sub.id }}" class="font-semibold text-gray-900 hover:text-primary-600 transition-colors">
+                                    {{ sub.plan_name }}
+                                </a>
+                                <div class="text-sm text-gray-500">
+                                    {{ sub.download_speed or 0 }} Mbps / {{ sub.upload_speed or 0 }} Mbps
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="text-right">
+                                <div class="font-semibold text-gray-900">{{ format_currency(sub.price, sub.currency or 'NGN') }}</div>
+                                <div class="text-xs text-gray-500">{{ sub.billing_cycle or 'monthly' }}</div>
+                            </div>
+                            {% set sub_style = get_subscription_status_style(sub.status.value) %}
+                            <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ sub_style.bg }} {{ sub_style.text }}">
+                                {{ sub.status.value.title() }}
+                            </span>
+                        </div>
+                    </div>
+                    <!-- Lifecycle Actions -->
+                    <div class="mt-3 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {% if sub.status.value == 'active' %}
+                        <button
+                            hx-post="/subscribers/{{ subscriber.id }}/services/{{ sub.id }}/suspend"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                            hx-vals='{"reason": "admin_action", "apply_grace_period": true, "grace_period_days": 14}'
+                            hx-confirm="Suspend this service? A 14-day grace period will be applied."
+                            class="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                        >
+                            Suspend
+                        </button>
+                        {% elif sub.status.value == 'suspended' %}
+                        <button
+                            hx-post="/subscribers/{{ subscriber.id }}/services/{{ sub.id }}/reactivate"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                            hx-confirm="Reactivate this service?"
+                            class="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                        >
+                            Reactivate
+                        </button>
+                        {% if sub.lifecycle_state == 'grace_period' %}
+                        <button
+                            hx-post="/subscribers/{{ subscriber.id }}/services/{{ sub.id }}/extend-grace"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                            hx-vals='{"days": 7}'
+                            class="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                            Extend Grace +7d
+                        </button>
+                        {% endif %}
+                        <button
+                            hx-post="/subscribers/{{ subscriber.id }}/services/{{ sub.id }}/terminate"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                            hx-vals='{"reason": "admin_action"}'
+                            hx-confirm="Terminate this service permanently? This cannot be undone."
+                            class="px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                            Terminate
+                        </button>
+                        {% elif sub.status.value == 'pending' %}
+                        <button
+                            hx-post="/subscribers/{{ subscriber.id }}/services/{{ sub.id }}/activate"
+                            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+                            class="px-3 py-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                        >
+                            Activate
+                        </button>
+                        {% endif %}
+                        <a
+                            href="/subscriptions/{{ sub.id }}"
+                            class="px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors"
+                        >
+                            View Details
+                        </a>
+                    </div>
+                    <!-- Grace Period Warning -->
+                    {% if sub.lifecycle_state == 'grace_period' and sub.grace_period_ends_at %}
+                    <div class="mt-3 px-3 py-2 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div class="flex items-center gap-2 text-sm text-orange-700">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <span class="font-medium">Grace Period</span>
+                            <span>- Terminates on {{ format_date(sub.grace_period_ends_at) }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    <p>No services yet</p>
+                    <a href="/subscriptions/new?party_id={{ subscriber.id }}" class="text-primary-600 hover:text-primary-700 font-medium text-sm">
+                        Add first service
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent Invoices -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">Recent Invoices</h2>
+                {% if account %}
+                <a href="/invoices?customer_account_id={{ account.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                    View All
+                </a>
+                {% endif %}
+            </div>
+            <div class="divide-y divide-gray-50">
+                {% for inv in invoices[:5] %}
+                <div class="px-6 py-4 flex items-center justify-between hover:bg-surface-50/50 transition-colors">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <a href="/invoices/{{ inv.id }}" class="font-semibold text-gray-900 hover:text-primary-600 transition-colors">
+                                #{{ inv.invoice_number }}
+                            </a>
+                            <div class="text-sm text-gray-500">{{ format_date(inv.invoice_date) }}</div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold text-gray-900">{{ format_currency(inv.total_amount, inv.currency) }}</div>
+                        <div class="text-xs text-gray-500">{{ inv.status }}</div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    No invoices yet
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Support Tickets -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-gray-900">Support Tickets</h2>
+                <a href="/support?party_id={{ subscriber.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                    View All
+                </a>
+            </div>
+            <div class="divide-y divide-gray-50">
+                {% for ticket in tickets[:5] %}
+                <div class="px-6 py-4 hover:bg-surface-50/50 transition-colors">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <a href="/support/{{ ticket.id }}" class="font-semibold text-gray-900 hover:text-primary-600 transition-colors">
+                                {{ ticket.subject }}
+                            </a>
+                            <div class="text-sm text-gray-500 mt-1">{{ format_datetime(ticket.created_at) }}</div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                            {{ ticket.status.value if ticket.status else 'Unknown' }}
+                        </span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="px-6 py-8 text-center text-gray-500">
+                    No support tickets
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Sidebar -->
+    <div class="space-y-6">
+        <!-- Contact Information -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900">Contact Information</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                {% if subscriber.primary_email %}
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">{{ subscriber.primary_email }}</div>
+                        <div class="text-xs text-gray-500">Primary Email</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if subscriber.primary_phone %}
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    </svg>
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">{{ format_phone(subscriber.primary_phone) }}</div>
+                        <div class="text-xs text-gray-500">Primary Phone</div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if subscriber.addresses and subscriber.addresses|length > 0 %}
+                {% set addr = subscriber.addresses[0] %}
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-gray-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <div>
+                        <div class="text-sm font-medium text-gray-900">
+                            {{ addr.line1 or '' }}{% if addr.line2 %}, {{ addr.line2 }}{% endif %}
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            {{ addr.city or '' }}{% if addr.state %}, {{ addr.state }}{% endif %} {{ addr.postal_code or '' }}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Account Details -->
+        {% if account %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900">Billing Account</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Account #</span>
+                    <span class="font-mono font-medium text-gray-900">{{ account.account_number }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Tier</span>
+                    <span class="font-medium text-gray-900 capitalize">{{ account.tier }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Billing Cycle</span>
+                    <span class="font-medium text-gray-900 capitalize">{{ account.billing_cycle or 'Monthly' }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Currency</span>
+                    <span class="font-medium text-gray-900">{{ account.currency }}</span>
+                </div>
+                {% if account.credit_limit %}
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Credit Limit</span>
+                    <span class="font-medium text-gray-900">{{ format_currency(account.credit_limit, account.currency) }}</span>
+                </div>
+                {% endif %}
+                {% if account.payment_terms %}
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Payment Terms</span>
+                    <span class="font-medium text-gray-900">{{ account.payment_terms }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Financial Summary -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900">Financial Summary</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Total Revenue</span>
+                    <span class="font-semibold text-gray-900">{{ format_currency(financial_summary.total_revenue, 'NGN') }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Monthly MRR</span>
+                    <span class="font-semibold text-emerald-600">{{ format_currency(financial_summary.mrr, 'NGN') }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Outstanding</span>
+                    <span class="font-semibold {% if financial_summary.outstanding_balance > 0 %}text-amber-600{% else %}text-gray-900{% endif %}">
+                        {{ format_currency(financial_summary.outstanding_balance, 'NGN') }}
+                    </span>
+                </div>
+                {% if financial_summary.overdue_amount > 0 %}
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500">Overdue</span>
+                    <span class="font-semibold text-red-600">{{ format_currency(financial_summary.overdue_amount, 'NGN') }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900">Recent Activity</h2>
+            </div>
+            <div class="p-6">
+                <div class="flow-root">
+                    <ul role="list" class="-mb-8">
+                        {% for activity in recent_activity[:5] %}
+                        <li>
+                            <div class="relative pb-8">
+                                {% if not loop.last %}
+                                <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
+                                {% endif %}
+                                <div class="relative flex space-x-3">
+                                    <div>
+                                        <span class="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center ring-8 ring-white">
+                                            {% if activity.type == 'subscription' %}
+                                            <svg class="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0"/>
+                                            </svg>
+                                            {% elif activity.type == 'invoice' %}
+                                            <svg class="h-4 w-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                                            </svg>
+                                            {% elif activity.type == 'ticket' %}
+                                            <svg class="h-4 w-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            {% else %}
+                                            <svg class="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="flex min-w-0 flex-1 justify-between space-x-4">
+                                        <div>
+                                            <p class="text-sm text-gray-900">{{ activity.title }}</p>
+                                            <p class="text-xs text-gray-500">{{ activity.description }}</p>
+                                        </div>
+                                        <div class="whitespace-nowrap text-right text-xs text-gray-500">
+                                            {{ format_datetime(activity.date) }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </li>
+                        {% else %}
+                        <li class="text-sm text-gray-500 text-center py-4">No recent activity</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        {% if subscriber.notes %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-semibold text-gray-900">Notes</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ subscriber.notes }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

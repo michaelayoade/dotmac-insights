@@ -1,0 +1,297 @@
+{% extends "layouts/module.html" %}
+
+{% block page_header %}
+<div class="flex items-center justify-between">
+    <div class="flex items-center gap-4">
+        <a href="/subscriptions/bundles" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </a>
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl font-semibold text-gray-900">{{ product.name }}</h1>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                    {% if product.bundle_type == 'prepaid' %}bg-blue-100 text-blue-800
+                    {% elif product.bundle_type == 'usage_based' %}bg-purple-100 text-purple-800
+                    {% else %}bg-orange-100 text-orange-800{% endif %}">
+                    {{ product.bundle_type|replace("_", " ")|title }}
+                </span>
+                {% if product.is_active %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                {% else %}
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                {% endif %}
+            </div>
+            <p class="mt-1 text-sm text-gray-500">{{ product.code }}</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        <form method="post" action="/subscriptions/bundles/products/{{ product.id }}/toggle" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                {% if product.is_active %}Disable{% else %}Enable{% endif %}
+            </button>
+        </form>
+        <a href="/subscriptions/bundles/products/{{ product.id }}/edit"
+           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            Edit
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Info -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Product Details -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Product Details</h2>
+            </div>
+            <div class="px-6 py-4">
+                {% if product.description %}
+                <p class="text-gray-700 mb-4">{{ product.description }}</p>
+                {% endif %}
+
+                <dl class="grid grid-cols-2 gap-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Data Amount</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900">
+                            {% if product.data_amount_mb %}
+                                {{ "%.1f"|format(product.data_amount_mb / 1024) }} GB
+                            {% elif product.data_cap_mb %}
+                                {{ "%.1f"|format(product.data_cap_mb / 1024) }} GB cap
+                            {% else %}
+                                Usage-based
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Price</dt>
+                        <dd class="mt-1 text-lg font-semibold text-gray-900">{{ product.price|format_currency(product.currency) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Validity</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {% if product.validity_days %}
+                                {{ product.validity_days }} days
+                            {% else %}
+                                No expiry
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Expiry Type</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ product.expiry_type|replace("_", " ")|title }}</dd>
+                    </div>
+                    {% if product.rollover_percent %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Rollover</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ product.rollover_percent }}%</dd>
+                    </div>
+                    {% endif %}
+                    {% if product.category %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Category</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ product.category }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Exhaustion Behavior -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">When Data Exhausted</h2>
+            </div>
+            <div class="px-6 py-4">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                        {% if product.exhaustion_action == 'block' %}bg-red-100 text-red-800
+                        {% elif product.exhaustion_action == 'throttle' %}bg-yellow-100 text-yellow-800
+                        {% elif product.exhaustion_action == 'auto_renew' %}bg-green-100 text-green-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ product.exhaustion_action|replace("_", " ")|title }}
+                    </span>
+                </div>
+
+                <dl class="grid grid-cols-2 gap-4">
+                    {% if product.exhaustion_action == 'throttle' and product.throttle_speed_kbps %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Throttle Speed</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ product.throttle_speed_kbps }} kbps</dd>
+                    </div>
+                    {% endif %}
+                    {% if product.auto_renew_product_id %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Auto-Renew Product</dt>
+                        <dd class="mt-1 text-sm text-gray-900">
+                            {% if product.auto_renew_product %}
+                            <a href="/subscriptions/bundles/products/{{ product.auto_renew_product_id }}" class="text-blue-600 hover:text-blue-800">
+                                {{ product.auto_renew_product.name }}
+                            </a>
+                            {% else %}
+                            ID: {{ product.auto_renew_product_id }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Speed Limits -->
+        {% if product.download_speed_kbps or product.upload_speed_kbps %}
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Speed Limits</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="grid grid-cols-2 gap-4">
+                    {% if product.download_speed_kbps %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Download</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ product.download_speed_kbps }} kbps</dd>
+                    </div>
+                    {% endif %}
+                    {% if product.upload_speed_kbps %}
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Upload</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ product.upload_speed_kbps }} kbps</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Alert Thresholds -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Usage Alerts</h2>
+            </div>
+            <div class="px-6 py-4">
+                <div class="flex items-center gap-4">
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between text-sm">
+                            <span>First Alert</span>
+                            <span class="font-medium">{{ product.alert_threshold_1 }}%</span>
+                        </div>
+                        <div class="mt-1 h-2 bg-gray-200 rounded-full">
+                            <div class="h-2 bg-yellow-400 rounded-full" style="width: {{ product.alert_threshold_1 }}%"></div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between text-sm">
+                            <span>Second Alert</span>
+                            <span class="font-medium">{{ product.alert_threshold_2 }}%</span>
+                        </div>
+                        <div class="mt-1 h-2 bg-gray-200 rounded-full">
+                            <div class="h-2 bg-orange-400 rounded-full" style="width: {{ product.alert_threshold_2 }}%"></div>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex items-center justify-between text-sm">
+                            <span>Final Alert</span>
+                            <span class="font-medium">{{ product.alert_threshold_3 }}%</span>
+                        </div>
+                        <div class="mt-1 h-2 bg-gray-200 rounded-full">
+                            <div class="h-2 bg-red-400 rounded-full" style="width: {{ product.alert_threshold_3 }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Revenue Stats -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Revenue (30 days)</h2>
+            </div>
+            <div class="px-6 py-4">
+                {% if revenue %}
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Total Revenue</dt>
+                        <dd class="mt-1 text-2xl font-semibold text-gray-900">{{ revenue.total_revenue|format_currency(revenue.currency) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Units Sold</dt>
+                        <dd class="mt-1 text-lg font-medium text-gray-900">{{ revenue.units_sold }}</dd>
+                    </div>
+                </dl>
+                {% else %}
+                <p class="text-sm text-gray-500">No sales data available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Visibility -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Visibility</h2>
+            </div>
+            <div class="px-6 py-4">
+                <ul class="space-y-3">
+                    <li class="flex items-center gap-2">
+                        {% if product.is_active %}
+                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        {% endif %}
+                        <span class="text-sm text-gray-700">Product is active</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        {% if product.customer_portal_visible %}
+                        <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        {% endif %}
+                        <span class="text-sm text-gray-700">Visible in customer portal</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-medium text-gray-900">Metadata</h2>
+            </div>
+            <div class="px-6 py-4">
+                <dl class="space-y-3 text-sm">
+                    <div>
+                        <dt class="text-gray-500">Created</dt>
+                        <dd class="text-gray-900">{{ product.created_at|format_datetime }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Last Updated</dt>
+                        <dd class="text-gray-900">{{ product.updated_at|format_datetime }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-gray-500">Display Order</dt>
+                        <dd class="text-gray-900">{{ product.display_order }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

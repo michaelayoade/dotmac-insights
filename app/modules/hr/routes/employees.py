@@ -4,6 +4,8 @@ HR Employees Routes - Employee Directory with SSR + HTMX.
 Permission Requirements:
 - hr:read - View employees and employee details
 - hr:write - Create, update, delete employees
+
+Uses EmployeeService and OrganizationService for all business logic.
 """
 from __future__ import annotations
 
@@ -11,7 +13,6 @@ from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -21,8 +22,20 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.employee import Employee, EmploymentStatus
-from app.models.hr import Department, Designation
+from app.models.employee import EmploymentStatus
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import (
+    EmployeeFilters,
+    EmployeeCreateData,
+    EmployeeUpdateData,
+)
+from app.services.hr.organization import OrganizationService
+from app.services.types import PaginationParams
+from app.services.hr.errors import (
+    EmployeeNotFoundError,
+    EmployeeAlreadyExistsError,
+    ValidationError as HRValidationError,
+)
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 
 # Permission dependencies
@@ -68,21 +81,21 @@ def get_status_options():
     ]
 
 
-def get_department_options(db):
+def get_department_options(service: OrganizationService):
     """Get department options for select dropdown."""
-    departments = db.query(Department).order_by(Department.department_name).all()
+    result = service.list_departments(pagination=PaginationParams(offset=0, limit=500))
     return [
         {"value": str(d.id), "label": d.department_name}
-        for d in departments
+        for d in sorted(result.items, key=lambda x: x.department_name or "")
     ]
 
 
-def get_designation_options(db):
+def get_designation_options(service: OrganizationService):
     """Get designation options for select dropdown."""
-    designations = db.query(Designation).order_by(Designation.designation_name).all()
+    result = service.list_designations(pagination=PaginationParams(offset=0, limit=500))
     return [
         {"value": str(d.id), "label": d.designation_name}
-        for d in designations
+        for d in sorted(result.items, key=lambda x: x.designation_name or "")
     ]
 
 
@@ -101,40 +114,29 @@ async def employees_list(
     sort: str = Query("name", description="Sort field"),
     dir: str = Query("asc", description="Sort direction"),
 ):
-    """Employee list page.
+    """Employee list page."""
+    employee_service = EmployeeService(db, user)
+    org_service = OrganizationService(db, user)
 
-    Returns full page for normal requests, table partial for HTMX requests.
-    """
-    # Build query - exclude soft-deleted employees
-    query = db.query(Employee).filter(Employee.is_deleted == False)
-
-    # Search
-    if q:
-        search_filter = or_(
-            Employee.name.ilike(f"%{q}%"),
-            Employee.email.ilike(f"%{q}%"),
-            Employee.employee_number.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
+    # Build filters
+    status_enum = None
     if status:
-        query = query.filter(Employee.status == status)
-    if department:
-        query = query.filter(Employee.department_id == int(department))
+        try:
+            status_enum = EmploymentStatus(status)
+        except ValueError:
+            pass
 
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_column = getattr(Employee, sort, Employee.name)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
-
-    # Paginate
+    filters = EmployeeFilters(
+        search=q,
+        status=status_enum,
+        department_id=int(department) if department else None,
+    )
     offset = (page - 1) * per_page
-    employees = query.offset(offset).limit(per_page).all()
+    pagination = PaginationParams(offset=offset, limit=per_page)
+
+    result = employee_service.list_employees(filters, pagination)
+    employees = result.items
+    total = result.total
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -143,7 +145,7 @@ async def employees_list(
     context["current_status"] = status
     context["current_department"] = department
     context["status_options"] = get_status_options()
-    context["department_options"] = get_department_options(db)
+    context["department_options"] = get_department_options(org_service)
     context["sort_key"] = sort
     context["sort_dir"] = dir
     context["pagination"] = build_pagination_context(page, per_page, total)
@@ -196,6 +198,8 @@ async def employee_new(
     db: DB,
 ):
     """New employee form page."""
+    org_service = OrganizationService(db, user)
+
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "New Employee"
@@ -206,8 +210,8 @@ async def employee_new(
     ])
     context["employee"] = None
     context["status_options"] = get_status_options()
-    context["department_options"] = get_department_options(db)
-    context["designation_options"] = get_designation_options(db)
+    context["department_options"] = get_department_options(org_service)
+    context["designation_options"] = get_designation_options(org_service)
     context["errors"] = {}
 
     template = templates.get_template("modules/hr/templates/employees/pages/form.html")
@@ -224,25 +228,19 @@ async def employee_create(
     db: DB,
 ):
     """Create a new employee."""
+    employee_service = EmployeeService(db, user)
+    org_service = OrganizationService(db, user)
     form = await request.form()
 
     # Basic validation
     errors = {}
     name = _form_str(form, "name")
     email = _form_str(form, "email")
-    employee_number = _form_str(form, "employee_number")
 
     if not name:
         errors["name"] = "Name is required"
     if email and "@" not in email:
         errors["email"] = "Invalid email address"
-    if employee_number:
-        existing = db.query(Employee).filter(
-            Employee.employee_number == employee_number,
-            Employee.is_deleted == False
-        ).first()
-        if existing:
-            errors["employee_number"] = "Employee number already exists"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -255,31 +253,68 @@ async def employee_create(
         ])
         context["employee"] = None
         context["status_options"] = get_status_options()
-        context["department_options"] = get_department_options(db)
-        context["designation_options"] = get_designation_options(db)
+        context["department_options"] = get_department_options(org_service)
+        context["designation_options"] = get_designation_options(org_service)
         context["errors"] = errors
         context["form_data"] = dict(form)
 
         template = templates.get_template("modules/hr/templates/employees/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Create employee
-    department_id = _form_int(form, "department_id")
-    designation_id = _form_int(form, "designation_id")
+    # Create employee using service
+    try:
+        data = EmployeeCreateData(
+            name=name,
+            email=email or None,
+            phone=_form_str(form, "phone") or None,
+            employee_number=_form_str(form, "employee_number") or None,
+            department_id=_form_int(form, "department_id"),
+            designation_id=_form_int(form, "designation_id"),
+            status=_form_status(form, "status", EmploymentStatus.ACTIVE),
+            employment_type=_form_str(form, "employment_type") or None,
+        )
+        employee = employee_service.create_employee(data)
+        db.commit()
+    except EmployeeAlreadyExistsError as e:
+        db.rollback()
+        errors["employee_number"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Employee"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Employees", "href": "/hr/employees"},
+            {"label": "New Employee"},
+        ])
+        context["employee"] = None
+        context["status_options"] = get_status_options()
+        context["department_options"] = get_department_options(org_service)
+        context["designation_options"] = get_designation_options(org_service)
+        context["errors"] = errors
+        context["form_data"] = dict(form)
 
-    employee = Employee(
-        name=name,
-        email=email or None,
-        phone=_form_str(form, "phone") or None,
-        employee_number=employee_number or None,
-        department_id=department_id,
-        designation_id=designation_id,
-        status=_form_status(form, "status", EmploymentStatus.ACTIVE),
-        employment_type=_form_str(form, "employment_type") or None,
-    )
-    db.add(employee)
-    db.commit()
-    db.refresh(employee)
+        template = templates.get_template("modules/hr/templates/employees/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+    except HRValidationError as e:
+        db.rollback()
+        errors["name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Employee"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Employees", "href": "/hr/employees"},
+            {"label": "New Employee"},
+        ])
+        context["employee"] = None
+        context["status_options"] = get_status_options()
+        context["department_options"] = get_department_options(org_service)
+        context["designation_options"] = get_designation_options(org_service)
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/hr/templates/employees/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, f"Employee '{employee.name}' created successfully.", "success")
 
@@ -296,15 +331,14 @@ async def employee_detail(
     employee_id: int,
 ):
     """Employee detail page."""
-    employee = db.query(Employee).filter(
-        Employee.id == employee_id,
-        Employee.is_deleted == False,
-    ).first()
+    service = EmployeeService(db, user)
 
-    if not employee:
+    try:
+        employee = service.get_employee(employee_id)
+    except EmployeeNotFoundError:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    # Load assigned tasks
+    # Load assigned tasks (still direct DB as Task is not an HR service concern)
     from app.models.task import Task, TaskStatus
     assigned_tasks = db.query(Task).filter(
         Task.assigned_to_id == employee_id,
@@ -360,12 +394,12 @@ async def employee_edit(
     employee_id: int,
 ):
     """Employee edit form page."""
-    employee = db.query(Employee).filter(
-        Employee.id == employee_id,
-        Employee.is_deleted == False,
-    ).first()
+    employee_service = EmployeeService(db, user)
+    org_service = OrganizationService(db, user)
 
-    if not employee:
+    try:
+        employee = employee_service.get_employee(employee_id)
+    except EmployeeNotFoundError:
         raise HTTPException(status_code=404, detail="Employee not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -379,8 +413,8 @@ async def employee_edit(
     ])
     context["employee"] = employee
     context["status_options"] = get_status_options()
-    context["department_options"] = get_department_options(db)
-    context["designation_options"] = get_designation_options(db)
+    context["department_options"] = get_department_options(org_service)
+    context["designation_options"] = get_designation_options(org_service)
     context["errors"] = {}
 
     template = templates.get_template("modules/hr/templates/employees/pages/form.html")
@@ -398,12 +432,12 @@ async def employee_update(
     employee_id: int,
 ):
     """Update an employee."""
-    employee = db.query(Employee).filter(
-        Employee.id == employee_id,
-        Employee.is_deleted == False,
-    ).first()
+    employee_service = EmployeeService(db, user)
+    org_service = OrganizationService(db, user)
 
-    if not employee:
+    try:
+        employee = employee_service.get_employee(employee_id)
+    except EmployeeNotFoundError:
         raise HTTPException(status_code=404, detail="Employee not found")
 
     form = await request.form()
@@ -412,20 +446,11 @@ async def employee_update(
     errors = {}
     name = _form_str(form, "name")
     email = _form_str(form, "email")
-    employee_number = _form_str(form, "employee_number")
 
     if not name:
         errors["name"] = "Name is required"
     if email and "@" not in email:
         errors["email"] = "Invalid email address"
-    if employee_number and employee_number != employee.employee_number:
-        existing = db.query(Employee).filter(
-            Employee.employee_number == employee_number,
-            Employee.id != employee_id,
-            Employee.is_deleted == False
-        ).first()
-        if existing:
-            errors["employee_number"] = "Employee number already exists"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -439,26 +464,67 @@ async def employee_update(
         ])
         context["employee"] = employee
         context["status_options"] = get_status_options()
-        context["department_options"] = get_department_options(db)
-        context["designation_options"] = get_designation_options(db)
+        context["department_options"] = get_department_options(org_service)
+        context["designation_options"] = get_designation_options(org_service)
         context["errors"] = errors
 
         template = templates.get_template("modules/hr/templates/employees/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Update employee
-    department_id = _form_int(form, "department_id")
-    designation_id = _form_int(form, "designation_id")
+    # Update employee using service
+    try:
+        data = EmployeeUpdateData(
+            name=name,
+            email=email or None,
+            phone=_form_str(form, "phone") or None,
+            employee_number=_form_str(form, "employee_number") or None,
+            department_id=_form_int(form, "department_id"),
+            designation_id=_form_int(form, "designation_id"),
+            status=_form_status(form, "status", employee.status),
+            employment_type=_form_str(form, "employment_type") or None,
+        )
+        employee = employee_service.update_employee(employee_id, data)
+        db.commit()
+    except EmployeeAlreadyExistsError as e:
+        db.rollback()
+        errors["employee_number"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {employee.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Employees", "href": "/hr/employees"},
+            {"label": employee.name, "href": f"/hr/employees/{employee.id}"},
+            {"label": "Edit"},
+        ])
+        context["employee"] = employee
+        context["status_options"] = get_status_options()
+        context["department_options"] = get_department_options(org_service)
+        context["designation_options"] = get_designation_options(org_service)
+        context["errors"] = errors
 
-    employee.name = name
-    employee.email = email or None
-    employee.phone = _form_str(form, "phone") or None
-    employee.employee_number = employee_number or None
-    employee.department_id = department_id
-    employee.designation_id = designation_id
-    employee.status = _form_status(form, "status", employee.status)
-    employee.employment_type = _form_str(form, "employment_type") or None
-    db.commit()
+        template = templates.get_template("modules/hr/templates/employees/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+    except HRValidationError as e:
+        db.rollback()
+        errors["name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {employee.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Employees", "href": "/hr/employees"},
+            {"label": employee.name, "href": f"/hr/employees/{employee.id}"},
+            {"label": "Edit"},
+        ])
+        context["employee"] = employee
+        context["status_options"] = get_status_options()
+        context["department_options"] = get_department_options(org_service)
+        context["designation_options"] = get_designation_options(org_service)
+        context["errors"] = errors
+
+        template = templates.get_template("modules/hr/templates/employees/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, f"Employee '{employee.name}' updated successfully.", "success")
 
@@ -475,21 +541,15 @@ async def employee_delete(
     employee_id: int,
 ):
     """Soft delete an employee."""
-    from datetime import datetime
+    service = EmployeeService(db, user)
 
-    employee = db.query(Employee).filter(
-        Employee.id == employee_id,
-        Employee.is_deleted == False,
-    ).first()
-
-    if not employee:
+    try:
+        employee = service.get_employee(employee_id)
+        name = employee.name
+        service.delete_employee(employee_id)
+        db.commit()
+    except EmployeeNotFoundError:
         raise HTTPException(status_code=404, detail="Employee not found")
-
-    name = employee.name
-    # Soft delete
-    employee.is_deleted = True
-    employee.deleted_at = datetime.utcnow()
-    db.commit()
 
     # For HTMX, return empty response with toast trigger
     if is_htmx_request(request):
@@ -510,12 +570,11 @@ async def employee_row(
     employee_id: int,
 ):
     """Single employee row partial for HTMX updates."""
-    employee = db.query(Employee).filter(
-        Employee.id == employee_id,
-        Employee.is_deleted == False,
-    ).first()
+    service = EmployeeService(db, user)
 
-    if not employee:
+    try:
+        employee = service.get_employee(employee_id)
+    except EmployeeNotFoundError:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)

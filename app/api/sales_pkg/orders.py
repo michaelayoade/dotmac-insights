@@ -15,7 +15,7 @@ from app.cache import cached, CACHE_TTL
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.credit_note import CreditNote
-from app.models.customer import Customer, CustomerStatus
+from app.models.party import CustomerAccount
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.sales import (
     ERPNextLead, SalesOrder, Quotation, CustomerGroup,
@@ -46,7 +46,7 @@ router = APIRouter()
 @router.get("/orders", dependencies=[Depends(Require("explorer:read"))])
 async def list_sales_orders(
     status: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -58,8 +58,8 @@ async def list_sales_orders(
         status_enum = _parse_sales_order_status(status)
         if status_enum:
             query = query.filter(SalesOrder.status == status_enum)
-    if customer_id:
-        query = query.filter(SalesOrder.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(SalesOrder.customer_account_id == customer_account_id)
 
     total = query.count()
     orders = query.order_by(SalesOrder.id.desc()).offset(offset).limit(limit).all()
@@ -135,13 +135,16 @@ async def create_sales_order(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a sales order locally."""
-    if payload.customer_id:
-        if not db.query(Customer.id).filter(Customer.id == payload.customer_id).first():
-            raise HTTPException(status_code=400, detail=f"Customer {payload.customer_id} not found")
+    if payload.customer_account_id:
+        if not db.query(CustomerAccount.id).filter(CustomerAccount.id == payload.customer_account_id).first():
+            raise HTTPException(
+                status_code=400,
+                detail=f"Customer account {payload.customer_account_id} not found",
+            )
 
     order = SalesOrder(
         erpnext_id=None,
-        customer_id=payload.customer_id,
+        customer_account_id=payload.customer_account_id,
         customer_name=payload.customer_name,
         order_type=payload.order_type,
         company=payload.company or get_company_context(allow_null=True),
@@ -181,10 +184,18 @@ async def update_sales_order(
     if not order:
         raise HTTPException(status_code=404, detail="Sales order not found")
 
-    if payload.customer_id is not None:
-        if payload.customer_id and not db.query(Customer.id).filter(Customer.id == payload.customer_id).first():
-            raise HTTPException(status_code=400, detail=f"Customer {payload.customer_id} not found")
-        order.customer_id = payload.customer_id
+    if payload.customer_account_id is not None:
+        if (
+            payload.customer_account_id
+            and not db.query(CustomerAccount.id)
+                .filter(CustomerAccount.id == payload.customer_account_id)
+                .first()
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Customer account {payload.customer_account_id} not found",
+            )
+        order.customer_account_id = payload.customer_account_id
     if payload.customer_name is not None:
         order.customer_name = payload.customer_name
     if payload.order_type is not None:

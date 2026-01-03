@@ -1707,3 +1707,346 @@ class TicketService:
             .limit(limit)
             .all()
         )
+
+    # =========================================================================
+    # Tag CRUD Operations
+    # =========================================================================
+
+    def list_tags(
+        self,
+        is_active: Optional[bool] = None,
+        q: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[List[TicketTag], int]:
+        """List ticket tags.
+
+        Args:
+            is_active: Filter by active status.
+            q: Search query for tag name.
+            skip: Number of records to skip.
+            limit: Maximum records to return.
+
+        Returns:
+            Tuple of (tags list, total count).
+        """
+        query = self.db.query(TicketTag)
+
+        if is_active is not None:
+            query = query.filter(TicketTag.is_active == is_active)
+
+        if q:
+            query = query.filter(TicketTag.name.ilike(f"%{q}%"))
+
+        total = query.count()
+        tags = query.order_by(TicketTag.name).offset(skip).limit(limit).all()
+
+        return tags, total
+
+    def get_tag(self, tag_id: int) -> Optional[TicketTag]:
+        """Get a tag by ID.
+
+        Args:
+            tag_id: The tag ID.
+
+        Returns:
+            The tag or None if not found.
+        """
+        return self.db.query(TicketTag).filter(TicketTag.id == tag_id).first()
+
+    def get_tag_by_name(self, name: str) -> Optional[TicketTag]:
+        """Get a tag by name.
+
+        Args:
+            name: The tag name.
+
+        Returns:
+            The tag or None if not found.
+        """
+        return self.db.query(TicketTag).filter(TicketTag.name == name).first()
+
+    def create_tag(
+        self,
+        name: str,
+        color: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> TicketTag:
+        """Create a new ticket tag.
+
+        Args:
+            name: Tag name.
+            color: Optional hex color.
+            description: Optional description.
+
+        Returns:
+            The created tag.
+
+        Raises:
+            ValidationError: If tag name already exists.
+        """
+        existing = self.get_tag_by_name(name)
+        if existing:
+            raise ValidationError(f"Tag '{name}' already exists")
+
+        tag = TicketTag(
+            name=name.strip(),
+            color=color,
+            description=description,
+            is_active=True,
+            usage_count=0,
+            created_by_id=self.principal.user_id if self.principal else None,
+        )
+        self.db.add(tag)
+        self.db.flush()
+        return tag
+
+    def update_tag(
+        self,
+        tag_id: int,
+        name: Optional[str] = None,
+        color: Optional[str] = None,
+        description: Optional[str] = None,
+        is_active: Optional[bool] = None,
+    ) -> Optional[TicketTag]:
+        """Update a tag.
+
+        Args:
+            tag_id: The tag ID.
+            name: New name (optional).
+            color: New color (optional).
+            description: New description (optional).
+            is_active: New active status (optional).
+
+        Returns:
+            The updated tag or None if not found.
+
+        Raises:
+            ValidationError: If new name already exists for another tag.
+        """
+        tag = self.get_tag(tag_id)
+        if not tag:
+            return None
+
+        if name is not None and name != tag.name:
+            existing = self.get_tag_by_name(name)
+            if existing and existing.id != tag_id:
+                raise ValidationError(f"Tag '{name}' already exists")
+            tag.name = name.strip()
+
+        if color is not None:
+            tag.color = color
+        if description is not None:
+            tag.description = description
+        if is_active is not None:
+            tag.is_active = is_active
+
+        self.db.flush()
+        return tag
+
+    def delete_tag(self, tag_id: int) -> bool:
+        """Delete a tag.
+
+        Args:
+            tag_id: The tag ID.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        tag = self.get_tag(tag_id)
+        if not tag:
+            return False
+
+        self.db.delete(tag)
+        self.db.flush()
+        return True
+
+    # =========================================================================
+    # Custom Field CRUD Operations
+    # =========================================================================
+
+    def list_custom_fields(
+        self,
+        is_active: Optional[bool] = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> tuple[List[TicketCustomField], int]:
+        """List custom fields.
+
+        Args:
+            is_active: Filter by active status.
+            skip: Number of records to skip.
+            limit: Maximum records to return.
+
+        Returns:
+            Tuple of (fields list, total count).
+        """
+        query = self.db.query(TicketCustomField)
+
+        if is_active is not None:
+            query = query.filter(TicketCustomField.is_active == is_active)
+
+        total = query.count()
+        fields = (
+            query.order_by(TicketCustomField.display_order)
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
+
+        return fields, total
+
+    def get_custom_field(self, field_id: int) -> Optional[TicketCustomField]:
+        """Get a custom field by ID.
+
+        Args:
+            field_id: The field ID.
+
+        Returns:
+            The field or None if not found.
+        """
+        return self.db.query(TicketCustomField).filter(
+            TicketCustomField.id == field_id
+        ).first()
+
+    def get_custom_field_by_key(self, field_key: str) -> Optional[TicketCustomField]:
+        """Get a custom field by key.
+
+        Args:
+            field_key: The field key.
+
+        Returns:
+            The field or None if not found.
+        """
+        return self.db.query(TicketCustomField).filter(
+            TicketCustomField.field_key == field_key
+        ).first()
+
+    def create_custom_field(
+        self,
+        name: str,
+        field_key: str,
+        field_type: str = "text",
+        description: Optional[str] = None,
+        options: Optional[dict] = None,
+        default_value: Optional[str] = None,
+        is_required: bool = False,
+        display_order: int = 100,
+        show_in_list: bool = False,
+        show_in_create: bool = True,
+    ) -> TicketCustomField:
+        """Create a new custom field.
+
+        Args:
+            name: Display name.
+            field_key: Unique key (used for API/storage).
+            field_type: Field type (text, number, dropdown, etc.).
+            description: Optional description.
+            options: Options for dropdown/multi_select types.
+            default_value: Default value.
+            is_required: Whether field is required.
+            display_order: Display order.
+            show_in_list: Show in list view.
+            show_in_create: Show in create form.
+
+        Returns:
+            The created field.
+
+        Raises:
+            ValidationError: If field key already exists.
+        """
+        existing = self.get_custom_field_by_key(field_key)
+        if existing:
+            raise ValidationError(f"Custom field with key '{field_key}' already exists")
+
+        field = TicketCustomField(
+            name=name.strip(),
+            field_key=field_key.strip().lower().replace(" ", "_"),
+            field_type=field_type,
+            description=description,
+            options=options,
+            default_value=default_value,
+            is_required=is_required,
+            display_order=display_order,
+            show_in_list=show_in_list,
+            show_in_create=show_in_create,
+            is_active=True,
+            created_by_id=self.principal.user_id if self.principal else None,
+        )
+        self.db.add(field)
+        self.db.flush()
+        return field
+
+    def update_custom_field(
+        self,
+        field_id: int,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        options: Optional[dict] = None,
+        default_value: Optional[str] = None,
+        is_required: Optional[bool] = None,
+        display_order: Optional[int] = None,
+        show_in_list: Optional[bool] = None,
+        show_in_create: Optional[bool] = None,
+        is_active: Optional[bool] = None,
+    ) -> Optional[TicketCustomField]:
+        """Update a custom field.
+
+        Note: field_key and field_type cannot be changed after creation.
+
+        Args:
+            field_id: The field ID.
+            name: New name (optional).
+            description: New description (optional).
+            options: New options (optional).
+            default_value: New default value (optional).
+            is_required: New required status (optional).
+            display_order: New display order (optional).
+            show_in_list: New show in list (optional).
+            show_in_create: New show in create (optional).
+            is_active: New active status (optional).
+
+        Returns:
+            The updated field or None if not found.
+        """
+        field = self.get_custom_field(field_id)
+        if not field:
+            return None
+
+        if name is not None:
+            field.name = name.strip()
+        if description is not None:
+            field.description = description
+        if options is not None:
+            field.options = options
+        if default_value is not None:
+            field.default_value = default_value
+        if is_required is not None:
+            field.is_required = is_required
+        if display_order is not None:
+            field.display_order = display_order
+        if show_in_list is not None:
+            field.show_in_list = show_in_list
+        if show_in_create is not None:
+            field.show_in_create = show_in_create
+        if is_active is not None:
+            field.is_active = is_active
+
+        self.db.flush()
+        return field
+
+    def delete_custom_field(self, field_id: int) -> bool:
+        """Delete a custom field.
+
+        Args:
+            field_id: The field ID.
+
+        Returns:
+            True if deleted, False if not found.
+        """
+        field = self.get_custom_field(field_id)
+        if not field:
+            return False
+
+        self.db.delete(field)
+        self.db.flush()
+        return True

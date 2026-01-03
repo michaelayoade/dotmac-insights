@@ -1,0 +1,73 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Debit Notes</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage accounts payable debit notes</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Draft</p>
+        <p class="mt-1 text-2xl font-bold text-amber-600">{{ stats.draft or 0 }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Issued</p>
+        <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.issued or 0 }}</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Applied</p>
+        <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.applied or 0 }}</p>
+    </div>
+</div>
+
+<!-- Search and Filters -->
+<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <div class="relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ current_search or '' }}"
+                    placeholder="Search debit notes..."
+                    class="block w-full rounded-xl border-0 py-2.5 pl-10 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                >
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="sm:w-48">
+            <select
+                name="status"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            >
+                <option value="">All Status</option>
+                {% for opt in status_options %}
+                <option value="{{ opt }}" {{ 'selected' if current_status == opt else '' }}>{{ opt | capitalize }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-500">
+            Search
+        </button>
+    </form>
+</div>
+
+<!-- Table -->
+<div id="notes-table">
+    {% include "modules/accounting/templates/notes/partials/debit_notes_table.html" %}
+</div>
+{% endblock %}

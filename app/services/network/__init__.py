@@ -29,6 +29,14 @@ from .network_types import (
     # IP Address types
     IPv4AddressFilters,
 )
+from .snmp_poller import SNMPPollerService
+from .snmp_types import (
+    PollingBatchResult,
+    RollupResult,
+    CleanupResult,
+    RouterPollConfig,
+    PollStatistics,
+)
 
 __all__ = [
     # Services
@@ -52,4 +60,11 @@ __all__ = [
     "IPv6NetworkFilters",
     # IP Address types
     "IPv4AddressFilters",
+    # SNMP Polling
+    "SNMPPollerService",
+    "PollingBatchResult",
+    "RollupResult",
+    "CleanupResult",
+    "RouterPollConfig",
+    "PollStatistics",
 ]

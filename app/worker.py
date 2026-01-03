@@ -29,6 +29,8 @@ celery_app = Celery(
         "app.tasks.workflow_tasks",
         "app.tasks.scheduled_actions",
         "app.tasks.provisioning_tasks",
+        "app.tasks.bundle_tasks",
+        "app.tasks.monitoring_tasks",
     ],
 )
 
@@ -199,5 +201,43 @@ celery_app.conf.beat_schedule = {
     "platform-send-heartbeat": {
         "task": "app.tasks.platform.send_heartbeat",
         "schedule": settings.heartbeat_interval_seconds,  # Default: 5 minutes
+    },
+    # Data Bundle tasks
+    "bundles-process-usage": {
+        "task": "bundles.process_usage",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "bundles-check-exhaustion": {
+        "task": "bundles.check_exhaustion",
+        "schedule": crontab(minute="*"),  # Every minute
+    },
+    "bundles-process-expiry": {
+        "task": "bundles.process_expiry",
+        "schedule": crontab(hour=0, minute=5),  # Daily at 00:05
+    },
+    "bundles-send-alerts": {
+        "task": "bundles.send_alerts",
+        "schedule": crontab(minute=15),  # Every hour at :15
+    },
+    "bundles-auto-activate": {
+        "task": "bundles.auto_activate_pending",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "bundles-cleanup-expired": {
+        "task": "bundles.cleanup_expired",
+        "schedule": crontab(hour=3, minute=0, day_of_week=0),  # Weekly on Sunday at 3 AM
+    },
+    # Network Monitoring (SNMP) tasks
+    "monitoring-poll-devices": {
+        "task": "monitoring.poll_devices",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "monitoring-aggregate-metrics": {
+        "task": "monitoring.aggregate_metrics",
+        "schedule": crontab(minute=5),  # Hourly at :05
+    },
+    "monitoring-cleanup-metrics": {
+        "task": "monitoring.cleanup_metrics",
+        "schedule": crontab(hour=3, minute=30),  # Daily at 3:30 AM
     },
 }

@@ -3,7 +3,7 @@ from .base import FieldType, EntityConfig
 
 CRM_ENTITIES: dict[str, EntityConfig] = {
     "leads": {
-        "model_name": "Contact",
+        "model_name": "Party",
         "display_name": "Leads",
         "description": "Unified CRM leads (contact_type=lead)",
         "fields": {
@@ -93,7 +93,7 @@ CRM_ENTITIES: dict[str, EntityConfig] = {
         "fields": {
             "id": {"type": FieldType.INTEGER, "description": "Internal ID"},
             "name": {"type": FieldType.STRING, "required": True, "max_length": 255, "description": "Opportunity name"},
-            "customer_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customers", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
+            "customer_account_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customer_accounts", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
             "lead_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "leads", "fk_lookup_fields": ["id", "email", "name"], "description": "Source lead"},
             "party_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "parties", "fk_lookup_fields": ["id", "name"], "description": "Party (person or organization)"},
             "stage_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "opportunity_stages", "fk_lookup_fields": ["id", "name"], "description": "Pipeline stage"},
@@ -128,10 +128,10 @@ CRM_ENTITIES: dict[str, EntityConfig] = {
             "activity_type": {"type": FieldType.ENUM, "required": True, "enum_values": ["call", "meeting", "email", "task", "note", "demo", "follow_up"], "description": "Activity type"},
             "subject": {"type": FieldType.STRING, "required": True, "max_length": 255, "description": "Subject"},
             "description": {"type": FieldType.STRING, "description": "Description"},
-            "contact_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "contacts", "fk_lookup_fields": ["id", "email", "name"], "description": "Contact"},
+            "party_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "parties", "fk_lookup_fields": ["id", "email", "name"], "description": "Contact"},
             "lead_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "leads", "fk_lookup_fields": ["id", "email", "name"], "description": "Lead"},
             "opportunity_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "opportunities", "fk_lookup_fields": ["id", "name"], "description": "Opportunity"},
-            "customer_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customers", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
+            "customer_account_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customer_accounts", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
             "owner_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "employees", "fk_lookup_fields": ["id", "email"], "description": "Owner"},
             "scheduled_at": {"type": FieldType.DATETIME, "description": "Scheduled date/time"},
             "completed_at": {"type": FieldType.DATETIME, "description": "Completed date/time"},

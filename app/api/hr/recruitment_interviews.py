@@ -4,22 +4,31 @@ Interviews Endpoints
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from typing import Dict, Any, Optional, List
 from datetime import date, datetime
 from pydantic import BaseModel
 
 from app.database import get_db
 from app.auth import Require, get_current_principal
-from app.models.auth import User
 from app.models.hr_recruitment import (
     Interview,
     InterviewStatus,
     InterviewResult,
-    JobApplicant,
-    JobApplicantStatus,
 )
-from .helpers import now
+from app.services.hr.recruitment import RecruitmentService
+from app.services.hr.recruitment_types import (
+    InterviewFeedbackData,
+    InterviewFilters,
+    InterviewScheduleData,
+    InterviewUpdateData,
+)
+from app.services.hr.errors import (
+    ApplicantNotFoundError,
+    ApplicantPipelineError,
+    InterviewNotFoundError,
+    ValidationError,
+)
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -67,13 +76,6 @@ class CompleteInterviewPayload(BaseModel):
 # HELPERS
 # =============================================================================
 
-def _load_interview(db: Session, interview_id: int) -> Interview:
-    interview = db.query(Interview).filter(Interview.id == interview_id).first()
-    if not interview:
-        raise HTTPException(status_code=404, detail="Interview not found")
-    return interview
-
-
 def _require_interview_status(interview: Interview, allowed: List[InterviewStatus]):
     if interview.status not in allowed:
         raise HTTPException(
@@ -98,25 +100,26 @@ async def list_interviews(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List interviews with filtering."""
-    query = db.query(Interview)
-
-    if job_applicant_id:
-        query = query.filter(Interview.job_applicant_id == job_applicant_id)
-    if interviewer_id:
-        query = query.filter(Interview.interviewer_id == interviewer_id)
+    status_enum = None
     if status:
         try:
             status_enum = InterviewStatus(status)
-            query = query.filter(Interview.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if from_date:
-        query = query.filter(func.date(Interview.scheduled_date) >= from_date)
-    if to_date:
-        query = query.filter(func.date(Interview.scheduled_date) <= to_date)
 
-    total = query.count()
-    interviews = query.order_by(Interview.scheduled_date.desc()).offset(offset).limit(limit).all()
+    service = RecruitmentService(db)
+    result = service.list_interviews(
+        InterviewFilters(
+            job_applicant_id=job_applicant_id,
+            interviewer_id=interviewer_id,
+            status=status_enum,
+            from_date=from_date,
+            to_date=to_date,
+        ),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    interviews = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -146,9 +149,11 @@ async def get_interview(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get interview detail."""
-    i = db.query(Interview).filter(Interview.id == interview_id).first()
-    if not i:
-        raise HTTPException(status_code=404, detail="Interview not found")
+    service = RecruitmentService(db)
+    try:
+        i = service.get_interview(interview_id)
+    except InterviewNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     return {
         "id": i.id,
@@ -174,56 +179,33 @@ async def get_interview(
 async def create_interview(
     payload: InterviewCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Schedule a new interview. Automatically moves applicant to INTERVIEW stage if in an earlier stage."""
-    # Verify applicant exists
-    applicant = db.query(JobApplicant).filter(JobApplicant.id == payload.job_applicant_id).first()
-    if not applicant:
-        raise HTTPException(status_code=404, detail="Job applicant not found")
-
-    # Validate applicant is in a schedulable status
-    schedulable_statuses = [
-        JobApplicantStatus.OPEN, JobApplicantStatus.REPLIED,
-        JobApplicantStatus.SCREENING, JobApplicantStatus.INTERVIEW,
-    ]
-    if applicant.status not in schedulable_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot schedule interview for applicant in {applicant.status.value if applicant.status else 'unknown'} status"
+    service = RecruitmentService(db, principal)
+    try:
+        interview = service.schedule_interview(
+            InterviewScheduleData(
+                job_applicant_id=payload.job_applicant_id,
+                scheduled_date=payload.scheduled_date,
+                duration_minutes=payload.duration_minutes or 60,
+                interviewer_id=payload.interviewer_id,
+                interviewer_name=payload.interviewer_name,
+                interview_type=payload.interview_type,
+                location=payload.location,
+                meeting_link=payload.meeting_link,
+                notes=payload.notes,
+            )
         )
+        db.commit()
+    except ApplicantNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except (ApplicantPipelineError, ValidationError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    # Automatically move applicant to INTERVIEW stage if in an earlier stage
-    earlier_stages = [JobApplicantStatus.OPEN, JobApplicantStatus.REPLIED, JobApplicantStatus.SCREENING]
-    applicant_moved = False
-    if applicant.status in earlier_stages:
-        applicant.status = JobApplicantStatus.INTERVIEW
-        applicant.status_changed_by_id = current_user.id if current_user else None
-        applicant.status_changed_at = now()
-        applicant_moved = True
-
-    interview = Interview(
-        job_applicant_id=payload.job_applicant_id,
-        scheduled_date=payload.scheduled_date,
-        duration_minutes=payload.duration_minutes or 60,
-        interviewer_id=payload.interviewer_id,
-        interviewer_name=payload.interviewer_name,
-        interview_type=payload.interview_type,
-        location=payload.location,
-        meeting_link=payload.meeting_link,
-        notes=payload.notes,
-        status=InterviewStatus.SCHEDULED,
-        created_by_id=current_user.id if current_user else None,
-        updated_by_id=current_user.id if current_user else None,
-    )
-    db.add(interview)
-    db.commit()
-
-    result = await get_interview(interview.id, db)
-    if applicant_moved:
-        result["applicant_status_changed"] = True
-        result["applicant_new_status"] = JobApplicantStatus.INTERVIEW.value
-    return result
+    return await get_interview(interview.id, db)
 
 
 @router.patch("/interviews/{interview_id}", dependencies=[Depends(Require("hr:write"))])
@@ -231,25 +213,39 @@ async def update_interview(
     interview_id: int,
     payload: InterviewUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an interview (reschedule, add feedback, etc.). Only SCHEDULED interviews can be modified."""
-    interview = _load_interview(db, interview_id)
+    if payload.feedback or payload.rating is not None:
+        raise HTTPException(status_code=400, detail="Use /complete to record feedback or rating")
 
-    # Only allow updates on scheduled interviews
-    if interview.status != InterviewStatus.SCHEDULED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot update interview in {interview.status.value if interview.status else 'unknown'} status. "
-                   f"Only scheduled interviews can be modified."
+    service = RecruitmentService(db, principal)
+    try:
+        interview = service.get_interview(interview_id)
+        if interview.status != InterviewStatus.SCHEDULED:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot update interview in {interview.status.value if interview.status else 'unknown'} status. "
+                       f"Only scheduled interviews can be modified."
+            )
+        service.update_interview(
+            interview_id,
+            InterviewUpdateData(
+                scheduled_date=payload.scheduled_date,
+                duration_minutes=payload.duration_minutes,
+                interviewer_id=payload.interviewer_id,
+                interviewer_name=payload.interviewer_name,
+                interview_type=payload.interview_type,
+                location=payload.location,
+                meeting_link=payload.meeting_link,
+                notes=payload.notes,
+            ),
         )
+        db.commit()
+    except InterviewNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(interview, field, value)
-
-    interview.updated_by_id = current_user.id if current_user else None
-    db.commit()
     return await get_interview(interview_id, db)
 
 
@@ -257,11 +253,17 @@ async def update_interview(
 async def delete_interview(
     interview_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an interview."""
-    interview = _load_interview(db, interview_id)
-    db.delete(interview)
-    db.commit()
+    service = RecruitmentService(db, principal)
+    try:
+        service.delete_interview(interview_id)
+        db.commit()
+    except InterviewNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+
     return {"message": "Interview deleted", "id": interview_id}
 
 
@@ -270,25 +272,29 @@ async def complete_interview(
     interview_id: int,
     payload: CompleteInterviewPayload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark interview as completed with result and optional feedback."""
-    interview = _load_interview(db, interview_id)
-    _require_interview_status(interview, [InterviewStatus.SCHEDULED])
+    if payload.rating is not None and (payload.rating < 1 or payload.rating > 5):
+        raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
 
-    interview.status = InterviewStatus.COMPLETED
-    interview.result = payload.result
-    if payload.feedback:
-        interview.feedback = payload.feedback
-    if payload.rating is not None:
-        if payload.rating < 1 or payload.rating > 5:
-            raise HTTPException(status_code=400, detail="Rating must be between 1 and 5")
-        interview.rating = payload.rating
-    interview.status_changed_by_id = current_user.id if current_user else None
-    interview.status_changed_at = now()
-    interview.updated_by_id = current_user.id if current_user else None
+    service = RecruitmentService(db, principal)
+    try:
+        interview = service.get_interview(interview_id)
+        _require_interview_status(interview, [InterviewStatus.SCHEDULED])
+        service.record_interview_feedback(
+            interview_id,
+            InterviewFeedbackData(
+                result=payload.result,
+                feedback=payload.feedback,
+                rating=payload.rating,
+            ),
+        )
+        db.commit()
+    except InterviewNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.commit()
     return await get_interview(interview_id, db)
 
 
@@ -296,18 +302,19 @@ async def complete_interview(
 async def cancel_interview(
     interview_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Cancel a scheduled interview."""
-    interview = _load_interview(db, interview_id)
-    _require_interview_status(interview, [InterviewStatus.SCHEDULED])
+    service = RecruitmentService(db, principal)
+    try:
+        interview = service.get_interview(interview_id)
+        _require_interview_status(interview, [InterviewStatus.SCHEDULED])
+        service.cancel_interview(interview_id)
+        db.commit()
+    except InterviewNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    interview.status = InterviewStatus.CANCELLED
-    interview.status_changed_by_id = current_user.id if current_user else None
-    interview.status_changed_at = now()
-    interview.updated_by_id = current_user.id if current_user else None
-
-    db.commit()
     return await get_interview(interview_id, db)
 
 
@@ -315,16 +322,17 @@ async def cancel_interview(
 async def mark_interview_no_show(
     interview_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark interview as no-show."""
-    interview = _load_interview(db, interview_id)
-    _require_interview_status(interview, [InterviewStatus.SCHEDULED])
+    service = RecruitmentService(db, principal)
+    try:
+        interview = service.get_interview(interview_id)
+        _require_interview_status(interview, [InterviewStatus.SCHEDULED])
+        service.mark_no_show(interview_id)
+        db.commit()
+    except InterviewNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    interview.status = InterviewStatus.NO_SHOW
-    interview.status_changed_by_id = current_user.id if current_user else None
-    interview.status_changed_at = now()
-    interview.updated_by_id = current_user.id if current_user else None
-
-    db.commit()
     return await get_interview(interview_id, db)

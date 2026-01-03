@@ -1,0 +1,381 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col gap-2 mb-6">
+    <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900">Subscription Settings</h1>
+    <p class="text-sm text-gray-500 font-body">Service types, lifecycle automation, billing, and RADIUS.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/subscriptions/templates/partials/service_nav.html" %}
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <form method="POST" action="/subscriptions/settings/service-types">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-display font-semibold text-gray-900">Service Types</h3>
+                <button type="submit" class="text-xs font-semibold text-primary-600 hover:text-primary-500">Save</button>
+            </div>
+            <div class="mt-4 space-y-4">
+                {% for service in [service_config.internet, service_config.voice, service_config.bundle, service_config.custom] %}
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-semibold text-gray-900">{{ service.type_code | title }}</p>
+                        <label class="inline-flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" name="{{ service.type_code }}_enabled" {% if service.enabled %}checked{% endif %}>
+                            Enabled
+                        </label>
+                    </div>
+                    <div class="mt-3 grid grid-cols-2 gap-3 text-xs text-gray-600">
+                        <label class="flex flex-col gap-1">
+                            <span>Default cycle</span>
+                            <input type="text" name="{{ service.type_code }}_default_billing_cycle" value="{{ service.default_billing_cycle }}" class="rounded-lg border-gray-200 text-xs">
+                        </label>
+                        <label class="flex flex-col gap-1">
+                            <span>Grace days</span>
+                            <input type="number" name="{{ service.type_code }}_grace_period_days" value="{{ service.grace_period_days }}" class="rounded-lg border-gray-200 text-xs">
+                        </label>
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" name="{{ service.type_code }}_requires_provisioning" {% if service.requires_provisioning %}checked{% endif %}>
+                            Provisioning required
+                        </label>
+                        <label class="inline-flex items-center gap-2">
+                            <input type="checkbox" name="{{ service.type_code }}_requires_router" {% if service.requires_router %}checked{% endif %}>
+                            Router required
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <form method="POST" action="/subscriptions/settings/lifecycle">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-display font-semibold text-gray-900">Lifecycle Automation</h3>
+                <button type="submit" class="text-xs font-semibold text-primary-600 hover:text-primary-500">Save</button>
+            </div>
+            <div class="mt-4 space-y-3 text-sm text-gray-700">
+                <label class="flex items-center justify-between">
+                    <span>Auto-activate on payment</span>
+                    <input type="checkbox" name="auto_activate_on_payment" {% if service_config.lifecycle.auto_activate_on_payment %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Auto-suspend on nonpayment</span>
+                    <input type="checkbox" name="auto_suspend_on_nonpayment" {% if service_config.lifecycle.auto_suspend_on_nonpayment %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Auto-cancel after days</span>
+                    <input type="number" name="auto_cancel_after_days" value="{{ service_config.lifecycle.auto_cancel_after_days }}" class="w-24 rounded-lg border-gray-200 text-xs">
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Self-reactivation</span>
+                    <input type="checkbox" name="allow_self_reactivation" {% if service_config.lifecycle.allow_self_reactivation %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Require payment for reactivation</span>
+                    <input type="checkbox" name="require_payment_for_reactivation" {% if service_config.lifecycle.require_payment_for_reactivation %}checked{% endif %}>
+                </label>
+                <div class="pt-3 border-t border-gray-100">
+                    <p class="text-xs uppercase tracking-wide text-gray-500 mb-2">Plan Changes</p>
+                    <label class="flex items-center justify-between">
+                        <span>Allow upgrades</span>
+                        <input type="checkbox" name="allow_upgrades" {% if service_config.plan_changes.allow_upgrades %}checked{% endif %}>
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span>Allow downgrades</span>
+                        <input type="checkbox" name="allow_downgrades" {% if service_config.plan_changes.allow_downgrades %}checked{% endif %}>
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span>Upgrade fee</span>
+                        <input type="number" name="upgrade_fee" value="{{ service_config.plan_changes.upgrade_fee }}" class="w-24 rounded-lg border-gray-200 text-xs">
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span>Downgrade fee</span>
+                        <input type="number" name="downgrade_fee" value="{{ service_config.plan_changes.downgrade_fee }}" class="w-24 rounded-lg border-gray-200 text-xs">
+                    </label>
+                    <label class="flex items-center justify-between">
+                        <span>Min days before downgrade</span>
+                        <input type="number" name="min_days_before_downgrade" value="{{ service_config.plan_changes.min_days_before_downgrade }}" class="w-24 rounded-lg border-gray-200 text-xs">
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <form method="POST" action="/subscriptions/settings/billing">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="flex items-center justify-between">
+                <h3 class="text-base font-display font-semibold text-gray-900">Billing Defaults</h3>
+                <button type="submit" class="text-xs font-semibold text-primary-600 hover:text-primary-500">Save</button>
+            </div>
+            <div class="mt-4 space-y-3 text-sm text-gray-700">
+                <label class="flex items-center justify-between">
+                    <span>Billing enabled</span>
+                    <input type="checkbox" name="enabled" {% if billing_config.enabled %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Default currency</span>
+                    <input type="text" name="default_currency" value="{{ billing_config.default_currency }}" class="w-24 rounded-lg border-gray-200 text-xs">
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Tax rate (%)</span>
+                    <input type="number" name="tax_rate" value="{{ billing_config.tax_rate }}" class="w-24 rounded-lg border-gray-200 text-xs" step="0.01">
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Invoice due days</span>
+                    <input type="number" name="invoice_due_days" value="{{ billing_config.invoice_due_days }}" class="w-24 rounded-lg border-gray-200 text-xs">
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Auto charge</span>
+                    <input type="checkbox" name="auto_charge_enabled" {% if billing_config.auto_charge_enabled %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Auto suspend</span>
+                    <input type="checkbox" name="auto_suspend_enabled" {% if billing_config.auto_suspend_enabled %}checked{% endif %}>
+                </label>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <form method="POST" action="/subscriptions/settings/radius">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="flex items-center justify-between">
+            <h3 class="text-base font-display font-semibold text-gray-900">RADIUS Settings</h3>
+            <button type="submit" class="text-xs font-semibold text-primary-600 hover:text-primary-500">Save</button>
+        </div>
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+            <div class="rounded-xl border border-gray-100 p-4 space-y-2">
+                <p class="text-xs uppercase tracking-wide text-gray-500">Server</p>
+                <input type="text" name="radius_host" value="{{ radius_settings.server.host }}" class="w-full rounded-lg border-gray-200 text-xs">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="number" name="radius_auth_port" value="{{ radius_settings.server.auth_port }}" class="rounded-lg border-gray-200 text-xs" placeholder="Auth port">
+                    <input type="number" name="radius_acct_port" value="{{ radius_settings.server.acct_port }}" class="rounded-lg border-gray-200 text-xs" placeholder="Acct port">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="number" name="radius_timeout_seconds" value="{{ radius_settings.server.timeout_seconds }}" class="rounded-lg border-gray-200 text-xs" placeholder="Timeout">
+                    <input type="number" name="radius_retries" value="{{ radius_settings.server.retries }}" class="rounded-lg border-gray-200 text-xs" placeholder="Retries">
+                </div>
+            </div>
+            <div class="rounded-xl border border-gray-100 p-4 space-y-2">
+                <p class="text-xs uppercase tracking-wide text-gray-500">Accounting</p>
+                <input type="text" name="accounting_method" value="{{ radius_settings.accounting.method }}" class="w-full rounded-lg border-gray-200 text-xs">
+                <input type="number" name="interim_update_interval_seconds" value="{{ radius_settings.accounting.interim_update_interval_seconds }}" class="w-full rounded-lg border-gray-200 text-xs">
+                <label class="flex items-center gap-2 text-xs">
+                    <input type="checkbox" name="track_sessions" {% if radius_settings.accounting.track_sessions %}checked{% endif %}>
+                    Track sessions
+                </label>
+                <label class="flex items-center gap-2 text-xs">
+                    <input type="checkbox" name="track_usage" {% if radius_settings.accounting.track_usage %}checked{% endif %}>
+                    Track usage
+                </label>
+            </div>
+        </div>
+        <div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs text-gray-600">
+            <div>
+                <p class="uppercase tracking-wide text-gray-400">Attribute Mappings</p>
+                <p class="mt-2 font-semibold text-gray-900">{{ radius_mappings | length }}</p>
+            </div>
+            <div>
+                <p class="uppercase tracking-wide text-gray-400">NAS Configs</p>
+                <p class="mt-2 font-semibold text-gray-900">{{ nas_configs | length }}</p>
+            </div>
+            <div>
+                <p class="uppercase tracking-wide text-gray-400">Dictionary Entries</p>
+                <p class="mt-2 font-semibold text-gray-900">{{ dictionary_entries | length }}</p>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <form method="POST" action="/subscriptions/settings/radius/credentials">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="flex items-center justify-between">
+            <h3 class="text-base font-display font-semibold text-gray-900">RADIUS Credential Generation</h3>
+            <button type="submit" class="text-xs font-semibold text-primary-600 hover:text-primary-500">Save</button>
+        </div>
+        <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700">
+            <div class="rounded-xl border border-gray-100 p-4 space-y-3">
+                <p class="text-xs uppercase tracking-wide text-gray-500">General</p>
+                <label class="flex items-center justify-between">
+                    <span>Enabled</span>
+                    <input type="checkbox" name="cred_enabled" {% if credential_config.enabled %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Auto-generate on create</span>
+                    <input type="checkbox" name="cred_auto_generate" {% if credential_config.auto_generate_on_create %}checked{% endif %}>
+                </label>
+                <label class="flex items-center justify-between">
+                    <span>Notify on regenerate</span>
+                    <input type="checkbox" name="cred_notify" {% if credential_config.notify_on_regenerate %}checked{% endif %}>
+                </label>
+            </div>
+            <div class="rounded-xl border border-gray-100 p-4 space-y-2">
+                <p class="text-xs uppercase tracking-wide text-gray-500">Username Format</p>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Format type</span>
+                    <select name="cred_format_type" class="rounded-lg border-gray-200 text-xs">
+                        <option value="template" {% if credential_config.username.format_type == 'template' %}selected{% endif %}>Template</option>
+                        <option value="sequential" {% if credential_config.username.format_type == 'sequential' %}selected{% endif %}>Sequential</option>
+                        <option value="email" {% if credential_config.username.format_type == 'email' %}selected{% endif %}>Email</option>
+                        <option value="phone" {% if credential_config.username.format_type == 'phone' %}selected{% endif %}>Phone</option>
+                        <option value="subscription_id" {% if credential_config.username.format_type == 'subscription_id' %}selected{% endif %}>Subscription ID</option>
+                    </select>
+                </label>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Template</span>
+                    <input type="text" name="cred_template" value="{{ credential_config.username.template }}" class="rounded-lg border-gray-200 text-xs" placeholder="{email}">
+                </label>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Domain</span>
+                    <input type="text" name="cred_domain" value="{{ credential_config.username.domain or '' }}" class="rounded-lg border-gray-200 text-xs" placeholder="example.com">
+                </label>
+                <div class="flex items-center gap-4 text-xs">
+                    <label class="inline-flex items-center gap-1">
+                        <input type="checkbox" name="cred_lowercase" {% if credential_config.username.lowercase %}checked{% endif %}>
+                        Lowercase
+                    </label>
+                    <label class="inline-flex items-center gap-1">
+                        <input type="checkbox" name="cred_strip_special" {% if credential_config.username.strip_special %}checked{% endif %}>
+                        Strip special
+                    </label>
+                </div>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Max length</span>
+                    <input type="number" name="cred_max_length" value="{{ credential_config.username.max_length }}" class="rounded-lg border-gray-200 text-xs" min="8" max="128">
+                </label>
+            </div>
+            <div class="rounded-xl border border-gray-100 p-4 space-y-2">
+                <p class="text-xs uppercase tracking-wide text-gray-500">Sequential Settings</p>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Prefix</span>
+                    <input type="text" name="cred_seq_prefix" value="{{ credential_config.sequential.prefix }}" class="rounded-lg border-gray-200 text-xs" placeholder="USER">
+                </label>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Padding length</span>
+                    <input type="number" name="cred_seq_padding" value="{{ credential_config.sequential.padding_length }}" class="rounded-lg border-gray-200 text-xs" min="1" max="10">
+                </label>
+                <label class="flex flex-col gap-1 text-xs">
+                    <span>Start from</span>
+                    <input type="number" name="cred_seq_start" value="{{ credential_config.sequential.start_from }}" class="rounded-lg border-gray-200 text-xs" min="1">
+                </label>
+            </div>
+        </div>
+        <div class="mt-4 rounded-xl border border-gray-100 p-4 space-y-2">
+            <p class="text-xs uppercase tracking-wide text-gray-500">Password Complexity</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <label class="flex flex-col gap-1">
+                    <span>Min length</span>
+                    <input type="number" name="cred_pwd_min" value="{{ credential_config.password.min_length }}" class="rounded-lg border-gray-200 text-xs" min="8" max="32">
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span>Max length</span>
+                    <input type="number" name="cred_pwd_max" value="{{ credential_config.password.max_length }}" class="rounded-lg border-gray-200 text-xs" min="8" max="64">
+                </label>
+                <label class="flex flex-col gap-1">
+                    <span>Special chars</span>
+                    <input type="text" name="cred_pwd_special_chars" value="{{ credential_config.password.special_chars }}" class="rounded-lg border-gray-200 text-xs">
+                </label>
+                <div class="flex flex-col gap-1">
+                    <span class="text-gray-500">Character types</span>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" name="cred_pwd_lower" {% if credential_config.password.include_lowercase %}checked{% endif %}>
+                            a-z
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" name="cred_pwd_upper" {% if credential_config.password.include_uppercase %}checked{% endif %}>
+                            A-Z
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" name="cred_pwd_digits" {% if credential_config.password.include_digits %}checked{% endif %}>
+                            0-9
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" name="cred_pwd_special" {% if credential_config.password.include_special %}checked{% endif %}>
+                            Special
+                        </label>
+                        <label class="inline-flex items-center gap-1">
+                            <input type="checkbox" name="cred_pwd_exclude_ambig" {% if credential_config.password.exclude_ambiguous %}checked{% endif %}>
+                            Exclude ambiguous
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900">Attribute Mappings</h3>
+        <form method="POST" action="/subscriptions/settings/radius/mappings" class="mt-4 space-y-2 text-xs text-gray-600">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" name="attribute_name" class="rounded-lg border-gray-200 text-xs" placeholder="Attribute name" required>
+                <input type="text" name="radius_attribute" class="rounded-lg border-gray-200 text-xs" placeholder="RADIUS attribute" required>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" name="nas_type" class="rounded-lg border-gray-200 text-xs" placeholder="NAS type">
+                <input type="text" name="value_format" class="rounded-lg border-gray-200 text-xs" placeholder="Value format">
+            </div>
+            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-primary-600 hover:bg-primary-500">Add Mapping</button>
+        </form>
+        <div class="mt-4 space-y-2 text-sm text-gray-700">
+            {% for mapping in radius_mappings %}
+            <div class="flex items-center justify-between">
+                <span>{{ mapping.attribute_name }}</span>
+                <span class="text-xs text-gray-500">{{ mapping.nas_type.value }}</span>
+            </div>
+            {% endfor %}
+            {% if not radius_mappings %}
+            <p class="text-gray-400">No mappings configured.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900">NAS Configs</h3>
+        <form method="POST" action="/subscriptions/settings/radius/nas" class="mt-4 space-y-2 text-xs text-gray-600">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div class="grid grid-cols-2 gap-2">
+                <input type="number" name="router_id" class="rounded-lg border-gray-200 text-xs" placeholder="Router ID" required>
+                <input type="text" name="nas_identifier" class="rounded-lg border-gray-200 text-xs" placeholder="NAS identifier">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" name="radius_secret" class="rounded-lg border-gray-200 text-xs" placeholder="RADIUS secret">
+                <input type="text" name="nas_type" class="rounded-lg border-gray-200 text-xs" placeholder="NAS type">
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <input type="number" name="coa_port" class="rounded-lg border-gray-200 text-xs" placeholder="CoA port">
+                <label class="inline-flex items-center gap-2 text-xs">
+                    <input type="checkbox" name="coa_enabled" checked>
+                    CoA enabled
+                </label>
+            </div>
+            <button type="submit" class="inline-flex items-center px-3 py-1.5 text-xs font-semibold text-white rounded-lg bg-primary-600 hover:bg-primary-500">Add NAS</button>
+        </form>
+        <div class="mt-4 space-y-2 text-sm text-gray-700">
+            {% for nas in nas_configs %}
+            <div class="flex items-center justify-between">
+                <span>{{ nas.nas_identifier }}</span>
+                <span class="text-xs text-gray-500">{{ nas.nas_type.value }}</span>
+            </div>
+            {% endfor %}
+            {% if not nas_configs %}
+            <p class="text-gray-400">No NAS configs found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session
 
 from app.auth import Principal, Require, get_current_principal
 from app.database import get_db
-from app.models.customer import Customer
 from app.models.invoice import Invoice, InvoiceStatus
 from app.services.accounting.invoice_types import (
     InvoiceCreateData,
@@ -69,8 +68,7 @@ class InvoiceLineCreate(BaseModel):
 class InvoiceCreate(BaseModel):
     """Schema for creating an invoice."""
 
-    customer_id: int
-    contact_id: Optional[int] = None
+    customer_account_id: int
     invoice_number: Optional[str] = None
     description: Optional[str] = None
     invoice_date: str
@@ -89,8 +87,7 @@ class InvoiceCreate(BaseModel):
 class InvoiceUpdate(BaseModel):
     """Schema for updating an invoice."""
 
-    customer_id: Optional[int] = None
-    contact_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     description: Optional[str] = None
     invoice_date: Optional[str] = None
     due_date: Optional[str] = None
@@ -150,8 +147,7 @@ def _to_create_data(schema: InvoiceCreate) -> InvoiceCreateData:
     ]
 
     return InvoiceCreateData(
-        customer_id=schema.customer_id,
-        contact_id=schema.contact_id,
+        customer_account_id=schema.customer_account_id,
         invoice_number=schema.invoice_number,
         description=schema.description,
         invoice_date=invoice_date,
@@ -198,8 +194,7 @@ def _to_update_data(schema: InvoiceUpdate) -> InvoiceUpdateData:
         conversion_rate = Decimal(str(schema.conversion_rate))
 
     return InvoiceUpdateData(
-        customer_id=schema.customer_id,
-        contact_id=schema.contact_id,
+        customer_account_id=schema.customer_account_id,
         description=schema.description,
         invoice_date=invoice_date,
         due_date=due_date,
@@ -221,8 +216,7 @@ def _serialize_invoice_list_item(inv: Invoice) -> Dict[str, Any]:
     return {
         "id": inv.id,
         "invoice_number": inv.invoice_number,
-        "customer_id": inv.customer_id,
-        "contact_id": inv.contact_id,
+        "customer_account_id": inv.customer_account_id,
         "invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
         "due_date": inv.due_date.isoformat() if inv.due_date else None,
         "total_amount": float(inv.total_amount) if inv.total_amount else 0,
@@ -237,16 +231,14 @@ def _serialize_invoice_list_item(inv: Invoice) -> Dict[str, Any]:
 def _serialize_invoice_detail(invoice: Invoice, db: Session) -> Dict[str, Any]:
     """Serialize invoice for detail response."""
     customer = None
-    if invoice.customer_id:
-        cust = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
-        if cust:
-            customer = {"id": cust.id, "name": cust.name, "email": cust.email}
+    if invoice.customer_account and invoice.customer_account.party:
+        party = invoice.customer_account.party
+        customer = {"id": invoice.customer_account_id, "party_id": party.id, "name": party.name, "email": party.primary_email}
 
     return {
         "id": invoice.id,
         "invoice_number": invoice.invoice_number,
-        "customer_id": invoice.customer_id,
-        "contact_id": invoice.contact_id,
+        "customer_account_id": invoice.customer_account_id,
         "customer": customer,
         "description": invoice.description,
         "invoice_date": (
@@ -296,8 +288,7 @@ def _serialize_invoice_detail(invoice: Invoice, db: Session) -> Dict[str, Any]:
 
 @router.get("/invoices", dependencies=[Depends(Require("accounting:read"))])
 def list_invoices(
-    customer_id: Optional[int] = None,
-    contact_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     status: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -321,8 +312,7 @@ def list_invoices(
 
     # Build filters
     filters = InvoiceFilters(
-        customer_id=customer_id,
-        contact_id=contact_id,
+        customer_account_id=customer_account_id,
         status=status_enum,
         start_date=parse_date(start_date, "start_date") if start_date else None,
         end_date=parse_date(end_date, "end_date") if end_date else None,

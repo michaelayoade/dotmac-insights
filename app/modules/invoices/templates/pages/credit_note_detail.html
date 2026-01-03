@@ -11,7 +11,7 @@
             <span class="text-gray-900">{{ credit_note.credit_number or 'CN-' ~ credit_note.id }}</span>
         </nav>
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ credit_note.credit_number or 'Credit Note #' ~ credit_note.id }}</h1>
-        <p class="mt-1.5 text-gray-500 font-body">{{ credit_note.contact.name if credit_note.contact else 'Credit Note' }}</p>
+        <p class="mt-1.5 text-gray-500 font-body">{{ credit_note.customer_account.party.name if credit_note.customer_account and credit_note.customer_account.party else 'Credit Note' }}</p>
     </div>
 </div>
 {% endblock %}
@@ -40,7 +40,7 @@
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Customer</dt>
-                        <dd class="mt-1.5 text-gray-900">{{ credit_note.contact.name if credit_note.contact else '-' }}</dd>
+                        <dd class="mt-1.5 text-gray-900">{{ credit_note.customer_account.party.name if credit_note.customer_account and credit_note.customer_account.party else '-' }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Issue Date</dt>

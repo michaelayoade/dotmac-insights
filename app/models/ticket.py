@@ -20,10 +20,13 @@ if TYPE_CHECKING:
 
 class TicketStatus(enum.Enum):
     OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    WAITING = "waiting"
     REPLIED = "replied"
     RESOLVED = "resolved"
     CLOSED = "closed"
     ON_HOLD = "on_hold"
+    REOPENED = "reopened"
 
 
 class TicketPriority(enum.Enum):

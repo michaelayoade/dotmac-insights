@@ -10,9 +10,12 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException, set_flash, form_str,
-    Account, AccountType, GLEntry,
-    func, or_, Decimal,
+    Account, AccountType,
 )
+from app.services.accounting import LedgerService
+from app.services.accounting.ledger_types import AccountCreateData, AccountFilters, AccountUpdateData, GLEntryFilters
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -55,15 +58,23 @@ def get_account_type_options():
     ]
 
 
-def get_parent_account_options(db, exclude_id: Optional[int] = None):
+def _get_ledger_service(db: DB, user: SessionUser) -> LedgerService:
+    return LedgerService(db, user)
+
+
+def get_parent_account_options(service: LedgerService, exclude_id: Optional[int] = None):
     """Get parent account options (groups only)."""
-    query = db.query(Account).filter(
-        Account.is_group == True,
-        Account.disabled == False,
+    filters = AccountFilters(
+        is_group=True,
+        include_disabled=False,
+        sort_by="account_name",
+        sort_dir="asc",
     )
+    pagination = PaginationParams(limit=1000, offset=0)
+    result = service.list_accounts(filters, pagination)
+    accounts = result.items
     if exclude_id:
-        query = query.filter(Account.id != exclude_id)
-    accounts = query.order_by(Account.account_name).all()
+        accounts = [acc for acc in accounts if acc.id != exclude_id]
     return [
         {"value": str(a.id), "label": f"{a.account_name} ({a.root_type.value.title() if a.root_type else 'Unknown'})"}
         for a in accounts
@@ -85,42 +96,10 @@ def build_account_tree(accounts: list, parent: Optional[str] = None) -> list:
     return tree
 
 
-def get_account_balance(db, account_name: str) -> Decimal:
+def get_account_balance(service: LedgerService, account: Account):
     """Calculate account balance from GL entries."""
-    result = db.query(
-        func.sum(GLEntry.debit) - func.sum(GLEntry.credit)
-    ).filter(
-        GLEntry.account == account_name,
-        GLEntry.is_cancelled == False,
-    ).scalar()
-    return result or Decimal("0")
-
-
-def get_account_stats(db) -> dict:
-    """Calculate account statistics."""
-    total_count = db.query(func.count(Account.id)).filter(
-        Account.disabled == False
-    ).scalar() or 0
-
-    group_count = db.query(func.count(Account.id)).filter(
-        Account.disabled == False,
-        Account.is_group == True,
-    ).scalar() or 0
-
-    by_root_type = {}
-    for root_type in AccountType:
-        count = db.query(func.count(Account.id)).filter(
-            Account.disabled == False,
-            Account.root_type == root_type,
-        ).scalar() or 0
-        by_root_type[root_type.value] = count
-
-    return {
-        "total_count": total_count,
-        "group_count": group_count,
-        "ledger_count": total_count - group_count,
-        "by_root_type": by_root_type,
-    }
+    info = service.get_account_balance(account)
+    return info.balance
 
 
 @router.get("/accounts", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -138,42 +117,38 @@ async def accounts_list(
     per_page: int = Query(100, ge=10, le=500),
 ):
     """Chart of Accounts list page."""
-    # Build query
-    query = db.query(Account)
-
-    if not show_disabled:
-        query = query.filter(Account.disabled == False)
-
-    # Search
-    if q:
-        search_filter = or_(
-            Account.account_name.ilike(f"%{q}%"),
-            Account.account_number.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filter by root type
+    service = _get_ledger_service(db, user)
+    root_type_enum = None
     if root_type:
-        query = query.filter(Account.root_type == root_type)
+        try:
+            root_type_enum = AccountType(root_type)
+        except ValueError:
+            root_type_enum = None
 
-    # Count total
-    total = query.count()
-
-    # Sort and fetch all for tree view, or paginate for flat view
-    query = query.order_by(Account.root_type, Account.account_name)
-
+    filters = AccountFilters(
+        search=q,
+        root_type=root_type_enum,
+        include_disabled=show_disabled,
+        sort_by="root_type",
+        sort_dir="asc",
+    )
+    pagination = PaginationParams(
+        limit=per_page,
+        offset=(page - 1) * per_page,
+    )
     if view == "tree" and not q:
-        # For tree view, get all accounts to build hierarchy
-        accounts = query.all()
-        account_tree = build_account_tree(accounts)
-    else:
-        # For flat view or search, paginate
-        offset = (page - 1) * per_page
-        accounts = query.offset(offset).limit(per_page).all()
-        account_tree = None
+        pagination = PaginationParams(limit=10000, offset=0)
 
-    # Get stats
-    stats = get_account_stats(db)
+    try:
+        result = service.list_accounts(filters, pagination)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    accounts = result.items
+    total = result.total
+    account_tree = build_account_tree(accounts) if view == "tree" and not q else None
+
+    stats = service.get_account_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -245,7 +220,8 @@ async def account_new(
     context["account"] = None
     context["root_type_options"] = get_root_type_options()
     context["account_type_options"] = get_account_type_options()
-    context["parent_options"] = get_parent_account_options(db)
+    service = _get_ledger_service(db, user)
+    context["parent_options"] = get_parent_account_options(service)
     context["errors"] = {}
 
     template = templates.get_template("modules/accounting/templates/accounts/pages/form.html")
@@ -280,10 +256,8 @@ async def account_create(
         errors["root_type"] = "Root type is required"
 
     # Check for duplicate name
-    existing = db.query(Account).filter(
-        Account.account_name == account_name,
-        Account.disabled == False,
-    ).first()
+    service = _get_ledger_service(db, user)
+    existing = service.get_account_by_name(account_name)
     if existing:
         errors["account_name"] = "An account with this name already exists"
 
@@ -299,7 +273,7 @@ async def account_create(
         context["account"] = None
         context["root_type_options"] = get_root_type_options()
         context["account_type_options"] = get_account_type_options()
-        context["parent_options"] = get_parent_account_options(db)
+        context["parent_options"] = get_parent_account_options(service)
         context["errors"] = errors
         context["form_data"] = dict(form)
 
@@ -309,23 +283,25 @@ async def account_create(
     # Get parent account name if parent_id provided
     parent_account_name = None
     if parent_id:
-        parent = db.query(Account).filter(Account.id == int(parent_id)).first()
-        if parent:
+        try:
+            parent = service.get_account(int(parent_id))
             parent_account_name = parent.account_name
+        except NotFoundError:
+            parent_account_name = None
 
     # Create account
-    account = Account(
-        account_name=account_name,
-        account_number=account_number,
-        root_type=AccountType(root_type_value),
-        account_type=account_type,
-        parent_account=parent_account_name,
-        is_group=is_group,
-        disabled=False,
+    account = service.create_account(
+        AccountCreateData(
+            account_name=account_name,
+            account_number=account_number,
+            root_type=AccountType(root_type_value),
+            account_type=account_type,
+            parent_account=parent_account_name,
+            is_group=is_group,
+            disabled=False,
+        )
     )
-    db.add(account)
     db.commit()
-    db.refresh(account)
 
     set_flash(response, f"Account '{account_name}' created successfully.", "success")
     return RedirectResponse(url=f"/accounting/accounts/{account.id}", status_code=303)
@@ -343,31 +319,26 @@ async def account_detail(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Account detail page with ledger entries."""
-    account = db.query(Account).filter(Account.id == account_id).first()
+    service = _get_ledger_service(db, user)
+    try:
+        account = service.get_account(account_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
 
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    gl_filters = GLEntryFilters(
+        account=account.account_name,
+        is_cancelled=False,
+        sort_by="posting_date",
+        sort_dir="desc",
+    )
+    gl_entries_result = service.list_gl_entries(gl_filters, pagination)
+    gl_entries = gl_entries_result.items
+    total_entries = gl_entries_result.total
 
-    # Get GL entries for this account
-    gl_query = db.query(GLEntry).filter(
-        GLEntry.account == account.account_name,
-        GLEntry.is_cancelled == False,
-    ).order_by(GLEntry.posting_date.desc())
+    balance = get_account_balance(service, account)
 
-    total_entries = gl_query.count()
-    offset = (page - 1) * per_page
-    gl_entries = gl_query.offset(offset).limit(per_page).all()
-
-    # Calculate balance
-    balance = get_account_balance(db, account.account_name)
-
-    # Get child accounts if this is a group
-    children = []
-    if account.is_group:
-        children = db.query(Account).filter(
-            Account.parent_account == account.account_name,
-            Account.disabled == False,
-        ).order_by(Account.account_name).all()
+    children = service.list_child_accounts(account.account_name) if account.is_group else []
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -397,10 +368,11 @@ async def account_edit(
     account_id: int,
 ):
     """Account edit form page."""
-    account = db.query(Account).filter(Account.id == account_id).first()
-
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    service = _get_ledger_service(db, user)
+    try:
+        account = service.get_account(account_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -414,7 +386,7 @@ async def account_edit(
     context["account"] = account
     context["root_type_options"] = get_root_type_options()
     context["account_type_options"] = get_account_type_options()
-    context["parent_options"] = get_parent_account_options(db, exclude_id=account.id)
+    context["parent_options"] = get_parent_account_options(service, exclude_id=account.id)
     context["errors"] = {}
 
     template = templates.get_template("modules/accounting/templates/accounts/pages/form.html")
@@ -432,10 +404,11 @@ async def account_update(
     account_id: int,
 ):
     """Update an existing account."""
-    account = db.query(Account).filter(Account.id == account_id).first()
-
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+    service = _get_ledger_service(db, user)
+    try:
+        account = service.get_account(account_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
 
     form = await request.form()
 
@@ -456,12 +429,8 @@ async def account_update(
         errors["root_type"] = "Root type is required"
 
     # Check for duplicate name (excluding this account)
-    existing = db.query(Account).filter(
-        Account.account_name == account_name,
-        Account.id != account_id,
-        Account.disabled == False,
-    ).first()
-    if existing:
+    existing = service.get_account_by_name(account_name)
+    if existing and existing.id != account_id:
         errors["account_name"] = "An account with this name already exists"
 
     if errors:
@@ -477,7 +446,7 @@ async def account_update(
         context["account"] = account
         context["root_type_options"] = get_root_type_options()
         context["account_type_options"] = get_account_type_options()
-        context["parent_options"] = get_parent_account_options(db, exclude_id=account.id)
+        context["parent_options"] = get_parent_account_options(service, exclude_id=account.id)
         context["errors"] = errors
         context["form_data"] = dict(form)
 
@@ -487,18 +456,25 @@ async def account_update(
     # Get parent account name if parent_id provided
     parent_account_name = None
     if parent_id:
-        parent = db.query(Account).filter(Account.id == int(parent_id)).first()
-        if parent:
+        try:
+            parent = service.get_account(int(parent_id))
             parent_account_name = parent.account_name
+        except NotFoundError:
+            parent_account_name = None
 
     # Update account
-    account.account_name = account_name
-    account.account_number = account_number
-    account.root_type = AccountType(root_type_value)
-    account.account_type = account_type
-    account.parent_account = parent_account_name
-    account.is_group = is_group
-    account.disabled = disabled
+    service.update_account(
+        account_id,
+        AccountUpdateData(
+            account_name=account_name,
+            account_number=account_number,
+            root_type=AccountType(root_type_value),
+            account_type=account_type,
+            parent_account=parent_account_name,
+            is_group=is_group,
+            disabled=disabled,
+        ),
+    )
     db.commit()
 
     set_flash(response, f"Account '{account_name}' updated successfully.", "success")

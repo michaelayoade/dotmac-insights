@@ -1,0 +1,181 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Department Tree</h1>
+            <p class="mt-1 text-sm text-gray-500">Hierarchical view of departments</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/hr/departments" class="px-4 py-2 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-sm text-gray-600">
+                List View
+            </a>
+            <a href="/hr/departments/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                New Department
+            </a>
+        </div>
+    </div>
+
+    <!-- Tree Container -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        {% if tree_data %}
+        <div x-data="deptTree({{ tree_data | tojson | e }})" class="space-y-2">
+            <template x-for="node in nodes" :key="node.id">
+                <div x-html="renderNode(node, 0)"></div>
+            </template>
+        </div>
+        {% else %}
+        <div class="text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-display font-semibold text-gray-900">No departments</h3>
+            <p class="mt-2 text-sm text-gray-500">Create departments to see the tree structure.</p>
+            <a href="/hr/departments/new" class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                New Department
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.dept-node {
+    position: relative;
+}
+
+.dept-node-content {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    transition: background-color 0.15s ease;
+}
+
+.dept-node-content:hover {
+    background-color: #f9fafb;
+}
+
+.dept-toggle {
+    width: 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #9ca3af;
+    transition: transform 0.15s ease;
+}
+
+.dept-toggle:hover {
+    color: #4f46e5;
+}
+
+.dept-toggle.expanded {
+    transform: rotate(90deg);
+}
+
+.dept-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #6b7280;
+}
+
+.dept-name {
+    font-weight: 500;
+    color: #111827;
+    font-size: 0.875rem;
+}
+
+.dept-name:hover {
+    color: #4f46e5;
+}
+
+.dept-count {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    background: #f3f4f6;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+}
+
+.dept-children {
+    margin-left: 1.5rem;
+    border-left: 1px solid #e5e7eb;
+    padding-left: 0.5rem;
+}
+</style>
+
+<script>
+function deptTree(data) {
+    return {
+        nodes: data,
+        expanded: {},
+
+        toggle(id) {
+            this.expanded[id] = !this.expanded[id];
+        },
+
+        isExpanded(id) {
+            return this.expanded[id] !== false; // Default to expanded
+        },
+
+        renderNode(node, level) {
+            const hasChildren = node.children && node.children.length > 0;
+            const isExpanded = this.isExpanded(node.id);
+            const indent = level * 24;
+
+            let html = `
+                <div class="dept-node" style="margin-left: ${indent}px;">
+                    <div class="dept-node-content">
+            `;
+
+            if (hasChildren) {
+                html += `
+                    <button type="button" class="dept-toggle ${isExpanded ? 'expanded' : ''}" @click="toggle(${node.id})">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                `;
+            } else {
+                html += `<span class="dept-toggle" style="visibility: hidden;"></span>`;
+            }
+
+            html += `
+                <svg class="dept-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                <a href="/hr/departments/${node.id}" class="dept-name">${node.name}</a>
+            `;
+
+            if (node.headcount > 0) {
+                html += `<span class="dept-count">${node.headcount} employees</span>`;
+            }
+
+            if (node.company) {
+                html += `<span class="dept-count">${node.company}</span>`;
+            }
+
+            html += `</div>`;
+
+            if (hasChildren && isExpanded) {
+                html += `<div class="dept-children">`;
+                for (const child of node.children) {
+                    html += this.renderNode(child, level + 1);
+                }
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+    };
+}
+</script>
+{% endblock %}

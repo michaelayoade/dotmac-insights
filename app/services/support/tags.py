@@ -151,6 +151,42 @@ class TagService:
             .all()
         )
 
+    def list_with_usage(
+        self,
+        days: int = 30,
+    ) -> tuple[List[TicketTag], dict[int, int], dict[int, int]]:
+        """List tags with total and recent usage counts."""
+        from datetime import datetime, timedelta
+        from app.models.unified_ticket import UnifiedTicket
+
+        tags = self.list(active_only=True)
+        usage: dict[int, int] = {}
+        recent_usage: dict[int, int] = {}
+        since = datetime.utcnow() - timedelta(days=days)
+
+        for tag in tags:
+            usage[tag.id] = (
+                self.db.query(func.count(UnifiedTicket.id))
+                .filter(
+                    UnifiedTicket.is_deleted == False,
+                    UnifiedTicket.tags.contains([tag.name]),
+                )
+                .scalar()
+                or 0
+            )
+            recent_usage[tag.id] = (
+                self.db.query(func.count(UnifiedTicket.id))
+                .filter(
+                    UnifiedTicket.is_deleted == False,
+                    UnifiedTicket.created_at >= since,
+                    UnifiedTicket.tags.contains([tag.name]),
+                )
+                .scalar()
+                or 0
+            )
+
+        return tags, usage, recent_usage
+
     # -------------------------------------------------------------------------
     # Mutations
     # -------------------------------------------------------------------------

@@ -15,6 +15,8 @@ __all__ = [
     "FiscalYearFilters",
     "FiscalYearCreateData",
     "FiscalYearUpdateData",
+    # Fiscal Period types
+    "FiscalPeriodFilters",
     # Cost Center types
     "CostCenterFilters",
     "CostCenterCreateData",
@@ -54,6 +56,16 @@ class FiscalYearUpdateData:
     is_short_year: Optional[bool] = None
     disabled: Optional[bool] = None
     auto_created: Optional[bool] = None
+
+
+# ============= FISCAL PERIOD TYPES =============
+
+@dataclass
+class FiscalPeriodFilters:
+    """Filters for listing fiscal periods."""
+
+    year: Optional[str] = None
+    status: Optional[str] = None
 
 
 # ============= COST CENTER TYPES =============

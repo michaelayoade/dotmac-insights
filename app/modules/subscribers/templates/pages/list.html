@@ -1,0 +1,179 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Subscribers</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage customers and subscribers</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/subscribers/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+            data-testid="new-subscriber-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>New Subscriber</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" data-testid="subscriber-stats">
+    <!-- Total -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center ring-2 ring-blue-200/50">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "{:,}".format(stats.total_subscribers) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center ring-2 ring-emerald-200/50">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "{:,}".format(stats.active_subscribers) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Active</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MRR -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-purple-200 flex items-center justify-center ring-2 ring-violet-200/50">
+                <svg class="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "₦{:,.0f}".format(stats.total_mrr) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total MRR</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- New This Month -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-200 flex items-center justify-center ring-2 ring-amber-200/50">
+                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">
+                    {{ "{:,}".format(stats.new_this_month) }}
+                    {% if stats.net_growth > 0 %}
+                    <span class="text-sm text-emerald-600">+{{ stats.net_growth }}</span>
+                    {% elif stats.net_growth < 0 %}
+                    <span class="text-sm text-red-600">{{ stats.net_growth }}</span>
+                    {% endif %}
+                </p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">New This Month</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters & Search -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 mb-6">
+    <div class="p-4 border-b border-gray-100">
+        <form
+            hx-get="/subscribers/table"
+            hx-target="#subscribers-table"
+            hx-trigger="submit, change from:select delay:300ms"
+            hx-push-url="true"
+            class="flex flex-wrap gap-3 items-end"
+        >
+            <!-- Search -->
+            <div class="flex-1 min-w-[200px]">
+                <label for="search" class="sr-only">Search</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        name="q"
+                        id="search"
+                        value="{{ search_query }}"
+                        placeholder="Search by name, email, phone..."
+                        class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-400 transition-all"
+                        hx-get="/subscribers/table"
+                        hx-target="#subscribers-table"
+                        hx-trigger="input changed delay:400ms, search"
+                    >
+                </div>
+            </div>
+
+            <!-- Status Filter -->
+            <div class="w-40">
+                <label for="status" class="sr-only">Status</label>
+                <select
+                    name="status"
+                    id="status"
+                    class="block w-full py-2.5 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-400 transition-all"
+                >
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {% if current_status == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Party Type Filter -->
+            <div class="w-40">
+                <label for="party_type" class="sr-only">Type</label>
+                <select
+                    name="party_type"
+                    id="party_type"
+                    class="block w-full py-2.5 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-400 transition-all"
+                >
+                    <option value="">All Types</option>
+                    {% for opt in party_type_options %}
+                    <option value="{{ opt.value }}" {% if current_party_type == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Has Active Subscription -->
+            <div class="w-48">
+                <label for="has_active_subscription" class="sr-only">Subscription Status</label>
+                <select
+                    name="has_active_subscription"
+                    id="has_active_subscription"
+                    class="block w-full py-2.5 px-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-100 focus:border-primary-400 transition-all"
+                >
+                    <option value="">All Subscribers</option>
+                    <option value="true" {% if current_has_active == true %}selected{% endif %}>With Active Service</option>
+                    <option value="false" {% if current_has_active == false %}selected{% endif %}>No Active Service</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="subscribers-table">
+        {% include "modules/subscribers/templates/partials/subscribers_table.html" %}
+    </div>
+</div>
+{% endblock %}

@@ -136,22 +136,22 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <!-- Customer -->
                 <div>
-                    <label for="customer_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    <label for="customer_account_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
                         Customer <span class="text-red-500">*</span>
                     </label>
                     <div class="relative">
                         <select
-                            name="customer_id"
-                            id="customer_id"
+                            name="customer_account_id"
+                            id="customer_account_id"
                             required
-                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.customer_id else '' }}"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.customer_account_id else '' }}"
                         >
                             <option value="">Select customer...</option>
                             {% for customer in customers %}
                             <option
                                 value="{{ customer.id }}"
-                                {{ 'selected' if (order.customer_id if order else (form_data.customer_id if form_data else '')) | string == customer.id | string else '' }}
-                            >{{ customer.customer_name }}</option>
+                                {{ 'selected' if (order.customer_account_id if order else (form_data.customer_account_id if form_data else '')) | string == customer.id | string else '' }}
+                            >{{ customer.party.name if customer.party else ("Account " ~ customer.id) }}</option>
                             {% endfor %}
                         </select>
                         <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
@@ -160,8 +160,8 @@
                             </svg>
                         </div>
                     </div>
-                    {% if errors.customer_id %}
-                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.customer_id }}</p>
+                    {% if errors.customer_account_id %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.customer_account_id }}</p>
                     {% endif %}
                 </div>
 

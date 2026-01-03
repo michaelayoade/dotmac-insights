@@ -1,17 +1,66 @@
-"""Conversation endpoints (Chatwoot)."""
+"""Conversation endpoints (Chatwoot).
+
+These routes are thin wrappers around ConversationService.
+All business logic resides in the service layer.
+"""
 from __future__ import annotations
 
-from typing import Dict, Any, Optional
+from datetime import datetime
+from typing import Dict, Any, Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.conversation import Conversation, ConversationStatus
 from app.models.party import CustomerAccount
-from app.auth import Require
+from app.auth import Require, get_current_user, Principal
+from app.services.support import ConversationService
+from app.services.support.errors import (
+    ConversationNotFoundError,
+    ConversationAssignmentError,
+)
 
 router = APIRouter()
+
+
+# =============================================================================
+# PYDANTIC MODELS
+# =============================================================================
+
+class StatusUpdateRequest(BaseModel):
+    status: str
+    snoozed_until: Optional[datetime] = None
+
+
+class StarRequest(BaseModel):
+    starred: bool
+
+
+class AssignRequest(BaseModel):
+    agent_id: Optional[int] = None
+    team_id: Optional[int] = None
+
+
+class TagRequest(BaseModel):
+    tag: str
+
+
+class SnoozeRequest(BaseModel):
+    until: datetime
+
+
+# =============================================================================
+# DEPENDENCY INJECTION
+# =============================================================================
+
+def get_conversation_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_user),
+) -> ConversationService:
+    """Provide ConversationService instance for dependency injection."""
+    return ConversationService(db, principal)
 
 
 @router.get("/conversations", dependencies=[Depends(Require("explorer:read"))])
@@ -116,3 +165,204 @@ def get_conversation(
         "party_name": party_name,
         "customer_account": customer_account,
     }
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+def _serialize_conversation(conv) -> Dict[str, Any]:
+    """Serialize a conversation for API response."""
+    return {
+        "id": conv.id,
+        "status": conv.status,
+        "is_starred": getattr(conv, "is_starred", False),
+        "assigned_agent_id": getattr(conv, "assigned_agent_id", None),
+        "assigned_team_id": getattr(conv, "assigned_team_id", None),
+        "tags": conv.tags if hasattr(conv, "tags") else None,
+        "resolved_at": conv.resolved_at.isoformat() if getattr(conv, "resolved_at", None) else None,
+        "snoozed_until": conv.snoozed_until.isoformat() if getattr(conv, "snoozed_until", None) else None,
+        "updated_at": conv.updated_at.isoformat() if getattr(conv, "updated_at", None) else None,
+    }
+
+
+# =============================================================================
+# CONVERSATION MUTATIONS
+# =============================================================================
+
+@router.post(
+    "/conversations/{conversation_id}/status",
+    dependencies=[Depends(Require("support:write"))],
+)
+def update_conversation_status(
+    conversation_id: int,
+    payload: StatusUpdateRequest,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Update conversation status."""
+    try:
+        conv = service.update_status(
+            conversation_id,
+            payload.status,
+            snoozed_until=payload.snoozed_until,
+        )
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.post(
+    "/conversations/{conversation_id}/star",
+    dependencies=[Depends(Require("support:write"))],
+)
+def star_conversation(
+    conversation_id: int,
+    payload: StarRequest,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Star or unstar a conversation."""
+    try:
+        conv = service.star(conversation_id, payload.starred)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.post(
+    "/conversations/{conversation_id}/assign",
+    dependencies=[Depends(Require("support:write"))],
+)
+def assign_conversation(
+    conversation_id: int,
+    payload: AssignRequest,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Assign a conversation to an agent and/or team."""
+    try:
+        conv = service.assign(
+            conversation_id,
+            agent_id=payload.agent_id,
+            team_id=payload.team_id,
+        )
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    except ConversationAssignmentError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post(
+    "/conversations/{conversation_id}/tag",
+    dependencies=[Depends(Require("support:write"))],
+)
+def add_conversation_tag(
+    conversation_id: int,
+    payload: TagRequest,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Add a tag to a conversation."""
+    try:
+        conv = service.add_tag(conversation_id, payload.tag)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.delete(
+    "/conversations/{conversation_id}/tag",
+    dependencies=[Depends(Require("support:write"))],
+)
+def remove_conversation_tag(
+    conversation_id: int,
+    tag: str = Query(..., description="Tag to remove"),
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Remove a tag from a conversation."""
+    try:
+        conv = service.remove_tag(conversation_id, tag)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.post(
+    "/conversations/{conversation_id}/resolve",
+    dependencies=[Depends(Require("support:write"))],
+)
+def resolve_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Mark a conversation as resolved."""
+    try:
+        conv = service.resolve(conversation_id)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.post(
+    "/conversations/{conversation_id}/snooze",
+    dependencies=[Depends(Require("support:write"))],
+)
+def snooze_conversation(
+    conversation_id: int,
+    payload: SnoozeRequest,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Snooze a conversation until a specific time."""
+    try:
+        conv = service.snooze(conversation_id, payload.until)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.post(
+    "/conversations/{conversation_id}/reopen",
+    dependencies=[Depends(Require("support:write"))],
+)
+def reopen_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Reopen a resolved or snoozed conversation."""
+    try:
+        conv = service.reopen(conversation_id)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+
+@router.post(
+    "/conversations/{conversation_id}/archive",
+    dependencies=[Depends(Require("support:write"))],
+)
+def archive_conversation(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    service: ConversationService = Depends(get_conversation_service),
+) -> Dict[str, Any]:
+    """Archive (close) a conversation."""
+    try:
+        conv = service.archive(conversation_id)
+        db.commit()
+        return _serialize_conversation(conv)
+    except ConversationNotFoundError:
+        raise HTTPException(status_code=404, detail="Conversation not found")

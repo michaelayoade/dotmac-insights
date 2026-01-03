@@ -904,6 +904,11 @@ class LeaveService:
 
     def create_holiday_list(self, data: HolidayListCreateData) -> HolidayList:
         """Create a new holiday list."""
+        # Validate date range
+        if data.from_date and data.to_date:
+            if data.from_date > data.to_date:
+                raise ValidationError("From date must be before or equal to to date")
+
         holiday_list = HolidayList(
             holiday_list_name=data.holiday_list_name,
             from_date=data.from_date,
@@ -961,6 +966,58 @@ class LeaveService:
             )
         )
         return holiday is not None
+
+    def update_holiday_list(
+        self, list_id: int, data: "HolidayListUpdateData"
+    ) -> HolidayList:
+        """Update a holiday list."""
+        from app.services.hr.leave_types import HolidayListUpdateData
+
+        holiday_list = self.get_holiday_list(list_id)
+
+        # Check for duplicate name (excluding self)
+        if data.holiday_list_name is not None:
+            existing = self.db.scalar(
+                select(HolidayList).where(
+                    HolidayList.holiday_list_name == data.holiday_list_name,
+                    HolidayList.id != list_id,
+                )
+            )
+            if existing:
+                raise ValidationError(
+                    f"Holiday list with name '{data.holiday_list_name}' already exists"
+                )
+            holiday_list.holiday_list_name = data.holiday_list_name
+
+        if data.from_date is not None:
+            holiday_list.from_date = data.from_date
+        if data.to_date is not None:
+            holiday_list.to_date = data.to_date
+
+        # Validate date range
+        if holiday_list.from_date and holiday_list.to_date:
+            if holiday_list.from_date > holiday_list.to_date:
+                raise ValidationError("From date must be before or equal to to date")
+
+        if data.company is not None:
+            holiday_list.company = data.company
+        if data.weekly_off is not None:
+            holiday_list.weekly_off = data.weekly_off
+
+        self.db.flush()
+        return holiday_list
+
+    def delete_holiday_list(self, list_id: int) -> None:
+        """Delete a holiday list and its holidays."""
+        holiday_list = self.get_holiday_list(list_id)
+
+        # Delete associated holidays
+        self.db.execute(
+            Holiday.__table__.delete().where(Holiday.holiday_list_id == list_id)
+        )
+
+        self.db.delete(holiday_list)
+        self.db.flush()
 
     # =========================================================================
     # Private Helpers

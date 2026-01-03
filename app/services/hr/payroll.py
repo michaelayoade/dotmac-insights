@@ -919,6 +919,111 @@ class PayrollService:
         self.db.flush()
         return slip
 
+    def delete_salary_slip(self, slip_id: int) -> None:
+        """Delete a salary slip (must be in DRAFT status)."""
+        slip = self.get_salary_slip(slip_id)
+
+        if slip.status != SalarySlipStatus.DRAFT:
+            raise SlipStatusTransitionError(
+                slip_id, slip.status.value, "delete"
+            )
+
+        self.db.delete(slip)
+        self.db.flush()
+
+    def bulk_submit_slips(self, slip_ids: List[int]) -> BulkSlipResult:
+        """Bulk submit salary slips by IDs."""
+        result = BulkSlipResult()
+
+        for slip_id in slip_ids:
+            try:
+                slip = self.db.get(SalarySlip, slip_id)
+                if slip and slip.status == SalarySlipStatus.DRAFT:
+                    self.submit_salary_slip(slip_id)
+                    result.submitted_count += 1
+                else:
+                    result.failed_ids.append(slip_id)
+            except Exception as e:
+                result.failed_ids.append(slip_id)
+                result.errors.append(f"Slip {slip_id}: {str(e)}")
+
+        self.db.flush()
+        return result
+
+    def bulk_cancel_slips(self, slip_ids: List[int]) -> BulkSlipResult:
+        """Bulk cancel salary slips by IDs."""
+        result = BulkSlipResult()
+
+        for slip_id in slip_ids:
+            try:
+                slip = self.db.get(SalarySlip, slip_id)
+                if slip and slip.status == SalarySlipStatus.SUBMITTED:
+                    self.cancel_salary_slip(slip_id)
+                    result.cancelled_count += 1
+                else:
+                    result.failed_ids.append(slip_id)
+            except Exception as e:
+                result.failed_ids.append(slip_id)
+                result.errors.append(f"Slip {slip_id}: {str(e)}")
+
+        self.db.flush()
+        return result
+
+    def get_slips_summary(
+        self,
+        from_date: Optional[date] = None,
+        to_date: Optional[date] = None,
+        company: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get salary slips summary statistics by status."""
+        from sqlalchemy import func
+
+        query = select(
+            SalarySlip.status,
+            func.count(SalarySlip.id),
+            func.sum(SalarySlip.gross_pay),
+            func.sum(SalarySlip.net_pay),
+        )
+
+        if from_date:
+            query = query.where(SalarySlip.start_date >= from_date)
+        if to_date:
+            query = query.where(SalarySlip.end_date <= to_date)
+        if company:
+            query = query.where(SalarySlip.company == company)
+
+        query = query.group_by(SalarySlip.status)
+        results = self.db.execute(query).all()
+
+        summary = {}
+        total_gross = Decimal("0")
+        total_net = Decimal("0")
+        total_count = 0
+
+        for row in results:
+            status_val = row[0].value if row[0] else None
+            count = int(row[1] or 0)
+            gross = row[2] or Decimal("0")
+            net = row[3] or Decimal("0")
+
+            summary[status_val] = {
+                "count": count,
+                "gross_pay": float(gross),
+                "net_pay": float(net),
+            }
+            total_count += count
+            total_gross += gross
+            total_net += net
+
+        return {
+            "by_status": summary,
+            "totals": {
+                "count": total_count,
+                "gross_pay": float(total_gross),
+                "net_pay": float(total_net),
+            },
+        }
+
     # ==========================================================================
     # Payroll Processing
     # ==========================================================================
@@ -1397,3 +1502,455 @@ class PayrollService:
             return result.quantize(Decimal("0.01"))
         except Exception:
             return Decimal("0")
+
+    # ==========================================================================
+    # Enhanced Payroll Generation with Nigerian Tax Compliance
+    # ==========================================================================
+
+    def generate_salary_slips_with_tax(
+        self, payroll_entry_id: int
+    ) -> "SlipGenerationDetailResult":
+        """Generate salary slips with Nigerian tax compliance.
+
+        This enhanced version:
+        - Calculates PAYE, Pension, NHF, NHIS based on Nigerian tax law
+        - Respects employment type eligibility (INTERN, NYSC exempt from some deductions)
+        - Returns detailed results with tax breakdown
+
+        Args:
+            payroll_entry_id: The payroll entry to generate slips for.
+
+        Returns:
+            SlipGenerationDetailResult with created/skipped details.
+
+        Raises:
+            PayrollEntryNotFoundError: If payroll entry doesn't exist.
+            PayrollAlreadyProcessedError: If slips already generated.
+        """
+        from app.feature_flags import feature_flags
+        from app.services.hr.payroll_types import (
+            CreatedSlipDetail,
+            SkippedSlipDetail,
+            SlipGenerationDetailResult,
+        )
+
+        entry = self.get_payroll_entry(payroll_entry_id)
+
+        if entry.salary_slips_created:
+            raise PayrollAlreadyProcessedError(
+                payroll_entry_id, "Salary slips already created"
+            )
+
+        result = SlipGenerationDetailResult(payroll_entry_id=payroll_entry_id)
+
+        # Get eligible assignments
+        assignments = self._get_eligible_assignments(entry)
+
+        for assignment in assignments:
+            try:
+                detail = self._create_slip_with_tax(entry, assignment)
+                if detail:
+                    result.created_details.append(detail)
+                    result.created_count += 1
+            except Exception as e:
+                result.skipped_details.append(SkippedSlipDetail(
+                    employee_id=assignment.employee_id or 0,
+                    employee=assignment.employee or "",
+                    reason=str(e),
+                ))
+                result.skipped_count += 1
+
+        # Mark entry as having slips created
+        entry.salary_slips_created = True
+        if self.principal and self.principal.user_id:
+            entry.updated_by_id = self.principal.user_id
+
+        self.db.flush()
+        return result
+
+    def _get_eligible_assignments(
+        self, entry: PayrollEntry
+    ) -> List[SalaryStructureAssignment]:
+        """Get eligible salary structure assignments for a payroll entry."""
+        query = select(SalaryStructureAssignment).where(
+            SalaryStructureAssignment.from_date <= entry.end_date
+        )
+
+        if entry.company:
+            query = query.where(SalaryStructureAssignment.company == entry.company)
+
+        # Apply department/designation filters by joining with Employee
+        if entry.department or entry.designation:
+            query = query.join(
+                Employee, SalaryStructureAssignment.employee_id == Employee.id
+            )
+            if entry.department:
+                query = query.where(Employee.department == entry.department)
+            if entry.designation:
+                query = query.where(Employee.designation == entry.designation)
+
+        all_assignments = list(self.db.scalars(query))
+
+        # Filter to only the most recent assignment per employee
+        employee_assignments: dict[int, SalaryStructureAssignment] = {}
+        for assignment in all_assignments:
+            if assignment.employee_id is None:
+                continue
+            existing = employee_assignments.get(assignment.employee_id)
+            if existing is None or (
+                assignment.from_date
+                and existing.from_date
+                and assignment.from_date > existing.from_date
+            ):
+                employee_assignments[assignment.employee_id] = assignment
+
+        return list(employee_assignments.values())
+
+    def _create_slip_with_tax(
+        self, entry: PayrollEntry, assignment: SalaryStructureAssignment
+    ) -> Optional["CreatedSlipDetail"]:
+        """Create a single salary slip with tax calculations."""
+        from app.feature_flags import feature_flags
+        from app.services.hr.payroll_types import CreatedSlipDetail
+
+        # Check if slip already exists
+        existing = self.db.scalar(
+            select(SalarySlip).where(
+                and_(
+                    SalarySlip.employee_id == assignment.employee_id,
+                    SalarySlip.start_date == entry.start_date,
+                    SalarySlip.end_date == entry.end_date,
+                )
+            )
+        )
+        if existing:
+            raise ValueError("Salary slip already exists")
+
+        # Get salary structure
+        if not assignment.salary_structure_id:
+            raise ValueError("No salary structure assigned")
+
+        structure = self.get_salary_structure(assignment.salary_structure_id)
+
+        # Calculate earnings and categorize for tax
+        gross_pay = Decimal("0")
+        basic_salary = Decimal("0")
+        housing_allowance = Decimal("0")
+        transport_allowance = Decimal("0")
+        other_allowances = Decimal("0")
+
+        for earning in structure.earnings:
+            if earning.statistical_component or earning.do_not_include_in_total:
+                continue
+            amount = earning.amount or Decimal("0")
+            gross_pay += amount
+            comp_name = (earning.salary_component or "").lower()
+
+            if "basic" in comp_name:
+                basic_salary += amount
+            elif "housing" in comp_name:
+                housing_allowance += amount
+            elif "transport" in comp_name:
+                transport_allowance += amount
+            else:
+                other_allowances += amount
+
+        # Use base from assignment if no basic component
+        if basic_salary == Decimal("0") and assignment.base:
+            basic_salary = assignment.base
+
+        # Get employee info for tax eligibility
+        employee = self.db.get(Employee, assignment.employee_id)
+        employment_type = None
+        months_of_service = None
+
+        if employee:
+            if hasattr(employee, "employment_type_enum") and employee.employment_type_enum:
+                employment_type = (
+                    employee.employment_type_enum.value
+                    if hasattr(employee.employment_type_enum, "value")
+                    else str(employee.employment_type_enum)
+                )
+            else:
+                employment_type = employee.employment_type
+
+            if employee.date_of_joining:
+                today = entry.posting_date or date.today()
+                doj = (
+                    employee.date_of_joining.date()
+                    if hasattr(employee.date_of_joining, "date")
+                    else employee.date_of_joining
+                )
+                delta = today - doj
+                months_of_service = delta.days // 30
+
+        # Calculate statutory deductions
+        if feature_flags.NIGERIA_COMPLIANCE_ENABLED:
+            from app.api.tax.payroll_integration import (
+                calculate_slip_deductions,
+                STATUTORY_COMPONENTS,
+            )
+
+            statutory = calculate_slip_deductions(
+                basic_salary=basic_salary,
+                housing_allowance=housing_allowance,
+                transport_allowance=transport_allowance,
+                other_allowances=other_allowances,
+                employment_type=employment_type,
+                months_of_service=months_of_service,
+                db=self.db,
+                payroll_date=entry.posting_date,
+            )
+        else:
+            statutory = {
+                "paye": Decimal("0"),
+                "pension_employee": Decimal("0"),
+                "pension_employer": Decimal("0"),
+                "nhf": Decimal("0"),
+                "nhis_employee": Decimal("0"),
+                "nhis_employer": Decimal("0"),
+                "total_employee_deductions": Decimal("0"),
+                "total_employer_contributions": Decimal("0"),
+                "is_paye_exempt": True,
+            }
+            STATUTORY_COMPONENTS = {
+                "PAYE": {"name": "PAYE", "abbr": "PAYE"},
+                "PENSION_EMPLOYEE": {"name": "Pension (Employee)", "abbr": "PEN-E"},
+                "NHF": {"name": "NHF", "abbr": "NHF"},
+                "NHIS_EMPLOYEE": {"name": "NHIS (Employee)", "abbr": "NHIS-E"},
+            }
+
+        # Sum non-statutory deductions
+        structure_deductions = Decimal("0")
+        for deduction in structure.deductions:
+            if deduction.statistical_component or deduction.do_not_include_in_total:
+                continue
+            comp_name = (deduction.salary_component or "").lower()
+            if any(x in comp_name for x in ["paye", "pension", "nhf", "nhis"]):
+                continue
+            structure_deductions += deduction.amount or Decimal("0")
+
+        total_deduction = statutory["total_employee_deductions"] + structure_deductions
+        net_pay = gross_pay - total_deduction
+
+        # Create salary slip
+        slip = SalarySlip(
+            employee=assignment.employee,
+            employee_id=assignment.employee_id,
+            employee_name=assignment.employee_name,
+            salary_structure=structure.salary_structure_name,
+            posting_date=entry.posting_date,
+            start_date=entry.start_date,
+            end_date=entry.end_date,
+            payroll_frequency=structure.payroll_frequency,
+            company=entry.company or structure.company,
+            currency=entry.currency or structure.currency,
+            gross_pay=gross_pay,
+            total_deduction=total_deduction,
+            net_pay=net_pay,
+            rounded_total=net_pay,
+            status=SalarySlipStatus.DRAFT,
+            payroll_entry=entry.erpnext_id or f"PAYROLL-{entry.id}",
+        )
+        if self.principal and self.principal.user_id:
+            slip.created_by_id = self.principal.user_id
+
+        self.db.add(slip)
+        self.db.flush()
+
+        # Add earnings
+        for idx, earning in enumerate(structure.earnings):
+            self.db.add(
+                SalarySlipEarning(
+                    salary_slip_id=slip.id,
+                    salary_component=earning.salary_component,
+                    abbr=earning.abbr,
+                    amount=earning.amount or Decimal("0"),
+                    default_amount=earning.amount or Decimal("0"),
+                    statistical_component=earning.statistical_component,
+                    do_not_include_in_total=earning.do_not_include_in_total,
+                    idx=idx,
+                )
+            )
+
+        # Add statutory deductions
+        deduction_idx = 0
+        if statutory["paye"] > Decimal("0"):
+            self.db.add(
+                SalarySlipDeduction(
+                    salary_slip_id=slip.id,
+                    salary_component=STATUTORY_COMPONENTS["PAYE"]["name"],
+                    abbr=STATUTORY_COMPONENTS["PAYE"]["abbr"],
+                    amount=statutory["paye"],
+                    default_amount=statutory["paye"],
+                    idx=deduction_idx,
+                )
+            )
+            deduction_idx += 1
+
+        if statutory["pension_employee"] > Decimal("0"):
+            self.db.add(
+                SalarySlipDeduction(
+                    salary_slip_id=slip.id,
+                    salary_component=STATUTORY_COMPONENTS["PENSION_EMPLOYEE"]["name"],
+                    abbr=STATUTORY_COMPONENTS["PENSION_EMPLOYEE"]["abbr"],
+                    amount=statutory["pension_employee"],
+                    default_amount=statutory["pension_employee"],
+                    idx=deduction_idx,
+                )
+            )
+            deduction_idx += 1
+
+        if statutory["nhf"] > Decimal("0"):
+            self.db.add(
+                SalarySlipDeduction(
+                    salary_slip_id=slip.id,
+                    salary_component=STATUTORY_COMPONENTS["NHF"]["name"],
+                    abbr=STATUTORY_COMPONENTS["NHF"]["abbr"],
+                    amount=statutory["nhf"],
+                    default_amount=statutory["nhf"],
+                    idx=deduction_idx,
+                )
+            )
+            deduction_idx += 1
+
+        if statutory["nhis_employee"] > Decimal("0"):
+            self.db.add(
+                SalarySlipDeduction(
+                    salary_slip_id=slip.id,
+                    salary_component=STATUTORY_COMPONENTS["NHIS_EMPLOYEE"]["name"],
+                    abbr=STATUTORY_COMPONENTS["NHIS_EMPLOYEE"]["abbr"],
+                    amount=statutory["nhis_employee"],
+                    default_amount=statutory["nhis_employee"],
+                    idx=deduction_idx,
+                )
+            )
+            deduction_idx += 1
+
+        # Add non-statutory deductions
+        for deduction in structure.deductions:
+            comp_name = (deduction.salary_component or "").lower()
+            if any(x in comp_name for x in ["paye", "pension", "nhf", "nhis"]):
+                continue
+            self.db.add(
+                SalarySlipDeduction(
+                    salary_slip_id=slip.id,
+                    salary_component=deduction.salary_component,
+                    abbr=deduction.abbr,
+                    amount=deduction.amount or Decimal("0"),
+                    default_amount=deduction.amount or Decimal("0"),
+                    statistical_component=deduction.statistical_component,
+                    do_not_include_in_total=deduction.do_not_include_in_total,
+                    idx=deduction_idx,
+                )
+            )
+            deduction_idx += 1
+
+        self.db.flush()
+
+        return CreatedSlipDetail(
+            id=slip.id,
+            employee=assignment.employee or "",
+            employee_id=assignment.employee_id or 0,
+            gross_pay=gross_pay,
+            net_pay=net_pay,
+            paye=statutory["paye"],
+            pension=statutory["pension_employee"],
+            is_paye_exempt=statutory.get("is_paye_exempt", False),
+        )
+
+    def regenerate_salary_slips(
+        self, payroll_entry_id: int
+    ) -> "SlipGenerationDetailResult":
+        """Delete draft slips and regenerate for a payroll entry.
+
+        Only draft slips are deleted; submitted/paid slips are preserved.
+        """
+        from app.services.hr.payroll_types import SlipGenerationDetailResult
+
+        entry = self.get_payroll_entry(payroll_entry_id)
+
+        # Delete only draft slips for this entry
+        payroll_ref = entry.erpnext_id or f"PAYROLL-{entry.id}"
+        deleted_count = self.db.execute(
+            delete(SalarySlip).where(
+                and_(
+                    SalarySlip.payroll_entry == payroll_ref,
+                    SalarySlip.status == SalarySlipStatus.DRAFT,
+                )
+            )
+        ).rowcount
+
+        # Reset the flag to allow regeneration
+        entry.salary_slips_created = False
+        self.db.flush()
+
+        # Regenerate slips
+        result = self.generate_salary_slips_with_tax(payroll_entry_id)
+        result.deleted_drafts = deleted_count
+
+        return result
+
+    def get_payable_slips(
+        self, payroll_entry_id: int, slip_ids: List[int]
+    ) -> List[SalarySlip]:
+        """Get salary slips that are payable for a payroll entry.
+
+        Validates that slips:
+        - Exist
+        - Belong to the payroll entry
+        - Are in a payable status (DRAFT or SUBMITTED)
+        - Have a positive net_pay amount
+        """
+        entry = self.get_payroll_entry(payroll_entry_id)
+        payroll_ref = entry.erpnext_id or f"PAYROLL-{entry.id}"
+
+        slips = list(
+            self.db.scalars(
+                select(SalarySlip).where(SalarySlip.id.in_(slip_ids))
+            )
+        )
+
+        # Validate all slips
+        slip_map = {s.id: s for s in slips}
+        missing = [sid for sid in slip_ids if sid not in slip_map]
+        if missing:
+            raise SalarySlipNotFoundError(missing[0])
+
+        payable = []
+        for slip in slips:
+            if slip.payroll_entry != payroll_ref:
+                raise ValueError(
+                    f"Slip {slip.id} does not belong to payroll entry {payroll_entry_id}"
+                )
+            if slip.status not in (SalarySlipStatus.SUBMITTED, SalarySlipStatus.DRAFT):
+                raise SlipStatusTransitionError(
+                    slip.id, slip.status.value, "payout"
+                )
+            if not slip.net_pay or slip.net_pay <= 0:
+                raise ValueError(f"Slip {slip.id} has no payable amount")
+            payable.append(slip)
+
+        return payable
+
+    def mark_slips_paid_by_transfer(
+        self,
+        slip_ids: List[int],
+        references: dict[int, str],
+    ) -> None:
+        """Mark salary slips as paid with transfer references.
+
+        Args:
+            slip_ids: List of slip IDs that were paid.
+            references: Mapping of slip_id to payment reference.
+        """
+        for slip_id in slip_ids:
+            slip = self.get_salary_slip(slip_id)
+            slip.status = SalarySlipStatus.PAID
+            slip.payment_reference = references.get(slip_id)
+            slip.payment_mode = "bank_transfer"
+            slip.paid_at = utc_now()
+            if self.principal and self.principal.user_id:
+                slip.paid_by_id = self.principal.user_id
+
+        self.db.flush()

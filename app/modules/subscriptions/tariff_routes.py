@@ -7,13 +7,11 @@ Permission Requirements:
 """
 from __future__ import annotations
 
-from typing import Optional, Any, cast
+from typing import Optional
 from decimal import Decimal
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_
-from sqlalchemy.sql import ColumnElement
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -24,8 +22,10 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.tariff import Tariff, TariffType
-from app.models.subscription import Subscription
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.errors import NotFoundError
+from app.services.subscriptions import TariffService
+from app.services.types import PaginationParams
 
 # Permission dependencies
 RequireSubscriptionsRead = Depends(require_scope("subscriptions:read"))
@@ -65,84 +65,43 @@ async def tariffs_list(
     db: DB,
     q: Optional[str] = Query(None, description="Search query"),
     tariff_type: Optional[str] = Query(None, description="Filter by tariff type"),
+    enabled_only: bool = Query(True, description="Show only enabled tariffs"),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("title", description="Sort field"),
     dir: str = Query("asc", description="Sort direction"),
 ):
     """Tariffs list page."""
-    query = db.query(Tariff).filter(Tariff.enabled == True)
+    svc = TariffService(db, principal=user)
 
-    # Search
-    if q:
-        search_filter = or_(
-            Tariff.title.ilike(f"%{q}%"),
-            Tariff.service_name.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if tariff_type:
-        try:
-            type_enum = TariffType(tariff_type)
-            query = query.filter(Tariff.tariff_type == type_enum)
-        except ValueError:
-            pass
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_mapping = {
-        "title": Tariff.title,
-        "price": Tariff.price,
-        "tariff_type": Tariff.tariff_type,
-        "created_at": Tariff.created_at,
-    }
-    order_column: ColumnElement[Any] = cast(ColumnElement[Any], sort_mapping.get(sort, Tariff.title))
-    if dir == "desc":
-        order_column = order_column.desc()
-    query = query.order_by(order_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    tariffs = query.offset(offset).limit(per_page).all()
+    # Get tariffs using service
+    result = svc.list_tariffs(
+        tariff_type=tariff_type,
+        enabled_only=enabled_only,
+        search=q,
+        pagination=PaginationParams(page=page, per_page=per_page),
+    )
 
     # Get subscription counts per tariff
     subscription_counts = {}
-    for tariff in tariffs:
-        count = db.query(func.count(Subscription.id)).filter(
-            Subscription.tariff_id == tariff.id
-        ).scalar() or 0
-        subscription_counts[tariff.id] = count
+    for tariff in result.items:
+        subscription_counts[tariff.id] = svc.get_subscription_count(tariff.id)
 
-    # Stats
-    total_tariffs = db.query(Tariff).filter(Tariff.enabled == True).count()
-    internet_tariffs = db.query(Tariff).filter(
-        Tariff.enabled == True,
-        Tariff.tariff_type == TariffType.INTERNET
-    ).count()
-
-    stats = {
-        "total": total_tariffs,
-        "internet": internet_tariffs,
-        "recurring": db.query(Tariff).filter(
-            Tariff.enabled == True,
-            Tariff.tariff_type == TariffType.RECURRING
-        ).count(),
-    }
+    # Get overview stats
+    stats = svc.get_overview_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["tariffs"] = tariffs
+    context["tariffs"] = result.items
     context["subscription_counts"] = subscription_counts
     context["stats"] = stats
     context["search_query"] = q or ""
     context["current_tariff_type"] = tariff_type
+    context["enabled_only"] = enabled_only
     context["tariff_type_options"] = get_tariff_type_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
     context["format_speed"] = format_speed
 
     # HTMX partial or full page
@@ -172,6 +131,7 @@ async def tariffs_table(
     db: DB,
     q: Optional[str] = Query(None),
     tariff_type: Optional[str] = Query(None),
+    enabled_only: bool = Query(True),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("title"),
@@ -180,7 +140,7 @@ async def tariffs_table(
     """Tariffs table partial for HTMX updates."""
     return await tariffs_list(
         request, response, user, csrf_token, db,
-        q, tariff_type, page, per_page, sort, dir
+        q, tariff_type, enabled_only, page, per_page, sort, dir
     )
 
 
@@ -198,29 +158,15 @@ async def tariff_detail(
     tariff_id: int,
 ):
     """Tariff detail page with analytics."""
-    tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
+    svc = TariffService(db, principal=user)
 
-    if not tariff:
+    try:
+        tariff = svc.get_tariff(tariff_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Tariff not found")
 
-    # Get subscriptions using this tariff
-    subscription_count = db.query(func.count(Subscription.id)).filter(
-        Subscription.tariff_id == tariff.id
-    ).scalar() or 0
-
-    # Active subscriptions with this tariff
-    active_count = db.query(func.count(Subscription.id)).filter(
-        Subscription.tariff_id == tariff.id,
-        Subscription.status == "active"
-    ).scalar() or 0
-
-    # Revenue from this tariff (active subscriptions)
-    from app.models.subscription import SubscriptionStatus
-    monthly_revenue = db.query(func.sum(Subscription.price)).filter(
-        Subscription.tariff_id == tariff.id,
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "monthly"
-    ).scalar() or Decimal("0")
+    # Get tariff stats using service
+    tariff_stats = svc.get_tariff_stats(tariff_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -232,9 +178,9 @@ async def tariff_detail(
         {"label": tariff.title},
     ])
     context["tariff"] = tariff
-    context["subscription_count"] = subscription_count
-    context["active_count"] = active_count
-    context["monthly_revenue"] = float(monthly_revenue)
+    context["subscription_count"] = tariff_stats.get("total_subscriptions", 0)
+    context["active_count"] = tariff_stats.get("active_subscriptions", 0)
+    context["monthly_revenue"] = float(tariff_stats.get("monthly_revenue", Decimal("0")))
     context["format_speed"] = format_speed
 
     template = templates.get_template("modules/subscriptions/templates/pages/tariff_detail.html")
@@ -255,11 +201,14 @@ async def tariff_toggle(
     tariff_id: int,
 ):
     """Toggle tariff enabled/disabled status."""
-    tariff = db.query(Tariff).filter(Tariff.id == tariff_id).first()
+    svc = TariffService(db, principal=user)
 
-    if not tariff:
+    try:
+        tariff = svc.get_tariff(tariff_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Tariff not found")
 
+    # Toggle status
     tariff.enabled = not tariff.enabled
     db.commit()
 

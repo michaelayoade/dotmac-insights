@@ -1035,12 +1035,12 @@ def get_reconciliation_suggestions(
                     reasons.append("Near due date")
 
             if score > 0:
-                suggestions.append({
-                    "document_type": "Sales Invoice",
-                    "document_id": inv.id,
-                    "document_name": inv.invoice_number or f"INV-{inv.id}",
-                    "party": str(inv.customer_id) if inv.customer_id else "",
-                    "party_name": "",  # Would need join to get customer name
+                    suggestions.append({
+                        "document_type": "Sales Invoice",
+                        "document_id": inv.id,
+                        "document_name": inv.invoice_number or f"INV-{inv.id}",
+                        "party": str(inv.customer_account_id) if inv.customer_account_id else "",
+                        "party_name": "",  # Would need join to get customer name
                     "outstanding_amount": inv_balance,
                     "due_date": inv.due_date.isoformat() if inv.due_date else None,
                     "posting_date": inv.invoice_date.isoformat() if inv.invoice_date else None,

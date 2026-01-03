@@ -38,7 +38,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 
 router = APIRouter()
@@ -103,7 +102,7 @@ class ProjectCreate(BaseModel):
     department: Optional[str] = Field(None, description="Owning department")
     company: Optional[str] = Field(None, description="Company code")
     cost_center: Optional[str] = Field(None, description="Cost center for allocation")
-    customer_id: Optional[int] = Field(None, description="Associated customer ID")
+    customer_account_id: Optional[int] = Field(None, description="Associated customer account ID")
     project_manager_id: Optional[int] = Field(None, description="Project manager employee ID")
     erpnext_customer: Optional[str] = Field(None, description="ERPNext customer reference")
     erpnext_sales_order: Optional[str] = Field(None, description="ERPNext sales order reference")
@@ -282,5 +281,4 @@ class CommentUpdate(BaseModel):
     """Update an existing comment."""
 
     content: str = Field(..., description="Updated comment text", min_length=1)
-
 

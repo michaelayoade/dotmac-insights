@@ -292,7 +292,7 @@ async def project_create(
     )
 
     # Link customer account if provided
-    customer_account_id = _form_int(form, "customer_id", 0)
+    customer_account_id = _form_int(form, "customer_account_id", 0)
     if customer_account_id:
         project.customer_account_id = customer_account_id
 
@@ -508,7 +508,7 @@ async def project_update(
     project.notes = _form_str(form, "notes") or None
 
     # Link customer account if provided
-    customer_account_id = _form_int(form, "customer_id", 0)
+    customer_account_id = _form_int(form, "customer_account_id", 0)
     project.customer_account_id = customer_account_id or None
 
     db.commit()

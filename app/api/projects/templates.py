@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.api.projects.schemas import _log_activity
 
@@ -339,7 +338,7 @@ class CreateFromTemplatePayload(BaseModel):
     """Payload for creating a project from a template."""
     project_name: str
     expected_start_date: Optional[date] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     project_manager_id: Optional[int] = None
     notes: Optional[str] = None
 
@@ -374,7 +373,7 @@ async def create_project_from_template(
         expected_start_date=start_date,
         expected_end_date=end_date,
         notes=payload.notes or template.default_notes,
-        customer_id=payload.customer_id,
+        customer_account_id=payload.customer_account_id,
         project_manager_id=payload.project_manager_id,
     )
     db.add(project)

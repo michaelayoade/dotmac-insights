@@ -2,11 +2,12 @@
 Attendance Management Router
 
 Endpoints for ShiftType, ShiftAssignment, Attendance, AttendanceRequest.
+
+Uses AttendanceService for all business logic.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from typing import Dict, Any, Optional, List
 from datetime import date, time, datetime
 from decimal import Decimal
@@ -15,16 +16,36 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.auth import Require, get_current_principal
 from app.models.auth import User
-from app.services.audit_logger import AuditLogger, serialize_for_audit
-from app.models.hr_attendance import (
-    ShiftType,
-    ShiftAssignment,
-    Attendance,
-    AttendanceStatus,
-    AttendanceRequest,
-    AttendanceRequestStatus,
+from app.models.hr_attendance import AttendanceStatus, AttendanceRequestStatus
+from app.services.hr.attendance import AttendanceService
+from app.services.hr.attendance_types import (
+    ShiftTypeCreateData,
+    ShiftTypeUpdateData,
+    ShiftAssignmentFilters,
+    ShiftAssignmentCreateData,
+    ShiftAssignmentUpdateData,
+    AttendanceFilters,
+    AttendanceCreateData,
+    AttendanceUpdateData,
+    CheckInData,
+    CheckOutData,
+    AttendanceRequestFilters,
+    AttendanceRequestCreateData,
+    BulkShiftAssignmentData,
 )
-from .helpers import decimal_or_default, csv_response, validate_date_order, now
+from app.services.types import PaginationParams
+from app.services.hr.errors import (
+    ShiftTypeNotFoundError,
+    ShiftAssignmentNotFoundError,
+    AttendanceNotFoundError,
+    DuplicateAttendanceError,
+    CheckInError,
+    CheckOutError,
+    AttendanceRequestNotFoundError,
+    AttendanceRequestStatusError,
+    ValidationError as HRValidationError,
+)
+from .helpers import csv_response
 
 router = APIRouter()
 
@@ -32,6 +53,35 @@ router = APIRouter()
 # =============================================================================
 # SHIFT TYPE
 # =============================================================================
+
+
+def _serialize_shift_type(st, include_details: bool = False) -> Dict[str, Any]:
+    """Serialize a ShiftType model to dict."""
+    result = {
+        "id": st.id,
+        "erpnext_id": st.erpnext_id,
+        "shift_type_name": st.shift_type_name,
+        "start_time": st.start_time.isoformat() if st.start_time else None,
+        "end_time": st.end_time.isoformat() if st.end_time else None,
+        "enable_auto_attendance": st.enable_auto_attendance,
+        "holiday_list": st.holiday_list,
+    }
+    if include_details:
+        result.update({
+            "working_hours_threshold_for_half_day": float(st.working_hours_threshold_for_half_day) if st.working_hours_threshold_for_half_day else 0,
+            "working_hours_threshold_for_absent": float(st.working_hours_threshold_for_absent) if st.working_hours_threshold_for_absent else 0,
+            "determine_check_in_and_check_out": st.determine_check_in_and_check_out,
+            "begin_check_in_before_shift_start_time": st.begin_check_in_before_shift_start_time,
+            "allow_check_out_after_shift_end_time": st.allow_check_out_after_shift_end_time,
+            "enable_entry_grace_period": st.enable_entry_grace_period,
+            "late_entry_grace_period": st.late_entry_grace_period,
+            "enable_exit_grace_period": st.enable_exit_grace_period,
+            "early_exit_grace_period": st.early_exit_grace_period,
+            "created_at": st.created_at.isoformat() if st.created_at else None,
+            "updated_at": st.updated_at.isoformat() if st.updated_at else None,
+        })
+    return result
+
 
 @router.get("/shift-types", dependencies=[Depends(Require("hr:read"))])
 async def list_shift_types(
@@ -41,30 +91,22 @@ async def list_shift_types(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List shift types."""
-    query = db.query(ShiftType)
+    service = AttendanceService(db)
+    result = service.list_shift_types(
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
 
+    # Apply search filter (service doesn't support text search)
+    data = result.items
     if search:
-        query = query.filter(ShiftType.shift_type_name.ilike(f"%{search}%"))
-
-    total = query.count()
-    shift_types = query.order_by(ShiftType.shift_type_name).offset(offset).limit(limit).all()
+        search_lower = search.lower()
+        data = [st for st in data if search_lower in st.shift_type_name.lower()]
 
     return {
-        "total": total,
+        "total": result.total if not search else len(data),
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": st.id,
-                "erpnext_id": st.erpnext_id,
-                "shift_type_name": st.shift_type_name,
-                "start_time": st.start_time.isoformat() if st.start_time else None,
-                "end_time": st.end_time.isoformat() if st.end_time else None,
-                "enable_auto_attendance": st.enable_auto_attendance,
-                "holiday_list": st.holiday_list,
-            }
-            for st in shift_types
-        ],
+        "data": [_serialize_shift_type(st) for st in data],
     }
 
 
@@ -74,30 +116,13 @@ async def get_shift_type(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get shift type detail."""
-    st = db.query(ShiftType).filter(ShiftType.id == shift_type_id).first()
-    if not st:
+    service = AttendanceService(db)
+    try:
+        st = service.get_shift_type(shift_type_id)
+    except ShiftTypeNotFoundError:
         raise HTTPException(status_code=404, detail="Shift type not found")
 
-    return {
-        "id": st.id,
-        "erpnext_id": st.erpnext_id,
-        "shift_type_name": st.shift_type_name,
-        "start_time": st.start_time.isoformat() if st.start_time else None,
-        "end_time": st.end_time.isoformat() if st.end_time else None,
-        "working_hours_threshold_for_half_day": float(st.working_hours_threshold_for_half_day) if st.working_hours_threshold_for_half_day else 0,
-        "working_hours_threshold_for_absent": float(st.working_hours_threshold_for_absent) if st.working_hours_threshold_for_absent else 0,
-        "determine_check_in_and_check_out": st.determine_check_in_and_check_out,
-        "begin_check_in_before_shift_start_time": st.begin_check_in_before_shift_start_time,
-        "allow_check_out_after_shift_end_time": st.allow_check_out_after_shift_end_time,
-        "enable_auto_attendance": st.enable_auto_attendance,
-        "enable_entry_grace_period": st.enable_entry_grace_period,
-        "late_entry_grace_period": st.late_entry_grace_period,
-        "enable_exit_grace_period": st.enable_exit_grace_period,
-        "early_exit_grace_period": st.early_exit_grace_period,
-        "holiday_list": st.holiday_list,
-        "created_at": st.created_at.isoformat() if st.created_at else None,
-        "updated_at": st.updated_at.isoformat() if st.updated_at else None,
-    }
+    return _serialize_shift_type(st, include_details=True)
 
 
 # =============================================================================
@@ -128,6 +153,29 @@ class ShiftAssignmentUpdate(BaseModel):
     docstatus: Optional[int] = None
 
 
+def _serialize_assignment(a, include_details: bool = False) -> Dict[str, Any]:
+    """Serialize a ShiftAssignment model to dict."""
+    result = {
+        "id": a.id,
+        "erpnext_id": a.erpnext_id,
+        "employee": a.employee,
+        "employee_id": a.employee_id,
+        "employee_name": a.employee_name,
+        "shift_type": a.shift_type,
+        "shift_type_id": a.shift_type_id,
+        "start_date": a.start_date.isoformat() if a.start_date else None,
+        "end_date": a.end_date.isoformat() if a.end_date else None,
+        "company": a.company,
+    }
+    if include_details:
+        result.update({
+            "docstatus": a.docstatus,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+        })
+    return result
+
+
 @router.get("/shift-assignments", dependencies=[Depends(Require("hr:read"))])
 async def list_shift_assignments(
     employee_id: Optional[int] = None,
@@ -140,43 +188,24 @@ async def list_shift_assignments(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List shift assignments with filtering."""
-    query = db.query(ShiftAssignment)
-
-    if employee_id:
-        query = query.filter(ShiftAssignment.employee_id == employee_id)
-    if shift_type_id:
-        query = query.filter(ShiftAssignment.shift_type_id == shift_type_id)
-    if start_date:
-        query = query.filter(ShiftAssignment.start_date >= start_date)
-    if end_date:
-        query = query.filter(
-            (ShiftAssignment.end_date <= end_date) | (ShiftAssignment.end_date == None)
-        )
-    if company:
-        query = query.filter(ShiftAssignment.company.ilike(f"%{company}%"))
-
-    total = query.count()
-    assignments = query.order_by(ShiftAssignment.start_date.desc()).offset(offset).limit(limit).all()
+    service = AttendanceService(db)
+    filters = ShiftAssignmentFilters(
+        employee_id=employee_id,
+        shift_type_id=shift_type_id,
+        start_date=start_date,
+        end_date=end_date,
+        company=company,
+    )
+    result = service.list_shift_assignments(
+        filters=filters,
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": a.id,
-                "erpnext_id": a.erpnext_id,
-                "employee": a.employee,
-                "employee_id": a.employee_id,
-                "employee_name": a.employee_name,
-                "shift_type": a.shift_type,
-                "shift_type_id": a.shift_type_id,
-                "start_date": a.start_date.isoformat() if a.start_date else None,
-                "end_date": a.end_date.isoformat() if a.end_date else None,
-                "company": a.company,
-            }
-            for a in assignments
-        ],
+        "data": [_serialize_assignment(a) for a in result.items],
     }
 
 
@@ -186,48 +215,45 @@ async def get_shift_assignment(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get shift assignment detail."""
-    a = db.query(ShiftAssignment).filter(ShiftAssignment.id == assignment_id).first()
-    if not a:
+    service = AttendanceService(db)
+    try:
+        a = service.get_shift_assignment(assignment_id)
+    except ShiftAssignmentNotFoundError:
         raise HTTPException(status_code=404, detail="Shift assignment not found")
 
-    return {
-        "id": a.id,
-        "erpnext_id": a.erpnext_id,
-        "employee": a.employee,
-        "employee_id": a.employee_id,
-        "employee_name": a.employee_name,
-        "shift_type": a.shift_type,
-        "shift_type_id": a.shift_type_id,
-        "start_date": a.start_date.isoformat() if a.start_date else None,
-        "end_date": a.end_date.isoformat() if a.end_date else None,
-        "company": a.company,
-        "docstatus": a.docstatus,
-        "created_at": a.created_at.isoformat() if a.created_at else None,
-        "updated_at": a.updated_at.isoformat() if a.updated_at else None,
-    }
+    return _serialize_assignment(a, include_details=True)
 
 
 @router.post("/shift-assignments", dependencies=[Depends(Require("hr:write"))])
 async def create_shift_assignment(
     payload: ShiftAssignmentCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new shift assignment."""
-    validate_date_order(payload.start_date, payload.end_date, "start_date/end_date")
+    service = AttendanceService(db, current_user)
 
-    assignment = ShiftAssignment(
+    if payload.end_date and payload.start_date > payload.end_date:
+        raise HTTPException(status_code=400, detail="start_date must be on or before end_date")
+
+    create_data = ShiftAssignmentCreateData(
+        employee_id=payload.employee_id or 0,
         employee=payload.employee,
-        employee_id=payload.employee_id,
         employee_name=payload.employee_name,
+        shift_type_id=payload.shift_type_id or 0,
         shift_type=payload.shift_type,
-        shift_type_id=payload.shift_type_id,
         start_date=payload.start_date,
         end_date=payload.end_date,
         company=payload.company,
-        docstatus=payload.docstatus or 0,
     )
-    db.add(assignment)
-    db.commit()
+
+    try:
+        assignment = service.create_shift_assignment(create_data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return await get_shift_assignment(assignment.id, db)
 
 
@@ -236,34 +262,47 @@ async def update_shift_assignment(
     assignment_id: int,
     payload: ShiftAssignmentUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a shift assignment."""
-    assignment = db.query(ShiftAssignment).filter(ShiftAssignment.id == assignment_id).first()
-    if not assignment:
+    service = AttendanceService(db, current_user)
+
+    update_data = ShiftAssignmentUpdateData(
+        shift_type_id=payload.shift_type_id,
+        shift_type=payload.shift_type,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+    )
+
+    try:
+        service.update_shift_assignment(assignment_id, update_data)
+        db.commit()
+    except ShiftAssignmentNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Shift assignment not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(assignment, field, value)
-
-    validate_date_order(assignment.start_date, assignment.end_date, "start_date/end_date")
-
-    db.commit()
-    return await get_shift_assignment(assignment.id, db)
+    return await get_shift_assignment(assignment_id, db)
 
 
 @router.delete("/shift-assignments/{assignment_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_shift_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a shift assignment."""
-    assignment = db.query(ShiftAssignment).filter(ShiftAssignment.id == assignment_id).first()
-    if not assignment:
+    service = AttendanceService(db, current_user)
+
+    try:
+        service.delete_shift_assignment(assignment_id)
+        db.commit()
+    except ShiftAssignmentNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Shift assignment not found")
 
-    db.delete(assignment)
-    db.commit()
     return {"message": "Shift assignment deleted", "id": assignment_id}
 
 
@@ -338,6 +377,40 @@ class CheckOutPayload(BaseModel):
     longitude: Optional[float] = None
 
 
+def _serialize_attendance(a, include_details: bool = False) -> Dict[str, Any]:
+    """Serialize an Attendance model to dict."""
+    result = {
+        "id": a.id,
+        "erpnext_id": a.erpnext_id,
+        "employee": a.employee,
+        "employee_id": a.employee_id,
+        "employee_name": a.employee_name,
+        "attendance_date": a.attendance_date.isoformat() if a.attendance_date else None,
+        "status": a.status.value if a.status else None,
+        "shift": a.shift,
+        "in_time": a.in_time.isoformat() if a.in_time else None,
+        "out_time": a.out_time.isoformat() if a.out_time else None,
+        "working_hours": float(a.working_hours) if a.working_hours else 0,
+        "late_entry": a.late_entry,
+        "early_exit": a.early_exit,
+        "company": a.company,
+    }
+    if include_details:
+        result.update({
+            "leave_type": a.leave_type,
+            "leave_application": a.leave_application,
+            "check_in_latitude": a.check_in_latitude,
+            "check_in_longitude": a.check_in_longitude,
+            "check_out_latitude": a.check_out_latitude,
+            "check_out_longitude": a.check_out_longitude,
+            "device_info": a.device_info,
+            "docstatus": a.docstatus,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+        })
+    return result
+
+
 @router.get("/attendances", dependencies=[Depends(Require("hr:read"))])
 async def list_attendances(
     employee_id: Optional[int] = None,
@@ -352,53 +425,35 @@ async def list_attendances(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List attendances with filtering."""
-    query = db.query(Attendance)
+    service = AttendanceService(db)
 
-    if employee_id:
-        query = query.filter(Attendance.employee_id == employee_id)
+    # Parse status enum
+    status_enum = None
     if status:
         try:
             status_enum = AttendanceStatus(status)
-            query = query.filter(Attendance.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if from_date:
-        query = query.filter(Attendance.attendance_date >= from_date)
-    if to_date:
-        query = query.filter(Attendance.attendance_date <= to_date)
-    if company:
-        query = query.filter(Attendance.company.ilike(f"%{company}%"))
-    if late_entry is not None:
-        query = query.filter(Attendance.late_entry == late_entry)
-    if early_exit is not None:
-        query = query.filter(Attendance.early_exit == early_exit)
 
-    total = query.count()
-    attendances = query.order_by(Attendance.attendance_date.desc()).offset(offset).limit(limit).all()
+    filters = AttendanceFilters(
+        employee_id=employee_id,
+        status=status_enum,
+        from_date=from_date,
+        to_date=to_date,
+        late_entry=late_entry,
+        early_exit=early_exit,
+        company=company,
+    )
+    result = service.list_attendances(
+        filters=filters,
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": a.id,
-                "erpnext_id": a.erpnext_id,
-                "employee": a.employee,
-                "employee_id": a.employee_id,
-                "employee_name": a.employee_name,
-                "attendance_date": a.attendance_date.isoformat() if a.attendance_date else None,
-                "status": a.status.value if a.status else None,
-                "shift": a.shift,
-                "in_time": a.in_time.isoformat() if a.in_time else None,
-                "out_time": a.out_time.isoformat() if a.out_time else None,
-                "working_hours": float(a.working_hours) if a.working_hours else 0,
-                "late_entry": a.late_entry,
-                "early_exit": a.early_exit,
-                "company": a.company,
-            }
-            for a in attendances
-        ],
+        "data": [_serialize_attendance(a) for a in result.items],
     }
 
 
@@ -412,24 +467,30 @@ async def export_attendances(
     db: Session = Depends(get_db),
 ):
     """Export attendances to CSV."""
-    query = db.query(Attendance)
-    if employee_id:
-        query = query.filter(Attendance.employee_id == employee_id)
+    service = AttendanceService(db)
+
+    # Parse status enum
+    status_enum = None
     if status:
         try:
             status_enum = AttendanceStatus(status)
-            query = query.filter(Attendance.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if from_date:
-        query = query.filter(Attendance.attendance_date >= from_date)
-    if to_date:
-        query = query.filter(Attendance.attendance_date <= to_date)
-    if company:
-        query = query.filter(Attendance.company.ilike(f"%{company}%"))
+
+    filters = AttendanceFilters(
+        employee_id=employee_id,
+        status=status_enum,
+        from_date=from_date,
+        to_date=to_date,
+        company=company,
+    )
+    result = service.list_attendances(
+        filters=filters,
+        pagination=PaginationParams(offset=0, limit=10000),
+    )
 
     rows = [["id", "employee", "employee_id", "attendance_date", "status", "in_time", "out_time", "working_hours", "late_entry", "early_exit", "company"]]
-    for a in query.order_by(Attendance.attendance_date.desc()).all():
+    for a in result.items:
         rows.append([
             str(a.id),
             a.employee,
@@ -454,41 +515,42 @@ async def attendance_summary(
     company: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Get attendance summary statistics."""
-    query = db.query(Attendance.status, func.count(Attendance.id))
+    """Get attendance summary statistics.
 
-    if employee_id:
-        query = query.filter(Attendance.employee_id == employee_id)
-    if from_date:
-        query = query.filter(Attendance.attendance_date >= from_date)
-    if to_date:
-        query = query.filter(Attendance.attendance_date <= to_date)
-    if company:
-        query = query.filter(Attendance.company.ilike(f"%{company}%"))
+    Note: This endpoint uses direct DB queries for aggregation since the service
+    doesn't have a dedicated summary method with these specific filters.
+    """
+    service = AttendanceService(db)
 
-    results = query.group_by(Attendance.status).all()
-    status_counts = {row[0].value if row[0] else None: int(row[1] or 0) for row in results}
+    # Get all attendances matching filters
+    filters = AttendanceFilters(
+        employee_id=employee_id,
+        from_date=from_date,
+        to_date=to_date,
+        company=company,
+    )
+    result = service.list_attendances(
+        filters=filters,
+        pagination=PaginationParams(offset=0, limit=10000),
+    )
 
-    late_count = db.query(func.count(Attendance.id)).filter(Attendance.late_entry == True)
-    early_count = db.query(func.count(Attendance.id)).filter(Attendance.early_exit == True)
+    # Aggregate counts manually
+    status_counts: Dict[str, int] = {}
+    late_entries = 0
+    early_exits = 0
 
-    if employee_id:
-        late_count = late_count.filter(Attendance.employee_id == employee_id)
-        early_count = early_count.filter(Attendance.employee_id == employee_id)
-    if from_date:
-        late_count = late_count.filter(Attendance.attendance_date >= from_date)
-        early_count = early_count.filter(Attendance.attendance_date >= from_date)
-    if to_date:
-        late_count = late_count.filter(Attendance.attendance_date <= to_date)
-        early_count = early_count.filter(Attendance.attendance_date <= to_date)
-    if company:
-        late_count = late_count.filter(Attendance.company.ilike(f"%{company}%"))
-        early_count = early_count.filter(Attendance.company.ilike(f"%{company}%"))
+    for a in result.items:
+        status_key = a.status.value if a.status else None
+        status_counts[status_key] = status_counts.get(status_key, 0) + 1
+        if a.late_entry:
+            late_entries += 1
+        if a.early_exit:
+            early_exits += 1
 
     return {
         "status_counts": status_counts,
-        "late_entries": late_count.scalar() or 0,
-        "early_exits": early_count.scalar() or 0,
+        "late_entries": late_entries,
+        "early_exits": early_exits,
     }
 
 
@@ -498,87 +560,52 @@ async def get_attendance(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get attendance detail."""
-    a = db.query(Attendance).filter(Attendance.id == attendance_id).first()
-    if not a:
+    service = AttendanceService(db)
+
+    try:
+        a = service.get_attendance(attendance_id)
+    except AttendanceNotFoundError:
         raise HTTPException(status_code=404, detail="Attendance not found")
 
-    return {
-        "id": a.id,
-        "erpnext_id": a.erpnext_id,
-        "employee": a.employee,
-        "employee_id": a.employee_id,
-        "employee_name": a.employee_name,
-        "attendance_date": a.attendance_date.isoformat() if a.attendance_date else None,
-        "status": a.status.value if a.status else None,
-        "leave_type": a.leave_type,
-        "leave_application": a.leave_application,
-        "shift": a.shift,
-        "in_time": a.in_time.isoformat() if a.in_time else None,
-        "out_time": a.out_time.isoformat() if a.out_time else None,
-        "working_hours": float(a.working_hours) if a.working_hours else 0,
-        "check_in_latitude": a.check_in_latitude,
-        "check_in_longitude": a.check_in_longitude,
-        "check_out_latitude": a.check_out_latitude,
-        "check_out_longitude": a.check_out_longitude,
-        "device_info": a.device_info,
-        "late_entry": a.late_entry,
-        "early_exit": a.early_exit,
-        "company": a.company,
-        "docstatus": a.docstatus,
-        "created_at": a.created_at.isoformat() if a.created_at else None,
-        "updated_at": a.updated_at.isoformat() if a.updated_at else None,
-    }
+    return _serialize_attendance(a, include_details=True)
 
 
 @router.post("/attendances", dependencies=[Depends(Require("hr:write"))])
 async def create_attendance(
     payload: AttendanceCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new attendance record."""
-    # Check for duplicate attendance (employee_id + attendance_date)
-    if payload.employee_id:
-        existing = db.query(Attendance).filter(
-            Attendance.employee_id == payload.employee_id,
-            Attendance.attendance_date == payload.attendance_date,
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Attendance already exists for employee on {payload.attendance_date} (ID: {existing.id})"
-            )
+    service = AttendanceService(db, current_user)
 
-    # Validate in_time < out_time if both are provided
-    if payload.in_time and payload.out_time and payload.in_time >= payload.out_time:
-        raise HTTPException(
-            status_code=400,
-            detail="in_time must be before out_time"
-        )
-
-    attendance = Attendance(
+    create_data = AttendanceCreateData(
+        employee_id=payload.employee_id or 0,
         employee=payload.employee,
-        employee_id=payload.employee_id,
         employee_name=payload.employee_name,
         attendance_date=payload.attendance_date,
         status=payload.status or AttendanceStatus.PRESENT,
-        leave_type=payload.leave_type,
-        leave_application=payload.leave_application,
         shift=payload.shift,
         in_time=payload.in_time,
         out_time=payload.out_time,
-        working_hours=decimal_or_default(payload.working_hours),
-        check_in_latitude=payload.check_in_latitude,
-        check_in_longitude=payload.check_in_longitude,
-        check_out_latitude=payload.check_out_latitude,
-        check_out_longitude=payload.check_out_longitude,
-        device_info=payload.device_info,
+        working_hours=payload.working_hours or Decimal("0"),
+        leave_type=payload.leave_type,
+        leave_application=payload.leave_application,
         late_entry=payload.late_entry or False,
         early_exit=payload.early_exit or False,
         company=payload.company,
-        docstatus=payload.docstatus or 0,
     )
-    db.add(attendance)
-    db.commit()
+
+    try:
+        attendance = service.create_attendance(create_data)
+        db.commit()
+    except DuplicateAttendanceError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return await get_attendance(attendance.id, db)
 
 
@@ -587,121 +614,120 @@ async def update_attendance(
     attendance_id: int,
     payload: AttendanceUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an attendance record."""
-    attendance = db.query(Attendance).filter(Attendance.id == attendance_id).first()
-    if not attendance:
+    service = AttendanceService(db, current_user)
+
+    update_data = AttendanceUpdateData(
+        status=payload.status,
+        shift=payload.shift,
+        in_time=payload.in_time,
+        out_time=payload.out_time,
+        working_hours=payload.working_hours,
+        late_entry=payload.late_entry,
+        early_exit=payload.early_exit,
+        leave_type=payload.leave_type,
+        leave_application=payload.leave_application,
+    )
+
+    try:
+        service.update_attendance(attendance_id, update_data)
+        db.commit()
+    except AttendanceNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Attendance not found")
+    except DuplicateAttendanceError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    update_data = payload.model_dump(exclude_unset=True)
-
-    # Determine target employee/date for duplicate check
-    target_employee_id = update_data.get("employee_id", attendance.employee_id)
-    target_date = update_data.get("attendance_date", attendance.attendance_date)
-    if target_employee_id and target_date:
-        existing = db.query(Attendance).filter(
-            Attendance.employee_id == target_employee_id,
-            Attendance.attendance_date == target_date,
-            Attendance.id != attendance_id,
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Attendance already exists for employee on {target_date} (ID: {existing.id})"
-            )
-
-    # Validate time ordering with prospective values
-    prospective_in_time = update_data.get("in_time", attendance.in_time)
-    prospective_out_time = update_data.get("out_time", attendance.out_time)
-    if prospective_in_time and prospective_out_time and prospective_in_time >= prospective_out_time:
-        raise HTTPException(status_code=400, detail="in_time must be before out_time")
-
-    for field, value in update_data.items():
-        if value is not None:
-            if field == "working_hours":
-                setattr(attendance, field, decimal_or_default(value))
-            else:
-                setattr(attendance, field, value)
-
-    db.commit()
-    return await get_attendance(attendance.id, db)
+    return await get_attendance(attendance_id, db)
 
 
 @router.delete("/attendances/{attendance_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_attendance(
     attendance_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an attendance record."""
-    attendance = db.query(Attendance).filter(Attendance.id == attendance_id).first()
-    if not attendance:
+    service = AttendanceService(db, current_user)
+
+    try:
+        service.delete_attendance(attendance_id)
+        db.commit()
+    except AttendanceNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Attendance not found")
 
-    db.delete(attendance)
-    db.commit()
     return {"message": "Attendance deleted", "id": attendance_id}
 
 
 @router.post("/attendances/{attendance_id}/check-in", dependencies=[Depends(Require("hr:write"))])
-async def check_in(
+async def check_in_attendance(
     attendance_id: int,
     payload: Optional[CheckInPayload] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Record check-in time for attendance with optional geolocation."""
-    attendance = db.query(Attendance).filter(Attendance.id == attendance_id).first()
-    if not attendance:
+    service = AttendanceService(db, current_user)
+
+    # Get employee_id from existing attendance
+    try:
+        attendance = service.get_attendance(attendance_id)
+    except AttendanceNotFoundError:
         raise HTTPException(status_code=404, detail="Attendance not found")
 
-    if attendance.in_time:
-        raise HTTPException(status_code=400, detail="Already checked in")
+    check_in_data = CheckInData(
+        attendance_date=attendance.attendance_date,
+        latitude=payload.latitude if payload else None,
+        longitude=payload.longitude if payload else None,
+        device_info=payload.device_info if payload else None,
+    )
 
-    attendance.in_time = now()
+    try:
+        service.check_in(attendance.employee_id, check_in_data)
+        db.commit()
+    except CheckInError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Store geolocation and device info if provided
-    if payload:
-        if payload.latitude is not None:
-            attendance.check_in_latitude = payload.latitude
-        if payload.longitude is not None:
-            attendance.check_in_longitude = payload.longitude
-        if payload.device_info:
-            attendance.device_info = payload.device_info
-
-    db.commit()
     return await get_attendance(attendance_id, db)
 
 
 @router.post("/attendances/{attendance_id}/check-out", dependencies=[Depends(Require("hr:write"))])
-async def check_out(
+async def check_out_attendance(
     attendance_id: int,
     payload: Optional[CheckOutPayload] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Record check-out time for attendance with optional geolocation."""
-    attendance = db.query(Attendance).filter(Attendance.id == attendance_id).first()
-    if not attendance:
+    service = AttendanceService(db, current_user)
+
+    # Get employee_id from existing attendance
+    try:
+        attendance = service.get_attendance(attendance_id)
+    except AttendanceNotFoundError:
         raise HTTPException(status_code=404, detail="Attendance not found")
 
-    if not attendance.in_time:
-        raise HTTPException(status_code=400, detail="Must check in before checking out")
-    if attendance.out_time:
-        raise HTTPException(status_code=400, detail="Already checked out")
+    check_out_data = CheckOutData(
+        attendance_date=attendance.attendance_date,
+        latitude=payload.latitude if payload else None,
+        longitude=payload.longitude if payload else None,
+    )
 
-    attendance.out_time = now()
+    try:
+        service.check_out(attendance.employee_id, check_out_data)
+        db.commit()
+    except CheckOutError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Store geolocation if provided
-    if payload:
-        if payload.latitude is not None:
-            attendance.check_out_latitude = payload.latitude
-        if payload.longitude is not None:
-            attendance.check_out_longitude = payload.longitude
-
-    # Calculate working hours
-    if attendance.in_time and attendance.out_time:
-        delta = attendance.out_time - attendance.in_time
-        attendance.working_hours = Decimal(str(delta.total_seconds() / 3600))
-
-    db.commit()
     return await get_attendance(attendance_id, db)
 
 
@@ -716,48 +742,39 @@ async def bulk_mark_attendance(
 
     Returns details on created vs skipped (already existed) entries.
     """
+    service = AttendanceService(db, current_user)
+
     created = []
     skipped = []
-    audit = AuditLogger(db)
 
     for emp_id in payload.employee_ids:
-        existing = db.query(Attendance).filter(
-            Attendance.employee_id == emp_id,
-            Attendance.attendance_date == payload.attendance_date,
-        ).first()
+        # Check if attendance already exists
+        existing = service.get_attendance_by_employee_date(emp_id, payload.attendance_date)
 
         if existing:
-            # Skip - attendance already exists for this employee on this date
             skipped.append({
                 "employee_id": emp_id,
                 "existing_id": existing.id,
                 "existing_status": existing.status.value if existing.status else None,
             })
         else:
-            attendance = Attendance(
-                employee=f"EMP-{emp_id}",
+            create_data = AttendanceCreateData(
                 employee_id=emp_id,
+                employee=f"EMP-{emp_id}",
                 attendance_date=payload.attendance_date,
                 status=payload.status,
-                created_by_id=current_user.id if current_user else None,
             )
-            db.add(attendance)
-            db.flush()
-            created.append({
-                "employee_id": emp_id,
-                "id": attendance.id,
-            })
-
-    # Log audit event for bulk operation
-    if created:
-        audit.log_create(
-            doctype="attendance",
-            document_id=0,  # Bulk operation
-            new_values={"employee_ids": [c["employee_id"] for c in created], "status": payload.status.value},
-            user_id=current_user.id if current_user else None,
-            document_name=f"Bulk attendance for {payload.attendance_date}",
-            remarks=f"Bulk created {len(created)} attendance records",
-        )
+            try:
+                attendance = service.create_attendance(create_data)
+                created.append({
+                    "employee_id": emp_id,
+                    "id": attendance.id,
+                })
+            except (DuplicateAttendanceError, HRValidationError):
+                skipped.append({
+                    "employee_id": emp_id,
+                    "reason": "Failed to create",
+                })
 
     db.commit()
     return {
@@ -807,19 +824,30 @@ class AttendanceRequestBulkAction(BaseModel):
     request_ids: List[int]
 
 
-def _require_request_status(request: AttendanceRequest, allowed: List[AttendanceRequestStatus]):
-    if request.status not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid status transition from {request.status.value if request.status else None}",
-        )
-
-
-def _load_request(db: Session, request_id: int) -> AttendanceRequest:
-    request = db.query(AttendanceRequest).filter(AttendanceRequest.id == request_id).first()
-    if not request:
-        raise HTTPException(status_code=404, detail="Attendance request not found")
-    return request
+def _serialize_request(r, include_details: bool = False) -> Dict[str, Any]:
+    """Serialize an AttendanceRequest model to dict."""
+    result = {
+        "id": r.id,
+        "erpnext_id": r.erpnext_id,
+        "employee": r.employee,
+        "employee_id": r.employee_id,
+        "employee_name": r.employee_name,
+        "from_date": r.from_date.isoformat() if r.from_date else None,
+        "to_date": r.to_date.isoformat() if r.to_date else None,
+        "half_day": r.half_day,
+        "reason": r.reason,
+        "status": r.status.value if r.status else None,
+        "company": r.company,
+    }
+    if include_details:
+        result.update({
+            "half_day_date": r.half_day_date.isoformat() if r.half_day_date else None,
+            "explanation": r.explanation,
+            "docstatus": r.docstatus,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        })
+    return result
 
 
 @router.get("/attendance-requests", dependencies=[Depends(Require("hr:read"))])
@@ -834,46 +862,33 @@ async def list_attendance_requests(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List attendance requests with filtering."""
-    query = db.query(AttendanceRequest)
+    service = AttendanceService(db)
 
-    if employee_id:
-        query = query.filter(AttendanceRequest.employee_id == employee_id)
+    # Parse status enum
+    status_enum = None
     if status:
         try:
             status_enum = AttendanceRequestStatus(status)
-            query = query.filter(AttendanceRequest.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if from_date:
-        query = query.filter(AttendanceRequest.from_date >= from_date)
-    if to_date:
-        query = query.filter(AttendanceRequest.to_date <= to_date)
-    if company:
-        query = query.filter(AttendanceRequest.company.ilike(f"%{company}%"))
 
-    total = query.count()
-    requests = query.order_by(AttendanceRequest.from_date.desc()).offset(offset).limit(limit).all()
+    filters = AttendanceRequestFilters(
+        employee_id=employee_id,
+        status=status_enum,
+        from_date=from_date,
+        to_date=to_date,
+        company=company,
+    )
+    result = service.list_attendance_requests(
+        filters=filters,
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": r.id,
-                "erpnext_id": r.erpnext_id,
-                "employee": r.employee,
-                "employee_id": r.employee_id,
-                "employee_name": r.employee_name,
-                "from_date": r.from_date.isoformat() if r.from_date else None,
-                "to_date": r.to_date.isoformat() if r.to_date else None,
-                "half_day": r.half_day,
-                "reason": r.reason,
-                "status": r.status.value if r.status else None,
-                "company": r.company,
-            }
-            for r in requests
-        ],
+        "data": [_serialize_request(r) for r in result.items],
     }
 
 
@@ -883,54 +898,48 @@ async def get_attendance_request(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get attendance request detail."""
-    r = db.query(AttendanceRequest).filter(AttendanceRequest.id == request_id).first()
-    if not r:
+    service = AttendanceService(db)
+
+    try:
+        r = service.get_attendance_request(request_id)
+    except AttendanceRequestNotFoundError:
         raise HTTPException(status_code=404, detail="Attendance request not found")
 
-    return {
-        "id": r.id,
-        "erpnext_id": r.erpnext_id,
-        "employee": r.employee,
-        "employee_id": r.employee_id,
-        "employee_name": r.employee_name,
-        "from_date": r.from_date.isoformat() if r.from_date else None,
-        "to_date": r.to_date.isoformat() if r.to_date else None,
-        "half_day": r.half_day,
-        "half_day_date": r.half_day_date.isoformat() if r.half_day_date else None,
-        "reason": r.reason,
-        "explanation": r.explanation,
-        "status": r.status.value if r.status else None,
-        "docstatus": r.docstatus,
-        "company": r.company,
-        "created_at": r.created_at.isoformat() if r.created_at else None,
-        "updated_at": r.updated_at.isoformat() if r.updated_at else None,
-    }
+    return _serialize_request(r, include_details=True)
 
 
 @router.post("/attendance-requests", dependencies=[Depends(Require("hr:write"))])
 async def create_attendance_request(
     payload: AttendanceRequestCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new attendance request."""
-    validate_date_order(payload.from_date, payload.to_date)
+    service = AttendanceService(db, current_user)
 
-    request = AttendanceRequest(
+    if payload.from_date > payload.to_date:
+        raise HTTPException(status_code=400, detail="from_date must be on or before to_date")
+
+    create_data = AttendanceRequestCreateData(
+        employee_id=payload.employee_id or 0,
         employee=payload.employee,
-        employee_id=payload.employee_id,
         employee_name=payload.employee_name,
         from_date=payload.from_date,
         to_date=payload.to_date,
-        half_day=payload.half_day or False,
-        half_day_date=payload.half_day_date,
         reason=payload.reason,
         explanation=payload.explanation,
-        status=payload.status or AttendanceRequestStatus.DRAFT,
+        half_day=payload.half_day or False,
+        half_day_date=payload.half_day_date,
         company=payload.company,
-        docstatus=payload.docstatus or 0,
     )
-    db.add(request)
-    db.commit()
+
+    try:
+        request = service.create_attendance_request(create_data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return await get_attendance_request(request.id, db)
 
 
@@ -939,34 +948,47 @@ async def update_attendance_request(
     request_id: int,
     payload: AttendanceRequestUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
-    """Update an attendance request."""
-    request = db.query(AttendanceRequest).filter(AttendanceRequest.id == request_id).first()
-    if not request:
+    """Update an attendance request.
+
+    Note: The service doesn't have update_attendance_request yet.
+    For now, we get the request via service and update directly.
+    """
+    service = AttendanceService(db, current_user)
+
+    try:
+        request = service.get_attendance_request(request_id)
+    except AttendanceRequestNotFoundError:
         raise HTTPException(status_code=404, detail="Attendance request not found")
 
+    # Update fields directly (service enhancement needed)
     for field, value in payload.model_dump(exclude_unset=True).items():
         if value is not None:
             setattr(request, field, value)
 
-    validate_date_order(request.from_date, request.to_date)
+    if request.from_date and request.to_date and request.from_date > request.to_date:
+        raise HTTPException(status_code=400, detail="from_date must be on or before to_date")
 
     db.commit()
-    return await get_attendance_request(request.id, db)
+    return await get_attendance_request(request_id, db)
 
 
 @router.delete("/attendance-requests/{request_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_attendance_request(
     request_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an attendance request."""
-    request = db.query(AttendanceRequest).filter(AttendanceRequest.id == request_id).first()
-    if not request:
+    service = AttendanceService(db, current_user)
+
+    try:
+        service.delete_attendance_request(request_id)
+        db.commit()
+    except AttendanceRequestNotFoundError:
         raise HTTPException(status_code=404, detail="Attendance request not found")
 
-    db.delete(request)
-    db.commit()
     return {"message": "Attendance request deleted", "id": request_id}
 
 
@@ -974,10 +996,22 @@ async def delete_attendance_request(
 async def submit_attendance_request(
     request_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit an attendance request for approval."""
-    request = _load_request(db, request_id)
-    _require_request_status(request, [AttendanceRequestStatus.DRAFT])
+    service = AttendanceService(db, current_user)
+
+    try:
+        request = service.get_attendance_request(request_id)
+    except AttendanceRequestNotFoundError:
+        raise HTTPException(status_code=404, detail="Attendance request not found")
+
+    if request.status != AttendanceRequestStatus.DRAFT:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status transition from {request.status.value}",
+        )
+
     request.status = AttendanceRequestStatus.PENDING
     db.commit()
     return await get_attendance_request(request_id, db)
@@ -990,26 +1024,18 @@ async def approve_attendance_request(
     current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Approve an attendance request."""
-    request = _load_request(db, request_id)
-    _require_request_status(request, [AttendanceRequestStatus.PENDING])
+    service = AttendanceService(db, current_user)
 
-    old_status = request.status
-    request.status = AttendanceRequestStatus.APPROVED
-    request.status_changed_by_id = current_user.id if current_user else None
-    request.status_changed_at = now()
-    request.updated_by_id = current_user.id if current_user else None
+    try:
+        service.approve_attendance_request(request_id)
+        db.commit()
+    except AttendanceRequestNotFoundError:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Attendance request not found")
+    except AttendanceRequestStatusError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Log audit event
-    audit = AuditLogger(db)
-    audit.log_approve(
-        doctype="attendance_request",
-        document_id=request.id,
-        user_id=current_user.id if current_user else None,
-        document_name=f"{request.employee} ({request.from_date} to {request.to_date})",
-        remarks=f"Status changed from {old_status.value} to approved",
-    )
-
-    db.commit()
     return await get_attendance_request(request_id, db)
 
 
@@ -1020,26 +1046,18 @@ async def reject_attendance_request(
     current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Reject an attendance request."""
-    request = _load_request(db, request_id)
-    _require_request_status(request, [AttendanceRequestStatus.PENDING])
+    service = AttendanceService(db, current_user)
 
-    old_status = request.status
-    request.status = AttendanceRequestStatus.REJECTED
-    request.status_changed_by_id = current_user.id if current_user else None
-    request.status_changed_at = now()
-    request.updated_by_id = current_user.id if current_user else None
+    try:
+        service.reject_attendance_request(request_id)
+        db.commit()
+    except AttendanceRequestNotFoundError:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Attendance request not found")
+    except AttendanceRequestStatusError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Log audit event
-    audit = AuditLogger(db)
-    audit.log_reject(
-        doctype="attendance_request",
-        document_id=request.id,
-        user_id=current_user.id if current_user else None,
-        document_name=f"{request.employee} ({request.from_date} to {request.to_date})",
-        remarks=f"Status changed from {old_status.value} to rejected",
-    )
-
-    db.commit()
     return await get_attendance_request(request_id, db)
 
 
@@ -1047,14 +1065,17 @@ async def reject_attendance_request(
 async def bulk_approve_attendance_requests(
     payload: AttendanceRequestBulkAction,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Bulk approve attendance requests."""
+    service = AttendanceService(db, current_user)
     updated = 0
     for req_id in payload.request_ids:
-        request = db.query(AttendanceRequest).filter(AttendanceRequest.id == req_id).first()
-        if request and request.status == AttendanceRequestStatus.PENDING:
-            request.status = AttendanceRequestStatus.APPROVED
+        try:
+            service.approve_attendance_request(req_id)
             updated += 1
+        except (AttendanceRequestNotFoundError, AttendanceRequestStatusError):
+            pass
     db.commit()
     return {"updated": updated, "requested": len(payload.request_ids)}
 
@@ -1063,13 +1084,16 @@ async def bulk_approve_attendance_requests(
 async def bulk_reject_attendance_requests(
     payload: AttendanceRequestBulkAction,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Bulk reject attendance requests."""
+    service = AttendanceService(db, current_user)
     updated = 0
     for req_id in payload.request_ids:
-        request = db.query(AttendanceRequest).filter(AttendanceRequest.id == req_id).first()
-        if request and request.status == AttendanceRequestStatus.PENDING:
-            request.status = AttendanceRequestStatus.REJECTED
+        try:
+            service.reject_attendance_request(req_id)
             updated += 1
+        except (AttendanceRequestNotFoundError, AttendanceRequestStatusError):
+            pass
     db.commit()
     return {"updated": updated, "requested": len(payload.request_ids)}

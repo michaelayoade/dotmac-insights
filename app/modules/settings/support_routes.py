@@ -71,7 +71,7 @@ async def support_settings_index(
     db: DB,
 ):
     """Support settings - general configuration."""
-    from app.models.support_settings import SupportSettings
+    from app.services.support.settings import SettingsService
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -79,10 +79,12 @@ async def support_settings_index(
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "general"
 
-    # Get or create settings
-    settings = db.query(SupportSettings).filter(SupportSettings.company == None).first()
-    if not settings:
-        settings = SupportSettings()
+    service = SettingsService(db, principal=user)
+    if not service.exists():
+        settings = service.get()
+        db.commit()
+    else:
+        settings = service.get()
 
     context["page_title"] = "Support Settings"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -108,50 +110,37 @@ async def save_support_settings(
     _csrf: CSRFProtect,
 ):
     """Save support settings."""
-    from app.models.support_settings import SupportSettings
+    from app.services.support.settings import SettingsService
+    from app.services.support.types import SupportSettingsUpdate
 
     form = await request.form()
 
-    settings = db.query(SupportSettings).filter(SupportSettings.company == None).first()
-    if not settings:
-        settings = SupportSettings()
-        db.add(settings)
-
-    settings_any: Any = settings
-
-    # SLA settings
-    settings_any.sla_warning_threshold_percent = _form_int(form, "sla_warning_threshold_percent", 80)
-    settings_any.default_first_response_hours = _form_int(form, "default_first_response_hours", 4)
-    settings_any.default_resolution_hours = _form_int(form, "default_resolution_hours", 24)
-    settings_any.sla_include_holidays = _form_bool(form, "sla_include_holidays")
-    settings_any.sla_include_weekends = _form_bool(form, "sla_include_weekends")
-
-    # Routing settings
-    settings_any.max_tickets_per_agent = _form_int(form, "max_tickets_per_agent", 20)
-    settings_any.rebalance_threshold_percent = _form_int(form, "rebalance_threshold_percent", 20)
-
-    # Auto-close settings
-    settings_any.auto_close_enabled = _form_bool(form, "auto_close_enabled")
-    settings_any.auto_close_resolved_days = _form_int(form, "auto_close_resolved_days", 7)
-    settings_any.allow_customer_reopen = _form_bool(form, "allow_customer_reopen")
-    settings_any.reopen_window_days = _form_int(form, "reopen_window_days", 14)
-    settings_any.max_reopens_allowed = _form_int(form, "max_reopens_allowed", 3)
-
-    # CSAT settings
-    settings_any.csat_enabled = _form_bool(form, "csat_enabled")
-    settings_any.csat_delay_hours = _form_int(form, "csat_delay_hours", 24)
-    settings_any.csat_survey_expiry_days = _form_int(form, "csat_survey_expiry_days", 7)
-
-    # Portal settings
-    settings_any.portal_enabled = _form_bool(form, "portal_enabled")
-    settings_any.portal_ticket_creation_enabled = _form_bool(form, "portal_ticket_creation_enabled")
-    settings_any.portal_show_ticket_history = _form_bool(form, "portal_show_ticket_history")
-    settings_any.portal_require_login = _form_bool(form, "portal_require_login")
-
-    # Knowledge base settings
-    settings_any.kb_enabled = _form_bool(form, "kb_enabled")
-    settings_any.kb_public_access = _form_bool(form, "kb_public_access")
-    settings_any.kb_suggest_articles_on_create = _form_bool(form, "kb_suggest_articles_on_create")
+    service = SettingsService(db, principal=user)
+    update_data = SupportSettingsUpdate(
+        sla_warning_threshold_percent=_form_int(form, "sla_warning_threshold_percent", 80),
+        default_first_response_hours=_form_int(form, "default_first_response_hours", 4),
+        default_resolution_hours=_form_int(form, "default_resolution_hours", 24),
+        sla_include_holidays=_form_bool(form, "sla_include_holidays"),
+        sla_include_weekends=_form_bool(form, "sla_include_weekends"),
+        max_tickets_per_agent=_form_int(form, "max_tickets_per_agent", 20),
+        rebalance_threshold_percent=_form_int(form, "rebalance_threshold_percent", 20),
+        auto_close_enabled=_form_bool(form, "auto_close_enabled"),
+        auto_close_resolved_days=_form_int(form, "auto_close_resolved_days", 7),
+        allow_customer_reopen=_form_bool(form, "allow_customer_reopen"),
+        reopen_window_days=_form_int(form, "reopen_window_days", 14),
+        max_reopens_allowed=_form_int(form, "max_reopens_allowed", 3),
+        csat_enabled=_form_bool(form, "csat_enabled"),
+        csat_delay_hours=_form_int(form, "csat_delay_hours", 24),
+        csat_survey_expiry_days=_form_int(form, "csat_survey_expiry_days", 7),
+        portal_enabled=_form_bool(form, "portal_enabled"),
+        portal_ticket_creation_enabled=_form_bool(form, "portal_ticket_creation_enabled"),
+        portal_show_ticket_history=_form_bool(form, "portal_show_ticket_history"),
+        portal_require_login=_form_bool(form, "portal_require_login"),
+        kb_enabled=_form_bool(form, "kb_enabled"),
+        kb_public_access=_form_bool(form, "kb_public_access"),
+        kb_suggest_articles_on_create=_form_bool(form, "kb_suggest_articles_on_create"),
+    )
+    service.update(update_data)
 
     db.commit()
 
@@ -170,7 +159,7 @@ async def escalations_list(
     db: DB,
 ):
     """Escalation policies."""
-    from app.models.support_settings import EscalationPolicy
+    from app.services.support.escalation import EscalationService
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -178,7 +167,10 @@ async def escalations_list(
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "escalations"
 
-    policies = db.query(EscalationPolicy).order_by(EscalationPolicy.name).all()
+    service = EscalationService(db, principal=user)
+    policies = service.list_policies(active_only=False)
+    for policy in policies:
+        _ = policy.levels
 
     context["page_title"] = "Escalation Policies"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -203,7 +195,7 @@ async def queues_list(
     db: DB,
 ):
     """Support queues."""
-    from app.models.support_settings import SupportQueue
+    from app.services.support.queues import QueueService
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -211,7 +203,8 @@ async def queues_list(
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "queues"
 
-    queues = db.query(SupportQueue).order_by(SupportQueue.display_order, SupportQueue.name).all()
+    service = QueueService(db, principal=user)
+    queues = service.list(active_only=False, include_all=True)
 
     context["page_title"] = "Support Queues"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -236,7 +229,7 @@ async def fields_list(
     db: DB,
 ):
     """Custom ticket fields."""
-    from app.models.support_settings import TicketFieldConfig
+    from app.services.support.custom_fields import CustomFieldService
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -244,7 +237,8 @@ async def fields_list(
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "fields"
 
-    fields = db.query(TicketFieldConfig).order_by(TicketFieldConfig.display_order, TicketFieldConfig.field_name).all()
+    service = CustomFieldService(db, principal=user)
+    fields = service.list(active_only=False)
 
     context["page_title"] = "Custom Fields"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -269,7 +263,7 @@ async def templates_list(
     db: DB,
 ):
     """Email templates."""
-    from app.models.support_settings import SupportEmailTemplate
+    from app.services.support.email_templates import EmailTemplateService
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -277,7 +271,10 @@ async def templates_list(
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "templates"
 
-    email_templates = db.query(SupportEmailTemplate).order_by(SupportEmailTemplate.template_type).all()
+    service = EmailTemplateService(db, principal=user)
+    service.ensure_default_templates()
+    db.commit()
+    email_templates = service.list(active_only=False)
 
     context["page_title"] = "Email Templates"
     context["breadcrumbs"] = build_breadcrumbs([

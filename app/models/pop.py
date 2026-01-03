@@ -7,7 +7,6 @@ from typing import Optional, List, TYPE_CHECKING
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
     from app.models.expense import Expense
     from app.models.party import Party
 
@@ -46,7 +45,6 @@ class Pop(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customers: Mapped[List[Customer]] = relationship(back_populates="pop")
     expenses: Mapped[List[Expense]] = relationship(back_populates="pop")
     org_party: Mapped[Optional[Party]] = relationship(backref="pops")
 

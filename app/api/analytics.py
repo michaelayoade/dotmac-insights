@@ -9,7 +9,8 @@ from decimal import Decimal
 
 from app.database import get_db
 from app.config import settings
-from app.models.customer import Customer, CustomerStatus
+from app.models.party import PartyRole, CustomerAccount
+from app.models.router import Router
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
@@ -61,7 +62,6 @@ def _get_active_currencies(db: Session, filters: Optional[List[Any]] = None) -> 
     """Return distinct currencies for active subscriptions after filters."""
     query = (
         db.query(Subscription.currency)
-        .outerjoin(Customer, Subscription.customer_id == Customer.id)
         .filter(Subscription.status == SubscriptionStatus.ACTIVE)
     )
     if filters:
@@ -110,7 +110,6 @@ def calculate_mrr(db: Session, filters: Optional[List[Any]] = None, currency: Op
 
     query = (
         db.query(func.sum(mrr_case))
-        .outerjoin(Customer, Subscription.customer_id == Customer.id)
         .filter(Subscription.status == SubscriptionStatus.ACTIVE)
     )
 
@@ -128,9 +127,9 @@ def calculate_mrr(db: Session, filters: Optional[List[Any]] = None, currency: Op
 async def _get_overview_impl(currency: Optional[str], db: Session, principal: Principal) -> Dict[str, Any]:
     """Implementation of overview metrics (cached)."""
     # Customer counts
-    total_customers = db.query(Customer).count()
-    active_customers = db.query(Customer).filter(Customer.status == CustomerStatus.ACTIVE).count()
-    churned_customers = db.query(Customer).filter(Customer.status == CustomerStatus.INACTIVE).count()
+    total_customers = db.query(CustomerAccount).count()
+    active_customers = db.query(CustomerAccount).filter(CustomerAccount.status == "active").count()
+    churned_customers = db.query(CustomerAccount).filter(CustomerAccount.status == "cancelled").count()
 
     resolved_currency = _resolve_currency(db, [], currency)
 
@@ -299,18 +298,18 @@ async def get_churn_trend(
     # Determine churn events: customers whose latest subscription end_date fell in period and have no active subs
     last_end_sub = (
         db.query(
-            Subscription.customer_id.label("customer_id"),
+            Subscription.party_id.label("party_id"),
             func.max(Subscription.end_date).label("last_end_date"),
         )
         .filter(Subscription.end_date.isnot(None))
-        .group_by(Subscription.customer_id)
+        .group_by(Subscription.party_id)
         .subquery()
     )
 
     active_sub_exists = (
         db.query(Subscription.id)
         .filter(
-            Subscription.customer_id == last_end_sub.c.customer_id,
+            Subscription.party_id == last_end_sub.c.party_id,
             Subscription.status == SubscriptionStatus.ACTIVE,
         )
         .exists()
@@ -319,7 +318,7 @@ async def get_churn_trend(
     churn_candidates = (
         db.query(
             func.date_trunc("month", last_end_sub.c.last_end_date).label("period_start"),
-            func.count(last_end_sub.c.customer_id).label("churned"),
+            func.count(last_end_sub.c.party_id).label("churned"),
         )
         .filter(
             last_end_sub.c.last_end_date >= start_dt,
@@ -336,7 +335,7 @@ async def get_churn_trend(
 
     def _active_count_at(point: datetime) -> int:
         return (
-            db.query(func.count(func.distinct(Subscription.customer_id)))
+            db.query(func.count(func.distinct(Subscription.party_id)))
             .filter(
                 Subscription.status == SubscriptionStatus.ACTIVE,
                 Subscription.start_date <= point,
@@ -356,10 +355,7 @@ async def get_churn_trend(
 
         # Active at end of period
         period_end = (current + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
-        active_end = db.query(func.count(Customer.id)).filter(
-            Customer.status == CustomerStatus.ACTIVE,
-            Customer.signup_date <= period_end,
-        ).scalar() or 0
+        active_end = _active_count_at(period_end)
 
         active_base = (active_start + active_end) / 2 if (active_start or active_end) else 0
         churn_rate = round(churned / active_base * 100, 2) if active_base > 0 else 0
@@ -398,18 +394,42 @@ async def _get_pop_performance_impl(currency: Optional[str], db: Session, princi
     # Build currency filter for MRR
     mrr_currency_filter = Subscription.currency == resolved_currency if resolved_currency else Subscription.id.isnot(None)
 
-    # Single aggregated query for all POP metrics
+    party_pop = (
+        db.query(
+            Subscription.party_id.label("party_id"),
+            func.min(Router.pop_id).label("pop_id"),
+        )
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(Router.pop_id.isnot(None))
+        .group_by(Subscription.party_id)
+        .subquery()
+    )
+
+    active_party_pop = (
+        db.query(
+            Subscription.party_id.label("party_id"),
+            func.min(Router.pop_id).label("pop_id"),
+        )
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(
+            Router.pop_id.isnot(None),
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .group_by(Subscription.party_id)
+        .subquery()
+    )
+
     pop_metrics = (
         db.query(
             Pop.id,
             Pop.name,
             Pop.code,
             Pop.city,
-            func.count(func.distinct(Customer.id)).label("total_customers"),
-            func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active_customers"),
-            func.sum(case((Customer.status == CustomerStatus.INACTIVE, 1), else_=0)).label("churned_customers"),
+            func.count(func.distinct(party_pop.c.party_id)).label("total_customers"),
+            func.count(func.distinct(active_party_pop.c.party_id)).label("active_customers"),
         )
-        .outerjoin(Customer, Customer.pop_id == Pop.id)
+        .outerjoin(party_pop, party_pop.c.pop_id == Pop.id)
+        .outerjoin(active_party_pop, active_party_pop.c.pop_id == Pop.id)
         .filter(Pop.is_active.is_(True))
         .group_by(Pop.id, Pop.name, Pop.code, Pop.city)
         .all()
@@ -418,15 +438,15 @@ async def _get_pop_performance_impl(currency: Optional[str], db: Session, princi
     # MRR by POP (separate query to handle currency filtering properly)
     mrr_by_pop = (
         db.query(
-            Customer.pop_id,
+            Router.pop_id,
             func.sum(mrr_case).label("mrr"),
         )
-        .join(Subscription, Subscription.customer_id == Customer.id)
+        .join(Router, Subscription.router_id == Router.id)
         .filter(
             Subscription.status == SubscriptionStatus.ACTIVE,
             mrr_currency_filter,
         )
-        .group_by(Customer.pop_id)
+        .group_by(Router.pop_id)
         .all()
     )
     mrr_map = {row.pop_id: float(row.mrr or 0) for row in mrr_by_pop}
@@ -434,12 +454,13 @@ async def _get_pop_performance_impl(currency: Optional[str], db: Session, princi
     # Open tickets by POP
     tickets_by_pop = (
         db.query(
-            Customer.pop_id,
+            party_pop.c.pop_id,
             func.count(Conversation.id).label("open_tickets"),
         )
-        .join(Conversation, Conversation.customer_id == Customer.id)
+        .join(CustomerAccount, CustomerAccount.id == Conversation.customer_account_id)
+        .join(party_pop, party_pop.c.party_id == CustomerAccount.party_id)
         .filter(Conversation.status.in_([ConversationStatus.OPEN, ConversationStatus.PENDING]))
-        .group_by(Customer.pop_id)
+        .group_by(party_pop.c.pop_id)
         .all()
     )
     tickets_map = {row.pop_id: row.open_tickets for row in tickets_by_pop}
@@ -447,12 +468,13 @@ async def _get_pop_performance_impl(currency: Optional[str], db: Session, princi
     # Outstanding by POP
     outstanding_by_pop = (
         db.query(
-            Customer.pop_id,
+            party_pop.c.pop_id,
             func.sum(Invoice.balance).label("outstanding"),
         )
-        .join(Invoice, Invoice.customer_id == Customer.id)
+        .join(CustomerAccount, CustomerAccount.id == Invoice.customer_account_id)
+        .join(party_pop, party_pop.c.party_id == CustomerAccount.party_id)
         .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE]))
-        .group_by(Customer.pop_id)
+        .group_by(party_pop.c.pop_id)
         .all()
     )
     outstanding_map = {row.pop_id: float(row.outstanding or 0) for row in outstanding_by_pop}
@@ -460,7 +482,7 @@ async def _get_pop_performance_impl(currency: Optional[str], db: Session, princi
     results = []
     for pop in pop_metrics:
         total = pop.total_customers or 0
-        churned = pop.churned_customers or 0
+        churned = max(total - (pop.active_customers or 0), 0)
         churn_rate = (churned / total * 100) if total > 0 else 0
 
         results.append({
@@ -500,18 +522,17 @@ async def get_customer_summary(
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Customer summary alias endpoint (avoids 404)."""
-    total = db.query(func.count(Customer.id)).scalar() or 0
-    active = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.ACTIVE).scalar() or 0
-    churned = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.INACTIVE).scalar() or 0
-    new_last_30 = db.query(func.count(Customer.id)).filter(
-        Customer.signup_date.isnot(None),
-        Customer.signup_date >= datetime.now(timezone.utc) - timedelta(days=30)
+    total = db.query(func.count(CustomerAccount.id)).scalar() or 0
+    active = db.query(func.count(CustomerAccount.id)).filter(CustomerAccount.status == "active").scalar() or 0
+    churned = db.query(func.count(CustomerAccount.id)).filter(CustomerAccount.status == "cancelled").scalar() or 0
+    new_last_30 = db.query(func.count(CustomerAccount.id)).filter(
+        CustomerAccount.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
     ).scalar() or 0
 
     by_status = db.query(
-        Customer.status,
-        func.count(Customer.id).label("count")
-    ).group_by(Customer.status).all()
+        CustomerAccount.status,
+        func.count(CustomerAccount.id).label("count")
+    ).group_by(CustomerAccount.status).all()
 
     return {
         "total_customers": total,
@@ -519,7 +540,7 @@ async def get_customer_summary(
         "churned_customers": churned,
         "new_last_30_days": new_last_30,
         "by_status": {
-            (row.status.value if row.status else "unknown"): row.count for row in by_status
+            (row.status if row.status else "unknown"): row.count for row in by_status
         },
     }
 
@@ -660,7 +681,7 @@ async def get_customers_by_plan(
     query = (
         db.query(
             Subscription.plan_name,
-            func.count(func.distinct(Subscription.customer_id)).label("customer_count"),
+            func.count(func.distinct(Subscription.party_id)).label("customer_count"),
             func.count(Subscription.id).label("subscription_count"),
             func.sum(mrr_case).label("mrr"),
         )
@@ -673,7 +694,7 @@ async def get_customers_by_plan(
     plans = (
         query
         .group_by(Subscription.plan_name)
-        .order_by(func.count(func.distinct(Subscription.customer_id)).desc())
+        .order_by(func.count(func.distinct(Subscription.party_id)).desc())
         .all()
     )
 
@@ -818,24 +839,27 @@ async def get_revenue_by_territory(
     )
 
     # Group by customer type (territory approximation for ISP)
+    segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "Unknown")
     by_type = (
         db.query(
-            Customer.customer_type,
-            func.count(func.distinct(Customer.id)).label("customer_count"),
+            segment_expr.label("segment"),
+            func.count(func.distinct(Subscription.party_id)).label("customer_count"),
             func.sum(mrr_case).label("mrr"),
         )
-        .join(Subscription, Subscription.customer_id == Customer.id)
+        .outerjoin(
+            PartyRole,
+            and_(PartyRole.party_id == Subscription.party_id, PartyRole.role == "customer"),
+        )
         .filter(
-            Customer.status == CustomerStatus.ACTIVE,
             Subscription.status == SubscriptionStatus.ACTIVE,
         )
-        .group_by(Customer.customer_type)
+        .group_by(segment_expr)
         .all()
     )
 
     return [
         {
-            "territory": t.customer_type or "Unknown",
+            "territory": t.segment or "Unknown",
             "customer_count": t.customer_count,
             "mrr": float(t.mrr or 0),
         }
@@ -851,16 +875,19 @@ async def get_revenue_cohort(
     from sqlalchemy import literal_column
 
     # Define cohort expression once and reference by label in GROUP BY
-    cohort_expr = func.to_char(func.date_trunc('month', Customer.signup_date), 'YYYY-MM')
+    cohort_expr = func.to_char(func.date_trunc('month', PartyRole.since), 'YYYY-MM')
 
     cohorts = (
         db.query(
             cohort_expr.label("cohort_month"),
-            func.count(Customer.id).label("total_customers"),
-            func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active"),
-            func.sum(case((Customer.status == CustomerStatus.INACTIVE, 1), else_=0)).label("churned"),
+            func.count(PartyRole.party_id).label("total_customers"),
+            func.sum(case((PartyRole.status == "active", 1), else_=0)).label("active"),
+            func.sum(case((PartyRole.status != "active", 1), else_=0)).label("churned"),
         )
-        .filter(Customer.signup_date.isnot(None))
+        .filter(
+            PartyRole.role == "customer",
+            PartyRole.since.isnot(None),
+        )
         .group_by(literal_column("1"))  # Group by first column (cohort_month)
         .order_by(literal_column("1"))
         .all()
@@ -898,9 +925,14 @@ async def get_aging_by_segment(db: Session = Depends(get_db_with_timeout)) -> Di
     segments: Dict[str, Dict[str, Any]] = {}
 
     # Get all unpaid invoices with customer info
+    segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "Unknown")
     unpaid = (
-        db.query(Invoice, Customer.customer_type)
-        .join(Customer, Invoice.customer_id == Customer.id)
+        db.query(Invoice, segment_expr)
+        .join(CustomerAccount, CustomerAccount.id == Invoice.customer_account_id)
+        .outerjoin(
+            PartyRole,
+            and_(PartyRole.party_id == CustomerAccount.party_id, PartyRole.role == "customer"),
+        )
         .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]))
         .all()
     )

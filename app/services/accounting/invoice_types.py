@@ -24,11 +24,14 @@ __all__ = [
 class InvoiceFilters:
     """Filters for listing invoices."""
 
+    search: Optional[str] = None
     customer_account_id: Optional[int] = None
     status: Optional[InvoiceStatus] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     overdue_only: bool = False
+    sort_by: str = "invoice_date"
+    sort_dir: str = "desc"
 
 
 @dataclass

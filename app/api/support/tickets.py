@@ -21,7 +21,7 @@ from app.models.auth import User
 from app.models.support_tags import TicketTag, TicketCustomField, CustomFieldType
 from app.auth import Principal, Require, get_current_principal
 from app.cache import cached, CACHE_TTL
-from app.services.errors import NotFoundError, ServiceError, ValidationError
+from app.services.errors import NotFoundError, ServiceError, ValidationError, DuplicateError
 from app.services.support.ticket_types import (
     ActivityData,
     AssignmentData,
@@ -34,6 +34,12 @@ from app.services.support.ticket_types import (
     TicketCreateData,
     TicketFilters,
     TicketUpdateData,
+)
+from app.services.support.types import (
+    TagCreate,
+    TagUpdate,
+    CustomFieldCreate,
+    CustomFieldUpdate,
 )
 from app.services.support.tickets import TicketService
 from app.services.types import PaginationParams
@@ -1479,19 +1485,15 @@ def list_tags(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """List all tag definitions."""
-    query = db.query(TicketTag)
-
-    if active_only:
-        query = query.filter(TicketTag.is_active == True)
-
-    if search:
-        query = query.filter(TicketTag.name.ilike(f"%{search}%"))
-
-    total = query.count()
-    tags = query.order_by(TicketTag.name).offset(offset).limit(limit).all()
+    tags, total = service.list_tags(
+        is_active=True if active_only else None,
+        search=search,
+        skip=offset,
+        limit=limit,
+    )
 
     return {
         "total": total,
@@ -1504,10 +1506,10 @@ def list_tags(
 @router.get("/tags/{tag_id}", dependencies=[ticket_read_dep])
 def get_tag(
     tag_id: int,
-    db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Get a specific tag definition."""
-    tag = db.query(TicketTag).filter(TicketTag.id == tag_id).first()
+    tag = service.get_tag(tag_id)
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
     return _serialize_tag(tag)
@@ -1517,24 +1519,20 @@ def get_tag(
 def create_tag(
     payload: TagCreateRequest,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Create a new tag definition."""
-    existing = db.query(TicketTag).filter(TicketTag.name == payload.name).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Tag with this name already exists")
-
-    tag = TicketTag(
-        name=payload.name,
-        color=payload.color,
-        description=payload.description,
-        is_active=payload.is_active,
-        created_by_id=getattr(principal, "id", None),
-    )
-    db.add(tag)
-    db.commit()
-    db.refresh(tag)
-    return {"id": tag.id, "name": tag.name}
+    try:
+        tag = service.create_tag(TagCreate(
+            name=payload.name,
+            color=payload.color,
+            description=payload.description,
+            is_active=payload.is_active,
+        ))
+        db.commit()
+        return {"id": tag.id, "name": tag.name}
+    except DuplicateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.patch("/tags/{tag_id}", dependencies=[ticket_write_dep])
@@ -1542,38 +1540,36 @@ def update_tag(
     tag_id: int,
     payload: TagUpdateRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update a tag definition."""
-    tag = db.query(TicketTag).filter(TicketTag.id == tag_id).first()
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
-
-    if payload.name and payload.name != tag.name:
-        existing = db.query(TicketTag).filter(TicketTag.name == payload.name, TicketTag.id != tag_id).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Tag with this name already exists")
-
-    for field in ["name", "color", "description", "is_active"]:
-        value = getattr(payload, field)
-        if value is not None:
-            setattr(tag, field, value)
-
-    tag.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(tag)
-    return _serialize_tag(tag)
+    try:
+        tag = service.update_tag(
+            tag_id,
+            TagUpdate(
+                name=payload.name,
+                color=payload.color,
+                description=payload.description,
+                is_active=payload.is_active,
+            ),
+        )
+        if not tag:
+            raise HTTPException(status_code=404, detail="Tag not found")
+        db.commit()
+        return _serialize_tag(tag)
+    except DuplicateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/tags/{tag_id}", dependencies=[ticket_write_dep])
 def delete_tag(
     tag_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Delete a tag definition."""
-    tag = db.query(TicketTag).filter(TicketTag.id == tag_id).first()
-    if not tag:
+    if not service.delete_tag(tag_id):
         raise HTTPException(status_code=404, detail="Tag not found")
-    db.delete(tag)
     db.commit()
     return Response(status_code=204)
 
@@ -1610,21 +1606,14 @@ def list_custom_fields(
     active_only: bool = True,
     show_in_create: Optional[bool] = None,
     show_in_list: Optional[bool] = None,
-    db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """List all custom field definitions."""
-    query = db.query(TicketCustomField)
-
-    if active_only:
-        query = query.filter(TicketCustomField.is_active == True)
-
-    if show_in_create is not None:
-        query = query.filter(TicketCustomField.show_in_create == show_in_create)
-
-    if show_in_list is not None:
-        query = query.filter(TicketCustomField.show_in_list == show_in_list)
-
-    fields = query.order_by(TicketCustomField.display_order, TicketCustomField.name).all()
+    fields = service.list_custom_fields(
+        is_active=True if active_only else None,
+        show_in_create=show_in_create,
+        show_in_list=show_in_list,
+    )
 
     return {
         "total": len(fields),
@@ -1635,10 +1624,10 @@ def list_custom_fields(
 @router.get("/custom-fields/{field_id}", dependencies=[ticket_read_dep])
 def get_custom_field(
     field_id: int,
-    db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Get a specific custom field definition."""
-    field = db.query(TicketCustomField).filter(TicketCustomField.id == field_id).first()
+    field = service.get_custom_field(field_id)
     if not field:
         raise HTTPException(status_code=404, detail="Custom field not found")
     return _serialize_custom_field(field)
@@ -1648,38 +1637,36 @@ def get_custom_field(
 def create_custom_field(
     payload: CustomFieldCreateRequest,
     db: Session = Depends(get_db),
-    principal=Depends(get_current_principal),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Create a new custom field definition."""
-    existing = db.query(TicketCustomField).filter(TicketCustomField.field_key == payload.field_key).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Custom field with this field_key already exists")
+    try:
+        options_data = None
+        if payload.options:
+            options_data = [{"value": o.value, "label": o.label} for o in payload.options]
 
-    options_data = None
-    if payload.options:
-        options_data = [{"value": o.value, "label": o.label} for o in payload.options]
-
-    field = TicketCustomField(
-        name=payload.name,
-        field_key=payload.field_key,
-        description=payload.description,
-        field_type=payload.field_type,
-        options=options_data,
-        default_value=payload.default_value,
-        is_required=payload.is_required,
-        min_length=payload.min_length,
-        max_length=payload.max_length,
-        regex_pattern=payload.regex_pattern,
-        display_order=payload.display_order,
-        show_in_list=payload.show_in_list,
-        show_in_create=payload.show_in_create,
-        is_active=payload.is_active,
-        created_by_id=getattr(principal, "id", None),
-    )
-    db.add(field)
-    db.commit()
-    db.refresh(field)
-    return {"id": field.id, "field_key": field.field_key}
+        field = service.create_custom_field(CustomFieldCreate(
+            name=payload.name,
+            field_key=payload.field_key,
+            description=payload.description,
+            field_type=payload.field_type,
+            options=options_data,
+            default_value=payload.default_value,
+            is_required=payload.is_required,
+            min_length=payload.min_length,
+            max_length=payload.max_length,
+            regex_pattern=payload.regex_pattern,
+            display_order=payload.display_order,
+            show_in_list=payload.show_in_list,
+            show_in_create=payload.show_in_create,
+            is_active=payload.is_active,
+        ))
+        db.commit()
+        return {"id": field.id, "field_key": field.field_key}
+    except DuplicateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.patch("/custom-fields/{field_id}", dependencies=[ticket_write_dep])
@@ -1687,40 +1674,49 @@ def update_custom_field(
     field_id: int,
     payload: CustomFieldUpdateRequest,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Dict[str, Any]:
     """Update a custom field definition."""
-    field = db.query(TicketCustomField).filter(TicketCustomField.id == field_id).first()
-    if not field:
-        raise HTTPException(status_code=404, detail="Custom field not found")
+    try:
+        options_data = None
+        if payload.options is not None:
+            options_data = [{"value": o.value, "label": o.label} for o in payload.options]
 
-    for attr in [
-        "name", "description", "field_type", "default_value", "is_required",
-        "min_length", "max_length", "regex_pattern", "display_order",
-        "show_in_list", "show_in_create", "is_active",
-    ]:
-        value = getattr(payload, attr)
-        if value is not None:
-            setattr(field, attr, value)
-
-    if payload.options is not None:
-        field.options = cast(Any, [{"value": o.value, "label": o.label} for o in payload.options])
-
-    field.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(field)
-    return _serialize_custom_field(field)
+        field = service.update_custom_field(
+            field_id,
+            CustomFieldUpdate(
+                name=payload.name,
+                description=payload.description,
+                field_type=payload.field_type,
+                options=options_data,
+                default_value=payload.default_value,
+                is_required=payload.is_required,
+                min_length=payload.min_length,
+                max_length=payload.max_length,
+                regex_pattern=payload.regex_pattern,
+                display_order=payload.display_order,
+                show_in_list=payload.show_in_list,
+                show_in_create=payload.show_in_create,
+                is_active=payload.is_active,
+            ),
+        )
+        if not field:
+            raise HTTPException(status_code=404, detail="Custom field not found")
+        db.commit()
+        return _serialize_custom_field(field)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/custom-fields/{field_id}", dependencies=[ticket_write_dep])
 def delete_custom_field(
     field_id: int,
     db: Session = Depends(get_db),
+    service: TicketService = Depends(get_ticket_service),
 ) -> Response:
     """Delete a custom field definition."""
-    field = db.query(TicketCustomField).filter(TicketCustomField.id == field_id).first()
-    if not field:
+    if not service.delete_custom_field(field_id):
         raise HTTPException(status_code=404, detail="Custom field not found")
-    db.delete(field)
     db.commit()
     return Response(status_code=204)
 

@@ -44,14 +44,10 @@
         </div>
     </td>
     <td class="px-3 py-4 hidden sm:table-cell" x-show="isVisible('customer')" x-cloak>
-        {% if inv.customer %}
-        <a href="/customers/{{ inv.customer.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
-            {{ inv.customer.name }}
+        {% if inv.customer_account and inv.customer_account.party %}
+        <a href="/parties/{{ inv.customer_account.party.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
+            {{ inv.customer_account.party.name }}
         </a>
-        {% elif inv.contact %}
-        <span class="text-sm text-gray-700 font-body">
-            {{ inv.contact.name }}
-        </span>
         {% else %}
         <span class="text-sm text-gray-400 italic font-body">No customer</span>
         {% endif %}

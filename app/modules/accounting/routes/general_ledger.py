@@ -9,42 +9,18 @@ from ._deps import (
     RequireAccountingRead,
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
-    is_htmx_request,
-    Account, GLEntry,
-    func, or_, datetime, Decimal,
+    is_htmx_request, HTTPException,
+    datetime,
 )
+from app.services.accounting import LedgerService
+from app.services.accounting.ledger_types import AccountFilters, GLEntryFilters
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
-
-def get_gl_stats(db) -> dict:
-    """Calculate General Ledger statistics."""
-    now = datetime.utcnow()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    total_count = db.query(func.count(GLEntry.id)).filter(
-        GLEntry.is_cancelled == False
-    ).scalar() or 0
-
-    this_month_count = db.query(func.count(GLEntry.id)).filter(
-        GLEntry.is_cancelled == False,
-        GLEntry.posting_date >= month_start
-    ).scalar() or 0
-
-    total_debit = db.query(func.sum(GLEntry.debit)).filter(
-        GLEntry.is_cancelled == False
-    ).scalar() or Decimal("0")
-
-    total_credit = db.query(func.sum(GLEntry.credit)).filter(
-        GLEntry.is_cancelled == False
-    ).scalar() or Decimal("0")
-
-    return {
-        "total_count": total_count,
-        "this_month_count": this_month_count,
-        "total_debit": total_debit,
-        "total_credit": total_credit,
-    }
+def _get_ledger_service(db: DB, user: SessionUser) -> LedgerService:
+    return LedgerService(db, user)
 
 
 @router.get("/general-ledger", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -63,62 +39,59 @@ async def general_ledger(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """General Ledger viewer page."""
-    # Build query
-    query = db.query(GLEntry).filter(GLEntry.is_cancelled == False)
+    service = _get_ledger_service(db, user)
 
-    # Search
-    if q:
-        query = query.filter(
-            or_(
-                GLEntry.voucher_no.ilike(f"%{q}%"),
-                GLEntry.account.ilike(f"%{q}%"),
-            )
-        )
-
-    # Filter by account
+    account_name = None
     if account_id:
-        account = db.query(Account).filter(Account.id == account_id).first()
-        if account:
-            query = query.filter(GLEntry.account == account.account_name)
+        try:
+            account = service.get_account(account_id)
+            account_name = account.account_name
+        except NotFoundError:
+            account_name = None
 
-    # Filter by voucher type
-    if voucher_type:
-        query = query.filter(GLEntry.voucher_type == voucher_type)
-
-    # Filter by date range
+    start_date = None
+    end_date = None
     if date_from:
         try:
-            from_date = datetime.strptime(date_from, "%Y-%m-%d")
-            query = query.filter(GLEntry.posting_date >= from_date)
+            start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
         except ValueError:
-            pass
+            start_date = None
     if date_to:
         try:
-            to_date = datetime.strptime(date_to, "%Y-%m-%d")
-            query = query.filter(GLEntry.posting_date <= to_date)
+            end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
         except ValueError:
-            pass
+            end_date = None
 
-    # Get total count for pagination
-    total = query.count()
+    filters = GLEntryFilters(
+        search=q,
+        account=account_name,
+        voucher_type=voucher_type,
+        start_date=start_date,
+        end_date=end_date,
+        is_cancelled=False,
+        sort_by="posting_date",
+        sort_dir="desc",
+    )
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_gl_entries(filters, pagination)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Order by posting date (newest first), then by id
-    query = query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc())
+    entries = result.items
+    total = result.total
 
-    # Paginate
-    entries = query.offset((page - 1) * per_page).limit(per_page).all()
+    accounts_result = service.list_accounts(
+        AccountFilters(is_group=False, include_disabled=False, sort_by="account_name"),
+        PaginationParams(limit=2000, offset=0),
+    )
+    accounts = accounts_result.items
 
-    # Get accounts for filter dropdown
-    accounts = db.query(Account).filter(
-        Account.is_group == False,
-    ).order_by(Account.account_number, Account.account_name).all()
+    voucher_type_options = [
+        {"value": vt, "label": vt} for vt in service.list_voucher_types()
+    ]
 
-    # Get voucher types for filter
-    voucher_types = db.query(GLEntry.voucher_type).distinct().all()
-    voucher_type_options = [{"value": vt[0], "label": vt[0]} for vt in voucher_types if vt[0]]
-
-    # Get stats
-    stats = get_gl_stats(db)
+    stats = service.get_gl_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -163,50 +136,47 @@ async def general_ledger_table(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """General Ledger table partial for HTMX."""
-    # Build query
-    query = db.query(GLEntry).filter(GLEntry.is_cancelled == False)
+    service = _get_ledger_service(db, user)
 
-    # Search
-    if q:
-        query = query.filter(
-            or_(
-                GLEntry.voucher_no.ilike(f"%{q}%"),
-                GLEntry.account.ilike(f"%{q}%"),
-            )
-        )
-
-    # Filter by account
+    account_name = None
     if account_id:
-        account = db.query(Account).filter(Account.id == account_id).first()
-        if account:
-            query = query.filter(GLEntry.account == account.account_name)
+        try:
+            account = service.get_account(account_id)
+            account_name = account.account_name
+        except NotFoundError:
+            account_name = None
 
-    # Filter by voucher type
-    if voucher_type:
-        query = query.filter(GLEntry.voucher_type == voucher_type)
-
-    # Filter by date range
+    start_date = None
+    end_date = None
     if date_from:
         try:
-            from_date = datetime.strptime(date_from, "%Y-%m-%d")
-            query = query.filter(GLEntry.posting_date >= from_date)
+            start_date = datetime.strptime(date_from, "%Y-%m-%d").date()
         except ValueError:
-            pass
+            start_date = None
     if date_to:
         try:
-            to_date = datetime.strptime(date_to, "%Y-%m-%d")
-            query = query.filter(GLEntry.posting_date <= to_date)
+            end_date = datetime.strptime(date_to, "%Y-%m-%d").date()
         except ValueError:
-            pass
+            end_date = None
 
-    # Get total count for pagination
-    total = query.count()
+    filters = GLEntryFilters(
+        search=q,
+        account=account_name,
+        voucher_type=voucher_type,
+        start_date=start_date,
+        end_date=end_date,
+        is_cancelled=False,
+        sort_by="posting_date",
+        sort_dir="desc",
+    )
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_gl_entries(filters, pagination)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Order by posting date (newest first), then by id
-    query = query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc())
-
-    # Paginate
-    entries = query.offset((page - 1) * per_page).limit(per_page).all()
+    entries = result.items
+    total = result.total
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)

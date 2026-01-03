@@ -24,11 +24,15 @@ __all__ = [
 class JEFilters:
     """Filters for listing journal entries."""
 
+    search: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     voucher_type: Optional[JournalEntryType] = None
     company: Optional[str] = None
     is_opening: Optional[bool] = None
+    docstatus: Optional[int] = None
+    sort_by: str = "posting_date"
+    sort_dir: str = "desc"
 
 
 @dataclass
@@ -54,6 +58,7 @@ class JECreateData:
     voucher_type: JournalEntryType = JournalEntryType.JOURNAL_ENTRY
     user_remark: Optional[str] = None
     description: Optional[str] = None
+    cheque_no: Optional[str] = None
     company: Optional[str] = None
     is_opening: bool = False
     lines: List[JELineData] = field(default_factory=list)
@@ -65,4 +70,5 @@ class JEUpdateData:
 
     posting_date: Optional[date] = None
     user_remark: Optional[str] = None
+    cheque_no: Optional[str] = None
     company: Optional[str] = None

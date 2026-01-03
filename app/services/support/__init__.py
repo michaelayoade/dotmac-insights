@@ -42,6 +42,7 @@ from .queues import QueueService
 from .settings import SettingsService
 from .custom_fields import CustomFieldService
 from .email_templates import EmailTemplateService
+from .analytics import SupportAnalyticsService
 
 # Type definitions
 from .types import (
@@ -73,8 +74,17 @@ from .types import (
     RoutingRuleCreate,
     RoutingRuleUpdate,
     # SLA types
+    BusinessCalendarCreate,
+    BusinessCalendarUpdate,
+    HolidayCreate,
+    SLABreachFilters,
     SLABreachInfo,
+    SLABreachSummary,
     SLADueDates,
+    SLAPolicyCreate,
+    SLAPolicyUpdate,
+    SLATargetCreate,
+    SLATargetUpdate,
     # Agent types
     AgentCreate,
     AgentFilters,
@@ -117,6 +127,24 @@ from .types import (
     # Email template types
     EmailTemplateCreate,
     EmailTemplateUpdate,
+    # Analytics types
+    AnalyticsFilters,
+    OverviewStats,
+    VolumeDataPoint,
+    VolumeTrend,
+    ResolutionTimeStats,
+    FirstResponseStats,
+    AgentPerformance,
+    TeamPerformance,
+    ChannelStats,
+    CategoryStats,
+    SLAPerformance,
+    BacklogAging,
+    ReopenAnalysis,
+    PatternInsights,
+    AutomationEffectiveness,
+    KBDeflection,
+    E2EReport,
 )
 
 # Errors
@@ -208,6 +236,7 @@ __all__ = [
     "SettingsService",
     "CustomFieldService",
     "EmailTemplateService",
+    "SupportAnalyticsService",
     # Types - Conversation
     "ConversationFilters",
     "ConversationCreate",
@@ -234,8 +263,17 @@ __all__ = [
     "RoutingRuleUpdate",
     "RoutingMatch",
     # Types - SLA
-    "SLADueDates",
+    "BusinessCalendarCreate",
+    "BusinessCalendarUpdate",
+    "HolidayCreate",
+    "SLABreachFilters",
     "SLABreachInfo",
+    "SLABreachSummary",
+    "SLADueDates",
+    "SLAPolicyCreate",
+    "SLAPolicyUpdate",
+    "SLATargetCreate",
+    "SLATargetUpdate",
     # Types - Stats
     "InboxStats",
     # Types - Bulk
@@ -282,6 +320,24 @@ __all__ = [
     # Types - Email Template
     "EmailTemplateCreate",
     "EmailTemplateUpdate",
+    # Types - Analytics
+    "AnalyticsFilters",
+    "OverviewStats",
+    "VolumeDataPoint",
+    "VolumeTrend",
+    "ResolutionTimeStats",
+    "FirstResponseStats",
+    "AgentPerformance",
+    "TeamPerformance",
+    "ChannelStats",
+    "CategoryStats",
+    "SLAPerformance",
+    "BacklogAging",
+    "ReopenAnalysis",
+    "PatternInsights",
+    "AutomationEffectiveness",
+    "KBDeflection",
+    "E2EReport",
     # Errors - Base
     "ServiceError",
     "NotFoundError",

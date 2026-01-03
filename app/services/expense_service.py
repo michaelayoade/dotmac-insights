@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING, Type
+from typing import Optional, TYPE_CHECKING, Type, List
 
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, desc, asc
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.expense_management import (
     ExpenseClaim,
@@ -16,7 +17,8 @@ from app.models.expense_management import (
 from app.models.employee import Employee
 from app.services.expense_policy_service import ExpensePolicyService, PolicyViolation
 from app.services.number_generator import NumberGenerator, FormatNotFoundError
-from app.services.errors import ValidationError
+from app.services.errors import ValidationError, NotFoundError
+from app.services.types import PaginatedResult, PaginationParams
 from app.services.approval_engine import (
     ApprovalEngine,
     WorkflowNotFoundError,
@@ -25,6 +27,7 @@ from app.services.approval_engine import (
     InvalidStateError,
 )
 from app.models.accounting_ext import ApprovalStatus
+from app.services.expenses.types import ExpenseClaimFilters
 
 if TYPE_CHECKING:
     from app.models.books_settings import DocumentType as BooksDocumentTypeType
@@ -42,6 +45,106 @@ class ExpenseService:
     def __init__(self, db: Session):
         self.db = db
         self.policy_service = ExpensePolicyService(db)
+
+    # -------------------------------------------------------------------------
+    # Queries
+    # -------------------------------------------------------------------------
+
+    def list_claims(
+        self,
+        filters: Optional[ExpenseClaimFilters] = None,
+        pagination: Optional[PaginationParams] = None,
+    ) -> PaginatedResult[ExpenseClaim]:
+        """List expense claims with optional filtering and pagination.
+
+        Args:
+            filters: Optional filter criteria.
+            pagination: Optional pagination parameters.
+
+        Returns:
+            PaginatedResult containing claims and total count.
+        """
+        filters = filters or ExpenseClaimFilters()
+        pagination = pagination or PaginationParams()
+
+        query = self.db.query(ExpenseClaim)
+
+        # Search
+        if filters.search:
+            search = f"%{filters.search}%"
+            query = query.filter(
+                or_(
+                    ExpenseClaim.title.ilike(search),
+                    ExpenseClaim.claim_number.ilike(search),
+                    ExpenseClaim.description.ilike(search),
+                )
+            )
+
+        # Filters
+        if filters.status:
+            # Convert string status to enum if needed
+            if isinstance(filters.status, str):
+                try:
+                    status_enum = ExpenseClaimStatus(filters.status)
+                    query = query.filter(ExpenseClaim.status == status_enum)
+                except ValueError:
+                    pass
+            else:
+                query = query.filter(ExpenseClaim.status == filters.status)
+        if filters.employee_id:
+            query = query.filter(ExpenseClaim.employee_id == filters.employee_id)
+        if filters.department_id:
+            query = query.filter(ExpenseClaim.department_id == filters.department_id)
+        if filters.project_id:
+            query = query.filter(ExpenseClaim.project_id == filters.project_id)
+        if filters.from_date:
+            query = query.filter(ExpenseClaim.claim_date >= filters.from_date)
+        if filters.to_date:
+            query = query.filter(ExpenseClaim.claim_date <= filters.to_date)
+        if filters.company:
+            query = query.filter(ExpenseClaim.company == filters.company)
+
+        # Count total
+        total = query.count()
+
+        # Sorting
+        sort_col = getattr(ExpenseClaim, filters.sort_by, ExpenseClaim.claim_date)
+        if filters.sort_dir == "desc":
+            query = query.order_by(desc(sort_col))
+        else:
+            query = query.order_by(asc(sort_col))
+
+        # Pagination
+        query = query.offset(pagination.offset).limit(pagination.limit)
+
+        return PaginatedResult(items=query.all(), total=total)
+
+    def get_claim(self, claim_id: int, include_lines: bool = True) -> ExpenseClaim:
+        """Get a single expense claim by ID.
+
+        Args:
+            claim_id: The expense claim ID.
+            include_lines: Whether to eagerly load line items.
+
+        Returns:
+            The ExpenseClaim object.
+
+        Raises:
+            NotFoundError: If claim not found.
+        """
+        query = self.db.query(ExpenseClaim).filter(ExpenseClaim.id == claim_id)
+
+        if include_lines:
+            query = query.options(selectinload(ExpenseClaim.lines))
+
+        claim = query.first()
+        if not claim:
+            raise NotFoundError(f"Expense claim {claim_id} not found")
+        return claim
+
+    # -------------------------------------------------------------------------
+    # Mutations
+    # -------------------------------------------------------------------------
 
     def create_claim(self, payload) -> ExpenseClaim:
         """Create a draft claim with lines and calculated totals."""

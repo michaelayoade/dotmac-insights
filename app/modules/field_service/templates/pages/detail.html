@@ -164,7 +164,7 @@
                         <dd class="mt-1 text-sm text-gray-900 font-body">
                             {% if customer %}
                             <span class="font-medium">
-                                {{ customer.customer_name }}
+                                {{ customer.party.name if customer and customer.party else ("Account " ~ customer.id if customer else "-") }}
                             </span>
                             {% else %}
                             <span class="text-gray-400 italic">Not linked</span>

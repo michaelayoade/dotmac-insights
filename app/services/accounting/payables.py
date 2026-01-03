@@ -22,8 +22,9 @@ from app.models.accounting import (
     Supplier,
 )
 from app.models.party import Party, SupplierAccount
+from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError
-from app.services.types import PaginationParams
+from app.services.types import PaginatedResult, PaginationParams
 
 from .payables_types import (
     AgingBucket,
@@ -333,6 +334,24 @@ class PayablesService:
             top_suppliers=top_suppliers,
         )
 
+    def list_outstanding_bills(self) -> List[PurchaseInvoice]:
+        """List outstanding purchase invoices for aging dashboards."""
+        return (
+            self.db.query(PurchaseInvoice)
+            .filter(
+                PurchaseInvoice.status.in_(
+                    [
+                        PurchaseInvoiceStatus.SUBMITTED,
+                        PurchaseInvoiceStatus.UNPAID,
+                        PurchaseInvoiceStatus.OVERDUE,
+                    ]
+                ),
+                PurchaseInvoice.outstanding_amount > 0,
+            )
+            .order_by(PurchaseInvoice.due_date)
+            .all()
+        )
+
     # -------------------------------------------------------------------------
     # Supplier CRUD
     # -------------------------------------------------------------------------
@@ -398,6 +417,75 @@ class PayablesService:
             for s in suppliers
         ]
 
+    def list_supplier_models(
+        self,
+        search: Optional[str] = None,
+        supplier_group: Optional[str] = None,
+        include_disabled: bool = False,
+        pagination: Optional[PaginationParams] = None,
+    ) -> PaginatedResult[Supplier]:
+        """List supplier models for web routes."""
+        if pagination is None:
+            pagination = PaginationParams()
+
+        query = self.db.query(Supplier)
+        if not include_disabled:
+            query = query.filter(Supplier.disabled == False)
+
+        if search:
+            if len(search) < 2:
+                raise ValidationError("Search query must be at least 2 characters")
+            query = query.filter(
+                or_(
+                    Supplier.supplier_name.ilike(f"%{search}%"),
+                    Supplier.email_id.ilike(f"%{search}%"),
+                    Supplier.tax_id.ilike(f"%{search}%"),
+                )
+            )
+
+        if supplier_group:
+            query = query.filter(Supplier.supplier_group == supplier_group)
+
+        query = query.order_by(Supplier.supplier_name)
+        return paginate(query, pagination)
+
+    def list_supplier_groups(self) -> List[str]:
+        """List distinct supplier groups for filters."""
+        rows = (
+            self.db.query(Supplier.supplier_group)
+            .filter(Supplier.supplier_group.isnot(None), Supplier.disabled == False)
+            .distinct()
+            .all()
+        )
+        return [row[0] for row in rows if row[0]]
+
+    def get_supplier_stats(self) -> Dict[str, Any]:
+        """Get supplier list stats (counts and payables totals)."""
+        total_suppliers = self.db.query(func.count(Supplier.id)).filter(
+            Supplier.disabled == False
+        ).scalar() or 0
+        active_suppliers = self.db.query(func.count(Supplier.id)).filter(
+            Supplier.disabled == False,
+            Supplier.on_hold == False,
+        ).scalar() or 0
+
+        total_payables = self.db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
+            PurchaseInvoice.outstanding_amount > 0,
+        ).scalar() or Decimal("0")
+
+        today = date.today()
+        total_overdue = self.db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
+            PurchaseInvoice.outstanding_amount > 0,
+            PurchaseInvoice.due_date < today,
+        ).scalar() or Decimal("0")
+
+        return {
+            "total_suppliers": total_suppliers,
+            "active_suppliers": active_suppliers,
+            "total_payables": total_payables,
+            "total_overdue": total_overdue,
+        }
+
     def get_supplier(self, supplier_id: int) -> SupplierDetail:
         """Get supplier detail by ID.
 
@@ -436,6 +524,39 @@ class PayablesService:
             disabled=supplier.disabled or False,
             is_frozen=supplier.is_frozen or False,
             on_hold=supplier.on_hold or False,
+        )
+
+    def get_supplier_model(self, supplier_id: int) -> Supplier:
+        """Get supplier model for web routes."""
+        supplier = self.db.query(Supplier).filter(Supplier.id == supplier_id).first()
+        if not supplier:
+            raise NotFoundError(f"Supplier {supplier_id} not found")
+        return supplier
+
+    def list_supplier_invoices(
+        self,
+        supplier_name: str,
+        limit: int = 20,
+    ) -> List[PurchaseInvoice]:
+        """List recent purchase invoices for a supplier."""
+        return (
+            self.db.query(PurchaseInvoice)
+            .filter(PurchaseInvoice.supplier == supplier_name)
+            .order_by(PurchaseInvoice.posting_date.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def get_supplier_outstanding(self, supplier_name: str) -> Decimal:
+        """Get total outstanding amount for a supplier."""
+        return (
+            self.db.query(func.sum(PurchaseInvoice.outstanding_amount))
+            .filter(
+                PurchaseInvoice.supplier == supplier_name,
+                PurchaseInvoice.outstanding_amount > 0,
+            )
+            .scalar()
+            or Decimal("0")
         )
 
     def create_supplier(

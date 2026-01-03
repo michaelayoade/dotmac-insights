@@ -1,0 +1,88 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Leave Application</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ application.leave_type }} - {{ application.from_date.strftime('%b %d') if application.from_date else '' }} to {{ application.to_date.strftime('%b %d, %Y') if application.to_date else '' }}</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/hr/my/leave" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to List
+            </a>
+            {% if application.status.value == 'Open' %}
+            <form method="POST" action="/hr/my/leave/{{ application.id }}/cancel" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 font-medium text-sm">
+                    Cancel Request
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Status Banner -->
+    <div class="{% if application.status.value == 'Approved' %}bg-emerald-50 border-emerald-200{% elif application.status.value == 'Rejected' %}bg-red-50 border-red-200{% elif application.status.value == 'Cancelled' %}bg-gray-50 border-gray-200{% else %}bg-amber-50 border-amber-200{% endif %} border rounded-2xl p-4">
+        <div class="flex items-center gap-3">
+            {% if application.status.value == 'Approved' %}
+            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-medium text-emerald-800">Approved</span>
+            {% elif application.status.value == 'Rejected' %}
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-medium text-red-800">Rejected</span>
+            {% elif application.status.value == 'Cancelled' %}
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            <span class="font-medium text-gray-800">Cancelled</span>
+            {% else %}
+            <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-medium text-amber-800">Pending Approval</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Details Card -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Leave Details</h2>
+        </div>
+        <div class="p-6">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Leave Type</dt>
+                    <dd class="mt-1 text-gray-900 font-medium">{{ application.leave_type }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Total Days</dt>
+                    <dd class="mt-1 text-gray-900 font-medium">{{ application.total_leave_days or 0 }} day(s)</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">From Date</dt>
+                    <dd class="mt-1 text-gray-900">{{ application.from_date.strftime('%B %d, %Y') if application.from_date else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">To Date</dt>
+                    <dd class="mt-1 text-gray-900">{{ application.to_date.strftime('%B %d, %Y') if application.to_date else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Half Day</dt>
+                    <dd class="mt-1 text-gray-900">{{ 'Yes' if application.half_day else 'No' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Application Date</dt>
+                    <dd class="mt-1 text-gray-900">{{ application.posting_date.strftime('%B %d, %Y') if application.posting_date else '-' }}</dd>
+                </div>
+            </dl>
+
+            {% if application.description %}
+            <div class="mt-6 pt-6 border-t border-gray-100">
+                <dt class="text-sm font-medium text-gray-500 mb-2">Reason / Description</dt>
+                <dd class="text-gray-900 bg-surface-50 rounded-xl p-4">{{ application.description }}</dd>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

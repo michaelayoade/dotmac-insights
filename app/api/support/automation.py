@@ -1,26 +1,32 @@
-"""Automation rules management endpoints."""
+"""Automation rules management endpoints.
+
+These routes are thin wrappers around AutomationService.
+All business logic resides in the service layer.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List, cast
-from enum import Enum
+from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.database import get_db
 from app.models.support_automation import (
-    AutomationRule,
-    AutomationLog,
     AutomationTrigger,
     AutomationActionType,
     ConditionOperator,
 )
-from app.models.ticket import Ticket
-from app.auth import Require
+from app.auth import Require, get_current_user, Principal
 from app.cache import cached, CACHE_TTL
+from app.services.support import AutomationService
+from app.services.support.types import (
+    AutomationRuleCreate,
+    AutomationRuleUpdate,
+    AutomationLogFilters,
+)
+from app.services.errors import NotFoundError, ValidationError
 
 router = APIRouter()
 
@@ -105,6 +111,18 @@ class AutomationTestRequest(BaseModel):
 
 
 # =============================================================================
+# DEPENDENCY INJECTION
+# =============================================================================
+
+def get_automation_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_user),
+) -> AutomationService:
+    """Provide AutomationService instance for dependency injection."""
+    return AutomationService(db, principal)
+
+
+# =============================================================================
 # REFERENCE DATA
 # =============================================================================
 
@@ -145,18 +163,15 @@ def list_rules(
     active_only: bool = False,
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """List automation rules."""
-    query = db.query(AutomationRule)
-
-    if trigger:
-        query = query.filter(AutomationRule.trigger == trigger)
-    if active_only:
-        query = query.filter(AutomationRule.is_active == True)
-
-    total = query.count()
-    rules = query.order_by(AutomationRule.priority, AutomationRule.name).offset(offset).limit(limit).all()
+    rules, total = service.list_db_rules(
+        trigger=trigger,
+        is_active=True if active_only else None,
+        skip=offset,
+        limit=limit,
+    )
 
     return {
         "total": total,
@@ -186,44 +201,45 @@ def list_rules(
 def create_rule(
     payload: AutomationRuleCreateRequest,
     db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """Create an automation rule."""
-    # Pydantic validators handle trigger, actions, and conditions validation
-    # Convert Pydantic models to dicts for JSON storage
-    conditions_data = [c.model_dump() for c in payload.conditions] if payload.conditions else None
-    actions_data = [a.model_dump() for a in payload.actions]
+    try:
+        conditions_data = [c.model_dump() for c in payload.conditions] if payload.conditions else None
+        actions_data = [a.model_dump() for a in payload.actions]
 
-    rule = AutomationRule(
-        name=payload.name,
-        description=payload.description,
-        trigger=payload.trigger,
-        conditions=conditions_data,
-        actions=actions_data,
-        is_active=payload.is_active,
-        priority=payload.priority,
-        stop_processing=payload.stop_processing,
-        max_executions_per_hour=payload.max_executions_per_hour,
-    )
-    db.add(rule)
-    db.commit()
-    db.refresh(rule)
-    return {"id": rule.id, "name": rule.name}
+        rule = service.create_db_rule(AutomationRuleCreate(
+            name=payload.name,
+            description=payload.description,
+            trigger=payload.trigger,
+            conditions=conditions_data,
+            actions=actions_data,
+            is_active=payload.is_active,
+            priority=payload.priority,
+            stop_processing=payload.stop_processing,
+            max_executions_per_hour=payload.max_executions_per_hour,
+        ))
+        db.commit()
+        return {"id": rule.id, "name": rule.name}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/rules/{rule_id}", dependencies=[Depends(Require("support:automation:read"))])
 def get_rule(
     rule_id: int,
-    db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """Get automation rule details."""
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
+    rule = service.get_db_rule(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
     # Get recent logs
-    recent_logs = db.query(AutomationLog).filter(
-        AutomationLog.rule_id == rule_id
-    ).order_by(AutomationLog.created_at.desc()).limit(10).all()
+    logs, _ = service.list_logs(
+        filters=AutomationLogFilters(rule_id=rule_id),
+        limit=10,
+    )
 
     return {
         "id": rule.id,
@@ -250,7 +266,7 @@ def get_rule(
                 "execution_time_ms": log.execution_time_ms,
                 "created_at": log.created_at.isoformat() if log.created_at else None,
             }
-            for log in recent_logs
+            for log in logs
         ],
     }
 
@@ -260,51 +276,54 @@ def update_rule(
     rule_id: int,
     payload: AutomationRuleUpdateRequest,
     db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """Update an automation rule."""
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
+    try:
+        conditions_data = None
+        if payload.conditions is not None:
+            conditions_data = [c.model_dump() for c in payload.conditions]
 
-    # Pydantic validators handle trigger, actions, and conditions validation
-    if payload.name is not None:
-        rule.name = payload.name
-    if payload.description is not None:
-        rule.description = payload.description
-    if payload.trigger is not None:
-        rule.trigger = payload.trigger
-    if payload.conditions is not None:
-        rule.conditions = cast(Any, [c.model_dump() for c in payload.conditions])
-    if payload.actions is not None:
-        if not payload.actions:
-            raise HTTPException(
-                status_code=400, detail="At least one action is required"
-            )
-        rule.actions = cast(Any, [a.model_dump() for a in payload.actions])
-    if payload.is_active is not None:
-        rule.is_active = payload.is_active
-    if payload.priority is not None:
-        rule.priority = payload.priority
-    if payload.stop_processing is not None:
-        rule.stop_processing = payload.stop_processing
-    if payload.max_executions_per_hour is not None:
-        rule.max_executions_per_hour = payload.max_executions_per_hour
+        actions_data = None
+        if payload.actions is not None:
+            if not payload.actions:
+                raise HTTPException(
+                    status_code=400, detail="At least one action is required"
+                )
+            actions_data = [a.model_dump() for a in payload.actions]
 
-    db.commit()
-    db.refresh(rule)
-    return {"id": rule.id, "name": rule.name}
+        rule = service.update_db_rule(
+            rule_id,
+            AutomationRuleUpdate(
+                name=payload.name,
+                description=payload.description,
+                trigger=payload.trigger,
+                conditions=conditions_data,
+                actions=actions_data,
+                is_active=payload.is_active,
+                priority=payload.priority,
+                stop_processing=payload.stop_processing,
+                max_executions_per_hour=payload.max_executions_per_hour,
+            ),
+        )
+        if not rule:
+            raise HTTPException(status_code=404, detail="Rule not found")
+
+        db.commit()
+        return {"id": rule.id, "name": rule.name}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete("/rules/{rule_id}", dependencies=[Depends(Require("support:automation:write"))])
 def delete_rule(
     rule_id: int,
     db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Response:
     """Delete an automation rule."""
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
-    if not rule:
+    if not service.delete_db_rule(rule_id):
         raise HTTPException(status_code=404, detail="Rule not found")
-    db.delete(rule)
     db.commit()
     return Response(status_code=204)
 
@@ -313,15 +332,14 @@ def delete_rule(
 def toggle_rule(
     rule_id: int,
     db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """Toggle automation rule active status."""
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
+    rule = service.toggle_db_rule(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
-    rule.is_active = not rule.is_active
     db.commit()
-    db.refresh(rule)
     return {"id": rule.id, "is_active": rule.is_active}
 
 
@@ -329,69 +347,28 @@ def toggle_rule(
 def test_rule(
     rule_id: int,
     payload: AutomationTestRequest,
-    db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """Test an automation rule against a ticket (dry run).
 
     Returns what would happen if the rule were executed, without actually
     performing any actions.
     """
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
+    result = service.test_rule(rule_id, payload.ticket_id)
 
-    ticket = db.query(Ticket).filter(Ticket.id == payload.ticket_id).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-
-    # Evaluate conditions (simplified - full logic in automation_executor)
-    conditions_result = []
-    would_match = True
-
-    if rule.conditions:
-        for condition in rule.conditions:
-            field = condition.get("field", "")
-            operator = condition.get("operator", "")
-            value = condition.get("value")
-
-            # Get ticket field value
-            ticket_value = getattr(ticket, field, None)
-            if isinstance(ticket_value, Enum):
-                ticket_value = ticket_value.value
-
-            # Simple evaluation
-            matched = False
-            if operator == "equals":
-                matched = str(ticket_value) == str(value)
-            elif operator == "not_equals":
-                matched = str(ticket_value) != str(value)
-            elif operator == "contains":
-                matched = value in str(ticket_value) if ticket_value else False
-            elif operator == "is_empty":
-                matched = ticket_value is None or ticket_value == ""
-            elif operator == "is_not_empty":
-                matched = ticket_value is not None and ticket_value != ""
-            elif operator == "in_list":
-                matched = str(ticket_value) in (value if isinstance(value, list) else [value])
-
-            conditions_result.append({
-                "field": field,
-                "operator": operator,
-                "expected_value": value,
-                "actual_value": str(ticket_value) if ticket_value else None,
-                "matched": matched,
-            })
-
-            if not matched:
-                would_match = False
+    if not result.get("success"):
+        error = result.get("error", "Unknown error")
+        if "not found" in error.lower():
+            raise HTTPException(status_code=404, detail=error)
+        raise HTTPException(status_code=400, detail=error)
 
     return {
-        "rule_id": rule.id,
-        "rule_name": rule.name,
-        "ticket_id": ticket.id,
-        "would_trigger": would_match,
-        "conditions_evaluated": conditions_result,
-        "actions_would_execute": rule.actions if would_match else [],
+        "rule_id": result["rule"]["id"],
+        "rule_name": result["rule"]["name"],
+        "ticket_id": result["ticket"]["id"],
+        "would_trigger": result["all_conditions_matched"],
+        "conditions_evaluated": result["conditions_evaluated"],
+        "actions_would_execute": result["actions_would_execute"],
         "note": "This is a dry run - no actions were executed",
     }
 
@@ -409,24 +386,20 @@ def list_logs(
     days: int = Query(default=7, le=30),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
-    db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """List automation execution logs."""
-    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
-    query = db.query(AutomationLog).filter(AutomationLog.created_at >= start_dt)
+    filters = AutomationLogFilters(
+        rule_id=rule_id,
+        ticket_id=ticket_id,
+        trigger=trigger,
+        success=success,
+        start_date=start_dt,
+    )
 
-    if rule_id:
-        query = query.filter(AutomationLog.rule_id == rule_id)
-    if ticket_id:
-        query = query.filter(AutomationLog.ticket_id == ticket_id)
-    if trigger:
-        query = query.filter(AutomationLog.trigger == trigger)
-    if success is not None:
-        query = query.filter(AutomationLog.success == success)
-
-    total = query.count()
-    logs = query.order_by(AutomationLog.created_at.desc()).offset(offset).limit(limit).all()
+    logs, total = service.list_logs(filters=filters, skip=offset, limit=limit)
 
     return {
         "total": total,
@@ -455,62 +428,28 @@ def list_logs(
 @cached("automation-logs-summary", ttl=CACHE_TTL["medium"])
 async def logs_summary(
     days: int = Query(default=7, le=30),
-    db: Session = Depends(get_db),
+    service: AutomationService = Depends(get_automation_service),
 ) -> Dict[str, Any]:
     """Get automation execution summary statistics."""
-    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Total executions
-    total = db.query(func.count(AutomationLog.id)).filter(
-        AutomationLog.created_at >= start_dt
-    ).scalar() or 0
+    summary = service.get_logs_summary(start_date=start_dt)
 
-    success_count = db.query(func.count(AutomationLog.id)).filter(
-        AutomationLog.created_at >= start_dt,
-        AutomationLog.success == True
-    ).scalar() or 0
-
-    # By trigger
-    by_trigger = db.query(
-        AutomationLog.trigger,
-        func.count(AutomationLog.id).label("count"),
-        func.sum(func.cast(AutomationLog.success, __import__('sqlalchemy').Integer)).label("success_count"),
-    ).filter(
-        AutomationLog.created_at >= start_dt
-    ).group_by(AutomationLog.trigger).all()
-
-    # By rule
-    by_rule = db.query(
-        AutomationLog.rule_id,
-        AutomationRule.name,
-        func.count(AutomationLog.id).label("count"),
-        func.avg(AutomationLog.execution_time_ms).label("avg_time_ms"),
-    ).join(AutomationRule, AutomationLog.rule_id == AutomationRule.id).filter(
-        AutomationLog.created_at >= start_dt
-    ).group_by(AutomationLog.rule_id, AutomationRule.name).order_by(
-        func.count(AutomationLog.id).desc()
-    ).limit(10).all()
+    success_rate = 0.0
+    if summary.total_executions > 0:
+        success_rate = round(summary.successful / summary.total_executions * 100, 1)
 
     return {
         "period_days": days,
-        "total_executions": total,
-        "successful_executions": success_count,
-        "success_rate": round(success_count / total * 100, 1) if total > 0 else 0,
+        "total_executions": summary.total_executions,
+        "successful_executions": summary.successful,
+        "success_rate": success_rate,
         "by_trigger": [
-            {
-                "trigger": row.trigger,
-                "count": row.count,
-                "success_count": row.success_count or 0,
-            }
-            for row in by_trigger
+            {"trigger": trigger, "count": count}
+            for trigger, count in summary.by_trigger.items()
         ],
         "top_rules": [
-            {
-                "rule_id": row.rule_id,
-                "rule_name": row.name,
-                "execution_count": row.count,
-                "avg_execution_time_ms": round(float(row.avg_time_ms or 0), 1),
-            }
-            for row in by_rule
+            {"rule_name": name, "execution_count": count}
+            for name, count in summary.by_rule.items()
         ],
     }

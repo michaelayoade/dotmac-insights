@@ -10,33 +10,19 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException, set_flash,
-    BankAccount, BankTransaction, BankTransactionStatus, BankReconciliation,
-    func, or_, datetime, Decimal,
+    BankTransactionStatus,
 )
+from app.services.accounting import BankingService
+from app.services.bank_reconciliation import BankReconciliationService
+from app.services.accounting.banking_types import BankTransactionFilters
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
 
-def get_bank_account_stats(db) -> dict:
-    """Calculate bank account statistics."""
-    total_count = db.query(func.count(BankAccount.id)).filter(
-        BankAccount.disabled == False
-    ).scalar() or 0
-
-    # Transaction counts
-    unreconciled = db.query(func.count(BankTransaction.id)).filter(
-        BankTransaction.status == BankTransactionStatus.UNRECONCILED
-    ).scalar() or 0
-
-    pending = db.query(func.count(BankTransaction.id)).filter(
-        BankTransaction.status == BankTransactionStatus.PENDING
-    ).scalar() or 0
-
-    return {
-        "total_accounts": total_count,
-        "unreconciled_txns": unreconciled,
-        "pending_txns": pending,
-    }
+def _get_banking_service(db: DB, user: SessionUser) -> BankingService:
+    return BankingService(db, user)
 
 
 @router.get("/bank-accounts", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -51,22 +37,20 @@ async def bank_accounts_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Bank accounts list page."""
-    query = db.query(BankAccount).filter(BankAccount.disabled == False)
-
-    if q:
-        query = query.filter(
-            or_(
-                BankAccount.account_name.ilike(f"%{q}%"),
-                BankAccount.bank.ilike(f"%{q}%"),
-                BankAccount.bank_account_no.ilike(f"%{q}%"),
-            )
+    service = _get_banking_service(db, user)
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_bank_accounts_paginated(
+            search=q,
+            include_disabled=False,
+            pagination=pagination,
         )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    total = query.count()
-    query = query.order_by(BankAccount.account_name)
-    accounts = query.offset((page - 1) * per_page).limit(per_page).all()
-
-    stats = get_bank_account_stats(db)
+    accounts = result.items
+    total = result.total
+    stats = service.get_bank_account_stats()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -99,20 +83,19 @@ async def bank_accounts_table(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Bank accounts table partial for HTMX."""
-    query = db.query(BankAccount).filter(BankAccount.disabled == False)
-
-    if q:
-        query = query.filter(
-            or_(
-                BankAccount.account_name.ilike(f"%{q}%"),
-                BankAccount.bank.ilike(f"%{q}%"),
-                BankAccount.bank_account_no.ilike(f"%{q}%"),
-            )
+    service = _get_banking_service(db, user)
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_bank_accounts_paginated(
+            search=q,
+            include_disabled=False,
+            pagination=pagination,
         )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    total = query.count()
-    query = query.order_by(BankAccount.account_name)
-    accounts = query.offset((page - 1) * per_page).limit(per_page).all()
+    accounts = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["accounts"] = accounts
@@ -136,45 +119,38 @@ async def bank_account_detail(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """Bank account detail page with transactions."""
-    account = db.query(BankAccount).filter(BankAccount.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
+    service = _get_banking_service(db, user)
+    try:
+        account = service.get_bank_account(account_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Bank account not found") from exc
 
-    # Get transactions
-    txn_query = db.query(BankTransaction).filter(
-        or_(
-            BankTransaction.bank_account_id == account_id,
-            BankTransaction.bank_account == account.account_name,
-        )
-    )
-
+    status_value = None
     if status:
         try:
-            txn_status = BankTransactionStatus(status)
-            txn_query = txn_query.filter(BankTransaction.status == txn_status)
+            status_value = BankTransactionStatus(status).value
         except ValueError:
-            pass
+            status_value = None
 
-    total_txns = txn_query.count()
-    txn_query = txn_query.order_by(BankTransaction.date.desc())
-    transactions = txn_query.offset((page - 1) * per_page).limit(per_page).all()
+    filters = BankTransactionFilters(
+        bank_account_id=account_id,
+        status=status_value,
+        sort_by="date",
+        sort_dir="desc",
+    )
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        txn_result = service.list_transactions(filters, pagination)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Calculate balance
-    total_deposits = db.query(func.sum(BankTransaction.deposit)).filter(
-        or_(
-            BankTransaction.bank_account_id == account_id,
-            BankTransaction.bank_account == account.account_name,
-        )
-    ).scalar() or Decimal("0")
+    transactions = txn_result.items
+    total_txns = txn_result.total
 
-    total_withdrawals = db.query(func.sum(BankTransaction.withdrawal)).filter(
-        or_(
-            BankTransaction.bank_account_id == account_id,
-            BankTransaction.bank_account == account.account_name,
-        )
-    ).scalar() or Decimal("0")
-
-    balance = total_deposits - total_withdrawals
+    balance_info = service.get_bank_account_balance_summary(account)
+    total_deposits = balance_info["total_deposits"]
+    total_withdrawals = balance_info["total_withdrawals"]
+    balance = balance_info["balance"]
 
     # Status options
     status_options = [{"value": s.value, "label": s.value.replace("_", " ").title()} for s in BankTransactionStatus]
@@ -209,23 +185,19 @@ async def bank_reconciliation_page(
     account_id: int,
 ):
     """Bank reconciliation interface."""
-    account = db.query(BankAccount).filter(BankAccount.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
+    service = _get_banking_service(db, user)
+    try:
+        account = service.get_bank_account(account_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Bank account not found") from exc
 
-    # Get unreconciled transactions
-    unreconciled_txns = db.query(BankTransaction).filter(
-        or_(
-            BankTransaction.bank_account_id == account_id,
-            BankTransaction.bank_account == account.account_name,
-        ),
-        BankTransaction.status.in_([BankTransactionStatus.UNRECONCILED, BankTransactionStatus.PENDING])
-    ).order_by(BankTransaction.date.desc()).limit(100).all()
+    unreconciled_txns = service.list_unreconciled_transactions(account, limit=100)
 
-    # Get recent reconciliations
-    reconciliations = db.query(BankReconciliation).filter(
-        BankReconciliation.bank_account == account.account_name
-    ).order_by(BankReconciliation.to_date.desc()).limit(10).all()
+    recon_service = BankReconciliationService(db)
+    reconciliations = recon_service.list_recent_reconciliations(
+        account.account_name,
+        limit=10,
+    )
 
     # Calculate totals
     unreconciled_deposits = sum(t.deposit or Decimal("0") for t in unreconciled_txns)
@@ -260,9 +232,11 @@ async def bank_reconciliation_mark(
     account_id: int,
 ):
     """Mark selected transactions as reconciled."""
-    account = db.query(BankAccount).filter(BankAccount.id == account_id).first()
-    if not account:
-        raise HTTPException(status_code=404, detail="Bank account not found")
+    service = _get_banking_service(db, user)
+    try:
+        service.get_bank_account(account_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Bank account not found") from exc
 
     form = await request.form()
     txn_ids = form.getlist("transaction_ids")
@@ -272,18 +246,16 @@ async def bank_reconciliation_mark(
         return RedirectResponse(url=f"/accounting/bank-accounts/{account_id}/reconcile", status_code=303)
 
     # Mark transactions as reconciled
-    count = 0
+    parsed_ids = []
     for txn_id in txn_ids:
         if not isinstance(txn_id, str):
             continue
         try:
-            txn = db.query(BankTransaction).filter(BankTransaction.id == int(txn_id)).first()
-            if txn:
-                txn.status = BankTransactionStatus.RECONCILED
-                count += 1
+            parsed_ids.append(int(txn_id))
         except ValueError:
-            pass
+            continue
 
+    count = service.mark_transactions_reconciled(parsed_ids)
     db.commit()
     set_flash(response, f"Marked {count} transaction(s) as reconciled.", "success")
     return RedirectResponse(url=f"/accounting/bank-accounts/{account_id}/reconcile", status_code=303)

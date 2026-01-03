@@ -143,8 +143,12 @@ class RecruitmentService:
         if filters:
             if filters.status is not None:
                 query = query.where(JobOpening.status == filters.status)
+            if filters.department is not None:
+                query = query.where(JobOpening.department.ilike(f"%{filters.department}%"))
             if filters.department_id is not None:
                 query = query.where(JobOpening.department_id == filters.department_id)
+            if filters.designation is not None:
+                query = query.where(JobOpening.designation.ilike(f"%{filters.designation}%"))
             if filters.designation_id is not None:
                 query = query.where(JobOpening.designation_id == filters.designation_id)
             if filters.company is not None:
@@ -501,6 +505,12 @@ class RecruitmentService:
         self.db.flush()
         return interview
 
+    def delete_interview(self, interview_id: int) -> None:
+        """Delete an interview."""
+        interview = self.get_interview(interview_id)
+        self.db.delete(interview)
+        self.db.flush()
+
     def record_interview_feedback(
         self, interview_id: int, data: InterviewFeedbackData
     ) -> Interview:
@@ -682,6 +692,12 @@ class RecruitmentService:
 
         self.db.flush()
         return offer
+
+    def delete_job_offer(self, offer_id: int) -> None:
+        """Delete a job offer."""
+        offer = self.get_job_offer(offer_id)
+        self.db.delete(offer)
+        self.db.flush()
 
     def send_job_offer(self, offer_id: int) -> JobOffer:
         """Mark a job offer as sent/awaiting response."""

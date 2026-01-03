@@ -1,7 +1,10 @@
-"""HR master data endpoints: employees, departments, designations, users, teams."""
+"""HR master data endpoints: employees, departments, designations, users, teams.
+
+Uses EmployeeService and OrganizationService for business logic.
+ERPNextUser endpoints use direct DB as no business logic service exists for them.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,8 +12,36 @@ from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
-from app.models.employee import Employee, EmploymentStatus
-from app.models.hr import Department, Designation, ERPNextUser, HDTeam, HDTeamMember
+from app.models.employee import EmploymentStatus
+from app.models.hr import ERPNextUser
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import (
+    EmployeeFilters,
+    EmployeeCreateData,
+    EmployeeUpdateData,
+)
+from app.services.hr.organization import OrganizationService
+from app.services.hr.organization_types import (
+    DepartmentFilters,
+    DepartmentCreateData,
+    DepartmentUpdateData,
+    DesignationFilters,
+    DesignationCreateData,
+    DesignationUpdateData,
+    HDTeamFilters,
+    HDTeamCreateData,
+    HDTeamUpdateData,
+    TeamMemberData,
+)
+from app.services.hr.errors import (
+    EmployeeNotFoundError,
+    EmployeeAlreadyExistsError,
+    DepartmentNotFoundError,
+    DesignationNotFoundError,
+    HDTeamNotFoundError,
+    ValidationError as HRValidationError,
+)
+from app.services.types import PaginationParams
 from .schemas import (
     EmployeeCreateRequest,
     EmployeeUpdateRequest,
@@ -29,6 +60,10 @@ from .schemas import (
 router = APIRouter()
 
 
+# =============================================================================
+# EMPLOYEES
+# =============================================================================
+
 @router.get("/employees", dependencies=[Depends(Require("hr:read"))])
 def list_employees(
     include_deleted: bool = False,
@@ -38,16 +73,18 @@ def list_employees(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employees."""
-    query = db.query(Employee)
-    if not include_deleted:
-        query = query.filter(Employee.is_deleted == False)
-    if search:
-        query = query.filter(Employee.name.ilike(f"%{search}%"))
+    service = EmployeeService(db)
 
-    total = query.count()
-    employees = query.order_by(Employee.name).offset(offset).limit(limit).all()
+    filters = EmployeeFilters(
+        search=search,
+        include_deleted=include_deleted,
+    )
+    pagination = PaginationParams(offset=offset, limit=limit)
+
+    result = service.list_employees(filters, pagination)
+
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "employees": [
@@ -67,7 +104,7 @@ def list_employees(
                 "salary": float(emp.salary) if emp.salary is not None else None,
                 "currency": emp.currency,
             }
-            for emp in employees
+            for emp in result.items
         ],
     }
 
@@ -78,8 +115,11 @@ def get_employee(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get an employee by id."""
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee or employee.is_deleted:
+    service = EmployeeService(db)
+
+    try:
+        employee = service.get_employee(employee_id)
+    except EmployeeNotFoundError:
         raise HTTPException(status_code=404, detail="Employee not found")
 
     return {
@@ -104,29 +144,38 @@ def get_employee(
 def create_employee(
     payload: EmployeeCreateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create an employee locally."""
-    employee = Employee(
-        employee_number=payload.employee_number,
-        name=payload.name,
-        email=payload.email,
-        phone=payload.phone,
-        designation=payload.designation,
-        department=payload.department,
-        reports_to=payload.reports_to,
-        department_id=payload.department_id,
-        designation_id=payload.designation_id,
-        reports_to_id=payload.reports_to_id,
-        status=EmploymentStatus(payload.status) if payload.status else EmploymentStatus.ACTIVE,
-        employment_type=payload.employment_type,
-        date_of_joining=payload.date_of_joining,
-        date_of_leaving=payload.date_of_leaving,
-        salary=payload.salary,
-        currency=payload.currency or "NGN",
-    )
-    db.add(employee)
-    db.commit()
-    db.refresh(employee)
+    service = EmployeeService(db, principal)
+
+    try:
+        data = EmployeeCreateData(
+            employee_number=payload.employee_number,
+            name=payload.name,
+            email=payload.email,
+            phone=payload.phone,
+            designation=payload.designation,
+            department=payload.department,
+            reports_to=payload.reports_to,
+            department_id=payload.department_id,
+            designation_id=payload.designation_id,
+            reports_to_id=payload.reports_to_id,
+            status=EmploymentStatus(payload.status) if payload.status else EmploymentStatus.ACTIVE,
+            employment_type=payload.employment_type,
+            date_of_joining=payload.date_of_joining,
+            salary=payload.salary,
+            currency=payload.currency or "NGN",
+        )
+        employee = service.create_employee(data)
+        db.commit()
+    except EmployeeAlreadyExistsError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"id": employee.id}
 
 
@@ -135,21 +184,45 @@ def update_employee(
     employee_id: int,
     payload: EmployeeUpdateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an employee locally."""
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee or employee.is_deleted:
+    service = EmployeeService(db, principal)
+
+    # Convert payload to update data
+    update_dict = payload.model_dump(exclude_unset=True)
+    status_val = None
+    if "status" in update_dict and update_dict["status"]:
+        status_val = EmploymentStatus(update_dict["status"])
+
+    try:
+        data = EmployeeUpdateData(
+            name=update_dict.get("name"),
+            email=update_dict.get("email"),
+            phone=update_dict.get("phone"),
+            employee_number=update_dict.get("employee_number"),
+            designation=update_dict.get("designation"),
+            department=update_dict.get("department"),
+            reports_to=update_dict.get("reports_to"),
+            department_id=update_dict.get("department_id"),
+            designation_id=update_dict.get("designation_id"),
+            reports_to_id=update_dict.get("reports_to_id"),
+            status=status_val,
+            employment_type=update_dict.get("employment_type"),
+            date_of_joining=update_dict.get("date_of_joining"),
+            date_of_leaving=update_dict.get("date_of_leaving"),
+            salary=update_dict.get("salary"),
+            currency=update_dict.get("currency"),
+        )
+        employee = service.update_employee(employee_id, data)
+        db.commit()
+    except EmployeeNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Employee not found")
+    except (EmployeeAlreadyExistsError, HRValidationError) as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    update_data = payload.model_dump(exclude_unset=True)
-    if "status" in update_data and update_data["status"]:
-        update_data["status"] = EmploymentStatus(update_data["status"])
-
-    for key, value in update_data.items():
-        setattr(employee, key, value)
-
-    db.commit()
-    db.refresh(employee)
     return {"id": employee.id}
 
 
@@ -160,16 +233,86 @@ def delete_employee(
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Soft delete an employee."""
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee or employee.is_deleted:
+    service = EmployeeService(db, principal)
+
+    try:
+        service.delete_employee(employee_id)
+        db.commit()
+    except EmployeeNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    employee.is_deleted = True
-    employee.deleted_at = datetime.now(timezone.utc)
-    employee.deleted_by_id = principal.id
-    db.commit()
     return {"status": "disabled", "employee_id": employee_id}
 
+
+# =============================================================================
+# ORG CHART
+# =============================================================================
+
+def _serialize_org_chart_node(node) -> Dict[str, Any]:
+    """Recursively serialize an OrgChartNode to dict."""
+    return {
+        "employee_id": node.employee_id,
+        "name": node.name,
+        "designation": node.designation,
+        "department": node.department,
+        "email": node.email,
+        "direct_reports": [
+            _serialize_org_chart_node(child) for child in node.direct_reports
+        ],
+    }
+
+
+@router.get("/org-chart", dependencies=[Depends(Require("hr:read"))])
+def get_org_chart(
+    depth: int = Query(default=3, ge=1, le=10),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get the organization chart as a hierarchical tree.
+
+    Returns all top-level employees (no manager) with their direct reports
+    nested recursively up to the specified depth.
+    """
+    service = EmployeeService(db)
+    nodes = service.get_org_chart(root_employee_id=None, depth=depth)
+
+    return {
+        "depth": depth,
+        "nodes": [_serialize_org_chart_node(node) for node in nodes],
+    }
+
+
+@router.get("/org-chart/{employee_id}", dependencies=[Depends(Require("hr:read"))])
+def get_org_chart_from_employee(
+    employee_id: int,
+    depth: int = Query(default=3, ge=1, le=10),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get the organization chart rooted at a specific employee.
+
+    Returns the specified employee with their direct reports nested
+    recursively up to the specified depth.
+    """
+    service = EmployeeService(db)
+
+    # Verify employee exists
+    try:
+        service.get_employee(employee_id)
+    except EmployeeNotFoundError:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    nodes = service.get_org_chart(root_employee_id=employee_id, depth=depth)
+
+    return {
+        "root_employee_id": employee_id,
+        "depth": depth,
+        "nodes": [_serialize_org_chart_node(node) for node in nodes],
+    }
+
+
+# =============================================================================
+# DEPARTMENTS
+# =============================================================================
 
 @router.get("/departments", dependencies=[Depends(Require("hr:read"))])
 def list_departments(
@@ -179,14 +322,15 @@ def list_departments(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List departments."""
-    query = db.query(Department)
-    if search:
-        query = query.filter(Department.department_name.ilike(f"%{search}%"))
+    service = OrganizationService(db)
 
-    total = query.count()
-    departments = query.order_by(Department.department_name).offset(offset).limit(limit).all()
+    filters = DepartmentFilters(search=search)
+    pagination = PaginationParams(offset=offset, limit=limit)
+
+    result = service.list_departments(filters, pagination)
+
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "departments": [
@@ -200,7 +344,7 @@ def list_departments(
                 "lft": dept.lft,
                 "rgt": dept.rgt,
             }
-            for dept in departments
+            for dept in result.items
         ],
     }
 
@@ -211,8 +355,11 @@ def get_department(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get a department by id."""
-    department = db.query(Department).filter(Department.id == department_id).first()
-    if not department:
+    service = OrganizationService(db)
+
+    try:
+        department = service.get_department(department_id)
+    except DepartmentNotFoundError:
         raise HTTPException(status_code=404, detail="Department not found")
 
     return {
@@ -231,19 +378,24 @@ def get_department(
 def create_department(
     payload: DepartmentCreateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a department locally."""
-    department = Department(
-        department_name=payload.department_name,
-        parent_department=payload.parent_department,
-        company=payload.company,
-        is_group=payload.is_group,
-        lft=payload.lft,
-        rgt=payload.rgt,
-    )
-    db.add(department)
-    db.commit()
-    db.refresh(department)
+    service = OrganizationService(db, principal)
+
+    try:
+        data = DepartmentCreateData(
+            department_name=payload.department_name,
+            parent_department=payload.parent_department,
+            company=payload.company,
+            is_group=payload.is_group,
+        )
+        department = service.create_department(data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"id": department.id}
 
 
@@ -252,18 +404,27 @@ def update_department(
     department_id: int,
     payload: DepartmentUpdateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a department locally."""
-    department = db.query(Department).filter(Department.id == department_id).first()
-    if not department:
+    service = OrganizationService(db, principal)
+
+    try:
+        data = DepartmentUpdateData(
+            department_name=payload.department_name,
+            parent_department=payload.parent_department,
+            company=payload.company,
+            is_group=payload.is_group,
+        )
+        department = service.update_department(department_id, data)
+        db.commit()
+    except DepartmentNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Department not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(department, key, value)
-
-    db.commit()
-    db.refresh(department)
     return {"id": department.id}
 
 
@@ -271,16 +432,64 @@ def update_department(
 def delete_department(
     department_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a department."""
-    department = db.query(Department).filter(Department.id == department_id).first()
-    if not department:
-        raise HTTPException(status_code=404, detail="Department not found")
+    service = OrganizationService(db, principal)
 
-    db.delete(department)
-    db.commit()
+    try:
+        service.delete_department(department_id)
+        db.commit()
+    except DepartmentNotFoundError:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Department not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"status": "deleted", "department_id": department_id}
 
+
+# =============================================================================
+# DEPARTMENT TREE
+# =============================================================================
+
+def _serialize_department_node(node) -> Dict[str, Any]:
+    """Recursively serialize a DepartmentNode to dict."""
+    return {
+        "id": node.id,
+        "department_name": node.department_name,
+        "parent_department": node.parent_department,
+        "company": node.company,
+        "is_group": node.is_group,
+        "children": [
+            _serialize_department_node(child) for child in node.children
+        ],
+    }
+
+
+@router.get("/department-tree", dependencies=[Depends(Require("hr:read"))])
+def get_department_tree(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get the department hierarchy as a tree.
+
+    Returns all root departments (no parent) with their child departments
+    nested recursively.
+    """
+    service = OrganizationService(db)
+    nodes = service.get_department_tree(company=company)
+
+    return {
+        "company": company,
+        "nodes": [_serialize_department_node(node) for node in nodes],
+    }
+
+
+# =============================================================================
+# DESIGNATIONS
+# =============================================================================
 
 @router.get("/designations", dependencies=[Depends(Require("hr:read"))])
 def list_designations(
@@ -290,14 +499,15 @@ def list_designations(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List designations."""
-    query = db.query(Designation)
-    if search:
-        query = query.filter(Designation.designation_name.ilike(f"%{search}%"))
+    service = OrganizationService(db)
 
-    total = query.count()
-    designations = query.order_by(Designation.designation_name).offset(offset).limit(limit).all()
+    filters = DesignationFilters(search=search)
+    pagination = PaginationParams(offset=offset, limit=limit)
+
+    result = service.list_designations(filters, pagination)
+
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "designations": [
@@ -307,7 +517,7 @@ def list_designations(
                 "designation_name": desig.designation_name,
                 "description": desig.description,
             }
-            for desig in designations
+            for desig in result.items
         ],
     }
 
@@ -318,8 +528,11 @@ def get_designation(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get a designation by id."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
-    if not designation:
+    service = OrganizationService(db)
+
+    try:
+        designation = service.get_designation(designation_id)
+    except DesignationNotFoundError:
         raise HTTPException(status_code=404, detail="Designation not found")
 
     return {
@@ -334,15 +547,22 @@ def get_designation(
 def create_designation(
     payload: DesignationCreateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a designation locally."""
-    designation = Designation(
-        designation_name=payload.designation_name,
-        description=payload.description,
-    )
-    db.add(designation)
-    db.commit()
-    db.refresh(designation)
+    service = OrganizationService(db, principal)
+
+    try:
+        data = DesignationCreateData(
+            designation_name=payload.designation_name,
+            description=payload.description,
+        )
+        designation = service.create_designation(data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"id": designation.id}
 
 
@@ -351,18 +571,25 @@ def update_designation(
     designation_id: int,
     payload: DesignationUpdateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a designation locally."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
-    if not designation:
+    service = OrganizationService(db, principal)
+
+    try:
+        data = DesignationUpdateData(
+            designation_name=payload.designation_name,
+            description=payload.description,
+        )
+        designation = service.update_designation(designation_id, data)
+        db.commit()
+    except DesignationNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Designation not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(designation, key, value)
-
-    db.commit()
-    db.refresh(designation)
     return {"id": designation.id}
 
 
@@ -370,16 +597,27 @@ def update_designation(
 def delete_designation(
     designation_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a designation."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
-    if not designation:
-        raise HTTPException(status_code=404, detail="Designation not found")
+    service = OrganizationService(db, principal)
 
-    db.delete(designation)
-    db.commit()
+    try:
+        service.delete_designation(designation_id)
+        db.commit()
+    except DesignationNotFoundError:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="Designation not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"status": "deleted", "designation_id": designation_id}
 
+
+# =============================================================================
+# ERPNEXT USERS (No service layer - direct DB operations)
+# =============================================================================
 
 @router.get("/erpnext-users", dependencies=[Depends(Require("hr:read"))])
 def list_erpnext_users(
@@ -498,6 +736,10 @@ def delete_erpnext_user(
     return {"status": "disabled", "erpnext_user_id": user_id}
 
 
+# =============================================================================
+# HD TEAMS
+# =============================================================================
+
 @router.get("/hd-teams", dependencies=[Depends(Require("hr:read"))])
 def list_hd_teams(
     search: Optional[str] = None,
@@ -506,14 +748,15 @@ def list_hd_teams(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List HD teams."""
-    query = db.query(HDTeam)
-    if search:
-        query = query.filter(HDTeam.team_name.ilike(f"%{search}%"))
+    service = OrganizationService(db)
 
-    total = query.count()
-    teams = query.order_by(HDTeam.team_name).offset(offset).limit(limit).all()
+    filters = HDTeamFilters(search=search)
+    pagination = PaginationParams(offset=offset, limit=limit)
+
+    result = service.list_hd_teams(filters, pagination)
+
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
         "hd_teams": [
@@ -525,7 +768,7 @@ def list_hd_teams(
                 "assignment_rule": team.assignment_rule,
                 "ignore_restrictions": team.ignore_restrictions,
             }
-            for team in teams
+            for team in result.items
         ],
     }
 
@@ -536,8 +779,11 @@ def get_hd_team(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get an HD team by id."""
-    team = db.query(HDTeam).filter(HDTeam.id == team_id).first()
-    if not team:
+    service = OrganizationService(db)
+
+    try:
+        team = service.get_hd_team(team_id)
+    except HDTeamNotFoundError:
         raise HTTPException(status_code=404, detail="HD team not found")
 
     return {
@@ -554,17 +800,24 @@ def get_hd_team(
 def create_hd_team(
     payload: HDTeamCreateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create an HD team locally."""
-    team = HDTeam(
-        team_name=payload.team_name,
-        description=payload.description,
-        assignment_rule=payload.assignment_rule,
-        ignore_restrictions=payload.ignore_restrictions,
-    )
-    db.add(team)
-    db.commit()
-    db.refresh(team)
+    service = OrganizationService(db, principal)
+
+    try:
+        data = HDTeamCreateData(
+            team_name=payload.team_name,
+            description=payload.description,
+            assignment_rule=payload.assignment_rule,
+            ignore_restrictions=payload.ignore_restrictions,
+        )
+        team = service.create_hd_team(data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"id": team.id}
 
 
@@ -573,18 +826,27 @@ def update_hd_team(
     team_id: int,
     payload: HDTeamUpdateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an HD team locally."""
-    team = db.query(HDTeam).filter(HDTeam.id == team_id).first()
-    if not team:
+    service = OrganizationService(db, principal)
+
+    try:
+        data = HDTeamUpdateData(
+            team_name=payload.team_name,
+            description=payload.description,
+            assignment_rule=payload.assignment_rule,
+            ignore_restrictions=payload.ignore_restrictions,
+        )
+        team = service.update_hd_team(team_id, data)
+        db.commit()
+    except HDTeamNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="HD team not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(team, key, value)
-
-    db.commit()
-    db.refresh(team)
     return {"id": team.id}
 
 
@@ -592,16 +854,24 @@ def update_hd_team(
 def delete_hd_team(
     team_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an HD team."""
-    team = db.query(HDTeam).filter(HDTeam.id == team_id).first()
-    if not team:
+    service = OrganizationService(db, principal)
+
+    try:
+        service.delete_hd_team(team_id)
+        db.commit()
+    except HDTeamNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="HD team not found")
 
-    db.delete(team)
-    db.commit()
     return {"status": "deleted", "hd_team_id": team_id}
 
+
+# =============================================================================
+# HD TEAM MEMBERS
+# =============================================================================
 
 @router.get("/hd-team-members", dependencies=[Depends(Require("hr:read"))])
 def list_hd_team_members(
@@ -611,12 +881,24 @@ def list_hd_team_members(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List HD team members."""
-    query = db.query(HDTeamMember)
-    if team_id:
-        query = query.filter(HDTeamMember.team_id == team_id)
+    service = OrganizationService(db)
 
-    total = query.count()
-    members = query.order_by(HDTeamMember.id.desc()).offset(offset).limit(limit).all()
+    if team_id:
+        try:
+            members = service.get_team_members(team_id)
+        except HDTeamNotFoundError:
+            raise HTTPException(status_code=404, detail="HD team not found")
+
+        # Apply pagination manually
+        total = len(members)
+        members = members[offset:offset + limit]
+    else:
+        # When no team_id, use direct query for all members
+        from app.models.hr import HDTeamMember
+        query = db.query(HDTeamMember)
+        total = query.count()
+        members = query.order_by(HDTeamMember.id.desc()).offset(offset).limit(limit).all()
+
     return {
         "total": total,
         "limit": limit,
@@ -640,6 +922,7 @@ def get_hd_team_member(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get an HD team member by id."""
+    from app.models.hr import HDTeamMember
     member = db.query(HDTeamMember).filter(HDTeamMember.id == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="HD team member not found")
@@ -657,17 +940,26 @@ def get_hd_team_member(
 def create_hd_team_member(
     payload: HDTeamMemberCreateRequest,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create an HD team member locally."""
-    member = HDTeamMember(
-        team_id=payload.team_id,
-        user=payload.user,
-        user_name=payload.user_name,
-        employee_id=payload.employee_id,
-    )
-    db.add(member)
-    db.commit()
-    db.refresh(member)
+    service = OrganizationService(db, principal)
+
+    try:
+        data = TeamMemberData(
+            user=payload.user,
+            user_name=payload.user_name,
+            employee_id=payload.employee_id,
+        )
+        member = service.add_team_member(payload.team_id, data)
+        db.commit()
+    except HDTeamNotFoundError:
+        db.rollback()
+        raise HTTPException(status_code=404, detail="HD team not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"id": member.id}
 
 
@@ -678,6 +970,7 @@ def update_hd_team_member(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Update an HD team member locally."""
+    from app.models.hr import HDTeamMember
     member = db.query(HDTeamMember).filter(HDTeamMember.id == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="HD team member not found")
@@ -695,12 +988,23 @@ def update_hd_team_member(
 def delete_hd_team_member(
     member_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an HD team member."""
+    from app.models.hr import HDTeamMember
+
+    # Get member to find team_id
     member = db.query(HDTeamMember).filter(HDTeamMember.id == member_id).first()
     if not member:
         raise HTTPException(status_code=404, detail="HD team member not found")
 
-    db.delete(member)
-    db.commit()
+    service = OrganizationService(db, principal)
+
+    try:
+        service.remove_team_member(member.team_id, member_id)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return {"status": "deleted", "hd_team_member_id": member_id}

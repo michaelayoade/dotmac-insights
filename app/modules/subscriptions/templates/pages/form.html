@@ -44,8 +44,8 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-gray-900">{{ selected_customer.name }}</p>
-                        {% if selected_customer.email %}
-                        <p class="text-xs text-gray-500">{{ selected_customer.email }}</p>
+                        {% if selected_customer.primary_email %}
+                        <p class="text-xs text-gray-500">{{ selected_customer.primary_email }}</p>
                         {% endif %}
                     </div>
                     <a href="/subscriptions/new" class="text-sm text-primary-600 hover:text-primary-500 font-medium">Change</a>
@@ -64,7 +64,7 @@
                         <option value="">Select a customer...</option>
                         {% for customer in customers %}
                         <option value="{{ customer.id }}" {{ 'selected' if form_data and form_data.party_id == customer.id|string else '' }}>
-                            {{ customer.name }} {% if customer.email %}({{ customer.email }}){% endif %}
+                            {{ customer.name }} {% if customer.primary_email %}({{ customer.primary_email }}){% endif %}
                         </option>
                         {% endfor %}
                     </select>
@@ -90,8 +90,8 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-semibold text-gray-900">{{ selected_customer.name }}</p>
-                        {% if selected_customer.email %}
-                        <p class="text-xs text-gray-500">{{ selected_customer.email }}</p>
+                        {% if selected_customer.primary_email %}
+                        <p class="text-xs text-gray-500">{{ selected_customer.primary_email }}</p>
                         {% endif %}
                     </div>
                     <a href="/parties/{{ selected_customer.id }}" class="text-sm text-primary-600 hover:text-primary-500 font-medium">View</a>
@@ -272,7 +272,7 @@
                     </div>
                 </div>
 
-                <!-- Start Date -->
+                <!-- Start / End Dates -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div>
                         <label for="start_date" class="block text-sm font-medium text-gray-700 mb-2">
@@ -283,6 +283,18 @@
                             id="start_date"
                             name="start_date"
                             value="{{ form_data.start_date if form_data else (subscription.start_date.strftime('%Y-%m-%d') if subscription and subscription.start_date else '') }}"
+                            class="w-full rounded-xl border-gray-200 shadow-sm focus:border-primary-500 focus:ring-primary-500 font-body"
+                        >
+                    </div>
+                    <div>
+                        <label for="end_date" class="block text-sm font-medium text-gray-700 mb-2">
+                            End Date
+                        </label>
+                        <input
+                            type="date"
+                            id="end_date"
+                            name="end_date"
+                            value="{{ form_data.end_date if form_data else (subscription.end_date.strftime('%Y-%m-%d') if subscription and subscription.end_date else '') }}"
                             class="w-full rounded-xl border-gray-200 shadow-sm focus:border-primary-500 focus:ring-primary-500 font-body"
                         >
                     </div>

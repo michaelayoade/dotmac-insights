@@ -300,7 +300,7 @@ class ServiceTransactionService:
             old_value=data.old_value,
             new_value=data.new_value,
             reason=data.reason,
-            metadata=data.metadata or {},
+            metadata_json=data.metadata or {},
             effective_date=data.effective_date or date.today(),
             created_by_id=self.principal.id if self.principal else None,
         )
@@ -978,7 +978,7 @@ class ServiceTransactionService:
             "old_value": txn.old_value,
             "new_value": txn.new_value,
             "reason": txn.reason,
-            "metadata": txn.metadata or {},
+            "metadata": txn.metadata_json or {},
             "effective_date": str(txn.effective_date) if txn.effective_date else None,
             "created_at": txn.created_at.isoformat() if txn.created_at else None,
             "created_by_id": txn.created_by_id,

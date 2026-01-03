@@ -52,10 +52,8 @@
                     </div>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
-                    {% if payment.contact %}
-                    <span class="text-gray-900">{{ payment.contact.name or payment.contact.email }}</span>
-                    {% elif payment.customer %}
-                    <span class="text-gray-900">{{ payment.customer.name }}</span>
+                    {% if payment.customer_account and payment.customer_account.party %}
+                    <span class="text-gray-900">{{ payment.customer_account.party.name }}</span>
                     {% else %}
                     <span class="text-gray-400">-</span>
                     {% endif %}

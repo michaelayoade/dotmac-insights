@@ -1,0 +1,335 @@
+{% extends "layouts/module.html" %}
+
+{% block page_header %}
+<div class="flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-semibold text-gray-900">
+            {% if is_edit %}Edit Bundle Product{% else %}Create Bundle Product{% endif %}
+        </h1>
+        <p class="mt-1 text-sm text-gray-500">Design a data bundle product for prepaid, usage-based, or hybrid billing</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block page_content %}
+{% if error %}
+<div class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+    <div class="flex">
+        <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <p class="ml-3 text-sm text-red-700">{{ error }}</p>
+    </div>
+</div>
+{% endif %}
+
+<form method="post"
+      action="{% if is_edit %}/subscriptions/bundles/products/{{ product.id }}{% else %}/subscriptions/bundles/products{% endif %}"
+      class="space-y-8">
+
+    <!-- Basic Information -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Basic Information</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="name" class="block text-sm font-medium text-gray-700">Product Name</label>
+                    <input type="text" name="name" id="name" required
+                           value="{{ product.name if product else (form_data.name if form_data else '') }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           placeholder="e.g., 10GB Monthly Bundle">
+                </div>
+                <div>
+                    <label for="code" class="block text-sm font-medium text-gray-700">Product Code</label>
+                    <input type="text" name="code" id="code" required {% if is_edit %}readonly{% endif %}
+                           value="{{ product.code if product else (form_data.code if form_data else '') }}"
+                           pattern="^[A-Z0-9_-]+$"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 {% if is_edit %}bg-gray-100{% endif %}"
+                           placeholder="e.g., BUNDLE_10GB_MONTHLY">
+                    <p class="mt-1 text-xs text-gray-500">Uppercase letters, numbers, underscores, and dashes only</p>
+                </div>
+            </div>
+
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                <textarea name="description" id="description" rows="2"
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                          placeholder="Optional description shown to customers">{{ product.description if product else (form_data.description if form_data else '') }}</textarea>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="category" class="block text-sm font-medium text-gray-700">Category</label>
+                    <input type="text" name="category" id="category"
+                           value="{{ product.category if product else (form_data.category if form_data else '') }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                           placeholder="e.g., Monthly, Weekly, Gaming">
+                </div>
+                <div class="flex items-end gap-6">
+                    <div class="flex items-center">
+                        <input type="checkbox" name="is_active" id="is_active" value="true"
+                               {% if not product or product.is_active %}checked{% endif %}
+                               class="h-4 w-4 text-blue-600 rounded border-gray-300">
+                        <label for="is_active" class="ml-2 text-sm text-gray-700">Active</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" name="customer_portal_visible" id="customer_portal_visible" value="true"
+                               {% if not product or product.customer_portal_visible %}checked{% endif %}
+                               class="h-4 w-4 text-blue-600 rounded border-gray-300">
+                        <label for="customer_portal_visible" class="ml-2 text-sm text-gray-700">Show in Portal</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bundle Type & Data Allocation -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Bundle Type & Data</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Bundle Type</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% for bt in bundle_types %}
+                    <label class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none
+                                  {% if (product and product.bundle_type == bt.value) or (form_data and form_data.bundle_type == bt.value) or (not product and not form_data and bt.value == 'prepaid') %}border-blue-500 ring-2 ring-blue-500{% else %}border-gray-300{% endif %}">
+                        <input type="radio" name="bundle_type" value="{{ bt.value }}"
+                               {% if (product and product.bundle_type == bt.value) or (form_data and form_data.bundle_type == bt.value) or (not product and not form_data and bt.value == 'prepaid') %}checked{% endif %}
+                               class="sr-only" x-model="bundleType">
+                        <span class="flex flex-1">
+                            <span class="flex flex-col">
+                                <span class="block text-sm font-medium text-gray-900">{{ bt.label }}</span>
+                                <span class="mt-1 text-xs text-gray-500">
+                                    {% if bt.value == 'prepaid' %}Fixed data amount for a set price
+                                    {% elif bt.value == 'usage_based' %}Pay per GB with tiered pricing
+                                    {% else %}Base plan with included data + overage{% endif %}
+                                </span>
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="data_amount_section">
+                    <label for="data_amount_mb" class="block text-sm font-medium text-gray-700">Data Amount (MB)</label>
+                    <div class="mt-1 flex rounded-md shadow-sm">
+                        <input type="number" name="data_amount_mb" id="data_amount_mb" min="1"
+                               value="{{ product.data_amount_mb if product else (form_data.data_amount_mb if form_data else '') }}"
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">MB</span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">e.g., 10240 for 10GB</p>
+                </div>
+
+                <div id="data_cap_section">
+                    <label for="data_cap_mb" class="block text-sm font-medium text-gray-700">Included Data Cap (MB)</label>
+                    <div class="mt-1 flex rounded-md shadow-sm">
+                        <input type="number" name="data_cap_mb" id="data_cap_mb" min="1"
+                               value="{{ product.data_cap_mb if product else (form_data.data_cap_mb if form_data else '') }}"
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">MB</span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">For hybrid: data included before overage</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pricing -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Pricing</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="price" class="block text-sm font-medium text-gray-700">Base Price</label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">NGN</span>
+                        </div>
+                        <input type="number" name="price" id="price" required step="0.01" min="0"
+                               value="{{ product.price if product else (form_data.price if form_data else '') }}"
+                               class="pl-12 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div id="overage_section">
+                    <label for="overage_price_per_mb" class="block text-sm font-medium text-gray-700">Overage Price per MB</label>
+                    <div class="mt-1 relative rounded-md shadow-sm">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <span class="text-gray-500 sm:text-sm">NGN</span>
+                        </div>
+                        <input type="number" name="overage_price_per_mb" id="overage_price_per_mb" step="0.0001" min="0"
+                               value="{{ product.overage_price_per_mb if product else '' }}"
+                               class="pl-12 block w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">For hybrid bundles: price per MB after cap</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expiry & Rollover -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Expiry & Rollover</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Expiry Type</label>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% for et in expiry_types %}
+                    <label class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none
+                                  {% if (product and product.expiry_type == et.value) or (form_data and form_data.expiry_type == et.value) or (not product and not form_data and et.value == 'strict') %}border-blue-500 ring-2 ring-blue-500{% else %}border-gray-300{% endif %}">
+                        <input type="radio" name="expiry_type" value="{{ et.value }}"
+                               {% if (product and product.expiry_type == et.value) or (form_data and form_data.expiry_type == et.value) or (not product and not form_data and et.value == 'strict') %}checked{% endif %}
+                               class="sr-only">
+                        <span class="flex flex-1">
+                            <span class="flex flex-col">
+                                <span class="block text-sm font-medium text-gray-900">{{ et.label }}</span>
+                                <span class="mt-1 text-xs text-gray-500">
+                                    {% if et.value == 'no_expiry' %}Data valid until consumed
+                                    {% elif et.value == 'strict' %}Expires on date, unused data lost
+                                    {% else %}Unused data rolls to next period{% endif %}
+                                </span>
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="validity_days" class="block text-sm font-medium text-gray-700">Validity (Days)</label>
+                    <input type="number" name="validity_days" id="validity_days" min="1" max="365"
+                           value="{{ product.validity_days if product else (form_data.validity_days if form_data else 30) }}"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+
+                <div id="rollover_section">
+                    <label for="rollover_percent" class="block text-sm font-medium text-gray-700">Rollover Percentage</label>
+                    <div class="mt-1 flex rounded-md shadow-sm">
+                        <input type="number" name="rollover_percent" id="rollover_percent" min="0" max="100"
+                               value="{{ product.rollover_percent if product else (form_data.rollover_percent if form_data else 0) }}"
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">%</span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">% of unused data that rolls to next bundle</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exhaustion Behavior -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">When Data Exhausted</h2>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Exhaustion Action</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {% for ea in exhaustion_actions %}
+                    <label class="relative flex cursor-pointer rounded-lg border bg-white p-4 shadow-sm focus:outline-none
+                                  {% if (product and product.exhaustion_action == ea.value) or (form_data and form_data.exhaustion_action == ea.value) or (not product and not form_data and ea.value == 'throttle') %}border-blue-500 ring-2 ring-blue-500{% else %}border-gray-300{% endif %}">
+                        <input type="radio" name="exhaustion_action" value="{{ ea.value }}"
+                               {% if (product and product.exhaustion_action == ea.value) or (form_data and form_data.exhaustion_action == ea.value) or (not product and not form_data and ea.value == 'throttle') %}checked{% endif %}
+                               class="sr-only">
+                        <span class="flex flex-1">
+                            <span class="flex flex-col">
+                                <span class="block text-sm font-medium text-gray-900">{{ ea.label }}</span>
+                                <span class="mt-1 text-xs text-gray-500">
+                                    {% if ea.value == 'block' %}Block internet access via CoA disconnect
+                                    {% elif ea.value == 'throttle' %}Reduce speed to specified rate
+                                    {% elif ea.value == 'auto_renew' %}Automatically purchase next bundle
+                                    {% else %}Just send notification, no network change{% endif %}
+                                </span>
+                            </span>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div id="throttle_section">
+                    <label for="throttle_speed_kbps" class="block text-sm font-medium text-gray-700">Throttle Speed</label>
+                    <div class="mt-1 flex rounded-md shadow-sm">
+                        <input type="number" name="throttle_speed_kbps" id="throttle_speed_kbps" min="1"
+                               value="{{ product.throttle_speed_kbps if product else (form_data.throttle_speed_kbps if form_data else 128) }}"
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">kbps</span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Speed limit when throttled (e.g., 128 kbps)</p>
+                </div>
+
+                <div id="auto_renew_section">
+                    <label for="auto_renew_product_id" class="block text-sm font-medium text-gray-700">Auto-Renew Product</label>
+                    <select name="auto_renew_product_id" id="auto_renew_product_id"
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">-- Select product --</option>
+                        {% for p in existing_products %}
+                        <option value="{{ p.id }}"
+                                {% if product and product.auto_renew_product_id == p.id %}selected{% endif %}>
+                            {{ p.name }} ({{ p.code }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">Product to auto-purchase when exhausted</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Speed Limits -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Speed Limits (Optional)</h2>
+        </div>
+        <div class="px-6 py-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label for="download_speed_kbps" class="block text-sm font-medium text-gray-700">Download Speed</label>
+                    <div class="mt-1 flex rounded-md shadow-sm">
+                        <input type="number" name="download_speed_kbps" id="download_speed_kbps" min="1"
+                               value="{{ product.download_speed_kbps if product else '' }}"
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">kbps</span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">Leave empty to use subscription's default speed</p>
+                </div>
+
+                <div>
+                    <label for="upload_speed_kbps" class="block text-sm font-medium text-gray-700">Upload Speed</label>
+                    <div class="mt-1 flex rounded-md shadow-sm">
+                        <input type="number" name="upload_speed_kbps" id="upload_speed_kbps" min="1"
+                               value="{{ product.upload_speed_kbps if product else '' }}"
+                               class="flex-1 rounded-l-md border-gray-300 focus:border-blue-500 focus:ring-blue-500">
+                        <span class="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">kbps</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-end gap-3">
+        <a href="/subscriptions/bundles"
+           class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            Cancel
+        </a>
+        <button type="submit"
+                class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+            {% if is_edit %}Update Product{% else %}Create Product{% endif %}
+        </button>
+    </div>
+</form>
+{% endblock %}

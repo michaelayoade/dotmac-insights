@@ -1,0 +1,41 @@
+{# Comment list partial for HTMX #}
+<div class="space-y-4" id="comments-list">
+    {% if comments %}
+        {% for comment in comments %}
+        <div class="bg-{% if comment.is_public %}white{% else %}yellow-50{% endif %} border border-gray-200 rounded-lg p-4">
+            <div class="flex items-start justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
+                        <span class="text-sm font-medium text-gray-700">
+                            {{ (comment.commented_by_name or 'U')[0]|upper }}
+                        </span>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">
+                            {{ comment.commented_by_name or 'Unknown' }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {{ comment.created_at.strftime('%b %d, %Y at %I:%M %p') if comment.created_at else 'Unknown time' }}
+                            {% if not comment.is_public %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 ml-2">
+                                Internal Note
+                            </span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3 text-sm text-gray-700 prose prose-sm max-w-none">
+                {{ comment.comment|safe }}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="text-center py-8 text-gray-500">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <p class="mt-2">No comments yet</p>
+        </div>
+    {% endif %}
+</div>

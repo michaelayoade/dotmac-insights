@@ -3,12 +3,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional, TYPE_CHECKING, Type
+from typing import Optional, TYPE_CHECKING, Type, List
 
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, desc, asc
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.expense_management import CashAdvance, CashAdvanceStatus
-from app.services.errors import ValidationError
+from app.services.errors import ValidationError, NotFoundError
+from app.services.types import PaginatedResult, PaginationParams
 from app.services.approval_engine import (
     ApprovalEngine,
     WorkflowNotFoundError,
@@ -18,6 +20,7 @@ from app.services.approval_engine import (
 )
 from app.services.number_generator import NumberGenerator, FormatNotFoundError
 from app.services.expense_posting_service import ExpensePostingService
+from app.services.expenses.types import CashAdvanceFilters
 
 if TYPE_CHECKING:
     from app.models.books_settings import DocumentType as BooksDocumentTypeType
@@ -34,6 +37,149 @@ class CashAdvanceService:
 
     def __init__(self, db: Session):
         self.db = db
+
+    # -------------------------------------------------------------------------
+    # Queries
+    # -------------------------------------------------------------------------
+
+    def list_advances(
+        self,
+        filters: Optional[CashAdvanceFilters] = None,
+        pagination: Optional[PaginationParams] = None,
+    ) -> PaginatedResult[CashAdvance]:
+        """List cash advances with optional filtering and pagination.
+
+        Args:
+            filters: Optional filter criteria.
+            pagination: Optional pagination parameters.
+
+        Returns:
+            PaginatedResult containing advances and total count.
+        """
+        filters = filters or CashAdvanceFilters()
+        pagination = pagination or PaginationParams()
+
+        query = self.db.query(CashAdvance)
+
+        # Search
+        if filters.search:
+            search = f"%{filters.search}%"
+            query = query.filter(
+                or_(
+                    CashAdvance.purpose.ilike(search),
+                    CashAdvance.advance_number.ilike(search),
+                    CashAdvance.destination.ilike(search),
+                )
+            )
+
+        # Filters
+        if filters.status:
+            # Convert string status to enum if needed
+            if isinstance(filters.status, str):
+                try:
+                    status_enum = CashAdvanceStatus(filters.status)
+                    query = query.filter(CashAdvance.status == status_enum)
+                except ValueError:
+                    pass
+            else:
+                query = query.filter(CashAdvance.status == filters.status)
+        if filters.employee_id:
+            query = query.filter(CashAdvance.employee_id == filters.employee_id)
+        if filters.from_date:
+            query = query.filter(CashAdvance.request_date >= filters.from_date)
+        if filters.to_date:
+            query = query.filter(CashAdvance.request_date <= filters.to_date)
+        if filters.has_balance is not None:
+            if filters.has_balance:
+                query = query.filter(CashAdvance.outstanding_amount > 0)
+            else:
+                query = query.filter(CashAdvance.outstanding_amount <= 0)
+
+        # Count total
+        total = query.count()
+
+        # Sorting
+        sort_col = getattr(CashAdvance, filters.sort_by, CashAdvance.request_date)
+        if filters.sort_dir == "desc":
+            query = query.order_by(desc(sort_col))
+        else:
+            query = query.order_by(asc(sort_col))
+
+        # Pagination
+        query = query.offset(pagination.offset).limit(pagination.limit)
+
+        return PaginatedResult(items=query.all(), total=total)
+
+    def get_advance(self, advance_id: int) -> CashAdvance:
+        """Get a single cash advance by ID.
+
+        Args:
+            advance_id: The cash advance ID.
+
+        Returns:
+            The CashAdvance object.
+
+        Raises:
+            NotFoundError: If advance not found.
+        """
+        advance = (
+            self.db.query(CashAdvance)
+            .filter(CashAdvance.id == advance_id)
+            .first()
+        )
+        if not advance:
+            raise NotFoundError(f"Cash advance {advance_id} not found")
+        return advance
+
+    def update_advance(self, advance_id: int, payload) -> CashAdvance:
+        """Update a draft cash advance.
+
+        Only draft advances can be updated.
+
+        Args:
+            advance_id: The cash advance ID.
+            payload: Update data.
+
+        Returns:
+            The updated CashAdvance.
+
+        Raises:
+            NotFoundError: If advance not found.
+            ValidationError: If advance is not in draft status.
+        """
+        advance = self.get_advance(advance_id)
+
+        if advance.status != CashAdvanceStatus.DRAFT:
+            raise ValidationError("Only draft advances can be updated")
+
+        # Update fields if provided
+        if hasattr(payload, 'purpose') and payload.purpose is not None:
+            advance.purpose = payload.purpose
+        if hasattr(payload, 'request_date') and payload.request_date is not None:
+            advance.request_date = payload.request_date
+        if hasattr(payload, 'required_by_date') and payload.required_by_date is not None:
+            advance.required_by_date = payload.required_by_date
+        if hasattr(payload, 'requested_amount') and payload.requested_amount is not None:
+            advance.requested_amount = payload.requested_amount
+            advance.approved_amount = payload.requested_amount
+            advance.base_requested_amount = payload.requested_amount * (advance.conversion_rate or Decimal("1"))
+        if hasattr(payload, 'project_id'):
+            advance.project_id = payload.project_id
+        if hasattr(payload, 'destination') and payload.destination is not None:
+            advance.destination = payload.destination
+        if hasattr(payload, 'trip_start_date'):
+            advance.trip_start_date = payload.trip_start_date
+        if hasattr(payload, 'trip_end_date'):
+            advance.trip_end_date = payload.trip_end_date
+
+        advance.updated_at = datetime.now(timezone.utc)
+        self.db.flush()
+
+        return advance
+
+    # -------------------------------------------------------------------------
+    # Mutations
+    # -------------------------------------------------------------------------
 
     def create_advance(self, payload) -> CashAdvance:
         advance = CashAdvance(

@@ -20,14 +20,14 @@
                     <label for="department" class="block text-sm font-medium text-gray-700 mb-1.5">Department</label>
                     <select name="department" id="department" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
                         <option value="">Select department</option>
-                        {% for opt in department_options %}<option value="{{ opt.value }}" {{ 'selected' if (opening and opening.department == opt.value) or (form_data and form_data.department == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                        {% for opt in department_options %}<option value="{{ opt.value }}" {{ 'selected' if (opening and (opening.department_id|string) == opt.value) or (form_data and form_data.department == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
                     </select>
                 </div>
                 <div>
                     <label for="designation" class="block text-sm font-medium text-gray-700 mb-1.5">Designation</label>
                     <select name="designation" id="designation" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
                         <option value="">Select designation</option>
-                        {% for opt in designation_options %}<option value="{{ opt.value }}" {{ 'selected' if (opening and opening.designation == opt.value) or (form_data and form_data.designation == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                        {% for opt in designation_options %}<option value="{{ opt.value }}" {{ 'selected' if (opening and (opening.designation_id|string) == opt.value) or (form_data and form_data.designation == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
                     </select>
                 </div>
             </div>

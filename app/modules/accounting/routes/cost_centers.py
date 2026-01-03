@@ -10,34 +10,22 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException, set_flash, validate_csrf, form_str, form_int,
-    CostCenter,
-    func, or_,
 )
+from app.services.accounting import FiscalService
+from app.services.accounting.fiscal_types import CostCenterCreateData, CostCenterUpdateData
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
 
-def get_cost_center_stats(db) -> dict:
-    """Calculate cost center statistics."""
-    total = db.query(func.count(CostCenter.id)).scalar() or 0
-    active = db.query(func.count(CostCenter.id)).filter(CostCenter.disabled == False).scalar() or 0
-    inactive = total - active
-    return {
-        "total": total,
-        "active": active,
-        "inactive": inactive,
-    }
+def _get_fiscal_service(db: DB, user: SessionUser) -> FiscalService:
+    return FiscalService(db, user)
 
 
-def get_parent_cost_center_options(db, exclude_id: Optional[int] = None) -> list:
+def get_parent_cost_center_options(service: FiscalService, exclude_id: Optional[int] = None) -> list:
     """Get cost centers that can be parents (groups)."""
-    query = db.query(CostCenter).filter(
-        CostCenter.disabled == False,
-        CostCenter.is_group == True,
-    )
-    if exclude_id:
-        query = query.filter(CostCenter.id != exclude_id)
-    centers = query.order_by(CostCenter.cost_center_name).all()
+    centers = service.list_parent_cost_centers(exclude_id=exclude_id)
     return [{"value": str(cc.id), "label": cc.cost_center_name} for cc in centers]
 
 
@@ -53,18 +41,19 @@ async def cost_centers_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Cost centers list page."""
-    query = db.query(CostCenter)
-
-    if q:
-        query = query.filter(
-            or_(
-                CostCenter.cost_center_name.ilike(f"%{q}%"),
-                CostCenter.cost_center_number.ilike(f"%{q}%"),
-            )
+    service = _get_fiscal_service(db, user)
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_cost_centers_paginated(
+            search=q,
+            include_disabled=False,
+            pagination=pagination,
         )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    total = query.count()
-    cost_centers = query.order_by(CostCenter.cost_center_name).offset((page - 1) * per_page).limit(per_page).all()
+    cost_centers = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -73,7 +62,7 @@ async def cost_centers_list(
         {"label": "Cost Centers", "href": "/accounting/cost-centers", "current": True},
     ])
     context["cost_centers"] = cost_centers
-    context["stats"] = get_cost_center_stats(db)
+    context["stats"] = service.get_cost_center_stats()
     context["current_search"] = q
     context["pagination"] = build_pagination_context(page, per_page, total)
 
@@ -97,18 +86,19 @@ async def cost_centers_table_partial(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Cost centers table HTMX partial."""
-    query = db.query(CostCenter)
-
-    if q:
-        query = query.filter(
-            or_(
-                CostCenter.cost_center_name.ilike(f"%{q}%"),
-                CostCenter.cost_center_number.ilike(f"%{q}%"),
-            )
+    service = _get_fiscal_service(db, user)
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_cost_centers_paginated(
+            search=q,
+            include_disabled=False,
+            pagination=pagination,
         )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    total = query.count()
-    cost_centers = query.order_by(CostCenter.cost_center_name).offset((page - 1) * per_page).limit(per_page).all()
+    cost_centers = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["cost_centers"] = cost_centers
@@ -135,7 +125,8 @@ async def cost_center_new_form(
         {"label": "Cost Centers", "href": "/accounting/cost-centers"},
         {"label": "New Cost Center", "href": "/accounting/cost-centers/new", "current": True},
     ])
-    context["parent_options"] = get_parent_cost_center_options(db)
+    service = _get_fiscal_service(db, user)
+    context["parent_options"] = get_parent_cost_center_options(service)
 
     template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
     return HTMLResponse(template.render(context))
@@ -167,7 +158,8 @@ async def cost_center_create(
         ])
         context["errors"] = errors
         context["form_data"] = dict(form)
-        context["parent_options"] = get_parent_cost_center_options(db)
+        service = _get_fiscal_service(db, user)
+        context["parent_options"] = get_parent_cost_center_options(service)
         template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
@@ -175,19 +167,23 @@ async def cost_center_create(
     parent_name = None
     parent_id = form_int(form, "parent_id")
     if parent_id is not None:
-        parent = db.query(CostCenter).filter(CostCenter.id == parent_id).first()
-        if parent:
+        service = _get_fiscal_service(db, user)
+        try:
+            parent = service.get_cost_center(parent_id)
             parent_name = parent.cost_center_name
+        except NotFoundError:
+            parent_name = None
 
-    cost_center = CostCenter(
-        cost_center_name=form_str(form, "cost_center_name"),
-        cost_center_number=form_str(form, "cost_center_code") or None,
-        parent_cost_center=parent_name,
-        disabled=not bool(form_str(form, "is_active")),
+    service = _get_fiscal_service(db, user)
+    cost_center = service.create_cost_center(
+        CostCenterCreateData(
+            cost_center_name=form_str(form, "cost_center_name"),
+            cost_center_number=form_str(form, "cost_center_code") or None,
+            parent_cost_center=parent_name,
+            disabled=not bool(form_str(form, "is_active")),
+        )
     )
-    db.add(cost_center)
     db.commit()
-    db.refresh(cost_center)
 
     set_flash(response, "Cost center created successfully", "success")
     return RedirectResponse(url="/accounting/cost-centers", status_code=303)
@@ -203,9 +199,11 @@ async def cost_center_edit_form(
     cc_id: int,
 ):
     """Edit cost center form."""
-    cost_center = db.query(CostCenter).filter(CostCenter.id == cc_id).first()
-    if not cost_center:
-        raise HTTPException(status_code=404, detail="Cost center not found")
+    service = _get_fiscal_service(db, user)
+    try:
+        cost_center = service.get_cost_center(cc_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Cost center not found") from exc
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -215,7 +213,7 @@ async def cost_center_edit_form(
         {"label": "Edit", "href": f"/accounting/cost-centers/{cc_id}/edit", "current": True},
     ])
     context["cost_center"] = cost_center
-    context["parent_options"] = get_parent_cost_center_options(db, exclude_id=cc_id)
+    context["parent_options"] = get_parent_cost_center_options(service, exclude_id=cc_id)
 
     template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
     return HTMLResponse(template.render(context))
@@ -231,9 +229,11 @@ async def cost_center_update(
     cc_id: int,
 ):
     """Update cost center."""
-    cost_center = db.query(CostCenter).filter(CostCenter.id == cc_id).first()
-    if not cost_center:
-        raise HTTPException(status_code=404, detail="Cost center not found")
+    service = _get_fiscal_service(db, user)
+    try:
+        cost_center = service.get_cost_center(cc_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Cost center not found") from exc
 
     form = await request.form()
     await validate_csrf(request)
@@ -253,7 +253,7 @@ async def cost_center_update(
         context["cost_center"] = cost_center
         context["errors"] = errors
         context["form_data"] = dict(form)
-        context["parent_options"] = get_parent_cost_center_options(db, exclude_id=cc_id)
+        context["parent_options"] = get_parent_cost_center_options(service, exclude_id=cc_id)
         template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
@@ -261,14 +261,21 @@ async def cost_center_update(
     parent_name = None
     parent_id = form_int(form, "parent_id")
     if parent_id is not None:
-        parent = db.query(CostCenter).filter(CostCenter.id == parent_id).first()
-        if parent:
+        try:
+            parent = service.get_cost_center(parent_id)
             parent_name = parent.cost_center_name
+        except NotFoundError:
+            parent_name = None
 
-    cost_center.cost_center_name = form_str(form, "cost_center_name")
-    cost_center.cost_center_number = form_str(form, "cost_center_code") or None
-    cost_center.parent_cost_center = parent_name
-    cost_center.disabled = not bool(form_str(form, "is_active"))
+    service.update_cost_center(
+        cc_id,
+        CostCenterUpdateData(
+            cost_center_name=form_str(form, "cost_center_name"),
+            cost_center_number=form_str(form, "cost_center_code") or None,
+            parent_cost_center=parent_name,
+            disabled=not bool(form_str(form, "is_active")),
+        ),
+    )
     db.commit()
 
     set_flash(response, "Cost center updated successfully", "success")

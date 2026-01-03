@@ -42,9 +42,22 @@ __all__ = [
     "RoutingRuleCreate",
     "RoutingRuleUpdate",
     "RoutingMatch",
+    "TicketRoutingRuleCreate",
+    "TicketRoutingRuleUpdate",
+    "AgentWorkload",
+    "QueueHealth",
     # SLA types
     "SLADueDates",
     "SLABreachInfo",
+    "BusinessCalendarCreate",
+    "BusinessCalendarUpdate",
+    "HolidayCreate",
+    "SLAPolicyCreate",
+    "SLAPolicyUpdate",
+    "SLATargetCreate",
+    "SLATargetUpdate",
+    "SLABreachFilters",
+    "SLABreachSummary",
     # Stats types
     "InboxStats",
     "ConversationStats",
@@ -365,6 +378,114 @@ class RoutingMatch:
     action_config: Dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass
+class TicketRoutingRuleCreate:
+    """Data for creating a ticket routing rule (RoutingRule model)."""
+
+    name: str
+    team_id: Optional[int] = None
+    strategy: str = "round_robin"
+    conditions: Optional[List[Dict[str, Any]]] = None
+    description: Optional[str] = None
+    priority: int = 100
+    is_active: bool = True
+    fallback_team_id: Optional[int] = None
+
+
+@dataclass
+class TicketRoutingRuleUpdate:
+    """Data for updating a ticket routing rule (all fields optional)."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    team_id: Optional[int] = None
+    strategy: Optional[str] = None
+    conditions: Optional[List[Dict[str, Any]]] = None
+    priority: Optional[int] = None
+    is_active: Optional[bool] = None
+    fallback_team_id: Optional[int] = None
+
+
+@dataclass
+class AgentWorkload:
+    """Agent workload statistics."""
+
+    agent_id: int
+    agent_name: str
+    open_tickets: int
+    capacity: int
+    utilization_pct: float
+
+
+@dataclass
+class QueueHealth:
+    """Queue health metrics."""
+
+    total_open: int
+    by_status: Dict[str, int]
+    avg_wait_minutes: float
+    agents_active: int
+    agents_at_capacity: int
+
+
+# ==============================================================================
+# Automation Types
+# ==============================================================================
+
+
+@dataclass
+class AutomationRuleCreate:
+    """Data for creating an automation rule (database-backed)."""
+
+    name: str
+    trigger: str
+    actions: List[Dict[str, Any]]
+    description: Optional[str] = None
+    conditions: Optional[List[Dict[str, Any]]] = None
+    is_active: bool = True
+    priority: int = 100
+    stop_processing: bool = False
+    max_executions_per_hour: Optional[int] = None
+
+
+@dataclass
+class AutomationRuleUpdate:
+    """Data for updating an automation rule (all fields optional)."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    trigger: Optional[str] = None
+    conditions: Optional[List[Dict[str, Any]]] = None
+    actions: Optional[List[Dict[str, Any]]] = None
+    is_active: Optional[bool] = None
+    priority: Optional[int] = None
+    stop_processing: Optional[bool] = None
+    max_executions_per_hour: Optional[int] = None
+
+
+@dataclass
+class AutomationLogFilters:
+    """Filters for listing automation logs."""
+
+    rule_id: Optional[int] = None
+    ticket_id: Optional[int] = None
+    trigger: Optional[str] = None
+    success: Optional[bool] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+
+@dataclass
+class AutomationLogSummary:
+    """Summary statistics for automation logs."""
+
+    total_executions: int
+    successful: int
+    failed: int
+    by_trigger: Dict[str, int]
+    by_rule: Dict[str, int]
+
+
 # ==============================================================================
 # SLA Types
 # ==============================================================================
@@ -387,6 +508,106 @@ class SLABreachInfo:
     breach_type: Optional[str] = None  # first_response, resolution, next_response
     breached_at: Optional[datetime] = None
     overdue_by_minutes: Optional[int] = None
+
+
+@dataclass
+class BusinessCalendarCreate:
+    """Data for creating a business calendar."""
+
+    name: str
+    calendar_type: str = "standard"  # standard, 24x7, custom
+    timezone: str = "UTC"
+    schedule: Optional[Dict[str, Any]] = None
+    description: Optional[str] = None
+    is_default: bool = False
+
+
+@dataclass
+class BusinessCalendarUpdate:
+    """Data for updating a business calendar."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    calendar_type: Optional[str] = None
+    timezone: Optional[str] = None
+    schedule: Optional[Dict[str, Any]] = None
+    is_default: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+@dataclass
+class HolidayCreate:
+    """Data for creating a holiday."""
+
+    name: str
+    holiday_date: datetime  # Date of the holiday
+    is_recurring: bool = False
+
+
+@dataclass
+class SLAPolicyCreate:
+    """Data for creating an SLA policy."""
+
+    name: str
+    calendar_id: Optional[int] = None
+    description: Optional[str] = None
+    conditions: Optional[List[Dict[str, Any]]] = None
+    is_default: bool = False
+    priority: int = 100
+
+
+@dataclass
+class SLAPolicyUpdate:
+    """Data for updating an SLA policy."""
+
+    name: Optional[str] = None
+    description: Optional[str] = None
+    calendar_id: Optional[int] = None
+    conditions: Optional[List[Dict[str, Any]]] = None
+    is_default: Optional[bool] = None
+    priority: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+@dataclass
+class SLATargetCreate:
+    """Data for creating an SLA target."""
+
+    target_type: str  # first_response, resolution, next_response
+    target_hours: float
+    priority: Optional[str] = None  # low, medium, high, urgent (None = all)
+    warning_threshold_pct: int = 80
+
+
+@dataclass
+class SLATargetUpdate:
+    """Data for updating an SLA target."""
+
+    target_type: Optional[str] = None
+    priority: Optional[str] = None
+    target_hours: Optional[float] = None
+    warning_threshold_pct: Optional[int] = None
+
+
+@dataclass
+class SLABreachFilters:
+    """Filters for listing SLA breaches."""
+
+    ticket_id: Optional[int] = None
+    policy_id: Optional[int] = None
+    target_type: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+
+
+@dataclass
+class SLABreachSummary:
+    """Summary statistics for SLA breaches."""
+
+    total_breaches: int
+    by_target_type: Dict[str, int]
+    by_policy: Dict[str, int]
+    avg_overdue_hours: float
 
 
 # ==============================================================================
@@ -1036,3 +1257,257 @@ class EmailTemplateUpdate:
     body_html: Optional[str] = None
     body_text: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+# ==============================================================================
+# Analytics Types
+# ==============================================================================
+
+
+@dataclass
+class AnalyticsFilters:
+    """Filters for analytics queries."""
+
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    days: int = 30
+    team_id: Optional[int] = None
+    agent_id: Optional[int] = None
+    channel: Optional[str] = None
+    priority: Optional[str] = None
+    ticket_type: Optional[str] = None
+
+
+@dataclass
+class OverviewStats:
+    """High-level support overview statistics."""
+
+    total_tickets: int
+    open_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+    pending_tickets: int
+    avg_resolution_hours: float
+    avg_first_response_hours: float
+    sla_attainment_pct: float
+    csat_score: Optional[float]
+    period_days: int
+
+
+@dataclass
+class VolumeDataPoint:
+    """Single data point for volume trends."""
+
+    period: str  # YYYY-MM or YYYY-MM-DD
+    year: int
+    month: int
+    day: Optional[int] = None
+    total: int = 0
+    opened: int = 0
+    resolved: int = 0
+    closed: int = 0
+    reopened: int = 0
+
+
+@dataclass
+class VolumeTrend:
+    """Volume trend over time."""
+
+    data: List[VolumeDataPoint]
+    total_opened: int
+    total_resolved: int
+    avg_daily_volume: float
+    peak_day: Optional[str]
+    peak_volume: int
+
+
+@dataclass
+class ResolutionTimeStats:
+    """Resolution time statistics."""
+
+    avg_hours: float
+    median_hours: float
+    p90_hours: float
+    p95_hours: float
+    min_hours: float
+    max_hours: float
+    sample_size: int
+
+
+@dataclass
+class FirstResponseStats:
+    """First response time statistics."""
+
+    avg_hours: float
+    median_hours: float
+    p90_hours: float
+    within_sla_pct: float
+    sample_size: int
+
+
+@dataclass
+class AgentPerformance:
+    """Individual agent performance metrics."""
+
+    agent_id: int
+    agent_name: str
+    team_id: Optional[int]
+    team_name: Optional[str]
+    total_tickets: int
+    resolved_tickets: int
+    resolution_rate: float
+    avg_resolution_hours: float
+    avg_first_response_hours: float
+    sla_attainment_pct: float
+    csat_score: Optional[float]
+    csat_responses: int
+    current_open: int
+    capacity: int
+    utilization_pct: float
+
+
+@dataclass
+class TeamPerformance:
+    """Team performance metrics."""
+
+    team_id: int
+    team_name: str
+    total_agents: int
+    active_agents: int
+    total_tickets: int
+    resolved_tickets: int
+    resolution_rate: float
+    avg_resolution_hours: float
+    avg_first_response_hours: float
+    sla_attainment_pct: float
+    csat_score: Optional[float]
+    current_open: int
+    total_capacity: int
+    utilization_pct: float
+    top_performers: List[str]
+
+
+@dataclass
+class ChannelStats:
+    """Statistics by support channel."""
+
+    channel: str
+    total_tickets: int
+    resolved_tickets: int
+    resolution_rate: float
+    avg_resolution_hours: float
+    avg_first_response_hours: float
+    sla_attainment_pct: float
+    pct_of_total: float
+
+
+@dataclass
+class CategoryStats:
+    """Statistics by ticket category/type."""
+
+    category: str
+    category_type: str  # ticket_type, issue_type, priority
+    total_tickets: int
+    resolved_tickets: int
+    resolution_rate: float
+    avg_resolution_hours: float
+    pct_of_total: float
+
+
+@dataclass
+class SLAPerformance:
+    """SLA performance metrics."""
+
+    period: str
+    response_met: int
+    response_breached: int
+    response_attainment_pct: float
+    resolution_met: int
+    resolution_breached: int
+    resolution_attainment_pct: float
+    total_tracked: int
+
+
+@dataclass
+class BacklogAging:
+    """Backlog aging analysis."""
+
+    age_bucket: str  # "0-24h", "1-3d", "3-7d", "1-2w", "2-4w", ">1m"
+    count: int
+    pct_of_backlog: float
+    avg_priority: float
+    sla_at_risk: int
+
+
+@dataclass
+class ReopenAnalysis:
+    """Ticket reopen/rework analysis."""
+
+    total_reopened: int
+    reopen_rate: float
+    avg_reopens_per_ticket: float
+    top_reopen_reasons: List[Dict[str, Any]]
+    by_agent: List[Dict[str, Any]]
+    by_category: List[Dict[str, Any]]
+
+
+@dataclass
+class PatternInsights:
+    """Support pattern insights."""
+
+    peak_hours: List[Dict[str, Any]]  # hour, count
+    peak_days: List[Dict[str, Any]]  # day_name, count
+    busiest_period: str
+    quietest_period: str
+    by_region: List[Dict[str, Any]]
+    seasonal_factors: List[Dict[str, Any]]
+
+
+@dataclass
+class AutomationEffectiveness:
+    """Automation rule effectiveness metrics."""
+
+    total_executions: int
+    successful_executions: int
+    success_rate: float
+    tickets_auto_assigned: int
+    tickets_auto_categorized: int
+    tickets_auto_responded: int
+    avg_time_saved_hours: float
+    top_rules: List[Dict[str, Any]]
+
+
+@dataclass
+class KBDeflection:
+    """Knowledge base deflection metrics."""
+
+    total_article_views: int
+    helpful_votes: int
+    not_helpful_votes: int
+    helpfulness_rate: float
+    estimated_deflections: int
+    deflection_rate: float
+    top_articles: List[Dict[str, Any]]
+    search_no_results: int
+
+
+@dataclass
+class E2EReport:
+    """End-to-end comprehensive support report."""
+
+    report_period: str
+    generated_at: datetime
+    overview: OverviewStats
+    volume_trend: VolumeTrend
+    resolution_stats: ResolutionTimeStats
+    first_response_stats: FirstResponseStats
+    sla_performance: List[SLAPerformance]
+    agent_performance: List[AgentPerformance]
+    team_performance: List[TeamPerformance]
+    channel_breakdown: List[ChannelStats]
+    category_breakdown: List[CategoryStats]
+    backlog_aging: List[BacklogAging]
+    reopen_analysis: ReopenAnalysis
+    patterns: PatternInsights
+    automation: AutomationEffectiveness
+    kb_deflection: KBDeflection

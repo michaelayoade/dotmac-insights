@@ -4,6 +4,7 @@ RADIUS Attribute Management
 Manages RADIUS user records in FreeRADIUS SQL backend for:
 - Authentication (radcheck table)
 - Authorization/Rate Limiting (radreply table)
+- Data Bundle Enforcement (data caps, CoA)
 
 MikroTik-specific attributes are used for bandwidth control.
 """
@@ -11,16 +12,29 @@ MikroTik-specific attributes are used for bandwidth control.
 from __future__ import annotations
 
 import logging
+import socket
+import struct
+import hashlib
 from typing import Optional, List, Dict, Any, TYPE_CHECKING
 from datetime import datetime
+from enum import Enum
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:
     from app.models.subscription import Subscription
+    from app.models.data_bundle import CustomerBundle
 
 logger = logging.getLogger(__name__)
+
+
+class CoAAction(str, Enum):
+    """RADIUS Change of Authorization actions."""
+    DISCONNECT = "disconnect"  # PoD - Packet of Disconnect
+    UPDATE_RATE = "update_rate"  # CoA - Update rate limit
+    UPDATE_DATA_CAP = "update_data_cap"  # CoA - Update data cap
+    THROTTLE = "throttle"  # CoA - Apply throttle speed
 
 
 def format_mikrotik_rate_limit(
@@ -74,6 +88,150 @@ def format_wispr_bandwidth(mbps: int) -> str:
         Speed in bps as string
     """
     return str(mbps * 1_000_000)
+
+
+def format_mikrotik_data_limit(data_mb: int) -> tuple[str, str]:
+    """
+    Format MikroTik data limit attributes for bundle enforcement.
+
+    Returns Mikrotik-Total-Limit and Mikrotik-Total-Limit-Gigawords
+    for data caps larger than 4GB.
+
+    Args:
+        data_mb: Data limit in megabytes
+
+    Returns:
+        Tuple of (total_limit, gigawords) as strings
+    """
+    # Convert MB to bytes
+    total_bytes = data_mb * 1024 * 1024
+
+    # Split into low 32-bits and high 32-bits (gigawords)
+    max_32bit = 2**32
+    gigawords = total_bytes // max_32bit
+    low_bytes = total_bytes % max_32bit
+
+    return str(low_bytes), str(gigawords)
+
+
+def format_session_timeout(minutes: int) -> str:
+    """
+    Format Session-Timeout attribute in seconds.
+
+    Used to force periodic re-authentication for usage checks.
+
+    Args:
+        minutes: Timeout in minutes
+
+    Returns:
+        Timeout in seconds as string
+    """
+    return str(minutes * 60)
+
+
+def build_coa_packet(
+    secret: bytes,
+    nas_ip: str,
+    username: str,
+    attributes: Dict[str, str],
+    packet_id: int = 1,
+) -> bytes:
+    """
+    Build a RADIUS CoA (Change of Authorization) packet.
+
+    Implements RFC 5176 for Dynamic Authorization.
+
+    Args:
+        secret: RADIUS shared secret
+        nas_ip: NAS IP address
+        username: PPP/Hotspot username
+        attributes: Dict of attribute name to value
+        packet_id: Packet identifier
+
+    Returns:
+        Raw RADIUS CoA packet bytes
+    """
+    # RADIUS CoA code is 43
+    COA_CODE = 43
+
+    # Build attribute list
+    attrs_data = b""
+
+    # User-Name (attribute 1)
+    user_name_bytes = username.encode("utf-8")
+    attrs_data += struct.pack("!BB", 1, len(user_name_bytes) + 2) + user_name_bytes
+
+    # Add vendor-specific attributes for MikroTik (vendor 14988)
+    MIKROTIK_VENDOR_ID = 14988
+
+    for attr_name, attr_value in attributes.items():
+        if attr_name == "Mikrotik-Rate-Limit":
+            # Mikrotik-Rate-Limit is vendor attribute 8
+            value_bytes = attr_value.encode("utf-8")
+            vsa_data = struct.pack("!BB", 8, len(value_bytes) + 2) + value_bytes
+            # Vendor-Specific attribute (26) wrapper
+            attrs_data += struct.pack("!BBL", 26, len(vsa_data) + 6, MIKROTIK_VENDOR_ID) + vsa_data
+
+        elif attr_name == "Mikrotik-Total-Limit":
+            # Mikrotik-Total-Limit is vendor attribute 17
+            value_bytes = struct.pack("!I", int(attr_value))
+            vsa_data = struct.pack("!BB", 17, len(value_bytes) + 2) + value_bytes
+            attrs_data += struct.pack("!BBL", 26, len(vsa_data) + 6, MIKROTIK_VENDOR_ID) + vsa_data
+
+        elif attr_name == "Session-Timeout":
+            # Session-Timeout is attribute 27
+            attrs_data += struct.pack("!BBI", 27, 6, int(attr_value))
+
+    # Calculate packet length
+    packet_length = 20 + len(attrs_data)  # 20 = header size
+
+    # Build packet without authenticator
+    packet = struct.pack("!BBH", COA_CODE, packet_id, packet_length)
+    packet += b"\x00" * 16  # Placeholder for authenticator
+    packet += attrs_data
+
+    # Calculate authenticator (MD5 of packet + secret)
+    authenticator = hashlib.md5(packet + secret).digest()
+
+    # Replace placeholder with real authenticator
+    packet = packet[:4] + authenticator + packet[20:]
+
+    return packet
+
+
+def build_pod_packet(
+    secret: bytes,
+    username: str,
+    packet_id: int = 1,
+) -> bytes:
+    """
+    Build a RADIUS PoD (Packet of Disconnect) packet.
+
+    Args:
+        secret: RADIUS shared secret
+        username: PPP/Hotspot username to disconnect
+        packet_id: Packet identifier
+
+    Returns:
+        Raw RADIUS Disconnect-Request packet bytes
+    """
+    # RADIUS Disconnect-Request code is 40
+    DISCONNECT_CODE = 40
+
+    # User-Name attribute
+    user_name_bytes = username.encode("utf-8")
+    attrs_data = struct.pack("!BB", 1, len(user_name_bytes) + 2) + user_name_bytes
+
+    packet_length = 20 + len(attrs_data)
+
+    packet = struct.pack("!BBH", DISCONNECT_CODE, packet_id, packet_length)
+    packet += b"\x00" * 16
+    packet += attrs_data
+
+    authenticator = hashlib.md5(packet + secret).digest()
+    packet = packet[:4] + authenticator + packet[20:]
+
+    return packet
 
 
 class RADIUSService:
@@ -454,3 +612,268 @@ class RADIUSService:
             "check": check_attrs,
             "reply": reply_attrs,
         }
+
+    # =========================================================================
+    # Data Bundle / Data Cap Methods
+    # =========================================================================
+
+    async def set_data_cap(
+        self,
+        username: str,
+        data_mb: int,
+        session_timeout_minutes: int = 15,
+    ) -> bool:
+        """
+        Set data cap attributes for a user (bundle enforcement).
+
+        Args:
+            username: PPP/Hotspot username
+            data_mb: Data limit in megabytes
+            session_timeout_minutes: Force re-auth interval for usage checks
+
+        Returns:
+            True if attributes set successfully
+        """
+        try:
+            # Set total limit (handles >4GB via gigawords)
+            low_bytes, gigawords = format_mikrotik_data_limit(data_mb)
+            await self._upsert_radreply(username, "Mikrotik-Total-Limit", low_bytes)
+
+            if int(gigawords) > 0:
+                await self._upsert_radreply(username, "Mikrotik-Total-Limit-Gigawords", gigawords)
+
+            # Set session timeout for periodic re-auth
+            timeout = format_session_timeout(session_timeout_minutes)
+            await self._upsert_radreply(username, "Session-Timeout", timeout)
+
+            logger.info(
+                "Data cap set for user",
+                extra={
+                    "username": username,
+                    "data_mb": data_mb,
+                    "session_timeout": session_timeout_minutes,
+                },
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to set data cap: {e}", extra={"username": username})
+            raise
+
+    async def remove_data_cap(self, username: str) -> bool:
+        """
+        Remove data cap attributes for a user.
+
+        Args:
+            username: PPP/Hotspot username
+
+        Returns:
+            True if removed
+        """
+        try:
+            self.db.execute(
+                text(
+                    "DELETE FROM radreply WHERE username = :username "
+                    "AND attribute IN ('Mikrotik-Total-Limit', 'Mikrotik-Total-Limit-Gigawords')"
+                ),
+                {"username": username},
+            )
+            self.db.commit()
+
+            logger.info("Data cap removed", extra={"username": username})
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to remove data cap: {e}", extra={"username": username})
+            self.db.rollback()
+            raise
+
+    # =========================================================================
+    # Change of Authorization (CoA) Methods
+    # =========================================================================
+
+    async def send_coa(
+        self,
+        nas_ip: str,
+        nas_secret: str,
+        username: str,
+        attributes: Dict[str, str],
+        coa_port: int = 3799,
+    ) -> bool:
+        """
+        Send a RADIUS Change of Authorization (CoA) packet to a NAS.
+
+        Args:
+            nas_ip: NAS/router IP address
+            nas_secret: RADIUS shared secret
+            username: PPP/Hotspot username
+            attributes: Dict of attributes to update
+            coa_port: CoA port (default 3799)
+
+        Returns:
+            True if CoA sent successfully
+        """
+        try:
+            packet = build_coa_packet(
+                secret=nas_secret.encode("utf-8"),
+                nas_ip=nas_ip,
+                username=username,
+                attributes=attributes,
+            )
+
+            # Send via UDP
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(5.0)
+            sock.sendto(packet, (nas_ip, coa_port))
+
+            # Wait for ACK/NAK
+            try:
+                response, _ = sock.recvfrom(4096)
+                response_code = response[0]
+
+                # 44 = CoA-ACK, 45 = CoA-NAK
+                if response_code == 44:
+                    logger.info(
+                        "CoA accepted",
+                        extra={"username": username, "nas_ip": nas_ip},
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        "CoA rejected",
+                        extra={"username": username, "nas_ip": nas_ip, "code": response_code},
+                    )
+                    return False
+
+            except socket.timeout:
+                logger.warning(
+                    "CoA timeout",
+                    extra={"username": username, "nas_ip": nas_ip},
+                )
+                return False
+            finally:
+                sock.close()
+
+        except Exception as e:
+            logger.error(f"Failed to send CoA: {e}", extra={"username": username})
+            raise
+
+    async def send_disconnect(
+        self,
+        nas_ip: str,
+        nas_secret: str,
+        username: str,
+        coa_port: int = 3799,
+    ) -> bool:
+        """
+        Send a RADIUS Disconnect-Request (PoD) to terminate a user session.
+
+        Args:
+            nas_ip: NAS/router IP address
+            nas_secret: RADIUS shared secret
+            username: PPP/Hotspot username to disconnect
+            coa_port: CoA port (default 3799)
+
+        Returns:
+            True if disconnect sent successfully
+        """
+        try:
+            packet = build_pod_packet(
+                secret=nas_secret.encode("utf-8"),
+                username=username,
+            )
+
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(5.0)
+            sock.sendto(packet, (nas_ip, coa_port))
+
+            try:
+                response, _ = sock.recvfrom(4096)
+                response_code = response[0]
+
+                # 41 = Disconnect-ACK, 42 = Disconnect-NAK
+                if response_code == 41:
+                    logger.info(
+                        "Disconnect accepted",
+                        extra={"username": username, "nas_ip": nas_ip},
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        "Disconnect rejected",
+                        extra={"username": username, "nas_ip": nas_ip, "code": response_code},
+                    )
+                    return False
+
+            except socket.timeout:
+                logger.warning(
+                    "Disconnect timeout",
+                    extra={"username": username, "nas_ip": nas_ip},
+                )
+                return False
+            finally:
+                sock.close()
+
+        except Exception as e:
+            logger.error(f"Failed to send disconnect: {e}", extra={"username": username})
+            raise
+
+    async def apply_throttle(
+        self,
+        nas_ip: str,
+        nas_secret: str,
+        username: str,
+        throttle_speed_kbps: int,
+    ) -> bool:
+        """
+        Apply throttle speed to a user via CoA (for bundle exhaustion).
+
+        Args:
+            nas_ip: NAS/router IP address
+            nas_secret: RADIUS shared secret
+            username: PPP/Hotspot username
+            throttle_speed_kbps: Throttle speed in kbps
+
+        Returns:
+            True if throttle applied
+        """
+        # Format rate limit for throttle speed
+        rate_limit = f"{throttle_speed_kbps}k/{throttle_speed_kbps}k"
+
+        return await self.send_coa(
+            nas_ip=nas_ip,
+            nas_secret=nas_secret,
+            username=username,
+            attributes={"Mikrotik-Rate-Limit": rate_limit},
+        )
+
+    async def restore_speed(
+        self,
+        nas_ip: str,
+        nas_secret: str,
+        username: str,
+        download_speed: int,
+        upload_speed: int,
+    ) -> bool:
+        """
+        Restore original speed for a user via CoA (after bundle renewal).
+
+        Args:
+            nas_ip: NAS/router IP address
+            nas_secret: RADIUS shared secret
+            username: PPP/Hotspot username
+            download_speed: Download speed in Mbps
+            upload_speed: Upload speed in Mbps
+
+        Returns:
+            True if speed restored
+        """
+        rate_limit = format_mikrotik_rate_limit(download_speed, upload_speed)
+
+        return await self.send_coa(
+            nas_ip=nas_ip,
+            nas_secret=nas_secret,
+            username=username,
+            attributes={"Mikrotik-Rate-Limit": rate_limit},
+        )

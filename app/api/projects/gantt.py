@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 
 router = APIRouter()
@@ -102,5 +101,4 @@ async def get_project_gantt_data(
             "max_date": max_date.isoformat() if max_date else None,
         },
     }
-
 

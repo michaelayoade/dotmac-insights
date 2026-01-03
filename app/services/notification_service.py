@@ -398,7 +398,7 @@ class NotificationService:
             "payment": f"/accounting/payments/{entity_id}",
             "journal_entry": f"/accounting/journal-entries/{entity_id}",
             "expense": f"/accounting/expenses/{entity_id}",
-            "customer": f"/customers/{entity_id}",
+            "customer": f"/parties/{entity_id}",
             "approval": f"/accounting/approvals/{entity_id}",
             "scorecard": f"/performance/scorecards/{entity_id}",
             "evaluation_period": f"/performance/periods/{entity_id}",

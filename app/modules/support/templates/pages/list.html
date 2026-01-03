@@ -29,7 +29,7 @@
     </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
         <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -58,14 +58,40 @@
         </div>
         <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 16c0 2.761-2.239 5-5 5H7l-4 3 1.5-4.5A5 5 0 015 16V8a5 5 0 015-5h6a5 5 0 015 5v8z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Waiting</p>
+                    <p class="text-xl font-bold text-gray-900">{{ stats.waiting | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center group-hover:bg-gray-100 transition-colors">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">On Hold</p>
+                    <p class="text-xl font-bold text-gray-900">{{ stats.on_hold | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+            <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
                     <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                     </svg>
                 </div>
                 <div>
-                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Urgent</p>
-                    <p class="text-xl font-bold text-gray-900">{{ stats.urgent | default(0) }}</p>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Reopened</p>
+                    <p class="text-xl font-bold text-gray-900">{{ stats.reopened | default(0) }}</p>
                 </div>
             </div>
         </div>
@@ -79,6 +105,19 @@
                 <div>
                     <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Resolved Today</p>
                     <p class="text-xl font-bold text-gray-900">{{ stats.resolved_today | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
+                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Overdue</p>
+                    <p class="text-xl font-bold text-gray-900">{{ (stats.response_overdue | default(0)) + (stats.resolution_overdue | default(0)) }}</p>
                 </div>
             </div>
         </div>
@@ -382,8 +421,12 @@
     {% set bulk_export_url = "/support/tickets/export" %}
     {% set item_name = "tickets" %}
     {% set actions = [
+        {'label': 'In Progress', 'url': '/support/tickets/bulk-status?status=in_progress', 'method': 'POST'},
+        {'label': 'Waiting', 'url': '/support/tickets/bulk-status?status=waiting', 'method': 'POST'},
+        {'label': 'On Hold', 'url': '/support/tickets/bulk-status?status=on_hold', 'method': 'POST'},
         {'label': 'Close', 'url': '/support/tickets/bulk-status?status=closed', 'method': 'POST'},
         {'label': 'Resolve', 'url': '/support/tickets/bulk-status?status=resolved', 'method': 'POST'},
+        {'label': 'Reopen', 'url': '/support/tickets/bulk-status?status=reopened', 'method': 'POST'},
     ] %}
     {% include "components/ui/bulk_actions.html" %}
 </div>

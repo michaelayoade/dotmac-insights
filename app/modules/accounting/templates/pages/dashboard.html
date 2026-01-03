@@ -11,21 +11,181 @@
 
 {% block content %}
 <div class="space-y-8">
-    <!-- Stats Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {% for stat in stats %}
-        <a href="{{ stat.href }}" class="block bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow group">
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        {% for card in summary_cards %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
             <div class="flex items-center gap-4">
-                <div class="flex-shrink-0 w-12 h-12 rounded-xl {{ stat.icon_bg }} flex items-center justify-center group-hover:scale-105 transition-transform">
-                    {% include "components/icons/" ~ stat.icon ~ ".html" ignore missing %}
+                <div class="flex-shrink-0 w-12 h-12 rounded-xl {{ card.icon_bg }} flex items-center justify-center">
+                    {% include "components/icons/" ~ card.icon ~ ".html" ignore missing %}
                 </div>
                 <div class="min-w-0">
-                    <p class="text-2xl font-display font-bold text-gray-900">{{ stat.value }}</p>
-                    <p class="text-sm text-gray-500 truncate">{{ stat.label }}</p>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">{{ card.subtext }}</p>
+                    <p class="mt-1 text-2xl font-display font-bold text-gray-900">{{ card.value }}</p>
+                    <p class="text-sm text-gray-600">{{ card.label }}</p>
                 </div>
             </div>
-        </a>
+        </div>
         {% endfor %}
+    </div>
+
+    <!-- Performance Snapshot -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Performance</h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Total Income</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(dashboard.performance.total_income) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Total Expenses</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(dashboard.performance.total_expenses) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Net Profit</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(dashboard.performance.net_profit) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Profit Margin</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(dashboard.performance.profit_margin) }}%</span>
+                </div>
+            </div>
+            <div class="mt-4 text-xs text-gray-500">Period: {{ dashboard.period.start_date }} - {{ dashboard.period.end_date }}</div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Balance Sheet</h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Total Assets</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(balance_sheet.total_assets) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Total Liabilities</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(balance_sheet.total_liabilities) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Total Equity</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(balance_sheet.total_equity) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Net Income</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(balance_sheet.net_income) }}</span>
+                </div>
+            </div>
+            <div class="mt-4 text-xs {{ 'text-emerald-600' if balance_sheet.is_balanced else 'text-red-600' }}">
+                {{ 'Balanced' if balance_sheet.is_balanced else 'Out of balance' }}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Cash Flow</h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Opening Balance</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(cash_flow.opening_balance) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Cash Inflows</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(cash_flow.cash_inflows) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Cash Outflows</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(cash_flow.cash_outflows) }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Closing Balance</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(cash_flow.closing_balance) }}</span>
+                </div>
+            </div>
+            <a href="/accounting/reports/cash-flow" class="mt-4 inline-flex items-center text-xs font-semibold text-primary-600 hover:text-primary-700">View cash flow report</a>
+        </div>
+    </div>
+
+    <!-- Receivables and Payables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Top Receivables</h2>
+                <a href="/accounting/receivables" class="text-sm font-medium text-primary-600 hover:text-primary-700">View aging</a>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
+                    <span>Total Outstanding</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(receivables_summary.total_outstanding) }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for party in receivables_summary.top_parties %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-700">{{ party.party_name or 'Unknown' }}</span>
+                        <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(party.outstanding) }}</span>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No outstanding receivables.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Top Payables</h2>
+                <a href="/accounting/payables" class="text-sm font-medium text-primary-600 hover:text-primary-700">View aging</a>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-between text-sm text-gray-500 mb-4">
+                    <span>Total Outstanding</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(payables_summary.total_outstanding) }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for party in payables_summary.top_parties %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-700">{{ party.party_name or 'Unknown' }}</span>
+                        <span class="font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(party.outstanding) }}</span>
+                    </div>
+                    {% else %}
+                    <p class="text-sm text-gray-500">No outstanding payables.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bank Balances and Activity -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 lg:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Bank Balances</h2>
+                <span class="text-sm text-gray-500">Total: {{ '{:,.2f}'.format(bank_total_balance) }}</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {% for account in bank_accounts %}
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-sm font-semibold text-gray-900">{{ account.name }}</p>
+                    <p class="text-xs text-gray-500">{{ account.bank or '-' }}</p>
+                    <p class="mt-2 text-lg font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(account.balance or 0) }}</p>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">No bank accounts available.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Activity</h2>
+            <div class="space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">GL Entries</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ dashboard.activity.gl_entries_count }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Bank Transactions</span>
+                    <span class="font-mono font-semibold text-gray-900">{{ dashboard.activity.bank_transactions_count }}</span>
+                </div>
+            </div>
+            <div class="mt-4 text-xs text-gray-500">Recent activity in the selected period.</div>
+        </div>
     </div>
 
     <!-- Quick Links -->

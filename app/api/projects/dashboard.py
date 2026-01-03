@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 
 router = APIRouter()
@@ -141,5 +140,4 @@ async def get_projects_dashboard(
             "due_this_week": due_this_week,
         },
     }
-
 

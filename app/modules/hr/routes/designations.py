@@ -4,6 +4,8 @@ HR Designations Routes - Job Designations with SSR + HTMX.
 Permission Requirements:
 - hr:read - View designations
 - hr:write - Create, update, delete designations
+
+Uses OrganizationService for all business logic.
 """
 from __future__ import annotations
 
@@ -20,7 +22,14 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.hr import Designation
+from app.services.hr.organization import OrganizationService
+from app.services.hr.organization_types import (
+    DesignationFilters,
+    DesignationCreateData,
+    DesignationUpdateData,
+)
+from app.services.types import PaginationParams
+from app.services.hr.errors import DesignationNotFoundError, ValidationError as HRValidationError
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 
 RequireHRRead = Depends(require_scope("hr:read"))
@@ -51,14 +60,15 @@ async def designations_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Designations list page."""
-    query = db.query(Designation)
+    service = OrganizationService(db, user)
 
-    if q:
-        query = query.filter(Designation.designation_name.ilike(f"%{q}%"))
-
-    total = query.count()
+    filters = DesignationFilters(search=q) if q else DesignationFilters()
     offset = (page - 1) * per_page
-    designations = query.order_by(Designation.designation_name).offset(offset).limit(per_page).all()
+    pagination = PaginationParams(offset=offset, limit=per_page)
+
+    result = service.list_designations(filters, pagination)
+    designations = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["designations"] = designations
@@ -114,6 +124,7 @@ async def designation_create(
     db: DB,
 ):
     """Create a new designation."""
+    service = OrganizationService(db, user)
     form = await request.form()
 
     errors = {}
@@ -122,13 +133,6 @@ async def designation_create(
 
     if not designation_name:
         errors["designation_name"] = "Designation name is required"
-
-    # Check for duplicates
-    existing = db.query(Designation).filter(
-        Designation.designation_name == designation_name
-    ).first()
-    if existing:
-        errors["designation_name"] = "A designation with this name already exists"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -146,13 +150,30 @@ async def designation_create(
         template = templates.get_template("modules/hr/templates/designations/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    designation = Designation(
-        designation_name=designation_name,
-        description=description or None,
-    )
-    db.add(designation)
-    db.commit()
-    db.refresh(designation)
+    try:
+        data = DesignationCreateData(
+            designation_name=designation_name,
+            description=description or None,
+        )
+        designation = service.create_designation(data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        errors["designation_name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Designation"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr"},
+            {"label": "Designations", "href": "/hr/designations"},
+            {"label": "New Designation"},
+        ])
+        context["designation"] = None
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/hr/templates/designations/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, "Designation created successfully.", "success")
     return RedirectResponse(url=f"/hr/designations/{designation.id}", status_code=303)
@@ -168,12 +189,14 @@ async def designation_detail(
     designation_id: int,
 ):
     """Designation detail page."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
+    service = OrganizationService(db, user)
 
-    if not designation:
+    try:
+        designation = service.get_designation(designation_id)
+    except DesignationNotFoundError:
         raise HTTPException(status_code=404, detail="Designation not found")
 
-    # Count employees with this designation
+    # Count employees with this designation (service doesn't have a headcount method for designations)
     from app.models.employee import Employee
     employee_count = db.query(Employee).filter(
         Employee.designation_id == designation_id,
@@ -205,9 +228,11 @@ async def designation_edit(
     designation_id: int,
 ):
     """Edit designation form."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
+    service = OrganizationService(db, user)
 
-    if not designation:
+    try:
+        designation = service.get_designation(designation_id)
+    except DesignationNotFoundError:
         raise HTTPException(status_code=404, detail="Designation not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -237,9 +262,11 @@ async def designation_update(
     designation_id: int,
 ):
     """Update a designation."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
+    service = OrganizationService(db, user)
 
-    if not designation:
+    try:
+        designation = service.get_designation(designation_id)
+    except DesignationNotFoundError:
         raise HTTPException(status_code=404, detail="Designation not found")
 
     form = await request.form()
@@ -250,14 +277,6 @@ async def designation_update(
 
     if not designation_name:
         errors["designation_name"] = "Designation name is required"
-
-    # Check for duplicates (excluding self)
-    existing = db.query(Designation).filter(
-        Designation.designation_name == designation_name,
-        Designation.id != designation_id
-    ).first()
-    if existing:
-        errors["designation_name"] = "A designation with this name already exists"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -276,9 +295,31 @@ async def designation_update(
         template = templates.get_template("modules/hr/templates/designations/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    designation.designation_name = designation_name
-    designation.description = description or None
-    db.commit()
+    try:
+        data = DesignationUpdateData(
+            designation_name=designation_name,
+            description=description or None,
+        )
+        designation = service.update_designation(designation_id, data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        errors["designation_name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {designation.designation_name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr"},
+            {"label": "Designations", "href": "/hr/designations"},
+            {"label": designation.designation_name, "href": f"/hr/designations/{designation.id}"},
+            {"label": "Edit"},
+        ])
+        context["designation"] = designation
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/hr/templates/designations/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, "Designation updated successfully.", "success")
     return RedirectResponse(url=f"/hr/designations/{designation.id}", status_code=303)
@@ -294,26 +335,22 @@ async def designation_delete(
     designation_id: int,
 ):
     """Delete a designation."""
-    designation = db.query(Designation).filter(Designation.id == designation_id).first()
+    service = OrganizationService(db, user)
 
-    if not designation:
+    try:
+        designation = service.get_designation(designation_id)
+    except DesignationNotFoundError:
         raise HTTPException(status_code=404, detail="Designation not found")
 
-    # Check if designation is in use
-    from app.models.employee import Employee
-    employee_count = db.query(Employee).filter(
-        Employee.designation_id == designation_id,
-        Employee.is_deleted == False
-    ).count()
-
-    if employee_count > 0:
+    try:
+        service.delete_designation(designation_id)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
         if is_htmx_request(request):
-            htmx_toast(response, f"Cannot delete designation - {employee_count} employee(s) are assigned to it.", "error")
+            htmx_toast(response, str(e), "error")
             return HTMLResponse("", headers=dict(response.headers))
-        raise HTTPException(status_code=400, detail=f"Cannot delete designation - {employee_count} employee(s) are assigned to it.")
-
-    db.delete(designation)
-    db.commit()
+        raise HTTPException(status_code=400, detail=str(e))
 
     if is_htmx_request(request):
         htmx_toast(response, "Designation deleted.", "success")

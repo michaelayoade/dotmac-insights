@@ -9,7 +9,7 @@ Uses AccountingSettingsService for configurable limits and buckets.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Dict, List, Optional
 
@@ -198,6 +198,15 @@ class ReceivablesService:
             truncated=len(invoices) >= max_invoices,
             max_invoices=max_invoices,
             buckets=buckets,
+        )
+
+    def list_customer_accounts(self) -> List[CustomerAccount]:
+        """List customer accounts ordered by party name."""
+        return (
+            self.db.query(CustomerAccount)
+            .join(Party, CustomerAccount.party_id == Party.id)
+            .order_by(Party.name)
+            .all()
         )
 
     # -------------------------------------------------------------------------
@@ -531,4 +540,70 @@ class ReceivablesService:
             total_revenue=Decimal(str(total_revenue)),
             pending_count=int(pending_count),
             pending_amount=Decimal(str(pending_amount)),
+        )
+
+    def get_invoice_list_stats(self) -> Dict[str, Decimal]:
+        """Get stats for invoice list view."""
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        total_count = self.db.query(func.count(Invoice.id)).scalar() or 0
+
+        outstanding = self.db.query(func.sum(Invoice.balance)).filter(
+            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID])
+        ).scalar() or Decimal("0")
+
+        overdue = self.db.query(func.sum(Invoice.balance)).filter(
+            Invoice.status == InvoiceStatus.OVERDUE
+        ).scalar() or Decimal("0")
+
+        paid_this_month = self.db.query(func.sum(Invoice.amount_paid)).filter(
+            Invoice.paid_date >= month_start
+        ).scalar() or Decimal("0")
+
+        return {
+            "total_count": total_count,
+            "outstanding": outstanding,
+            "overdue": overdue,
+            "paid_this_month": paid_this_month,
+        }
+
+    def list_outstanding_invoices(self) -> List[Invoice]:
+        """List outstanding invoices for aging dashboards."""
+        return (
+            self.db.query(Invoice)
+            .filter(
+                Invoice.status.in_(
+                    [
+                        InvoiceStatus.PENDING,
+                        InvoiceStatus.PARTIALLY_PAID,
+                        InvoiceStatus.OVERDUE,
+                    ]
+                ),
+                Invoice.balance > 0,
+            )
+            .order_by(Invoice.due_date)
+            .all()
+        )
+
+    def list_outstanding_invoices_for_customer(
+        self,
+        customer_account_id: int,
+    ) -> List[Invoice]:
+        """List outstanding invoices for a specific customer account."""
+        return (
+            self.db.query(Invoice)
+            .filter(
+                Invoice.customer_account_id == customer_account_id,
+                Invoice.status.in_(
+                    [
+                        InvoiceStatus.PENDING,
+                        InvoiceStatus.PARTIALLY_PAID,
+                        InvoiceStatus.OVERDUE,
+                    ]
+                ),
+                Invoice.balance > 0,
+            )
+            .order_by(Invoice.due_date)
+            .all()
         )

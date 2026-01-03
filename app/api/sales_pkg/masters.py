@@ -15,7 +15,6 @@ from app.cache import cached, CACHE_TTL
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.credit_note import CreditNote
-from app.models.customer import Customer, CustomerStatus
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.sales import (
     ERPNextLead, SalesOrder, Quotation, CustomerGroup, 
@@ -381,4 +380,3 @@ async def delete_sales_person(
     person.enabled = False
     db.commit()
     return {"status": "disabled", "sales_person_id": person_id}
-

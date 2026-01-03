@@ -211,7 +211,7 @@
                 <div class="p-5 border-b border-gray-100">
                     <div class="flex items-center justify-between">
                         <h2 class="text-base font-semibold text-gray-900 font-display">Recent Customers</h2>
-                        <a href="/customers?pop_id={{ pop.id }}" class="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors">
+                        <a href="/parties" class="text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors">
                             View all
                         </a>
                     </div>
@@ -220,13 +220,13 @@
                     {% if recent_customers %}
                     <div class="space-y-3">
                         {% for customer in recent_customers[:5] %}
-                        <a href="/customers/{{ customer.id }}" class="flex items-center gap-3 group">
+                        <a href="/parties/{{ customer.id }}" class="flex items-center gap-3 group">
                             <div class="w-8 h-8 bg-gradient-to-br from-gray-100 to-gray-50 rounded-lg flex items-center justify-center text-xs font-bold text-gray-500">
                                 {{ customer.name[:2] | upper if customer.name else '??' }}
                             </div>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 truncate group-hover:text-primary-600 transition-colors">{{ customer.name }}</p>
-                                <p class="text-xs text-gray-400 font-body">{{ customer.email or customer.phone or 'No contact' }}</p>
+                                <p class="text-xs text-gray-400 font-body">{{ customer.primary_email or customer.primary_phone or 'No contact' }}</p>
                             </div>
                         </a>
                         {% endfor %}

@@ -10,9 +10,12 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request,
-    AuditLog, AuditAction,
-    func, or_, datetime,
+    AuditAction,
+    datetime,
 )
+from app.services.accounting import AuditLogService
+from app.services.accounting.audit_log_types import AuditLogFilters
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -39,6 +42,10 @@ def get_audit_action_options() -> list:
     ]
 
 
+def _get_audit_log_service(db: DB, user: SessionUser) -> AuditLogService:
+    return AuditLogService(db, user)
+
+
 @router.get("/audit-log", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
 async def audit_log_list(
     request: Request,
@@ -55,40 +62,38 @@ async def audit_log_list(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """Audit log list page."""
-    query = db.query(AuditLog)
-
-    if q:
-        query = query.filter(
-            or_(
-                AuditLog.document_name.ilike(f"%{q}%"),
-                AuditLog.user_name.ilike(f"%{q}%"),
-                AuditLog.user_email.ilike(f"%{q}%"),
-            )
-        )
-
-    if doc_type:
-        query = query.filter(AuditLog.doctype == doc_type)
-
+    service = _get_audit_log_service(db, user)
+    action_enum = None
     if action:
-        query = query.filter(AuditLog.action == AuditAction(action))
+        try:
+            action_enum = AuditAction(action)
+        except ValueError:
+            action_enum = None
 
+    from_dt = None
     if date_from:
         try:
             from_dt = datetime.strptime(date_from, "%Y-%m-%d")
-            query = query.filter(AuditLog.timestamp >= from_dt)
         except ValueError:
-            pass
+            from_dt = None
 
+    to_dt = None
     if date_to:
         try:
             to_dt = datetime.strptime(date_to, "%Y-%m-%d")
             to_dt = to_dt.replace(hour=23, minute=59, second=59)
-            query = query.filter(AuditLog.timestamp <= to_dt)
         except ValueError:
-            pass
+            to_dt = None
 
-    total = query.count()
-    entries = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    filters = AuditLogFilters(
+        query=q,
+        doc_type=doc_type,
+        action=action_enum,
+        date_from=from_dt,
+        date_to=to_dt,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list_audit_logs(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -96,7 +101,7 @@ async def audit_log_list(
         {"label": "Accounting", "href": "/accounting/invoices"},
         {"label": "Audit Log", "href": "/accounting/audit-log", "current": True},
     ])
-    context["entries"] = entries
+    context["entries"] = result.items
     context["current_search"] = q
     context["current_doc_type"] = doc_type
     context["current_action"] = action
@@ -104,7 +109,7 @@ async def audit_log_list(
     context["current_date_to"] = date_to
     context["doc_type_options"] = get_audit_doc_type_options()
     context["action_options"] = get_audit_action_options()
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/accounting/templates/audit_log/partials/audit_log_table.html")
@@ -130,49 +135,47 @@ async def audit_log_table_partial(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """Audit log table HTMX partial."""
-    query = db.query(AuditLog)
-
-    if q:
-        query = query.filter(
-            or_(
-                AuditLog.document_name.ilike(f"%{q}%"),
-                AuditLog.user_name.ilike(f"%{q}%"),
-                AuditLog.user_email.ilike(f"%{q}%"),
-            )
-        )
-
-    if doc_type:
-        query = query.filter(AuditLog.doctype == doc_type)
-
+    service = _get_audit_log_service(db, user)
+    action_enum = None
     if action:
-        query = query.filter(AuditLog.action == AuditAction(action))
+        try:
+            action_enum = AuditAction(action)
+        except ValueError:
+            action_enum = None
 
+    from_dt = None
     if date_from:
         try:
             from_dt = datetime.strptime(date_from, "%Y-%m-%d")
-            query = query.filter(AuditLog.timestamp >= from_dt)
         except ValueError:
-            pass
+            from_dt = None
 
+    to_dt = None
     if date_to:
         try:
             to_dt = datetime.strptime(date_to, "%Y-%m-%d")
             to_dt = to_dt.replace(hour=23, minute=59, second=59)
-            query = query.filter(AuditLog.timestamp <= to_dt)
         except ValueError:
-            pass
+            to_dt = None
 
-    total = query.count()
-    entries = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    filters = AuditLogFilters(
+        query=q,
+        doc_type=doc_type,
+        action=action_enum,
+        date_from=from_dt,
+        date_to=to_dt,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list_audit_logs(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["entries"] = entries
+    context["entries"] = result.items
     context["current_search"] = q
     context["current_doc_type"] = doc_type
     context["current_action"] = action
     context["current_date_from"] = date_from
     context["current_date_to"] = date_to
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     template = templates.get_template("modules/accounting/templates/audit_log/partials/audit_log_table.html")
     return HTMLResponse(template.render(context))

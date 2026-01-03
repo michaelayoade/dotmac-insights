@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy.orm import Session
+from sqlalchemy import func, or_
 
 from app.models.accounting import (
     Account,
@@ -39,6 +40,14 @@ if TYPE_CHECKING:
 
 __all__ = ["JournalEntryService"]
 
+ALLOWED_SORTS = {
+    "posting_date",
+    "voucher_type",
+    "company",
+    "docstatus",
+    "erpnext_id",
+    "id",
+}
 
 class JournalEntryService:
     """Service for journal entry business logic.
@@ -96,10 +105,26 @@ class JournalEntryService:
         if filters.is_opening is not None:
             query = query.filter(JournalEntry.is_opening == filters.is_opening)
 
-        # Default ordering
-        query = query.order_by(
-            JournalEntry.posting_date.desc(), JournalEntry.id.desc()
-        )
+        if filters.docstatus is not None:
+            query = query.filter(JournalEntry.docstatus == filters.docstatus)
+
+        if filters.search:
+            if len(filters.search) < 2:
+                raise ValidationError("Search query must be at least 2 characters")
+            query = query.filter(
+                or_(
+                    JournalEntry.erpnext_id.ilike(f"%{filters.search}%"),
+                    JournalEntry.user_remark.ilike(f"%{filters.search}%"),
+                    JournalEntry.cheque_no.ilike(f"%{filters.search}%"),
+                )
+            )
+
+        sort_key = filters.sort_by if filters.sort_by in ALLOWED_SORTS else "posting_date"
+        sort_column = getattr(JournalEntry, sort_key, JournalEntry.posting_date)
+        if filters.sort_dir == "asc":
+            query = query.order_by(sort_column.asc(), JournalEntry.id.asc())
+        else:
+            query = query.order_by(sort_column.desc(), JournalEntry.id.desc())
 
         return paginate(query, pagination)
 
@@ -144,6 +169,33 @@ class JournalEntryService:
             .all()
         )
 
+    def get_entry_stats(self) -> dict:
+        """Get summary stats for journal entries list view."""
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        total_count = self.db.query(func.count(JournalEntry.id)).scalar() or 0
+
+        draft_count = self.db.query(func.count(JournalEntry.id)).filter(
+            JournalEntry.docstatus == 0
+        ).scalar() or 0
+
+        posted_count = self.db.query(func.count(JournalEntry.id)).filter(
+            JournalEntry.docstatus == 1
+        ).scalar() or 0
+
+        this_month = self.db.query(func.count(JournalEntry.id)).filter(
+            JournalEntry.posting_date >= month_start,
+            JournalEntry.docstatus == 1,
+        ).scalar() or 0
+
+        return {
+            "total_count": total_count,
+            "draft_count": draft_count,
+            "posted_count": posted_count,
+            "this_month": this_month,
+        }
+
     # -------------------------------------------------------------------------
     # CRUD
     # -------------------------------------------------------------------------
@@ -177,6 +229,7 @@ class JournalEntryService:
             voucher_type=data.voucher_type,
             posting_date=datetime.combine(data.posting_date, datetime.min.time()),
             user_remark=user_remark,
+            cheque_no=data.cheque_no,
             company=company,
             is_opening=data.is_opening,
             total_debit=Decimal("0"),
@@ -293,10 +346,109 @@ class JournalEntryService:
         if data.user_remark is not None:
             je.user_remark = data.user_remark
 
+        if data.cheque_no is not None:
+            je.cheque_no = data.cheque_no
+
         if data.company is not None:
             je.company = data.company
 
         je.updated_at = datetime.now(timezone.utc)
+
+        # Audit log
+        audit = AuditLogger(self.db)
+        audit.log_update(
+            doctype="journal_entry",
+            document_id=je.id,
+            user_id=self.principal.id if self.principal else None,
+            old_values=old_values,
+            new_values=serialize_for_audit(je),
+        )
+
+        return je
+
+    def update_entry_with_lines(self, entry_id: int, data: JECreateData) -> JournalEntry:
+        """Update a draft journal entry with new line items."""
+        from app.services.audit_logger import AuditLogger, serialize_for_audit
+        from app.services.je_validator import JEValidator
+        from app.services.je_validator import ValidationError as JEValidationError
+
+        je = self.get_entry(entry_id)
+        if je.docstatus != 0:
+            raise ValidationError("Can only update draft entries")
+
+        old_values = serialize_for_audit(je)
+
+        # Update header fields
+        je.voucher_type = data.voucher_type
+        je.posting_date = datetime.combine(data.posting_date, datetime.min.time())
+        je.user_remark = data.user_remark
+        je.cheque_no = data.cheque_no
+        je.company = data.company or je.company
+        je.is_opening = data.is_opening
+
+        # Build account lines
+        je_accounts: List[JournalEntryItem] = []
+        for line_data in data.lines:
+            account_name = line_data.account
+            account_id = line_data.account_id
+
+            if not account_name and account_id:
+                account = (
+                    self.db.query(Account).filter(Account.id == account_id).first()
+                )
+                if not account:
+                    raise ValidationError(f"Account {account_id} not found")
+                account_name = account.account_name
+            elif account_name and not account_id:
+                account = (
+                    self.db.query(Account)
+                    .filter(Account.account_name == account_name)
+                    .first()
+                )
+                if account:
+                    account_id = account.id
+
+            if not account_name:
+                raise ValidationError("Account is required")
+            if account_id is None:
+                raise ValidationError(f"Account '{account_name}' not found in chart of accounts")
+
+            je_acc = JournalEntryItem(
+                account=account_name,
+                account_id=account_id,
+                debit=line_data.debit,
+                credit=line_data.credit,
+                party_type=line_data.party_type,
+                party=line_data.party,
+                cost_center=line_data.cost_center,
+                description=line_data.description,
+                user_remark=line_data.user_remark,
+            )
+            je_accounts.append(je_acc)
+
+        # Validate
+        validator = JEValidator(self.db)
+        try:
+            validator.validate_or_raise(je, je_accounts)
+        except JEValidationError as exc:
+            raise ValidationError(str(exc)) from exc
+
+        total_debit = sum((a.debit or Decimal("0") for a in je_accounts), Decimal("0"))
+        total_credit = sum((a.credit or Decimal("0") for a in je_accounts), Decimal("0"))
+
+        je.total_debit = total_debit
+        je.total_credit = total_credit
+        je.updated_at = datetime.now(timezone.utc)
+
+        # Replace items
+        self.db.query(JournalEntryItem).filter(
+            JournalEntryItem.journal_entry_id == je.id
+        ).delete()
+
+        for idx, acc in enumerate(je_accounts, 1):
+            acc.journal_entry_id = je.id
+            acc.idx = idx
+            self.db.add(acc)
 
         # Audit log
         audit = AuditLogger(self.db)

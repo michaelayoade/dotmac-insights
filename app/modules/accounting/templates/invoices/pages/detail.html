@@ -137,14 +137,10 @@
                             Customer
                         </dt>
                         <dd class="mt-1.5 text-sm text-gray-900 font-body" data-testid="invoice-customer">
-                            {% if invoice.customer %}
-                            <a href="/customers/{{ invoice.customer.id }}" class="text-primary-600 hover:text-primary-500 transition-colors">
-                                {{ invoice.customer.name }}
+                            {% if invoice.customer_account and invoice.customer_account.party %}
+                            <a href="/parties/{{ invoice.customer_account.party.id }}" class="text-primary-600 hover:text-primary-500 transition-colors">
+                                {{ invoice.customer_account.party.name }}
                             </a>
-                            {% elif invoice.contact %}
-                            <span class="text-gray-900 font-body">
-                                {{ invoice.contact.name }}
-                            </span>
                             {% else %}
                             <span class="text-gray-400 italic">No customer</span>
                             {% endif %}

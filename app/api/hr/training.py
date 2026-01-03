@@ -14,16 +14,31 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import Require, get_current_principal
-from app.models.auth import User
-from app.services.audit_logger import AuditLogger, serialize_for_audit
 from app.models.hr_training import (
-    TrainingProgram,
-    TrainingEvent,
     TrainingEventStatus,
-    TrainingEventEmployee,
     TrainingResult,
     TrainingResultStatus,
 )
+from app.services.hr.training import TrainingService
+from app.services.hr.training_types import (
+    EventEmployeeData,
+    TrainingEventCreateData,
+    TrainingEventFilters,
+    TrainingEventUpdateData,
+    TrainingProgramCreateData,
+    TrainingProgramFilters,
+    TrainingProgramUpdateData,
+    TrainingResultCreateData,
+    TrainingResultFilters,
+    TrainingResultUpdateData,
+)
+from app.services.hr.errors import (
+    TrainingEventNotFoundError,
+    TrainingProgramNotFoundError,
+    TrainingResultNotFoundError,
+    ValidationError,
+)
+from app.services.types import PaginationParams
 from .helpers import decimal_or_default, csv_response, status_counts
 
 router = APIRouter()
@@ -57,13 +72,13 @@ async def list_training_programs(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List training programs with filtering."""
-    query = db.query(TrainingProgram)
-
-    if search:
-        query = query.filter(TrainingProgram.training_program_name.ilike(f"%{search}%"))
-
-    total = query.count()
-    programs = query.order_by(TrainingProgram.training_program_name).offset(offset).limit(limit).all()
+    service = TrainingService(db)
+    result = service.list_programs(
+        TrainingProgramFilters(search=search),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    programs = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -88,9 +103,11 @@ async def get_training_program(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get training program detail."""
-    p = db.query(TrainingProgram).filter(TrainingProgram.id == program_id).first()
-    if not p:
-        raise HTTPException(status_code=404, detail="Training program not found")
+    service = TrainingService(db)
+    try:
+        p = service.get_program(program_id)
+    except TrainingProgramNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     return {
         "id": p.id,
@@ -109,17 +126,25 @@ async def get_training_program(
 async def create_training_program(
     payload: TrainingProgramCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new training program."""
-    program = TrainingProgram(
-        training_program_name=payload.training_program_name,
-        description=payload.description,
-        trainer_name=payload.trainer_name,
-        trainer_email=payload.trainer_email,
-        supplier=payload.supplier,
-    )
-    db.add(program)
-    db.commit()
+    service = TrainingService(db, principal)
+    try:
+        program = service.create_program(
+            TrainingProgramCreateData(
+                training_program_name=payload.training_program_name,
+                description=payload.description,
+                trainer_name=payload.trainer_name,
+                trainer_email=payload.trainer_email,
+                supplier=payload.supplier,
+            )
+        )
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_training_program(program.id, db)
 
 
@@ -128,32 +153,47 @@ async def update_training_program(
     program_id: int,
     payload: TrainingProgramUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a training program."""
-    program = db.query(TrainingProgram).filter(TrainingProgram.id == program_id).first()
-    if not program:
-        raise HTTPException(status_code=404, detail="Training program not found")
+    service = TrainingService(db, principal)
+    try:
+        service.update_program(
+            program_id,
+            TrainingProgramUpdateData(
+                training_program_name=payload.training_program_name,
+                description=payload.description,
+                trainer_name=payload.trainer_name,
+                trainer_email=payload.trainer_email,
+                supplier=payload.supplier,
+            ),
+        )
+        db.commit()
+    except TrainingProgramNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            setattr(program, field, value)
-
-    db.commit()
-    return await get_training_program(program.id, db)
+    return await get_training_program(program_id, db)
 
 
 @router.delete("/training-programs/{program_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_training_program(
     program_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a training program."""
-    program = db.query(TrainingProgram).filter(TrainingProgram.id == program_id).first()
-    if not program:
-        raise HTTPException(status_code=404, detail="Training program not found")
+    service = TrainingService(db, principal)
+    try:
+        service.delete_program(program_id)
+        db.commit()
+    except TrainingProgramNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(program)
-    db.commit()
     return {"message": "Training program deleted", "id": program_id}
 
 
@@ -207,21 +247,6 @@ class TrainingEventUpdate(BaseModel):
     employees: Optional[List[TrainingEventEmployeePayload]] = Field(default=None)
 
 
-def _require_event_status(event: TrainingEvent, allowed: List[TrainingEventStatus]):
-    if event.status not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid status transition from {event.status.value if event.status else None}",
-        )
-
-
-def _load_event(db: Session, event_id: int) -> TrainingEvent:
-    event = db.query(TrainingEvent).filter(TrainingEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Training event not found")
-    return event
-
-
 @router.get("/training-events", dependencies=[Depends(Require("hr:read"))])
 async def list_training_events(
     status: Optional[str] = None,
@@ -235,27 +260,27 @@ async def list_training_events(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List training events with filtering."""
-    query = db.query(TrainingEvent)
-
+    status_enum = None
     if status:
         try:
             status_enum = TrainingEventStatus(status)
-            query = query.filter(TrainingEvent.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if training_program_id:
-        query = query.filter(TrainingEvent.training_program_id == training_program_id)
-    if company:
-        query = query.filter(TrainingEvent.company.ilike(f"%{company}%"))
-    if from_time:
-        query = query.filter(TrainingEvent.start_time >= from_time)
-    if to_time:
-        query = query.filter(TrainingEvent.end_time <= to_time)
-    if search:
-        query = query.filter(TrainingEvent.event_name.ilike(f"%{search}%"))
 
-    total = query.count()
-    events = query.order_by(TrainingEvent.start_time.desc()).offset(offset).limit(limit).all()
+    service = TrainingService(db)
+    result = service.list_events(
+        TrainingEventFilters(
+            training_program_id=training_program_id,
+            status=status_enum,
+            company=company,
+            from_date=from_time,
+            to_date=to_time,
+            search=search,
+        ),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    events = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -287,14 +312,15 @@ async def training_events_summary(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get training events summary by status."""
-    query = db.query(TrainingEvent.status, func.count(TrainingEvent.id))
-
-    if company:
-        query = query.filter(TrainingEvent.company.ilike(f"%{company}%"))
-
-    results = query.group_by(TrainingEvent.status).all()
-
-    return {"status_counts": status_counts(results)}
+    service = TrainingService(db)
+    metrics = service.get_metrics(company)
+    return {
+        "status_counts": {
+            "scheduled": metrics.scheduled_events,
+            "completed": metrics.completed_events,
+            "cancelled": metrics.cancelled_events,
+        }
+    }
 
 
 @router.get("/training-events/{event_id}", dependencies=[Depends(Require("hr:read"))])
@@ -303,9 +329,11 @@ async def get_training_event(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get training event detail with employees."""
-    e = db.query(TrainingEvent).filter(TrainingEvent.id == event_id).first()
-    if not e:
-        raise HTTPException(status_code=404, detail="Training event not found")
+    service = TrainingService(db)
+    try:
+        e = service.get_event(event_id)
+    except TrainingEventNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     employees = [
         {
@@ -348,42 +376,57 @@ async def get_training_event(
 async def create_training_event(
     payload: TrainingEventCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new training event with employees."""
-    event = TrainingEvent(
-        event_name=payload.event_name,
-        training_program=payload.training_program,
-        training_program_id=payload.training_program_id,
-        type=payload.type,
-        level=payload.level,
-        status=payload.status or TrainingEventStatus.SCHEDULED,
-        company=payload.company,
-        start_time=payload.start_time,
-        end_time=payload.end_time,
-        location=payload.location,
-        trainer_name=payload.trainer_name,
-        trainer_email=payload.trainer_email,
-        course=payload.course,
-        introduction=payload.introduction,
-    )
-    db.add(event)
-    db.flush()
-
+    employees = []
     if payload.employees:
         for idx, emp in enumerate(payload.employees):
-            employee = TrainingEventEmployee(
-                training_event_id=event.id,
-                employee=emp.employee,
-                employee_id=emp.employee_id,
-                employee_name=emp.employee_name,
-                department=emp.department,
-                status=emp.status,
-                attendance=emp.attendance,
-                idx=emp.idx if emp.idx is not None else idx,
+            if emp.employee_id is None:
+                raise HTTPException(status_code=400, detail="employee_id is required for event employees")
+            employees.append(
+                EventEmployeeData(
+                    employee_id=emp.employee_id,
+                    employee=emp.employee,
+                    employee_name=emp.employee_name,
+                    department=emp.department,
+                    status=emp.status or "Invited",
+                    idx=emp.idx if emp.idx is not None else idx,
+                )
             )
-            db.add(employee)
 
-    db.commit()
+    service = TrainingService(db, principal)
+    try:
+        event = service.create_event(
+            TrainingEventCreateData(
+                event_name=payload.event_name,
+                training_program=payload.training_program,
+                training_program_id=payload.training_program_id,
+                type=payload.type,
+                level=payload.level,
+                company=payload.company,
+                start_time=payload.start_time,
+                end_time=payload.end_time,
+                location=payload.location,
+                trainer_name=payload.trainer_name,
+                trainer_email=payload.trainer_email,
+                course=payload.course,
+                introduction=payload.introduction,
+                employees=employees,
+            )
+        )
+        if payload.status and payload.status != TrainingEventStatus.SCHEDULED:
+            if payload.status == TrainingEventStatus.COMPLETED:
+                service.complete_event(event.id)
+            elif payload.status == TrainingEventStatus.CANCELLED:
+                service.cancel_event(event.id)
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported status transition on create")
+        db.commit()
+    except (TrainingProgramNotFoundError, ValidationError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_training_event(event.id, db)
 
 
@@ -392,52 +435,73 @@ async def update_training_event(
     event_id: int,
     payload: TrainingEventUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a training event and optionally replace employees."""
-    event = db.query(TrainingEvent).filter(TrainingEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Training event not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-    employees_data = update_data.pop("employees", None)
-
-    for field, value in update_data.items():
-        if value is not None:
-            setattr(event, field, value)
-
-    if employees_data is not None:
-        db.query(TrainingEventEmployee).filter(
-            TrainingEventEmployee.training_event_id == event.id
-        ).delete(synchronize_session=False)
-        for idx, emp in enumerate(employees_data):
-            employee = TrainingEventEmployee(
-                training_event_id=event.id,
-                employee=emp.get("employee"),
-                employee_id=emp.get("employee_id"),
-                employee_name=emp.get("employee_name"),
-                department=emp.get("department"),
-                status=emp.get("status"),
-                attendance=emp.get("attendance"),
-                idx=emp.get("idx") if emp.get("idx") is not None else idx,
+    employees = None
+    if payload.employees is not None:
+        employees = []
+        for idx, emp in enumerate(payload.employees):
+            if emp.employee_id is None:
+                raise HTTPException(status_code=400, detail="employee_id is required for event employees")
+            employees.append(
+                EventEmployeeData(
+                    employee_id=emp.employee_id,
+                    employee=emp.employee,
+                    employee_name=emp.employee_name,
+                    department=emp.department,
+                    status=emp.status or "Invited",
+                    idx=emp.idx if emp.idx is not None else idx,
+                )
             )
-            db.add(employee)
 
-    db.commit()
-    return await get_training_event(event.id, db)
+    service = TrainingService(db, principal)
+    try:
+        service.update_event(
+            event_id,
+            TrainingEventUpdateData(
+                event_name=payload.event_name,
+                training_program=payload.training_program,
+                training_program_id=payload.training_program_id,
+                type=payload.type,
+                level=payload.level,
+                status=payload.status,
+                start_time=payload.start_time,
+                end_time=payload.end_time,
+                location=payload.location,
+                trainer_name=payload.trainer_name,
+                trainer_email=payload.trainer_email,
+                course=payload.course,
+                introduction=payload.introduction,
+                employees=employees,
+            ),
+        )
+        db.commit()
+    except TrainingEventNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except (TrainingProgramNotFoundError, ValidationError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return await get_training_event(event_id, db)
 
 
 @router.delete("/training-events/{event_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_training_event(
     event_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a training event."""
-    event = db.query(TrainingEvent).filter(TrainingEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=404, detail="Training event not found")
+    service = TrainingService(db, principal)
+    try:
+        service.delete_event(event_id)
+        db.commit()
+    except TrainingEventNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(event)
-    db.commit()
     return {"message": "Training event deleted", "id": event_id}
 
 
@@ -445,12 +509,20 @@ async def delete_training_event(
 async def complete_training_event(
     event_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark a training event as completed."""
-    event = _load_event(db, event_id)
-    _require_event_status(event, [TrainingEventStatus.SCHEDULED])
-    event.status = TrainingEventStatus.COMPLETED
-    db.commit()
+    service = TrainingService(db, principal)
+    try:
+        service.complete_event(event_id)
+        db.commit()
+    except TrainingEventNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_training_event(event_id, db)
 
 
@@ -458,12 +530,20 @@ async def complete_training_event(
 async def cancel_training_event(
     event_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Cancel a training event."""
-    event = _load_event(db, event_id)
-    _require_event_status(event, [TrainingEventStatus.SCHEDULED])
-    event.status = TrainingEventStatus.CANCELLED
-    db.commit()
+    service = TrainingService(db, principal)
+    try:
+        service.cancel_event(event_id)
+        db.commit()
+    except TrainingEventNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_training_event(event_id, db)
 
 
@@ -505,21 +585,24 @@ async def list_training_results(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List training results with filtering."""
-    query = db.query(TrainingResult)
-
-    if training_event_id:
-        query = query.filter(TrainingResult.training_event_id == training_event_id)
-    if employee_id:
-        query = query.filter(TrainingResult.employee_id == employee_id)
+    result_enum = None
     if result:
         try:
             result_enum = TrainingResultStatus(result)
-            query = query.filter(TrainingResult.result == result_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid result: {result}")
 
-    total = query.count()
-    results = query.order_by(TrainingResult.created_at.desc()).offset(offset).limit(limit).all()
+    service = TrainingService(db)
+    result_page = service.list_results(
+        TrainingResultFilters(
+            training_event_id=training_event_id,
+            employee_id=employee_id,
+            result=result_enum,
+        ),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    results = result_page.items
+    total = result_page.total
 
     return {
         "total": total,
@@ -565,9 +648,11 @@ async def get_training_result(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get training result detail."""
-    r = db.query(TrainingResult).filter(TrainingResult.id == result_id).first()
-    if not r:
-        raise HTTPException(status_code=404, detail="Training result not found")
+    service = TrainingService(db)
+    try:
+        r = service.get_result(result_id)
+    except TrainingResultNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     return {
         "id": r.id,
@@ -590,21 +675,34 @@ async def get_training_result(
 async def create_training_result(
     payload: TrainingResultCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new training result."""
-    result = TrainingResult(
-        training_event=payload.training_event,
-        training_event_id=payload.training_event_id,
-        employee=payload.employee,
-        employee_id=payload.employee_id,
-        employee_name=payload.employee_name,
-        hours=decimal_or_default(payload.hours),
-        grade=payload.grade,
-        result=payload.result or TrainingResultStatus.PENDING,
-        comments=payload.comments,
-    )
-    db.add(result)
-    db.commit()
+    if payload.training_event_id is None:
+        raise HTTPException(status_code=400, detail="training_event_id is required")
+    if payload.employee_id is None:
+        raise HTTPException(status_code=400, detail="employee_id is required")
+
+    service = TrainingService(db, principal)
+    try:
+        result = service.create_result(
+            TrainingResultCreateData(
+                training_event=payload.training_event,
+                training_event_id=payload.training_event_id,
+                employee=payload.employee,
+                employee_id=payload.employee_id,
+                employee_name=payload.employee_name,
+                hours=decimal_or_default(payload.hours),
+                grade=payload.grade,
+                result=payload.result or TrainingResultStatus.PENDING,
+                comments=payload.comments,
+            )
+        )
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_training_result(result.id, db)
 
 
@@ -613,35 +711,46 @@ async def update_training_result(
     result_id: int,
     payload: TrainingResultUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a training result."""
-    result = db.query(TrainingResult).filter(TrainingResult.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=404, detail="Training result not found")
+    service = TrainingService(db, principal)
+    try:
+        service.update_result(
+            result_id,
+            TrainingResultUpdateData(
+                hours=decimal_or_default(payload.hours) if payload.hours is not None else None,
+                grade=payload.grade,
+                result=payload.result,
+                comments=payload.comments,
+            ),
+        )
+        db.commit()
+    except TrainingResultNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            if field == "hours":
-                setattr(result, field, decimal_or_default(value))
-            else:
-                setattr(result, field, value)
-
-    db.commit()
-    return await get_training_result(result.id, db)
+    return await get_training_result(result_id, db)
 
 
 @router.delete("/training-results/{result_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_training_result(
     result_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a training result."""
-    result = db.query(TrainingResult).filter(TrainingResult.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=404, detail="Training result not found")
+    service = TrainingService(db, principal)
+    try:
+        service.delete_result(result_id)
+        db.commit()
+    except TrainingResultNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(result)
-    db.commit()
     return {"message": "Training result deleted", "id": result_id}
 
 
@@ -649,14 +758,20 @@ async def delete_training_result(
 async def pass_training_result(
     result_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark a training result as passed."""
-    result = db.query(TrainingResult).filter(TrainingResult.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=404, detail="Training result not found")
+    service = TrainingService(db, principal)
+    try:
+        service.update_result(
+            result_id,
+            TrainingResultUpdateData(result=TrainingResultStatus.PASSED),
+        )
+        db.commit()
+    except TrainingResultNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    result.result = TrainingResultStatus.PASSED
-    db.commit()
     return await get_training_result(result_id, db)
 
 
@@ -664,12 +779,18 @@ async def pass_training_result(
 async def fail_training_result(
     result_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark a training result as failed."""
-    result = db.query(TrainingResult).filter(TrainingResult.id == result_id).first()
-    if not result:
-        raise HTTPException(status_code=404, detail="Training result not found")
+    service = TrainingService(db, principal)
+    try:
+        service.update_result(
+            result_id,
+            TrainingResultUpdateData(result=TrainingResultStatus.FAILED),
+        )
+        db.commit()
+    except TrainingResultNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    result.result = TrainingResultStatus.FAILED
-    db.commit()
     return await get_training_result(result_id, db)

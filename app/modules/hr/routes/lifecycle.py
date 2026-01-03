@@ -4,15 +4,15 @@ HR Lifecycle Routes - Onboarding, Separation, Promotion, Transfer with SSR + HTM
 Permission Requirements:
 - hr:read - View lifecycle events
 - hr:write - Create, update, manage lifecycle events
+
+Uses LifecycleService for all business logic.
 """
 from __future__ import annotations
 
 from typing import Optional
-from datetime import date
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -22,16 +22,17 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.employee import Employee
-from app.models.hr import Department, Designation
-from app.models.hr_lifecycle import (
-    EmployeeOnboarding,
-    EmployeeSeparation,
-    EmployeePromotion,
-    EmployeeTransfer,
-    BoardingStatus,
-)
+from app.models.hr_lifecycle import BoardingStatus
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.hr.lifecycle import LifecycleService
+from app.services.hr.lifecycle_types import (
+    OnboardingFilters,
+    SeparationFilters,
+    PromotionFilters,
+    TransferFilters,
+)
+from app.services.base import Pagination
+from app.services.hr.errors import NotFoundError, ValidationError
 
 RequireHRRead = Depends(require_scope("hr:read"))
 RequireHRWrite = Depends(require_scope("hr:write"))
@@ -41,25 +42,26 @@ templates = get_template_env()
 
 
 def get_boarding_status_options():
+    """Get boarding status options for select dropdown."""
     return [
         {"value": s.value, "label": s.value.replace("_", " ").title()}
         for s in BoardingStatus
     ]
 
 
-def get_employee_options(db):
-    employees = db.query(Employee).filter(Employee.is_deleted == False).order_by(Employee.name).all()
-    return [{"value": str(e.id), "label": e.name} for e in employees]
+def _lifecycle_error_response(
+    request: Request,
+    response: Response,
+    message: str,
+    redirect_url: str,
+):
+    if is_htmx_request(request):
+        htmx_toast(response, message, "error")
+        response.headers["HX-Redirect"] = redirect_url
+        return HTMLResponse("", headers=dict(response.headers))
 
-
-def get_department_options(db):
-    departments = db.query(Department).order_by(Department.department_name).all()
-    return [{"value": str(d.id), "label": d.department_name} for d in departments]
-
-
-def get_designation_options(db):
-    designations = db.query(Designation).order_by(Designation.designation_name).all()
-    return [{"value": str(d.id), "label": d.designation_name} for d in designations]
+    set_flash(response, message, "error")
+    return RedirectResponse(url=redirect_url, status_code=303)
 
 
 # =============================================================================
@@ -79,20 +81,26 @@ async def onboarding_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Onboarding list page."""
-    query = db.query(EmployeeOnboarding)
+    service = LifecycleService(db, user)
 
-    if q:
-        query = query.filter(or_(
-            EmployeeOnboarding.employee_name.ilike(f"%{q}%"),
-            EmployeeOnboarding.employee.ilike(f"%{q}%"),
-        ))
-
+    # Build filters - handle invalid status gracefully
+    status_enum = None
     if status:
-        query = query.filter(EmployeeOnboarding.boarding_status == status)
+        try:
+            status_enum = BoardingStatus(status)
+        except ValueError:
+            pass  # Invalid status value, ignore filter
+    filters = OnboardingFilters(
+        search=q,
+        boarding_status=status_enum,
+    )
 
-    total = query.count()
     offset = (page - 1) * per_page
-    onboardings = query.order_by(EmployeeOnboarding.date_of_joining.desc()).offset(offset).limit(per_page).all()
+    pagination = Pagination(offset=offset, limit=per_page)
+
+    result = service.list_onboardings(filters, pagination)
+    onboardings = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["onboardings"] = onboardings
@@ -127,9 +135,11 @@ async def onboarding_detail(
     onboarding_id: int,
 ):
     """Onboarding detail page."""
-    onboarding = db.query(EmployeeOnboarding).filter(EmployeeOnboarding.id == onboarding_id).first()
+    service = LifecycleService(db, user)
 
-    if not onboarding:
+    try:
+        onboarding = service.get_onboarding(onboarding_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Onboarding not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -157,12 +167,18 @@ async def onboarding_start(
     onboarding_id: int,
 ):
     """Start the onboarding process."""
-    onboarding = db.query(EmployeeOnboarding).filter(EmployeeOnboarding.id == onboarding_id).first()
-    if not onboarding:
-        raise HTTPException(status_code=404, detail="Onboarding not found")
-
-    onboarding.boarding_status = BoardingStatus.IN_PROGRESS
-    db.commit()
+    service = LifecycleService(db, user)
+    try:
+        service.start_onboarding(onboarding_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        return _lifecycle_error_response(
+            request, response, str(exc), f"/hr/lifecycle/onboarding/{onboarding_id}"
+        )
 
     if is_htmx_request(request):
         htmx_toast(response, "Onboarding started.", "success")
@@ -183,12 +199,18 @@ async def onboarding_complete(
     onboarding_id: int,
 ):
     """Complete the onboarding process."""
-    onboarding = db.query(EmployeeOnboarding).filter(EmployeeOnboarding.id == onboarding_id).first()
-    if not onboarding:
-        raise HTTPException(status_code=404, detail="Onboarding not found")
-
-    onboarding.boarding_status = BoardingStatus.COMPLETED
-    db.commit()
+    service = LifecycleService(db, user)
+    try:
+        service.complete_onboarding(onboarding_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        return _lifecycle_error_response(
+            request, response, str(exc), f"/hr/lifecycle/onboarding/{onboarding_id}"
+        )
 
     if is_htmx_request(request):
         htmx_toast(response, "Onboarding completed.", "success")
@@ -216,20 +238,26 @@ async def separation_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Separation list page."""
-    query = db.query(EmployeeSeparation)
+    service = LifecycleService(db, user)
 
-    if q:
-        query = query.filter(or_(
-            EmployeeSeparation.employee_name.ilike(f"%{q}%"),
-            EmployeeSeparation.employee.ilike(f"%{q}%"),
-        ))
-
+    # Build filters - handle invalid status gracefully
+    status_enum = None
     if status:
-        query = query.filter(EmployeeSeparation.boarding_status == status)
+        try:
+            status_enum = BoardingStatus(status)
+        except ValueError:
+            pass  # Invalid status value, ignore filter
+    filters = SeparationFilters(
+        search=q,
+        boarding_status=status_enum,
+    )
 
-    total = query.count()
     offset = (page - 1) * per_page
-    separations = query.order_by(EmployeeSeparation.separation_date.desc()).offset(offset).limit(per_page).all()
+    pagination = Pagination(offset=offset, limit=per_page)
+
+    result = service.list_separations(filters, pagination)
+    separations = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["separations"] = separations
@@ -264,9 +292,11 @@ async def separation_detail(
     separation_id: int,
 ):
     """Separation detail page."""
-    separation = db.query(EmployeeSeparation).filter(EmployeeSeparation.id == separation_id).first()
+    service = LifecycleService(db, user)
 
-    if not separation:
+    try:
+        separation = service.get_separation(separation_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Separation not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -282,6 +312,70 @@ async def separation_detail(
 
     template = templates.get_template("modules/hr/templates/lifecycle/pages/separation_detail.html")
     return HTMLResponse(template.render(context))
+
+
+@router.post("/separation/{separation_id}/start", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def separation_start(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    separation_id: int,
+):
+    """Start the separation process."""
+    service = LifecycleService(db, user)
+    try:
+        service.start_separation(separation_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        return _lifecycle_error_response(
+            request, response, str(exc), f"/hr/lifecycle/separation/{separation_id}"
+        )
+
+    if is_htmx_request(request):
+        htmx_toast(response, "Separation started.", "success")
+        response.headers["HX-Redirect"] = f"/hr/lifecycle/separation/{separation_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, "Separation started.", "success")
+    return RedirectResponse(url=f"/hr/lifecycle/separation/{separation_id}", status_code=303)
+
+
+@router.post("/separation/{separation_id}/complete", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def separation_complete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    separation_id: int,
+):
+    """Complete the separation process."""
+    service = LifecycleService(db, user)
+    try:
+        service.complete_separation(separation_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        return _lifecycle_error_response(
+            request, response, str(exc), f"/hr/lifecycle/separation/{separation_id}"
+        )
+
+    if is_htmx_request(request):
+        htmx_toast(response, "Separation completed.", "success")
+        response.headers["HX-Redirect"] = f"/hr/lifecycle/separation/{separation_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, "Separation completed.", "success")
+    return RedirectResponse(url=f"/hr/lifecycle/separation/{separation_id}", status_code=303)
 
 
 # =============================================================================
@@ -300,17 +394,16 @@ async def promotions_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Promotions list page."""
-    query = db.query(EmployeePromotion)
+    service = LifecycleService(db, user)
 
-    if q:
-        query = query.filter(or_(
-            EmployeePromotion.employee_name.ilike(f"%{q}%"),
-            EmployeePromotion.employee.ilike(f"%{q}%"),
-        ))
+    filters = PromotionFilters(search=q)
 
-    total = query.count()
     offset = (page - 1) * per_page
-    promotions = query.order_by(EmployeePromotion.promotion_date.desc()).offset(offset).limit(per_page).all()
+    pagination = Pagination(offset=offset, limit=per_page)
+
+    result = service.list_promotions(filters, pagination)
+    promotions = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["promotions"] = promotions
@@ -343,9 +436,11 @@ async def promotion_detail(
     promotion_id: int,
 ):
     """Promotion detail page."""
-    promotion = db.query(EmployeePromotion).filter(EmployeePromotion.id == promotion_id).first()
+    service = LifecycleService(db, user)
 
-    if not promotion:
+    try:
+        promotion = service.get_promotion(promotion_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Promotion not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -361,6 +456,38 @@ async def promotion_detail(
 
     template = templates.get_template("modules/hr/templates/lifecycle/pages/promotion_detail.html")
     return HTMLResponse(template.render(context))
+
+
+@router.post("/promotions/{promotion_id}/submit", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def promotion_submit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    promotion_id: int,
+):
+    """Submit a promotion (make it official)."""
+    service = LifecycleService(db, user)
+    try:
+        service.submit_promotion(promotion_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        return _lifecycle_error_response(
+            request, response, str(exc), f"/hr/lifecycle/promotions/{promotion_id}"
+        )
+
+    if is_htmx_request(request):
+        htmx_toast(response, "Promotion submitted.", "success")
+        response.headers["HX-Redirect"] = f"/hr/lifecycle/promotions/{promotion_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, "Promotion submitted.", "success")
+    return RedirectResponse(url=f"/hr/lifecycle/promotions/{promotion_id}", status_code=303)
 
 
 # =============================================================================
@@ -379,17 +506,16 @@ async def transfers_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Transfers list page."""
-    query = db.query(EmployeeTransfer)
+    service = LifecycleService(db, user)
 
-    if q:
-        query = query.filter(or_(
-            EmployeeTransfer.employee_name.ilike(f"%{q}%"),
-            EmployeeTransfer.employee.ilike(f"%{q}%"),
-        ))
+    filters = TransferFilters(search=q)
 
-    total = query.count()
     offset = (page - 1) * per_page
-    transfers = query.order_by(EmployeeTransfer.transfer_date.desc()).offset(offset).limit(per_page).all()
+    pagination = Pagination(offset=offset, limit=per_page)
+
+    result = service.list_transfers(filters, pagination)
+    transfers = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["transfers"] = transfers
@@ -422,9 +548,11 @@ async def transfer_detail(
     transfer_id: int,
 ):
     """Transfer detail page."""
-    transfer = db.query(EmployeeTransfer).filter(EmployeeTransfer.id == transfer_id).first()
+    service = LifecycleService(db, user)
 
-    if not transfer:
+    try:
+        transfer = service.get_transfer(transfer_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Transfer not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -440,3 +568,35 @@ async def transfer_detail(
 
     template = templates.get_template("modules/hr/templates/lifecycle/pages/transfer_detail.html")
     return HTMLResponse(template.render(context))
+
+
+@router.post("/transfers/{transfer_id}/submit", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def transfer_submit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    transfer_id: int,
+):
+    """Submit a transfer (make it official)."""
+    service = LifecycleService(db, user)
+    try:
+        service.submit_transfer(transfer_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        return _lifecycle_error_response(
+            request, response, str(exc), f"/hr/lifecycle/transfers/{transfer_id}"
+        )
+
+    if is_htmx_request(request):
+        htmx_toast(response, "Transfer submitted.", "success")
+        response.headers["HX-Redirect"] = f"/hr/lifecycle/transfers/{transfer_id}"
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, "Transfer submitted.", "success")
+    return RedirectResponse(url=f"/hr/lifecycle/transfers/{transfer_id}", status_code=303)

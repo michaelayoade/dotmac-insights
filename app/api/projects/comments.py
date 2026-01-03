@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.auth import User
 from app.auth import get_current_user
@@ -205,4 +204,3 @@ async def delete_comment(
     db.commit()
 
     return {"message": "Comment deleted", "id": comment_id}
-

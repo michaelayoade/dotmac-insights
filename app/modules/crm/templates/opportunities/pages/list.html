@@ -1,0 +1,69 @@
+{% extends "layouts/module.html" %}
+
+{% block title %}Opportunities{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Opportunities</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ total }} total opportunities</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/crm/opportunities?view=kanban" class="btn {% if view == 'kanban' %}btn-primary{% else %}btn-secondary{% endif %}">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                </svg>
+                Kanban
+            </a>
+            <a href="/crm/opportunities?view=list" class="btn {% if view == 'list' %}btn-primary{% else %}btn-secondary{% endif %}">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                List
+            </a>
+            <a href="/crm/opportunities?action=new" class="btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Opportunity
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white shadow rounded-lg p-4">
+        <form hx-get="/crm/opportunities/table" hx-target="#opportunities-table" class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <input type="text" name="search" value="{{ search }}" placeholder="Search opportunities..."
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    hx-get="/crm/opportunities/table" hx-target="#opportunities-table" hx-trigger="keyup changed delay:300ms">
+            </div>
+            <div class="w-40">
+                <select name="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    hx-get="/crm/opportunities/table" hx-target="#opportunities-table" hx-trigger="change">
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {% if status_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="w-48">
+                <select name="stage_id" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    hx-get="/crm/opportunities/table" hx-target="#opportunities-table" hx-trigger="change">
+                    <option value="">All Stages</option>
+                    {% for stage in stages %}
+                    <option value="{{ stage.id }}" {% if stage_filter == stage.id %}selected{% endif %}>{{ stage.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="opportunities-table" class="bg-white shadow rounded-lg overflow-hidden">
+        {% include "modules/crm/templates/opportunities/partials/opportunities_table.html" %}
+    </div>
+</div>
+{% endblock %}

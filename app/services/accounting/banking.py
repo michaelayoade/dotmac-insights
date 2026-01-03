@@ -118,6 +118,79 @@ class BankingService:
             ],
         }
 
+    def list_bank_accounts_paginated(
+        self,
+        search: Optional[str] = None,
+        include_disabled: bool = False,
+        pagination: Optional[PaginationParams] = None,
+    ) -> PaginatedResult[BankAccount]:
+        """List bank accounts with optional search and pagination."""
+        if pagination is None:
+            pagination = PaginationParams()
+
+        query = self.db.query(BankAccount)
+        if not include_disabled:
+            query = query.filter(BankAccount.disabled == False)
+
+        if search:
+            if len(search) < 2:
+                raise ValidationError("Search query must be at least 2 characters")
+            query = query.filter(
+                or_(
+                    BankAccount.account_name.ilike(f"%{search}%"),
+                    BankAccount.bank.ilike(f"%{search}%"),
+                    BankAccount.bank_account_no.ilike(f"%{search}%"),
+                )
+            )
+
+        query = query.order_by(BankAccount.account_name)
+        return paginate(query, pagination)
+
+    def get_bank_account_stats(self) -> Dict[str, Any]:
+        """Get summary stats for bank accounts list view."""
+        total_count = self.db.query(func.count(BankAccount.id)).filter(
+            BankAccount.disabled == False
+        ).scalar() or 0
+
+        unreconciled = self.db.query(func.count(BankTransaction.id)).filter(
+            BankTransaction.status == BankTransactionStatus.UNRECONCILED
+        ).scalar() or 0
+
+        pending = self.db.query(func.count(BankTransaction.id)).filter(
+            BankTransaction.status == BankTransactionStatus.PENDING
+        ).scalar() or 0
+
+        return {
+            "total_accounts": total_count,
+            "unreconciled_txns": unreconciled,
+            "pending_txns": pending,
+        }
+
+    def get_bank_account_balance_summary(
+        self,
+        account: BankAccount,
+    ) -> Dict[str, Decimal]:
+        """Get deposits/withdrawals/balance summary for a bank account."""
+        total_deposits = self.db.query(func.sum(BankTransaction.deposit)).filter(
+            or_(
+                BankTransaction.bank_account_id == account.id,
+                BankTransaction.bank_account == account.account_name,
+            )
+        ).scalar() or Decimal("0")
+
+        total_withdrawals = self.db.query(func.sum(BankTransaction.withdrawal)).filter(
+            or_(
+                BankTransaction.bank_account_id == account.id,
+                BankTransaction.bank_account == account.account_name,
+            )
+        ).scalar() or Decimal("0")
+
+        return {
+            "total_deposits": total_deposits,
+            "total_withdrawals": total_withdrawals,
+            "balance": total_deposits - total_withdrawals,
+        }
+
     def get_bank_account(self, account_id: int) -> BankAccount:
         """Get a bank account by ID.
 
@@ -248,6 +321,9 @@ class BankingService:
         """
         query = self.db.query(BankTransaction)
 
+        if filters.bank_account_id:
+            query = query.filter(BankTransaction.bank_account_id == filters.bank_account_id)
+
         if filters.bank_account:
             query = query.filter(
                 BankTransaction.bank_account.ilike(f"%{filters.bank_account}%")
@@ -330,6 +406,41 @@ class BankingService:
         if not txn:
             raise NotFoundError("Bank transaction not found")
         return txn
+
+    def mark_transactions_reconciled(self, transaction_ids: List[int]) -> int:
+        """Mark bank transactions as reconciled."""
+        if not transaction_ids:
+            return 0
+        txns = (
+            self.db.query(BankTransaction)
+            .filter(BankTransaction.id.in_(transaction_ids))
+            .all()
+        )
+        for txn in txns:
+            txn.status = BankTransactionStatus.RECONCILED
+        return len(txns)
+
+    def list_unreconciled_transactions(
+        self,
+        account: BankAccount,
+        limit: int = 100,
+    ) -> List[BankTransaction]:
+        """List unreconciled/pending transactions for a bank account."""
+        return (
+            self.db.query(BankTransaction)
+            .filter(
+                or_(
+                    BankTransaction.bank_account_id == account.id,
+                    BankTransaction.bank_account == account.account_name,
+                ),
+                BankTransaction.status.in_(
+                    [BankTransactionStatus.UNRECONCILED, BankTransactionStatus.PENDING]
+                ),
+            )
+            .order_by(BankTransaction.date.desc())
+            .limit(limit)
+            .all()
+        )
 
     def create_transaction(
         self,

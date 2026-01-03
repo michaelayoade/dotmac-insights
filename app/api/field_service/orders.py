@@ -34,7 +34,7 @@ from app.models.field_service import (
     TimeEntryType,
     PhotoType,
 )
-from app.models.customer import Customer
+from app.models.party import CustomerAccount
 from app.models.employee import Employee
 from app.models.project import Project
 from app.models.task import Task
@@ -52,7 +52,7 @@ class ServiceOrderCreate(BaseModel):
     """Schema for creating a service order."""
     order_type: ServiceOrderType
     priority: Optional[ServiceOrderPriority] = ServiceOrderPriority.MEDIUM
-    customer_id: int
+    customer_account_id: int
     project_id: Optional[int] = None
     task_id: Optional[int] = None
     ticket_id: Optional[int] = None
@@ -258,7 +258,7 @@ def serialize_order(order: ServiceOrder, include_details: bool = False) -> Dict[
         "order_type": order.order_type.value,
         "status": order.status.value,
         "priority": order.priority.value,
-        "customer_id": order.customer_id,
+        "customer_account_id": order.customer_account_id,
         "customer_name": order.customer.name if order.customer else None,
         "project_id": order.project_id,
         "task_id": order.task_id,
@@ -473,7 +473,7 @@ async def list_orders(
     status: Optional[str] = None,
     order_type: Optional[str] = None,
     priority: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     technician_id: Optional[int] = None,
     team_id: Optional[int] = None,
     zone_id: Optional[int] = None,
@@ -508,8 +508,8 @@ async def list_orders(
         except ValueError:
             raise HTTPException(400, f"Invalid priority: {priority}")
 
-    if customer_id:
-        query = query.filter(ServiceOrder.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(ServiceOrder.customer_account_id == customer_account_id)
 
     if technician_id:
         query = query.filter(ServiceOrder.assigned_technician_id == technician_id)
@@ -603,9 +603,9 @@ async def create_order(
 ) -> Dict[str, Any]:
     """Create a new service order with transaction safety."""
     # Validate customer
-    customer = db.query(Customer).filter(Customer.id == payload.customer_id).first()
+    customer = db.query(CustomerAccount).filter(CustomerAccount.id == payload.customer_account_id).first()
     if not customer:
-        raise HTTPException(400, "Customer not found")
+        raise HTTPException(400, "Customer account not found")
 
     # Validate linked entities
     if payload.project_id:
@@ -630,7 +630,7 @@ async def create_order(
             order_type=payload.order_type,
             status=ServiceOrderStatus.DRAFT,
             priority=payload.priority or ServiceOrderPriority.MEDIUM,
-            customer_id=payload.customer_id,
+            customer_account_id=payload.customer_account_id,
             project_id=payload.project_id,
             task_id=payload.task_id,
             ticket_id=payload.ticket_id,

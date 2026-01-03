@@ -91,6 +91,7 @@ class BankTransactionFilters:
     """Filters for listing bank transactions."""
 
     bank_account: Optional[str] = None
+    bank_account_id: Optional[int] = None
     status: Optional[str] = None
     transaction_type: Optional[str] = None
     start_date: Optional[date] = None

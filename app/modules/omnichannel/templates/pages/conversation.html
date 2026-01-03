@@ -283,12 +283,12 @@
                         View Ticket #{{ conversation.ticket_id }}
                     </a>
                     {% endif %}
-                    {% if conversation.customer_id %}
-                    <a href="/customers/{{ conversation.customer_id }}" class="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 font-body transition-colors">
+                    {% if conversation.customer_account and conversation.customer_account.party %}
+                    <a href="/parties/{{ conversation.customer_account.party.id }}" class="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 font-body transition-colors">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        View Customer
+                        View Party
                     </a>
                     {% endif %}
                 </div>

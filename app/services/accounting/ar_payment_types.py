@@ -24,10 +24,14 @@ __all__ = [
 class PaymentFilters:
     """Filters for listing payments."""
 
+    search: Optional[str] = None
     customer_account_id: Optional[int] = None
     status: Optional[PaymentStatus] = None
+    payment_method: Optional[PaymentMethod] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    sort_by: str = "payment_date"
+    sort_dir: str = "desc"
 
 
 @dataclass
@@ -68,7 +72,11 @@ class PaymentUpdateData:
 
     payment_date: Optional[datetime] = None
     amount: Optional[Decimal] = None
+    receipt_number: Optional[str] = None
+    customer_account_id: Optional[int] = None
+    currency: Optional[str] = None
     payment_method: Optional[PaymentMethod] = None
     transaction_reference: Optional[str] = None
     notes: Optional[str] = None
     conversion_rate: Optional[Decimal] = None
+    bank_account_id: Optional[int] = None

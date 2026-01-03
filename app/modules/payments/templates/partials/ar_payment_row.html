@@ -4,7 +4,7 @@
         <a href="/payments/receivables/{{ payment.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ payment.receipt_number or 'PMT-' ~ payment.id }}</a>
     </td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
-        {{ payment.contact.name if payment.contact else (payment.customer.customer_name if payment.customer else '-') }}
+        {{ payment.customer_account.party.name if payment.customer_account and payment.customer_account.party else '-' }}
     </td>
     <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ payment.payment_date.strftime('%b %d, %Y') if payment.payment_date else '-' }}</td>
     <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900 text-right">{{ payment.amount|round(2) }} {{ payment.currency }}</td>

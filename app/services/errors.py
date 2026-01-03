@@ -35,3 +35,9 @@ class ForbiddenError(ServiceError):
     """Raised when principal lacks permission for the operation."""
 
     http_code = 403
+
+
+class DuplicateError(ConflictError):
+    """Raised when attempting to create a duplicate resource."""
+
+    pass

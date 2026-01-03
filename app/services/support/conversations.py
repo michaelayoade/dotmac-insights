@@ -26,7 +26,7 @@ from app.models.omni import (
 )
 from app.models.agent import Agent, Team
 from app.models.ticket import Ticket, TicketStatus, TicketPriority
-from app.models.sales import ERPNextLead
+from app.models.party import Party, PartyRole
 from app.services.base import paginate
 from app.services.types import PaginatedResult, PaginationParams
 
@@ -735,46 +735,95 @@ class ConversationService:
         company_name: Optional[str] = None,
         source: str = "inbox",
         notes: Optional[str] = None,
-    ) -> ERPNextLead:
+        qualification: Optional[str] = None,
+        owner_party_id: Optional[int] = None,
+    ) -> Party:
         """Create a sales lead from a conversation.
+
+        Creates a Party entity with a PartyRole(role="lead"). This replaces
+        the deprecated ERPNextLead approach - all leads are now Party entities.
 
         Args:
             conversation_id: The conversation ID.
             lead_name: Lead name (defaults to contact name).
-            company_name: Company name.
-            source: Lead source.
+            company_name: Company name (for organization-type parties).
+            source: Lead source (e.g., "inbox", "website", "referral").
             notes: Lead notes.
+            qualification: Lead qualification status.
+            owner_party_id: Party ID of the sales rep owning this lead.
 
         Returns:
-            Created ERPNextLead instance.
+            Created Party instance with lead role.
 
         Raises:
             ConversationNotFoundError: If conversation not found.
-            ValidationError: If conversation already has a lead.
+            ValidationError: If conversation party is already a lead.
         """
         conv = self.get(conversation_id)
 
-        if conv.lead_id:
-            raise ValidationError("Conversation already has a lead")
+        # Check if party already exists and has lead role
+        if conv.party_id:
+            existing_lead_role = (
+                self.db.query(PartyRole)
+                .filter(PartyRole.party_id == conv.party_id)
+                .filter(PartyRole.role == "lead")
+                .filter(PartyRole.until.is_(None))
+                .first()
+            )
+            if existing_lead_role:
+                raise ValidationError("Conversation party is already a lead")
 
-        lead = ERPNextLead(
-            lead_name=lead_name or conv.contact_name or "Unknown",
-            company_name=company_name or conv.contact_company,
-            email_id=conv.contact_email,
-            source=source,
+            # Party exists but no lead role - add lead role
+            party = self.db.query(Party).filter(Party.id == conv.party_id).first()
+            if party:
+                role = PartyRole(
+                    party_id=party.id,
+                    role="lead",
+                    status="active",
+                    source=source,
+                    source_campaign=f"conversation_{conv.id}",
+                    qualification=qualification,
+                    owner_party_id=owner_party_id,
+                )
+                self.db.add(role)
+                self.db.flush()
+                return party
+
+        # Create new Party
+        # Determine party type based on whether company_name is provided
+        party_type = "organization" if company_name else "person"
+        party_name = lead_name or conv.contact_name or "Unknown"
+
+        party = Party(
+            type=party_type,
+            status="active",
+            name=party_name if party_type == "person" else company_name,
+            primary_email=conv.contact_email,
+            primary_phone=conv.contact_phone if hasattr(conv, 'contact_phone') else None,
             notes=notes or f"Created from inbox conversation #{conv.id}",
-            status="Open",
-            created_at=datetime.now(timezone.utc),
         )
-        self.db.add(lead)
+        self.db.add(party)
         self.db.flush()
 
-        # Link conversation to lead
-        conv.lead_id = lead.id
+        # Create PartyRole with role='lead'
+        role = PartyRole(
+            party_id=party.id,
+            role="lead",
+            status="active",
+            source=source,
+            source_campaign=f"conversation_{conv.id}",
+            qualification=qualification,
+            owner_party_id=owner_party_id,
+        )
+        self.db.add(role)
+        self.db.flush()
+
+        # Link conversation to party
+        conv.party_id = party.id
         conv.updated_at = datetime.now(timezone.utc)
         self.db.flush()
 
-        return lead
+        return party
 
     # -------------------------------------------------------------------------
     # Bulk Operations

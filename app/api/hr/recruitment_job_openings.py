@@ -10,8 +10,16 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, get_current_principal
 from app.models.hr_recruitment import JobOpening, JobOpeningStatus
+from app.services.hr.recruitment import RecruitmentService
+from app.services.hr.recruitment_types import (
+    JobOpeningCreateData,
+    JobOpeningFilters,
+    JobOpeningUpdateData,
+)
+from app.services.hr.errors import JobOpeningNotFoundError, ValidationError
+from app.services.types import PaginationParams
 from .helpers import decimal_or_default, status_counts
 
 router = APIRouter()
@@ -70,27 +78,27 @@ async def list_job_openings(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List job openings with filtering."""
-    query = db.query(JobOpening)
-
+    status_enum = None
     if status:
         try:
             status_enum = JobOpeningStatus(status)
-            query = query.filter(JobOpening.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if department:
-        query = query.filter(JobOpening.department.ilike(f"%{department}%"))
-    if designation:
-        query = query.filter(JobOpening.designation.ilike(f"%{designation}%"))
-    if company:
-        query = query.filter(JobOpening.company.ilike(f"%{company}%"))
-    if search:
-        query = query.filter(JobOpening.job_title.ilike(f"%{search}%"))
-    if publish is not None:
-        query = query.filter(JobOpening.publish == publish)
 
-    total = query.count()
-    openings = query.order_by(JobOpening.created_at.desc()).offset(offset).limit(limit).all()
+    service = RecruitmentService(db)
+    result = service.list_job_openings(
+        JobOpeningFilters(
+            status=status_enum,
+            department=department,
+            designation=designation,
+            company=company,
+            publish=publish,
+            search=search,
+        ),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    openings = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -137,9 +145,11 @@ async def get_job_opening(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get job opening detail."""
-    j = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    if not j:
-        raise HTTPException(status_code=404, detail="Job opening not found")
+    service = RecruitmentService(db)
+    try:
+        j = service.get_job_opening(opening_id)
+    except JobOpeningNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     return {
         "id": j.id,
@@ -166,25 +176,36 @@ async def get_job_opening(
 async def create_job_opening(
     payload: JobOpeningCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new job opening."""
-    opening = JobOpening(
-        job_title=payload.job_title,
-        designation=payload.designation,
-        designation_id=payload.designation_id,
-        department=payload.department,
-        department_id=payload.department_id,
-        company=payload.company,
-        status=payload.status or JobOpeningStatus.OPEN,
-        publish=payload.publish or False,
-        route=payload.route,
-        description=payload.description,
-        lower_range=decimal_or_default(payload.lower_range),
-        upper_range=decimal_or_default(payload.upper_range),
-        currency=payload.currency or "USD",
-    )
-    db.add(opening)
-    db.commit()
+    service = RecruitmentService(db, principal)
+    try:
+        opening = service.create_job_opening(
+            JobOpeningCreateData(
+                job_title=payload.job_title,
+                designation=payload.designation,
+                designation_id=payload.designation_id,
+                department=payload.department,
+                department_id=payload.department_id,
+                company=payload.company,
+                description=payload.description,
+                lower_range=decimal_or_default(payload.lower_range),
+                upper_range=decimal_or_default(payload.upper_range),
+                currency=payload.currency or "USD",
+                publish=payload.publish or False,
+            )
+        )
+        if payload.status and payload.status != JobOpeningStatus.OPEN:
+            service.update_job_opening(
+                opening.id,
+                JobOpeningUpdateData(status=payload.status),
+            )
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_job_opening(opening.id, db)
 
 
@@ -193,36 +214,53 @@ async def update_job_opening(
     opening_id: int,
     payload: JobOpeningUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a job opening."""
-    opening = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    if not opening:
-        raise HTTPException(status_code=404, detail="Job opening not found")
+    service = RecruitmentService(db, principal)
+    try:
+        service.update_job_opening(
+            opening_id,
+            JobOpeningUpdateData(
+                job_title=payload.job_title,
+                designation=payload.designation,
+                designation_id=payload.designation_id,
+                department=payload.department,
+                department_id=payload.department_id,
+                description=payload.description,
+                lower_range=decimal_or_default(payload.lower_range) if payload.lower_range is not None else None,
+                upper_range=decimal_or_default(payload.upper_range) if payload.upper_range is not None else None,
+                currency=payload.currency,
+                publish=payload.publish,
+                status=payload.status,
+            ),
+        )
+        db.commit()
+    except JobOpeningNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    decimal_fields = ["lower_range", "upper_range"]
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            if field in decimal_fields:
-                setattr(opening, field, decimal_or_default(value))
-            else:
-                setattr(opening, field, value)
-
-    db.commit()
-    return await get_job_opening(opening.id, db)
+    return await get_job_opening(opening_id, db)
 
 
 @router.delete("/job-openings/{opening_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_job_opening(
     opening_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a job opening."""
-    opening = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    if not opening:
-        raise HTTPException(status_code=404, detail="Job opening not found")
+    service = RecruitmentService(db, principal)
+    try:
+        service.delete_job_opening(opening_id)
+        db.commit()
+    except JobOpeningNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(opening)
-    db.commit()
     return {"message": "Job opening deleted", "id": opening_id}
 
 
@@ -230,17 +268,20 @@ async def delete_job_opening(
 async def close_job_opening(
     opening_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Close a job opening."""
-    opening = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    if not opening:
-        raise HTTPException(status_code=404, detail="Job opening not found")
+    service = RecruitmentService(db, principal)
+    try:
+        opening = service.get_job_opening(opening_id)
+        if opening.status != JobOpeningStatus.OPEN:
+            raise HTTPException(status_code=400, detail="Only open positions can be closed")
+        service.close_job_opening(opening_id)
+        db.commit()
+    except JobOpeningNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    if opening.status != JobOpeningStatus.OPEN:
-        raise HTTPException(status_code=400, detail="Only open positions can be closed")
-
-    opening.status = JobOpeningStatus.CLOSED
-    db.commit()
     return await get_job_opening(opening_id, db)
 
 
@@ -248,17 +289,26 @@ async def close_job_opening(
 async def hold_job_opening(
     opening_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Put a job opening on hold."""
-    opening = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    if not opening:
-        raise HTTPException(status_code=404, detail="Job opening not found")
+    service = RecruitmentService(db, principal)
+    try:
+        opening = service.get_job_opening(opening_id)
+        if opening.status != JobOpeningStatus.OPEN:
+            raise HTTPException(status_code=400, detail="Only open positions can be put on hold")
+        service.update_job_opening(
+            opening_id,
+            JobOpeningUpdateData(status=JobOpeningStatus.ON_HOLD),
+        )
+        db.commit()
+    except JobOpeningNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    if opening.status != JobOpeningStatus.OPEN:
-        raise HTTPException(status_code=400, detail="Only open positions can be put on hold")
-
-    opening.status = JobOpeningStatus.ON_HOLD
-    db.commit()
     return await get_job_opening(opening_id, db)
 
 
@@ -266,15 +316,24 @@ async def hold_job_opening(
 async def reopen_job_opening(
     opening_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Reopen a job opening."""
-    opening = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    if not opening:
-        raise HTTPException(status_code=404, detail="Job opening not found")
+    service = RecruitmentService(db, principal)
+    try:
+        opening = service.get_job_opening(opening_id)
+        if opening.status == JobOpeningStatus.OPEN:
+            raise HTTPException(status_code=400, detail="Position is already open")
+        service.update_job_opening(
+            opening_id,
+            JobOpeningUpdateData(status=JobOpeningStatus.OPEN),
+        )
+        db.commit()
+    except JobOpeningNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    if opening.status == JobOpeningStatus.OPEN:
-        raise HTTPException(status_code=400, detail="Position is already open")
-
-    opening.status = JobOpeningStatus.OPEN
-    db.commit()
     return await get_job_opening(opening_id, db)

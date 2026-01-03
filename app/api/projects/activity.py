@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.api.projects.comments import VALID_ENTITY_TYPES
 
@@ -139,4 +138,3 @@ async def get_project_activity_timeline(
         "total": len(activities),
         "data": [_serialize_activity(a) for a in activities],
     }
-

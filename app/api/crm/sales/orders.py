@@ -23,7 +23,7 @@ router = APIRouter(prefix="/orders", tags=["crm-sales-orders"])
 
 class SalesOrderBase(BaseModel):
     """Base schema for sales orders."""
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_date: Optional[datetime] = None
     delivery_date: Optional[datetime] = None
@@ -41,6 +41,7 @@ class SalesOrderCreate(SalesOrderBase):
 
 class SalesOrderUpdate(BaseModel):
     """Schema for updating a sales order."""
+    customer_account_id: Optional[int] = None
     customer_name: Optional[str] = None
     order_date: Optional[datetime] = None
     delivery_date: Optional[datetime] = None
@@ -55,7 +56,7 @@ class SalesOrderResponse(BaseModel):
     """Schema for sales order response."""
     id: int
     erpnext_id: Optional[str]
-    customer_id: Optional[int]
+    customer_account_id: Optional[int]
     customer_name: Optional[str]
     status: str
     order_date: Optional[datetime]
@@ -93,7 +94,7 @@ def _serialize_order(order: SalesOrder) -> Dict[str, Any]:
     return {
         "id": order.id,
         "erpnext_id": order.erpnext_id,
-        "customer_id": order.customer_id,
+        "customer_account_id": order.customer_account_id,
         "customer_name": order.customer_name,
         "status": order.status.value if order.status else None,
         "order_date": order.transaction_date.isoformat() if order.transaction_date else None,
@@ -115,7 +116,7 @@ def _serialize_order(order: SalesOrder) -> Dict[str, Any]:
 @router.get("", dependencies=[Depends(Require("crm:read"))])
 async def list_orders(
     status: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -128,8 +129,8 @@ async def list_orders(
         if status_enum:
             query = query.filter(SalesOrder.status == status_enum)
 
-    if customer_id:
-        query = query.filter(SalesOrder.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(SalesOrder.customer_account_id == customer_account_id)
 
     total = query.count()
     orders = query.order_by(SalesOrder.id.desc()).offset(offset).limit(limit).all()
@@ -159,7 +160,7 @@ async def create_order(
 ) -> Dict[str, Any]:
     """Create a new sales order."""
     order = SalesOrder(
-        customer_id=payload.customer_id,
+        customer_account_id=payload.customer_account_id,
         customer_name=payload.customer_name,
         transaction_date=payload.order_date,
         delivery_date=payload.delivery_date,

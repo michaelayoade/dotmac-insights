@@ -1,0 +1,45 @@
+{% if policies %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Policy Name</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Leave Types</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for policy in policies %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <a href="/hr/leave/policies/{{ policy.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ policy.leave_policy_name }}</a>
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600">
+                    {% if policy.details %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        {{ policy.details|length }} leave type{{ 's' if policy.details|length != 1 else '' }}
+                    </span>
+                    {% else %}
+                    <span class="text-gray-400">No allocations</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href="/hr/leave/policies/{{ policy.id }}/edit" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="Edit">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No leave policies found</h3>
+    <p class="text-sm text-gray-500 mb-4">{% if search_query %}Try adjusting your search.{% else %}Create your first leave policy to get started.{% endif %}</p>
+    <a href="/hr/leave/policies/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+        New Leave Policy
+    </a>
+</div>
+{% endif %}

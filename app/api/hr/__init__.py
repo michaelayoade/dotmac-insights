@@ -15,10 +15,12 @@ from .appraisal import router as appraisal_router
 from .lifecycle import router as lifecycle_router
 from .analytics import router as analytics_router
 from .masters import router as masters_router
+from .me import router as me_router
 
 router = APIRouter()
 
 # Include all sub-routers
+router.include_router(me_router, tags=["HR - Self Service"])
 router.include_router(leave_router, tags=["HR - Leave Management"])
 router.include_router(attendance_router, tags=["HR - Attendance"])
 router.include_router(recruitment_router, tags=["HR - Recruitment"])

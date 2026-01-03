@@ -4,12 +4,16 @@ This package provides comprehensive helpdesk support functionality:
 - Ticket management and CRUD
 - Agent and team management
 - Conversations (Chatwoot)
+- Messages (omnichannel messaging)
+- Channels (email, WhatsApp, SMS, etc.)
 - Analytics and insights
 - SLA policies and business calendars
 - Automation rules
 - Routing configuration
 - Knowledge base
 - Canned responses (macros)
+- Email templates
+- Webhooks
 """
 from fastapi import APIRouter
 
@@ -23,6 +27,10 @@ from .routing import router as routing_router
 from .knowledge_base import router as kb_router
 from .canned_responses import router as canned_router
 from .csat import router as csat_router
+from .messages import router as messages_router
+from .channels import router as channels_router
+from .email_templates import router as email_templates_router
+from .webhooks import router as webhooks_router
 
 router = APIRouter()
 
@@ -55,5 +63,17 @@ router.include_router(canned_router, tags=["Support - Canned Responses"])
 
 # CSAT surveys
 router.include_router(csat_router, tags=["Support - CSAT"])
+
+# Messages
+router.include_router(messages_router, tags=["Support - Messages"])
+
+# Channels
+router.include_router(channels_router, prefix="/channels", tags=["Support - Channels"])
+
+# Email templates
+router.include_router(email_templates_router, prefix="/email-templates", tags=["Support - Email Templates"])
+
+# Webhooks
+router.include_router(webhooks_router, prefix="/webhooks", tags=["Support - Webhooks"])
 
 __all__ = ["router"]

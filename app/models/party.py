@@ -25,7 +25,7 @@ from app.database import Base
 from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
-    from app.models.party import Party  # pragma: no cover
+    from app.models.customer_usage import CustomerUsage  # pragma: no cover
 
 
 class PartyType(enum.Enum):
@@ -143,6 +143,23 @@ class Party(Base):
     timezone: Mapped[Optional[str]] = mapped_column(Text)
     locale: Mapped[Optional[str]] = mapped_column(Text, server_default="en")
     tax_id: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Social media profiles
+    linkedin_url: Mapped[Optional[str]] = mapped_column(Text)
+    twitter_handle: Mapped[Optional[str]] = mapped_column(Text)
+    facebook_url: Mapped[Optional[str]] = mapped_column(Text)
+    instagram_handle: Mapped[Optional[str]] = mapped_column(Text)
+    website_url: Mapped[Optional[str]] = mapped_column(Text)
+
+    # Communication preferences
+    preferred_channel: Mapped[Optional[str]] = mapped_column(Text)  # email, sms, whatsapp, phone
+    do_not_contact: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    contact_frequency_limit: Mapped[Optional[int]] = mapped_column()  # max contacts per week
+
+    # Engagement tracking
+    engagement_score: Mapped[Optional[int]] = mapped_column()  # 0-100 computed score
+    last_engagement_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_contacted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     tags: Mapped[List[dict]] = mapped_column(
         JSONB,
         default=list,
@@ -181,6 +198,7 @@ class Party(Base):
         back_populates="person",
         foreign_keys="[Membership.person_party_id]",
     )
+    usage_records: Mapped[List["CustomerUsage"]] = relationship(back_populates="party")
 
     __table_args__ = (
         Index(

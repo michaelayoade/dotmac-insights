@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.auth import User
 from app.auth import get_current_user
@@ -277,4 +276,3 @@ async def assign_task_to_milestone(
         "task_id": task_id,
         "milestone_id": milestone_id,
     }
-

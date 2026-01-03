@@ -9,13 +9,15 @@ Routes should call this service and control the transaction boundary.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import func, or_
 
 from app.models.payment import Payment, PaymentMethod, PaymentSource, PaymentStatus
+from app.models.party import CustomerAccount
 from app.models.payment_allocation import PaymentAllocation
 from app.services.base import paginate, safe_filter, scoped_query
 from app.services.errors import NotFoundError, ValidationError
@@ -34,7 +36,8 @@ if TYPE_CHECKING:
 __all__ = ["ARPaymentService"]
 
 # Allowed filter fields for safe_filter
-ALLOWED_FILTERS = {"customer_account_id", "status"}
+ALLOWED_FILTERS = {"customer_account_id", "status", "payment_method"}
+ALLOWED_SORTS = {"payment_date", "amount", "status", "receipt_number", "id"}
 
 
 class ARPaymentService:
@@ -82,6 +85,7 @@ class ARPaymentService:
         filter_dict = {
             "customer_account_id": filters.customer_account_id,
             "status": filters.status,
+            "payment_method": filters.payment_method,
         }
         query = safe_filter(query, Payment, filter_dict, ALLOWED_FILTERS)
 
@@ -91,10 +95,79 @@ class ARPaymentService:
         if filters.end_date:
             query = query.filter(Payment.payment_date <= filters.end_date)
 
-        # Default ordering
-        query = query.order_by(Payment.payment_date.desc(), Payment.id.desc())
+        if filters.search:
+            if len(filters.search) < 2:
+                raise ValidationError("Search query must be at least 2 characters")
+            query = query.filter(
+                or_(
+                    Payment.receipt_number.ilike(f"%{filters.search}%"),
+                    Payment.transaction_reference.ilike(f"%{filters.search}%"),
+                )
+            )
+
+        sort_key = filters.sort_by if filters.sort_by in ALLOWED_SORTS else "payment_date"
+        sort_column = getattr(Payment, sort_key, Payment.payment_date)
+        if filters.sort_dir == "asc":
+            query = query.order_by(sort_column.asc(), Payment.id.asc())
+        else:
+            query = query.order_by(sort_column.desc(), Payment.id.desc())
 
         return paginate(query, pagination)
+
+    def get_payment_stats(self) -> dict:
+        """Get summary stats for payments list view."""
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_month_start = (month_start - timedelta(days=1)).replace(day=1)
+
+        total_count = self.db.query(func.count(Payment.id)).scalar() or 0
+
+        this_month = self.db.query(func.sum(Payment.amount)).filter(
+            Payment.payment_date >= month_start
+        ).scalar() or Decimal("0")
+
+        last_month = self.db.query(func.sum(Payment.amount)).filter(
+            Payment.payment_date >= last_month_start,
+            Payment.payment_date < month_start,
+        ).scalar() or Decimal("0")
+
+        unallocated = self.db.query(func.sum(Payment.unallocated_amount)).filter(
+            Payment.unallocated_amount > 0
+        ).scalar() or Decimal("0")
+
+        return {
+            "total_count": total_count,
+            "this_month": this_month,
+            "last_month": last_month,
+            "unallocated": unallocated,
+        }
+
+    def get_ar_payment_stats(self) -> dict:
+        """Get summary stats for AR payments list view."""
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        this_month = self.db.query(func.sum(Payment.amount)).filter(
+            Payment.payment_date >= month_start,
+            Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
+        ).scalar() or Decimal("0")
+
+        pending_amount = self.db.query(func.sum(Payment.amount)).filter(
+            Payment.status == PaymentStatus.PENDING
+        ).scalar() or Decimal("0")
+
+        unallocated = self.db.query(func.sum(Payment.unallocated_amount)).filter(
+            Payment.unallocated_amount > 0
+        ).scalar() or Decimal("0")
+
+        total_count = self.db.query(func.count(Payment.id)).scalar() or 0
+
+        return {
+            "this_month": this_month,
+            "pending_amount": pending_amount,
+            "unallocated": unallocated,
+            "total_count": total_count,
+        }
 
     def get_payment(self, payment_id: int) -> Payment:
         """Get a payment by ID.
@@ -109,6 +182,23 @@ class ARPaymentService:
             NotFoundError: If payment not found.
         """
         payment = self.db.query(Payment).filter(Payment.id == payment_id).first()
+        if not payment:
+            raise NotFoundError(f"Payment {payment_id} not found")
+        return payment
+
+    def get_payment_with_relations(
+        self,
+        payment_id: int,
+        *,
+        include_allocations: bool = False,
+    ) -> Payment:
+        """Get a payment with related entities for detail views."""
+        query = self.db.query(Payment).options(
+            selectinload(Payment.customer_account).selectinload(CustomerAccount.party)
+        )
+        if include_allocations:
+            query = query.options(selectinload(Payment.allocations))
+        payment = query.filter(Payment.id == payment_id).first()
         if not payment:
             raise NotFoundError(f"Payment {payment_id} not found")
         return payment
@@ -225,6 +315,15 @@ class ARPaymentService:
             payment.base_amount = payment.amount * payment.conversion_rate
             payment.unallocated_amount = payment.amount - payment.total_allocated
 
+        if data.receipt_number is not None:
+            payment.receipt_number = data.receipt_number
+
+        if data.customer_account_id is not None:
+            payment.customer_account_id = data.customer_account_id
+
+        if data.currency is not None:
+            payment.currency = data.currency
+
         if data.payment_method is not None:
             payment.payment_method = data.payment_method
 
@@ -237,6 +336,9 @@ class ARPaymentService:
         if data.conversion_rate is not None:
             payment.conversion_rate = data.conversion_rate
             payment.base_amount = payment.amount * payment.conversion_rate
+
+        if data.bank_account_id is not None:
+            payment.bank_account_id = data.bank_account_id
 
         payment.updated_by_id = self.principal.id if self.principal else None
 
@@ -267,6 +369,20 @@ class ARPaymentService:
         payment.is_deleted = True
         payment.deleted_at = datetime.now(timezone.utc)
         payment.deleted_by_id = self.principal.id if self.principal else None
+
+    def approve_payment(self, payment_id: int) -> Payment:
+        """Approve a payment."""
+        payment = self.get_payment(payment_id)
+        payment.status = PaymentStatus.APPROVED
+        payment.updated_by_id = self.principal.id if self.principal else None
+        return payment
+
+    def post_payment(self, payment_id: int) -> Payment:
+        """Post a payment to the general ledger."""
+        payment = self.get_payment(payment_id)
+        payment.status = PaymentStatus.POSTED
+        payment.updated_by_id = self.principal.id if self.principal else None
+        return payment
 
     # -------------------------------------------------------------------------
     # Allocations

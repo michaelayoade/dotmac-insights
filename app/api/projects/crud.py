@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.models.auth import User
 from app.models.notification import NotificationEventType
@@ -66,7 +65,7 @@ async def create_project(
         department=payload.department,
         company=payload.company,
         cost_center=payload.cost_center,
-        customer_id=payload.customer_id,
+        customer_account_id=payload.customer_account_id,
         project_manager_id=payload.project_manager_id,
         erpnext_customer=payload.erpnext_customer,
         erpnext_sales_order=payload.erpnext_sales_order,
@@ -174,8 +173,8 @@ async def update_project(
         project.company = payload.company
     if payload.cost_center is not None:
         project.cost_center = payload.cost_center
-    if payload.customer_id is not None:
-        project.customer_id = payload.customer_id
+    if payload.customer_account_id is not None:
+        project.customer_account_id = payload.customer_account_id
     if payload.project_manager_id is not None:
         project.project_manager_id = payload.project_manager_id
     if payload.erpnext_customer is not None:

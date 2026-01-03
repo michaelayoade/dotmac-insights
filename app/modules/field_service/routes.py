@@ -385,14 +385,14 @@ async def service_order_create(
     errors = {}
     title = _form_str(form, "title")
     service_address = _form_str(form, "service_address")
-    customer_account_id = _form_int(form, "customer_id")
+    customer_account_id = _form_int(form, "customer_account_id")
 
     if not title:
         errors["title"] = "Title is required"
     if not service_address:
         errors["service_address"] = "Service address is required"
     if customer_account_id is None:
-        errors["customer_id"] = "Customer is required"
+        errors["customer_account_id"] = "Customer is required"
 
     if errors:
         customers = (

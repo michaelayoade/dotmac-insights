@@ -36,6 +36,17 @@ from app.models.hr_appraisal import Appraisal
 from app.models.hr_training import TrainingEvent, TrainingEventEmployee
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.utils.datetime_utils import utc_now
+from app.services.hr.leave import LeaveService
+from app.services.hr.leave_types import ApplicationCreateData, ApplicationFilters
+from app.services.hr.attendance import AttendanceService
+from app.services.hr.attendance_types import CheckInData, CheckOutData, AttendanceFilters
+from app.services.hr.errors import (
+    ValidationError as HRValidationError,
+    CheckInError,
+    CheckOutError,
+    LeaveApplicationNotFoundError,
+    LeaveStatusTransitionError,
+)
 
 RequireHRRead = Depends(require_scope("hr:read"))
 
@@ -192,8 +203,14 @@ async def my_leave_list(
         LeaveApplication.employee_id == employee.id,
     )
 
+    # Validate and apply status filter using enum
     if status:
-        query = query.filter(LeaveApplication.status == status)
+        try:
+            status_enum = LeaveApplicationStatus(status)
+            query = query.filter(LeaveApplication.status == status_enum)
+        except ValueError:
+            # Invalid status value - ignore filter
+            pass
 
     total = query.count()
     offset = (page - 1) * per_page
@@ -377,8 +394,12 @@ async def my_leave_create(
     if leave_type_id is None or from_date is None or to_date is None:
         raise HTTPException(status_code=400, detail="Invalid leave data")
 
-    leave_type = db.query(LeaveType).filter(LeaveType.id == leave_type_id).first()
-    if not leave_type:
+    # Use LeaveService for business logic
+    leave_service = LeaveService(db)
+
+    try:
+        leave_type = leave_service.get_leave_type(leave_type_id)
+    except Exception:
         errors["leave_type_id"] = "Leave type not found"
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -391,9 +412,9 @@ async def my_leave_create(
         template = templates.get_template("modules/hr/templates/my/pages/leave_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    total_days = (to_date - from_date).days + 1
-
-    application = LeaveApplication(
+    # Build application data for service
+    is_half_day = _form_str(form, "half_day") == "on"
+    app_data = ApplicationCreateData(
         employee_id=employee.id,
         employee=employee.erpnext_id or str(employee.id),
         employee_name=employee.name,
@@ -401,15 +422,14 @@ async def my_leave_create(
         leave_type=leave_type.leave_type_name,
         from_date=from_date,
         to_date=to_date,
-        total_leave_days=total_days,
-        posting_date=date.today(),
+        half_day=is_half_day,
         description=_form_str(form, "description") or None,
-        half_day=_form_str(form, "half_day") == "on",
-        status=LeaveApplicationStatus.OPEN,
+        company=employee.company,
     )
-    db.add(application)
+
+    # Service handles half-day calculation and validation
+    application = leave_service.create_application(app_data)
     db.commit()
-    db.refresh(application)
 
     set_flash(response, "Leave application submitted successfully.", "success")
     return RedirectResponse(url="/hr/my/leave", status_code=303)
@@ -471,6 +491,7 @@ async def my_leave_cancel(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
+    # Verify ownership
     application = db.query(LeaveApplication).filter(
         LeaveApplication.id == application_id,
         LeaveApplication.employee_id == employee.id,
@@ -479,15 +500,17 @@ async def my_leave_cancel(
     if not application:
         raise HTTPException(status_code=404, detail="Leave application not found")
 
-    if application.status != LeaveApplicationStatus.OPEN:
+    # Use LeaveService for cancellation (handles status transitions and balance restoration)
+    leave_service = LeaveService(db)
+    try:
+        leave_service.cancel_application(application_id)
+        db.commit()
+    except LeaveStatusTransitionError:
         if is_htmx_request(request):
             htmx_toast(response, "Only pending applications can be cancelled.", "error")
             return HTMLResponse("", headers=dict(response.headers))
         set_flash(response, "Only pending applications can be cancelled.", "error")
         return RedirectResponse(url=f"/hr/my/leave/{application_id}", status_code=303)
-
-    application.status = LeaveApplicationStatus.CANCELLED
-    db.commit()
 
     if is_htmx_request(request):
         htmx_toast(response, "Leave application cancelled.", "success")
@@ -548,19 +571,19 @@ async def my_attendance_list(
     offset = (page - 1) * per_page
     records = query.order_by(Attendance.attendance_date.desc()).offset(offset).limit(per_page).all()
 
-    # Summary stats
+    # Summary stats using AttendanceStatus enum
     present_count = db.query(func.count(Attendance.id)).filter(
         Attendance.employee_id == employee.id,
         Attendance.attendance_date >= start_date,
         Attendance.attendance_date <= end_date,
-        Attendance.status == "Present",
+        Attendance.status == AttendanceStatus.PRESENT,
     ).scalar() or 0
 
     absent_count = db.query(func.count(Attendance.id)).filter(
         Attendance.employee_id == employee.id,
         Attendance.attendance_date >= start_date,
         Attendance.attendance_date <= end_date,
-        Attendance.status == "Absent",
+        Attendance.status == AttendanceStatus.ABSENT,
     ).scalar() or 0
 
     # Today's attendance for check-in/out buttons
@@ -612,41 +635,34 @@ async def my_check_in(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    today = date.today()
-    now = utc_now()
+    # Use AttendanceService for check-in (handles validation, shift detection, late entry)
+    attendance_service = AttendanceService(db)
+    try:
+        check_in_data = CheckInData()
+        attendance = attendance_service.check_in(employee.id, check_in_data)
+        db.commit()
 
-    # Check for existing attendance today
-    existing = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date == today,
-    ).first()
-
-    if existing:
+        time_str = attendance.in_time.strftime('%H:%M') if attendance.in_time else utc_now().strftime('%H:%M')
         if is_htmx_request(request):
-            htmx_toast(response, "You have already checked in today.", "warning")
+            htmx_toast(response, f"Checked in at {time_str}.", "success")
+            response.headers["HX-Refresh"] = "true"
             return HTMLResponse("", headers=dict(response.headers))
-        set_flash(response, "You have already checked in today.", "warning")
+
+        set_flash(response, f"Checked in at {time_str}.", "success")
         return RedirectResponse(url="/hr/my/attendance", status_code=303)
 
-    # Create attendance record
-    attendance = Attendance(
-        employee_id=employee.id,
-        employee=employee.erpnext_id or str(employee.id),
-        employee_name=employee.name,
-        attendance_date=today,
-        status="Present",
-        in_time=now.time(),
-    )
-    db.add(attendance)
-    db.commit()
-
-    if is_htmx_request(request):
-        htmx_toast(response, f"Checked in at {now.strftime('%H:%M')}.", "success")
-        response.headers["HX-Refresh"] = "true"
-        return HTMLResponse("", headers=dict(response.headers))
-
-    set_flash(response, f"Checked in at {now.strftime('%H:%M')}.", "success")
-    return RedirectResponse(url="/hr/my/attendance", status_code=303)
+    except CheckInError as e:
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "warning")
+            return HTMLResponse("", headers=dict(response.headers))
+        set_flash(response, str(e), "warning")
+        return RedirectResponse(url="/hr/my/attendance", status_code=303)
+    except HRValidationError as e:
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        set_flash(response, str(e), "error")
+        return RedirectResponse(url="/hr/my/attendance", status_code=303)
 
 
 @router.post("/attendance/check-out", response_class=HTMLResponse, dependencies=[RequireHRRead])
@@ -664,39 +680,34 @@ async def my_check_out(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    today = date.today()
-    now = utc_now()
+    # Use AttendanceService for check-out (handles working hours calculation, early exit detection)
+    attendance_service = AttendanceService(db)
+    try:
+        check_out_data = CheckOutData()
+        attendance = attendance_service.check_out(employee.id, check_out_data)
+        db.commit()
 
-    # Find today's attendance
-    attendance = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date == today,
-    ).first()
-
-    if not attendance:
+        time_str = attendance.out_time.strftime('%H:%M') if attendance.out_time else utc_now().strftime('%H:%M')
         if is_htmx_request(request):
-            htmx_toast(response, "You have not checked in today.", "warning")
+            htmx_toast(response, f"Checked out at {time_str}.", "success")
+            response.headers["HX-Refresh"] = "true"
             return HTMLResponse("", headers=dict(response.headers))
-        set_flash(response, "You have not checked in today.", "warning")
+
+        set_flash(response, f"Checked out at {time_str}.", "success")
         return RedirectResponse(url="/hr/my/attendance", status_code=303)
 
-    if attendance.out_time:
+    except CheckOutError as e:
         if is_htmx_request(request):
-            htmx_toast(response, "You have already checked out.", "warning")
+            htmx_toast(response, str(e), "warning")
             return HTMLResponse("", headers=dict(response.headers))
-        set_flash(response, "You have already checked out.", "warning")
+        set_flash(response, str(e), "warning")
         return RedirectResponse(url="/hr/my/attendance", status_code=303)
-
-    attendance.out_time = now.time()
-    db.commit()
-
-    if is_htmx_request(request):
-        htmx_toast(response, f"Checked out at {now.strftime('%H:%M')}.", "success")
-        response.headers["HX-Refresh"] = "true"
-        return HTMLResponse("", headers=dict(response.headers))
-
-    set_flash(response, f"Checked out at {now.strftime('%H:%M')}.", "success")
-    return RedirectResponse(url="/hr/my/attendance", status_code=303)
+    except HRValidationError as e:
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        set_flash(response, str(e), "error")
+        return RedirectResponse(url="/hr/my/attendance", status_code=303)
 
 
 # =============================================================================
@@ -875,14 +886,17 @@ async def my_appraisal_detail(
     if not appraisal:
         raise HTTPException(status_code=404, detail="Appraisal not found")
 
+    # Safe access for appraisal dates (may be None)
+    year_label = str(appraisal.start_date.year) if appraisal.start_date else "N/A"
+
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = f"Appraisal - {appraisal.start_date.year}"
+    context["page_title"] = f"Appraisal - {year_label}"
     context["breadcrumbs"] = build_breadcrumbs([
         {"label": "HR", "href": "/hr"},
         {"label": "My HR", "href": "/hr/my"},
         {"label": "My Appraisals", "href": "/hr/my/appraisals"},
-        {"label": str(appraisal.start_date.year)},
+        {"label": year_label},
     ])
     context["employee"] = employee
     context["appraisal"] = appraisal

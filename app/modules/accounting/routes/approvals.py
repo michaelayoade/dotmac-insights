@@ -10,10 +10,19 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     HTTPException, set_flash, validate_csrf, form_str, form_int, form_decimal,
-    ApprovalWorkflow, ApprovalStep, DocumentApproval, ApprovalHistory, ApprovalStatus, ApprovalMode, AccountingControl,
-    JournalEntry, Payment, Invoice, PurchaseInvoice, User,
-    func, or_, datetime, Decimal, timedelta, selectinload,
+    ApprovalStatus,
 )
+from app.services.accounting import ApprovalsService
+from app.services.accounting.approvals_types import (
+    ApprovalListFilters,
+    ControlsUpdateData,
+    WorkflowCreateData,
+    WorkflowFilters,
+    WorkflowStepCreateData,
+    WorkflowUpdateData,
+)
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -33,55 +42,8 @@ def get_approval_doctype_options():
     ]
 
 
-def get_approval_stats(db, user_id: int) -> dict:
-    """Get approval statistics for dashboard."""
-    from datetime import date
-    today = date.today()
-
-    pending = db.query(func.count(DocumentApproval.id)).filter(
-        DocumentApproval.status == ApprovalStatus.PENDING
-    ).scalar() or 0
-
-    approved_today = db.query(func.count(DocumentApproval.id)).filter(
-        DocumentApproval.status == ApprovalStatus.APPROVED,
-        func.date(DocumentApproval.approved_at) == today
-    ).scalar() or 0
-
-    rejected_today = db.query(func.count(DocumentApproval.id)).filter(
-        DocumentApproval.status == ApprovalStatus.REJECTED,
-        func.date(DocumentApproval.rejected_at) == today
-    ).scalar() or 0
-
-    overdue = db.query(func.count(DocumentApproval.id)).filter(
-        DocumentApproval.status == ApprovalStatus.PENDING,
-        DocumentApproval.submitted_at < datetime.utcnow() - timedelta(days=3)
-    ).scalar() or 0
-
-    return {
-        "pending": pending,
-        "approved_today": approved_today,
-        "rejected_today": rejected_today,
-        "overdue": overdue,
-    }
-
-
-def get_document_for_approval(db, doctype: str, document_id: int):
-    """Fetch the actual document for approval review."""
-    document = None
-    if doctype == "journal_entry":
-        document = db.query(JournalEntry).options(
-            selectinload(JournalEntry.items)
-        ).filter(JournalEntry.id == document_id).first()
-    elif doctype == "supplier_payment":
-        from app.models.supplier_payment import SupplierPayment
-        document = db.query(SupplierPayment).filter(SupplierPayment.id == document_id).first()
-    elif doctype == "purchase_invoice":
-        document = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == document_id).first()
-    elif doctype == "payment":
-        document = db.query(Payment).filter(Payment.id == document_id).first()
-    elif doctype == "invoice":
-        document = db.query(Invoice).filter(Invoice.id == document_id).first()
-    return document
+def _get_approvals_service(db: DB, user: SessionUser) -> ApprovalsService:
+    return ApprovalsService(db, user)
 
 
 # --- Pending Approvals ---
@@ -99,25 +61,18 @@ async def approvals_list(
     per_page: int = Query(20, ge=10, le=100),
 ):
     """Pending approvals list page."""
-    query = db.query(DocumentApproval).filter(
-        DocumentApproval.status == ApprovalStatus.PENDING
-    )
-
-    if doctype:
-        query = query.filter(DocumentApproval.doctype == doctype)
-
-    total = query.count()
-    approvals = query.order_by(DocumentApproval.submitted_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
+    service = _get_approvals_service(db, user)
+    filters = ApprovalListFilters(doctype=doctype)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list_pending_approvals(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["approvals"] = approvals
-    context["stats"] = get_approval_stats(db, user.id)
+    context["approvals"] = result.items
+    context["stats"] = service.get_stats()
     context["doctype_options"] = get_approval_doctype_options()
     context["current_doctype"] = doctype
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     template = templates.get_template("modules/accounting/templates/approvals/pages/list.html")
     return HTMLResponse(template.render(context))
@@ -136,22 +91,15 @@ async def approvals_table(
     per_page: int = Query(20, ge=10, le=100),
 ):
     """Approvals table HTMX partial."""
-    query = db.query(DocumentApproval).filter(
-        DocumentApproval.status == ApprovalStatus.PENDING
-    )
-
-    if doctype:
-        query = query.filter(DocumentApproval.doctype == doctype)
-
-    total = query.count()
-    approvals = query.order_by(DocumentApproval.submitted_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
+    service = _get_approvals_service(db, user)
+    filters = ApprovalListFilters(doctype=doctype)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list_pending_approvals(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["approvals"] = approvals
+    context["approvals"] = result.items
     context["current_doctype"] = doctype
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     template = templates.get_template("modules/accounting/templates/approvals/partials/approvals_table.html")
     return HTMLResponse(template.render(context))
@@ -169,29 +117,14 @@ async def approval_detail(
     _: None = RequireAccountingRead,
 ):
     """Document approval detail page."""
-    approval = db.query(DocumentApproval).options(
-        selectinload(DocumentApproval.approval_history)
-    ).filter(
-        DocumentApproval.doctype == doctype,
-        DocumentApproval.document_id == document_id
-    ).first()
+    service = _get_approvals_service(db, user)
+    try:
+        approval, document, workflow_steps, approval_history = service.get_approval_detail(
+            doctype, document_id
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    if not approval:
-        raise HTTPException(status_code=404, detail="Approval not found")
-
-    # Get the actual document
-    document = get_document_for_approval(db, doctype, document_id)
-
-    # Get workflow steps
-    workflow_steps = []
-    if approval.workflow_id:
-        workflow = db.query(ApprovalWorkflow).options(
-            selectinload(ApprovalWorkflow.steps)
-        ).filter(ApprovalWorkflow.id == approval.workflow_id).first()
-        if workflow:
-            workflow_steps = sorted(workflow.steps, key=lambda s: s.step_order)
-
-    # Check if current user can approve
     can_approve = approval.status == ApprovalStatus.PENDING
 
     context = get_base_context(request, response, user, csrf_token)
@@ -201,9 +134,7 @@ async def approval_detail(
     context["doctype"] = doctype
     context["document_id"] = document_id
     context["workflow_steps"] = workflow_steps
-    context["approval_history"] = sorted(
-        approval.approval_history, key=lambda h: h.action_at
-    ) if approval.approval_history else []
+    context["approval_history"] = approval_history
     context["can_approve"] = can_approve
 
     template = templates.get_template("modules/accounting/templates/approvals/pages/detail.html")
@@ -224,49 +155,13 @@ async def approve_document(
     form_data = await request.form()
     await validate_csrf(request)
 
-    approval = db.query(DocumentApproval).filter(
-        DocumentApproval.doctype == doctype,
-        DocumentApproval.document_id == document_id,
-        DocumentApproval.status == ApprovalStatus.PENDING
-    ).first()
-
-    if not approval:
-        raise HTTPException(status_code=404, detail="Pending approval not found")
-
     remarks = form_str(form_data, "remarks")
-
-    # Record approval history
-    history = ApprovalHistory(
-        document_approval_id=approval.id,
-        step_order=approval.current_step,
-        action="APPROVED",
-        user_id=user.id,
-        remarks=remarks
-    )
-    db.add(history)
-
-    # Get workflow to check if more steps needed
-    workflow = db.query(ApprovalWorkflow).options(
-        selectinload(ApprovalWorkflow.steps)
-    ).filter(ApprovalWorkflow.id == approval.workflow_id).first()
-
-    next_step_exists = False
-    if workflow:
-        next_steps = [s for s in workflow.steps if s.step_order > approval.current_step]
-        next_step_exists = len(next_steps) > 0
-
-    if next_step_exists:
-        # Move to next step
-        approval.current_step += 1
-        approval.step_approved_at = datetime.utcnow()
-        approval.step_approved_by_id = user.id
-    else:
-        # Final approval
-        approval.status = ApprovalStatus.APPROVED
-        approval.approved_at = datetime.utcnow()
-        approval.approved_by_id = user.id
-
-    db.commit()
+    service = _get_approvals_service(db, user)
+    try:
+        service.approve_document(doctype, document_id, user.id, remarks)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     set_flash(response, "Document approved successfully", "success")
     return RedirectResponse(url="/accounting/approvals", status_code=303)
@@ -286,34 +181,13 @@ async def reject_document(
     form_data = await request.form()
     await validate_csrf(request)
 
-    approval = db.query(DocumentApproval).filter(
-        DocumentApproval.doctype == doctype,
-        DocumentApproval.document_id == document_id,
-        DocumentApproval.status == ApprovalStatus.PENDING
-    ).first()
-
-    if not approval:
-        raise HTTPException(status_code=404, detail="Pending approval not found")
-
     remarks = form_str(form_data, "remarks")
-
-    # Record rejection history
-    history = ApprovalHistory(
-        document_approval_id=approval.id,
-        step_order=approval.current_step,
-        action="REJECTED",
-        user_id=user.id,
-        remarks=remarks
-    )
-    db.add(history)
-
-    # Update approval status
-    approval.status = ApprovalStatus.REJECTED
-    approval.rejected_at = datetime.utcnow()
-    approval.rejected_by_id = user.id
-    approval.rejection_reason = remarks
-
-    db.commit()
+    service = _get_approvals_service(db, user)
+    try:
+        service.reject_document(doctype, document_id, user.id, remarks)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     set_flash(response, "Document rejected", "warning")
     return RedirectResponse(url="/accounting/approvals", status_code=303)
@@ -336,39 +210,19 @@ async def workflows_list(
     per_page: int = Query(20, ge=10, le=100),
 ):
     """Workflow configuration list page."""
-    query = db.query(ApprovalWorkflow).options(
-        selectinload(ApprovalWorkflow.steps)
-    )
-
-    if q:
-        query = query.filter(
-            or_(
-                ApprovalWorkflow.workflow_name.ilike(f"%{q}%"),
-                ApprovalWorkflow.description.ilike(f"%{q}%")
-            )
-        )
-
-    if doctype:
-        query = query.filter(ApprovalWorkflow.doctype == doctype)
-
-    if status == "active":
-        query = query.filter(ApprovalWorkflow.is_active == True)
-    elif status == "inactive":
-        query = query.filter(ApprovalWorkflow.is_active == False)
-
-    total = query.count()
-    workflows = query.order_by(ApprovalWorkflow.workflow_name).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
+    service = _get_approvals_service(db, user)
+    filters = WorkflowFilters(query=q, doctype=doctype, status=status)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list_workflows(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["workflows"] = workflows
+    context["workflows"] = result.items
     context["doctype_options"] = get_approval_doctype_options()
     context["current_search"] = q
     context["current_doctype"] = doctype
     context["current_status"] = status
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     template = templates.get_template("modules/accounting/templates/workflows/pages/list.html")
     return HTMLResponse(template.render(context))
@@ -389,37 +243,17 @@ async def workflows_table(
     per_page: int = Query(20, ge=10, le=100),
 ):
     """Workflows table HTMX partial."""
-    query = db.query(ApprovalWorkflow).options(
-        selectinload(ApprovalWorkflow.steps)
-    )
-
-    if q:
-        query = query.filter(
-            or_(
-                ApprovalWorkflow.workflow_name.ilike(f"%{q}%"),
-                ApprovalWorkflow.description.ilike(f"%{q}%")
-            )
-        )
-
-    if doctype:
-        query = query.filter(ApprovalWorkflow.doctype == doctype)
-
-    if status == "active":
-        query = query.filter(ApprovalWorkflow.is_active == True)
-    elif status == "inactive":
-        query = query.filter(ApprovalWorkflow.is_active == False)
-
-    total = query.count()
-    workflows = query.order_by(ApprovalWorkflow.workflow_name).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
+    service = _get_approvals_service(db, user)
+    filters = WorkflowFilters(query=q, doctype=doctype, status=status)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = service.list_workflows(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["workflows"] = workflows
+    context["workflows"] = result.items
     context["current_search"] = q
     context["current_doctype"] = doctype
     context["current_status"] = status
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     template = templates.get_template("modules/accounting/templates/workflows/partials/workflows_table.html")
     return HTMLResponse(template.render(context))
@@ -456,7 +290,8 @@ async def workflow_create(
     form_data = await request.form()
     await validate_csrf(request)
 
-    workflow = ApprovalWorkflow(
+    service = _get_approvals_service(db, user)
+    data = WorkflowCreateData(
         workflow_name=form_str(form_data, "workflow_name"),
         doctype=form_str(form_data, "doctype"),
         description=form_str(form_data, "description") or None,
@@ -464,9 +299,8 @@ async def workflow_create(
         is_mandatory=bool(form_str(form_data, "is_mandatory")),
         escalation_enabled=bool(form_str(form_data, "escalation_enabled")),
         escalation_hours=form_int(form_data, "escalation_hours", 24) or 24,
-        created_by_id=user.id,
     )
-    db.add(workflow)
+    workflow = service.create_workflow(data, user.id)
     db.commit()
 
     set_flash(response, f"Workflow '{workflow.workflow_name}' created", "success")
@@ -484,15 +318,13 @@ async def workflow_detail(
     _: None = RequireAccountingRead,
 ):
     """Workflow detail page."""
-    workflow = db.query(ApprovalWorkflow).options(
-        selectinload(ApprovalWorkflow.steps)
-    ).filter(ApprovalWorkflow.id == workflow_id).first()
+    service = _get_approvals_service(db, user)
+    try:
+        workflow = service.get_workflow(workflow_id, include_steps=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    # Get available roles and users for step configuration
-    users = db.query(User).filter(User.is_active == True).order_by(User.name).all()
+    users = service.list_active_users()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -521,10 +353,11 @@ async def workflow_edit(
     _: None = RequireAccountingWrite,
 ):
     """Edit workflow form."""
-    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
-
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+    service = _get_approvals_service(db, user)
+    try:
+        workflow = service.get_workflow(workflow_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -548,20 +381,21 @@ async def workflow_update(
     form_data = await request.form()
     await validate_csrf(request)
 
-    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
-
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    workflow.workflow_name = form_str(form_data, "workflow_name")
-    workflow.doctype = form_str(form_data, "doctype")
-    workflow.description = form_str(form_data, "description") or None
-    workflow.is_active = bool(form_str(form_data, "is_active"))
-    workflow.is_mandatory = bool(form_str(form_data, "is_mandatory"))
-    workflow.escalation_enabled = bool(form_str(form_data, "escalation_enabled"))
-    workflow.escalation_hours = form_int(form_data, "escalation_hours", 24) or 24
-
-    db.commit()
+    service = _get_approvals_service(db, user)
+    data = WorkflowUpdateData(
+        workflow_name=form_str(form_data, "workflow_name"),
+        doctype=form_str(form_data, "doctype"),
+        description=form_str(form_data, "description") or None,
+        is_active=bool(form_str(form_data, "is_active")),
+        is_mandatory=bool(form_str(form_data, "is_mandatory")),
+        escalation_enabled=bool(form_str(form_data, "escalation_enabled")),
+        escalation_hours=form_int(form_data, "escalation_hours", 24) or 24,
+    )
+    try:
+        workflow = service.update_workflow(workflow_id, data)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     set_flash(response, f"Workflow '{workflow.workflow_name}' updated", "success")
     return RedirectResponse(url=f"/accounting/workflows/{workflow.id}", status_code=303)
@@ -580,13 +414,12 @@ async def workflow_toggle(
     form_data = await request.form()
     await validate_csrf(request)
 
-    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
-
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    workflow.is_active = not workflow.is_active
-    db.commit()
+    service = _get_approvals_service(db, user)
+    try:
+        workflow = service.toggle_workflow(workflow_id)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     status = "activated" if workflow.is_active else "deactivated"
     set_flash(response, f"Workflow {status}", "success")
@@ -606,23 +439,21 @@ async def workflow_add_step(
     form_data = await request.form()
     await validate_csrf(request)
 
-    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
-
-    if not workflow:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-
-    step = ApprovalStep(
-        workflow_id=workflow_id,
+    service = _get_approvals_service(db, user)
+    data = WorkflowStepCreateData(
         step_order=form_int(form_data, "step_order", 1) or 1,
         step_name=form_str(form_data, "step_name"),
         role_required=form_str(form_data, "role_required") or None,
         user_id=form_int(form_data, "user_id"),
-        approval_mode=ApprovalMode(form_str(form_data, "approval_mode", "any")),
+        approval_mode=form_str(form_data, "approval_mode", "any"),
         amount_threshold_min=form_decimal(form_data, "amount_threshold_min"),
         amount_threshold_max=form_decimal(form_data, "amount_threshold_max"),
     )
-    db.add(step)
-    db.commit()
+    try:
+        step = service.add_step(workflow_id, data)
+        db.commit()
+    except (NotFoundError, ValidationError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     set_flash(response, f"Step '{step.step_name}' added", "success")
     return RedirectResponse(url=f"/accounting/workflows/{workflow_id}", status_code=303)
@@ -642,16 +473,12 @@ async def workflow_delete_step(
     form_data = await request.form()
     await validate_csrf(request)
 
-    step = db.query(ApprovalStep).filter(
-        ApprovalStep.id == step_id,
-        ApprovalStep.workflow_id == workflow_id
-    ).first()
-
-    if not step:
-        raise HTTPException(status_code=404, detail="Step not found")
-
-    db.delete(step)
-    db.commit()
+    service = _get_approvals_service(db, user)
+    try:
+        service.delete_step(workflow_id, step_id)
+        db.commit()
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     set_flash(response, "Step deleted", "success")
     return RedirectResponse(url=f"/accounting/workflows/{workflow_id}", status_code=303)
@@ -669,9 +496,8 @@ async def controls_form(
     _: None = RequireAccountingWrite,
 ):
     """Accounting controls configuration form."""
-    controls = db.query(AccountingControl).filter(
-        AccountingControl.company == None  # Global controls
-    ).first()
+    service = _get_approvals_service(db, user)
+    controls = service.get_controls()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -693,20 +519,13 @@ async def controls_update(
     form_data = await request.form()
     await validate_csrf(request)
 
-    controls = db.query(AccountingControl).filter(
-        AccountingControl.company == None
-    ).first()
-
-    if not controls:
-        controls = AccountingControl(company=None)
-        db.add(controls)
-
-    # Update controls based on form data
-    controls.require_approval_journal_entry = bool(form_str(form_data, "require_je_approval"))
-    controls.require_approval_payment = bool(form_str(form_data, "require_payment_approval"))
-    controls.backdating_days_allowed = form_int(form_data, "max_backdate_days", 30) or 30
-    controls.updated_by_id = user.id
-
+    service = _get_approvals_service(db, user)
+    data = ControlsUpdateData(
+        require_approval_journal_entry=bool(form_str(form_data, "require_je_approval")),
+        require_approval_payment=bool(form_str(form_data, "require_payment_approval")),
+        backdating_days_allowed=form_int(form_data, "max_backdate_days", 30) or 30,
+    )
+    service.update_controls(data, user.id)
     db.commit()
 
     set_flash(response, "Accounting controls updated", "success")

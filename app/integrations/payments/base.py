@@ -35,7 +35,7 @@ class InitializePaymentRequest:
     metadata: Optional[Dict[str, Any]] = None
     channels: Optional[List[str]] = None  # card, bank, ussd, etc.
     invoice_id: Optional[int] = None
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     split_code: Optional[str] = None  # For split payments
     subaccount: Optional[str] = None
 
@@ -128,7 +128,7 @@ class VirtualAccountRequest:
     """Request to create a virtual account."""
     customer_email: str
     customer_name: str
-    customer_id: Optional[int] = None
+    customer_account_id: Optional[int] = None
     preferred_bank: Optional[str] = None
     bvn: Optional[str] = None
     is_permanent: bool = True

@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.services.audit_logger import AuditLogger
 
@@ -134,4 +133,3 @@ async def get_entity_history(
         "total": len(history),
         "data": history,
     }
-

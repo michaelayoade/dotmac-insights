@@ -12,10 +12,23 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import Require, get_current_principal
-from app.models.auth import User
 from app.services.audit_logger import AuditLogger
-from app.models.hr_recruitment import JobOffer, JobOfferStatus, JobOfferTerm
-from .helpers import decimal_or_default, status_counts, now
+from app.models.hr_recruitment import JobApplicant, JobOffer, JobOfferStatus
+from app.services.hr.recruitment import RecruitmentService
+from app.services.hr.recruitment_types import (
+    JobOfferCreateData,
+    JobOfferFilters,
+    JobOfferUpdateData,
+    OfferTermData,
+)
+from app.services.hr.errors import (
+    ApplicantPipelineError,
+    JobOfferNotFoundError,
+    OfferExpiredError,
+    ValidationError,
+)
+from app.services.types import PaginationParams
+from .helpers import decimal_or_default, status_counts
 
 router = APIRouter()
 
@@ -78,13 +91,6 @@ def _require_offer_status(offer: JobOffer, allowed: List[JobOfferStatus]):
         )
 
 
-def _load_offer(db: Session, offer_id: int) -> JobOffer:
-    offer = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
-    if not offer:
-        raise HTTPException(status_code=404, detail="Job offer not found")
-    return offer
-
-
 # =============================================================================
 # ENDPOINTS
 # =============================================================================
@@ -101,25 +107,26 @@ async def list_job_offers(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List job offers with filtering."""
-    query = db.query(JobOffer)
-
+    status_enum = None
     if status:
         try:
             status_enum = JobOfferStatus(status)
-            query = query.filter(JobOffer.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if job_applicant_id:
-        query = query.filter(JobOffer.job_applicant_id == job_applicant_id)
-    if company:
-        query = query.filter(JobOffer.company.ilike(f"%{company}%"))
-    if from_date:
-        query = query.filter(JobOffer.offer_date >= from_date)
-    if to_date:
-        query = query.filter(JobOffer.offer_date <= to_date)
 
-    total = query.count()
-    offers = query.order_by(JobOffer.offer_date.desc()).offset(offset).limit(limit).all()
+    service = RecruitmentService(db)
+    result = service.list_job_offers(
+        JobOfferFilters(
+            status=status_enum,
+            job_applicant_id=job_applicant_id,
+            company=company,
+            from_date=from_date,
+            to_date=to_date,
+        ),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    offers = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -165,9 +172,11 @@ async def get_job_offer(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get job offer detail with terms."""
-    o = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
-    if not o:
-        raise HTTPException(status_code=404, detail="Job offer not found")
+    service = RecruitmentService(db)
+    try:
+        o = service.get_job_offer(offer_id)
+    except JobOfferNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     terms = [
         {
@@ -202,34 +211,58 @@ async def get_job_offer(
 async def create_job_offer(
     payload: JobOfferCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new job offer with terms."""
-    offer = JobOffer(
-        job_applicant=payload.job_applicant,
-        job_applicant_id=payload.job_applicant_id,
-        applicant_name=payload.applicant_name,
-        applicant_email=payload.applicant_email,
-        designation=payload.designation,
-        offer_date=payload.offer_date,
-        status=payload.status or JobOfferStatus.PENDING,
-        company=payload.company,
-        base=decimal_or_default(payload.base),
-        salary_structure=payload.salary_structure,
-    )
-    db.add(offer)
-    db.flush()
+    service = RecruitmentService(db, principal)
+    applicant_id = payload.job_applicant_id
+    if applicant_id is None and payload.job_applicant:
+        applicant = db.query(JobApplicant).filter(JobApplicant.erpnext_id == payload.job_applicant).first()
+        applicant_id = applicant.id if applicant else None
+    if applicant_id is None:
+        raise HTTPException(status_code=400, detail="job_applicant_id is required")
+    job_applicant_ref = payload.job_applicant or str(applicant_id)
 
+    terms = []
     if payload.terms:
         for idx, t in enumerate(payload.terms):
-            term = JobOfferTerm(
-                job_offer_id=offer.id,
-                offer_term=t.offer_term,
-                value=t.value,
-                idx=t.idx if t.idx is not None else idx,
+            if t.offer_term or t.value:
+                terms.append(
+                    OfferTermData(
+                        offer_term=t.offer_term or "",
+                        value=t.value or "",
+                        idx=t.idx if t.idx is not None else idx,
+                    )
+                )
+    try:
+        offer = service.create_job_offer(
+            JobOfferCreateData(
+                job_applicant_id=applicant_id,
+                job_applicant=job_applicant_ref,
+                applicant_name=payload.applicant_name,
+                applicant_email=payload.applicant_email,
+                designation=payload.designation,
+                offer_date=payload.offer_date,
+                company=payload.company,
+                base=decimal_or_default(payload.base),
+                salary_structure=payload.salary_structure,
+                terms=terms,
             )
-            db.add(term)
+        )
+        if payload.status and payload.status != JobOfferStatus.PENDING:
+            if payload.status == JobOfferStatus.AWAITING_RESPONSE:
+                service.send_job_offer(offer.id)
+            elif payload.status == JobOfferStatus.ACCEPTED:
+                service.accept_job_offer(offer.id)
+            elif payload.status == JobOfferStatus.REJECTED:
+                service.reject_job_offer(offer.id)
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported status transition on create")
+        db.commit()
+    except (ApplicantPipelineError, ValidationError, OfferExpiredError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    db.commit()
     return await get_job_offer(offer.id, db)
 
 
@@ -238,49 +271,71 @@ async def update_job_offer(
     offer_id: int,
     payload: JobOfferUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a job offer and optionally replace terms."""
-    offer = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
-    if not offer:
-        raise HTTPException(status_code=404, detail="Job offer not found")
+    service = RecruitmentService(db, principal)
+    terms = None
+    if payload.terms is not None:
+        terms = []
+        for idx, t in enumerate(payload.terms):
+            if t.offer_term or t.value:
+                terms.append(
+                    OfferTermData(
+                        offer_term=t.offer_term or "",
+                        value=t.value or "",
+                        idx=t.idx if t.idx is not None else idx,
+                    )
+                )
 
-    update_data = payload.model_dump(exclude_unset=True)
-    terms_data = update_data.pop("terms", None)
-
-    for field, value in update_data.items():
-        if value is not None:
-            if field == "base":
-                setattr(offer, field, decimal_or_default(value))
+    try:
+        service.update_job_offer(
+            offer_id,
+            JobOfferUpdateData(
+                offer_date=payload.offer_date,
+                designation=payload.designation,
+                base=decimal_or_default(payload.base) if payload.base is not None else None,
+                salary_structure=payload.salary_structure,
+                terms=terms,
+            ),
+        )
+        if payload.status:
+            if payload.status == JobOfferStatus.AWAITING_RESPONSE:
+                service.send_job_offer(offer_id)
+            elif payload.status == JobOfferStatus.ACCEPTED:
+                service.accept_job_offer(offer_id)
+            elif payload.status == JobOfferStatus.REJECTED:
+                service.reject_job_offer(offer_id)
+            elif payload.status == JobOfferStatus.PENDING:
+                pass
             else:
-                setattr(offer, field, value)
+                raise HTTPException(status_code=400, detail="Unsupported status transition")
+        db.commit()
+    except JobOfferNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except (ApplicantPipelineError, ValidationError, OfferExpiredError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    if terms_data is not None:
-        db.query(JobOfferTerm).filter(JobOfferTerm.job_offer_id == offer.id).delete(synchronize_session=False)
-        for idx, t in enumerate(terms_data):
-            term = JobOfferTerm(
-                job_offer_id=offer.id,
-                offer_term=t.get("offer_term"),
-                value=t.get("value"),
-                idx=t.get("idx") if t.get("idx") is not None else idx,
-            )
-            db.add(term)
-
-    db.commit()
-    return await get_job_offer(offer.id, db)
+    return await get_job_offer(offer_id, db)
 
 
 @router.delete("/job-offers/{offer_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_job_offer(
     offer_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a job offer and its terms."""
-    offer = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
-    if not offer:
-        raise HTTPException(status_code=404, detail="Job offer not found")
+    service = RecruitmentService(db, principal)
+    try:
+        service.delete_job_offer(offer_id)
+        db.commit()
+    except JobOfferNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(offer)
-    db.commit()
     return {"message": "Job offer deleted", "id": offer_id}
 
 
@@ -290,10 +345,16 @@ async def send_job_offer(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Send a job offer to the applicant."""
-    offer = _load_offer(db, offer_id)
-    _require_offer_status(offer, [JobOfferStatus.PENDING])
-    offer.status = JobOfferStatus.AWAITING_RESPONSE
-    db.commit()
+    service = RecruitmentService(db)
+    try:
+        offer = service.get_job_offer(offer_id)
+        _require_offer_status(offer, [JobOfferStatus.PENDING])
+        service.send_job_offer(offer_id)
+        db.commit()
+    except JobOfferNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+
     return await get_job_offer(offer_id, db)
 
 
@@ -303,20 +364,19 @@ async def accept_job_offer(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Mark a job offer as accepted."""
-    offer = _load_offer(db, offer_id)
-    _require_offer_status(offer, [JobOfferStatus.AWAITING_RESPONSE])
-
-    # Check if offer has expired
-    if offer.expiry_date and offer.expiry_date < date.today():
-        offer.status = JobOfferStatus.EXPIRED
+    service = RecruitmentService(db)
+    try:
+        offer = service.get_job_offer(offer_id)
+        _require_offer_status(offer, [JobOfferStatus.AWAITING_RESPONSE])
+        service.accept_job_offer(offer_id)
         db.commit()
-        raise HTTPException(
-            status_code=400,
-            detail=f"Offer has expired on {offer.expiry_date.isoformat()}"
-        )
+    except JobOfferNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except OfferExpiredError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    offer.status = JobOfferStatus.ACCEPTED
-    db.commit()
     return await get_job_offer(offer_id, db)
 
 
@@ -326,10 +386,16 @@ async def reject_job_offer(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Mark a job offer as rejected."""
-    offer = _load_offer(db, offer_id)
-    _require_offer_status(offer, [JobOfferStatus.AWAITING_RESPONSE])
-    offer.status = JobOfferStatus.REJECTED
-    db.commit()
+    service = RecruitmentService(db)
+    try:
+        offer = service.get_job_offer(offer_id)
+        _require_offer_status(offer, [JobOfferStatus.AWAITING_RESPONSE])
+        service.reject_job_offer(offer_id)
+        db.commit()
+    except JobOfferNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+
     return await get_job_offer(offer_id, db)
 
 
@@ -338,30 +404,31 @@ async def void_job_offer(
     offer_id: int,
     payload: VoidOfferPayload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Void a job offer with reason."""
-    offer = _load_offer(db, offer_id)
-    _require_offer_status(offer, [JobOfferStatus.PENDING, JobOfferStatus.AWAITING_RESPONSE])
+    service = RecruitmentService(db, principal)
+    try:
+        offer = service.get_job_offer(offer_id)
+        _require_offer_status(offer, [JobOfferStatus.PENDING, JobOfferStatus.AWAITING_RESPONSE])
+        service.void_job_offer(offer_id, payload.reason)
 
-    offer.status = JobOfferStatus.VOIDED
-    offer.voided_at = now()
-    offer.voided_by_id = current_user.id if current_user else None
-    offer.void_reason = payload.reason
-    offer.status_changed_by_id = current_user.id if current_user else None
-    offer.status_changed_at = now()
+        audit = AuditLogger(db)
+        audit.log_cancel(
+            doctype="job_offer",
+            document_id=offer.id,
+            user_id=principal.user_id if principal else None,
+            document_name=f"{offer.applicant_name}",
+            remarks=f"Voided: {payload.reason}",
+        )
+        db.commit()
+    except JobOfferNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ApplicantPipelineError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
 
-    # Log audit event
-    audit = AuditLogger(db)
-    audit.log_cancel(
-        doctype="job_offer",
-        document_id=offer.id,
-        user_id=current_user.id if current_user else None,
-        document_name=f"{offer.applicant_name}",
-        remarks=f"Voided: {payload.reason}",
-    )
-
-    db.commit()
     return await get_job_offer(offer_id, db)
 
 
@@ -369,22 +436,24 @@ async def void_job_offer(
 async def bulk_send_job_offers(
     payload: BulkSendOffersPayload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_principal),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Bulk send job offers to applicants."""
     sent = 0
     skipped = []
+    service = RecruitmentService(db, principal)
     for offer_id in payload.offer_ids:
-        offer = db.query(JobOffer).filter(JobOffer.id == offer_id).first()
-        if offer and offer.status == JobOfferStatus.PENDING:
-            offer.status = JobOfferStatus.AWAITING_RESPONSE
-            offer.status_changed_by_id = current_user.id if current_user else None
-            offer.status_changed_at = now()
-            sent += 1
-        else:
-            skipped.append({
-                "id": offer_id,
-                "reason": "Not found" if not offer else f"Invalid status: {offer.status.value}"
-            })
+        try:
+            offer = service.get_job_offer(offer_id)
+            if offer.status == JobOfferStatus.PENDING:
+                service.send_job_offer(offer_id)
+                sent += 1
+            else:
+                skipped.append({
+                    "id": offer_id,
+                    "reason": f"Invalid status: {offer.status.value if offer.status else 'unknown'}",
+                })
+        except JobOfferNotFoundError:
+            skipped.append({"id": offer_id, "reason": "Not found"})
     db.commit()
     return {"sent": sent, "skipped": len(skipped), "requested": len(payload.offer_ids), "skipped_details": skipped}

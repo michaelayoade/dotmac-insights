@@ -119,7 +119,12 @@
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                 {% if ticket.status.value == 'open' %}bg-amber-50 text-amber-700
                                 {% elif ticket.status.value == 'in_progress' %}bg-blue-50 text-blue-700
-                                {% else %}bg-purple-50 text-purple-700{% endif %}">
+                                {% elif ticket.status.value == 'waiting' %}bg-purple-50 text-purple-700
+                                {% elif ticket.status.value == 'on_hold' %}bg-gray-50 text-gray-700
+                                {% elif ticket.status.value == 'resolved' %}bg-emerald-50 text-emerald-700
+                                {% elif ticket.status.value == 'closed' %}bg-gray-50 text-gray-700
+                                {% elif ticket.status.value == 'reopened' %}bg-red-50 text-red-700
+                                {% else %}bg-surface-50 text-gray-700{% endif %}">
                                 {{ ticket.status.value.replace('_', ' ').title() }}
                             </span>
                             <p class="text-sm text-gray-500 mt-1">{{ ticket.created_at.strftime('%b %d') }}</p>

@@ -67,6 +67,20 @@ class BankReconciliationService:
             raise ReconciliationError(f"Bank account {bank_account_id} not found")
         return account
 
+    def list_recent_reconciliations(
+        self,
+        bank_account_name: str,
+        limit: int = 10,
+    ) -> List[BankReconciliation]:
+        """List recent reconciliations for a bank account."""
+        return (
+            self.db.query(BankReconciliation)
+            .filter(BankReconciliation.bank_account == bank_account_name)
+            .order_by(BankReconciliation.to_date.desc())
+            .limit(limit)
+            .all()
+        )
+
     def start_reconciliation(
         self,
         bank_account_id: int,

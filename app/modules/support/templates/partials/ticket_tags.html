@@ -1,0 +1,57 @@
+{# Ticket tags partial for HTMX #}
+<div class="flex flex-wrap gap-2" id="ticket-tags">
+    {% for tag in tags %}
+    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+        {{ tag }}
+        <button type="button"
+                hx-delete="/support/tickets/{{ ticket.id }}/tags/{{ tag }}"
+                hx-target="#ticket-tags"
+                hx-swap="outerHTML"
+                class="ml-1.5 inline-flex items-center justify-center h-4 w-4 rounded-full text-primary-400 hover:bg-primary-200 hover:text-primary-600 focus:outline-none">
+            <span class="sr-only">Remove tag {{ tag }}</span>
+            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    </span>
+    {% endfor %}
+
+    {# Add tag form #}
+    <form hx-post="/support/tickets/{{ ticket.id }}/tags"
+          hx-target="#ticket-tags"
+          hx-swap="outerHTML"
+          class="inline-flex"
+          x-data="{ showInput: false, tag: '' }">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <template x-if="!showInput">
+            <button type="button" @click="showInput = true"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">
+                <svg class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Add Tag
+            </button>
+        </template>
+
+        <template x-if="showInput">
+            <div class="inline-flex items-center space-x-1">
+                <input type="text" name="tag" x-model="tag"
+                       class="w-24 px-2 py-0.5 text-xs border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+                       placeholder="Tag name"
+                       @keydown.escape="showInput = false; tag = ''"
+                       x-init="$nextTick(() => $el.focus())">
+                <button type="submit" :disabled="!tag.trim()"
+                        class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50">
+                    Add
+                </button>
+                <button type="button" @click="showInput = false; tag = ''"
+                        class="inline-flex items-center px-1 py-0.5 rounded text-xs text-gray-500 hover:text-gray-700">
+                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </template>
+    </form>
+</div>

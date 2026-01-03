@@ -1,18 +1,27 @@
 """
 Inventory Routes - Warehouse and Stock Management with SSR + HTMX.
 
+All business logic is delegated to services. Routes are thin wrappers that:
+- Parse and validate input
+- Call service methods
+- Map service exceptions to HTTP responses
+- Control transaction boundaries (commit/rollback)
+
 Permission Requirements:
 - inventory:read - View warehouses and stock entries
 - inventory:write - Create, update, delete inventory items
 """
 from __future__ import annotations
 
-from typing import Optional, Any
+from datetime import datetime
+from typing import Optional, Any, NoReturn
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
 
+from app.database import get_db
+from app.auth import Principal, get_current_principal
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
     get_base_context,
@@ -21,8 +30,20 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.inventory import Warehouse, StockEntry, StockEntryType
+from app.models.inventory import StockEntryType
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.errors import NotFoundError, ValidationError, ConflictError
+from app.services.types import PaginationParams
+from app.services.inventory import (
+    WarehouseService,
+    StockEntryService,
+    WarehouseFilters,
+    WarehouseCreateData,
+    WarehouseUpdateData,
+    StockEntryFilters,
+    StockEntryCreateData,
+    StockEntryUpdateData,
+)
 
 # Permission dependencies
 RequireInventoryRead = Depends(require_scope("inventory:read"))
@@ -32,13 +53,49 @@ router = APIRouter(prefix="/inventory", tags=["inventory"])
 templates = get_template_env()
 
 
+# =============================================================================
+# SERVICE DEPENDENCIES
+# =============================================================================
+
+def get_warehouse_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> WarehouseService:
+    """Get warehouse service instance."""
+    return WarehouseService(db, principal)
+
+
+def get_stock_entry_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> StockEntryService:
+    """Get stock entry service instance."""
+    return StockEntryService(db, principal)
+
+
+# =============================================================================
+# HELPERS
+# =============================================================================
+
 def _form_str(form: Any, key: str, default: str = "") -> str:
+    """Extract string value from form data."""
     value = form.get(key, default)
     if isinstance(value, UploadFile):
         return default
     if value is None:
         return default
     return str(value).strip()
+
+
+def _handle_service_error(e: Exception) -> NoReturn:
+    """Convert service exceptions to HTTP exceptions."""
+    if isinstance(e, NotFoundError):
+        raise HTTPException(status_code=404, detail=str(e))
+    if isinstance(e, ValidationError):
+        raise HTTPException(status_code=422, detail=str(e))
+    if isinstance(e, ConflictError):
+        raise HTTPException(status_code=409, detail=str(e))
+    raise HTTPException(status_code=500, detail=str(e))
 
 
 def get_warehouse_type_options():
@@ -70,6 +127,7 @@ async def warehouses_list(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    service: WarehouseService = Depends(get_warehouse_service),
     q: Optional[str] = Query(None, description="Search query"),
     type: Optional[str] = Query(None, description="Filter by warehouse type"),
     page: int = Query(1, ge=1),
@@ -78,42 +136,27 @@ async def warehouses_list(
     dir: str = Query("asc", description="Sort direction"),
 ):
     """Warehouse list page."""
-    query = db.query(Warehouse).filter(Warehouse.is_deleted == False)
+    # Build filters and pagination
+    filters = WarehouseFilters(
+        search=q,
+        warehouse_type=type,
+        sort_by=sort,
+        sort_dir=dir,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    # Search
-    if q:
-        search_filter = or_(
-            Warehouse.warehouse_name.ilike(f"%{q}%"),
-            Warehouse.warehouse_type.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if type:
-        query = query.filter(Warehouse.warehouse_type == type)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_column = getattr(Warehouse, sort, Warehouse.warehouse_name)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    warehouses = query.offset(offset).limit(per_page).all()
+    # Get warehouses from service
+    result = service.list_warehouses(filters, pagination)
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["warehouses"] = warehouses
+    context["warehouses"] = result.items
     context["search_query"] = q or ""
     context["current_type"] = type
     context["type_options"] = get_warehouse_type_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -139,6 +182,7 @@ async def warehouses_table(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    service: WarehouseService = Depends(get_warehouse_service),
     q: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -148,7 +192,7 @@ async def warehouses_table(
 ):
     """Warehouse table partial for HTMX updates."""
     return await warehouses_list(
-        request, response, user, csrf_token, db,
+        request, response, user, csrf_token, db, service,
         q, type, page, per_page, sort, dir
     )
 
@@ -160,13 +204,11 @@ async def warehouse_new(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """New warehouse form page."""
-    # Get parent warehouse options
-    parent_warehouses = db.query(Warehouse).filter(
-        Warehouse.is_group == True,
-        Warehouse.is_deleted == False,
-    ).all()
+    # Get parent warehouse options from service
+    parent_warehouses = service.get_parent_warehouses()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -193,31 +235,17 @@ async def warehouse_create(
     csrf_token: CSRFToken,
     csrf: CSRFProtect,
     db: DB,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Create a new warehouse."""
     form = await request.form()
 
-    # Basic validation
-    errors = {}
+    # Extract form data
     warehouse_name = _form_str(form, "warehouse_name")
 
+    # Basic client-side validation for UX
     if not warehouse_name:
-        errors["warehouse_name"] = "Warehouse name is required"
-
-    # Check for duplicate name
-    existing = db.query(Warehouse).filter(
-        Warehouse.warehouse_name == warehouse_name,
-        Warehouse.is_deleted == False,
-    ).first()
-    if existing:
-        errors["warehouse_name"] = "A warehouse with this name already exists"
-
-    if errors:
-        parent_warehouses = db.query(Warehouse).filter(
-            Warehouse.is_group == True,
-            Warehouse.is_deleted == False,
-        ).all()
-
+        parent_warehouses = service.get_parent_warehouses()
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
         context["page_title"] = "New Warehouse"
@@ -229,27 +257,46 @@ async def warehouse_create(
         context["warehouse"] = None
         context["type_options"] = get_warehouse_type_options()
         context["parent_warehouses"] = parent_warehouses
-        context["errors"] = errors
+        context["errors"] = {"warehouse_name": "Warehouse name is required"}
         context["form_data"] = dict(form)
 
         template = templates.get_template("modules/inventory/templates/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Create warehouse
-    warehouse = Warehouse(
-        warehouse_name=warehouse_name,
-        warehouse_type=_form_str(form, "warehouse_type") or None,
-        parent_warehouse=_form_str(form, "parent_warehouse") or None,
-        is_group=form.get("is_group") == "on",
-        company=_form_str(form, "company") or None,
-        origin_system="local",
-    )
-    db.add(warehouse)
-    db.commit()
-    db.refresh(warehouse)
+    try:
+        # Create warehouse via service
+        data = WarehouseCreateData(
+            warehouse_name=warehouse_name,
+            warehouse_type=_form_str(form, "warehouse_type") or None,
+            parent_warehouse=_form_str(form, "parent_warehouse") or None,
+            is_group=form.get("is_group") == "on",
+            company=_form_str(form, "company") or None,
+        )
+        warehouse = service.create_warehouse(data)
+        db.commit()
 
-    set_flash(response, f"Warehouse '{warehouse.warehouse_name}' created successfully.", "success")
-    return RedirectResponse(url=f"/inventory/{warehouse.id}", status_code=303)
+        set_flash(response, f"Warehouse '{warehouse.warehouse_name}' created successfully.", "success")
+        return RedirectResponse(url=f"/inventory/{warehouse.id}", status_code=303)
+
+    except (ValidationError, ConflictError) as e:
+        db.rollback()
+        parent_warehouses = service.get_parent_warehouses()
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Warehouse"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Inventory", "href": "/inventory"},
+            {"label": "New Warehouse"},
+        ])
+        context["warehouse"] = None
+        context["type_options"] = get_warehouse_type_options()
+        context["parent_warehouses"] = parent_warehouses
+        context["errors"] = {"warehouse_name": str(e)}
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/inventory/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.get("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryRead])
@@ -260,14 +307,12 @@ async def warehouse_detail(
     csrf_token: CSRFToken,
     db: DB,
     warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Warehouse detail page."""
-    warehouse = db.query(Warehouse).filter(
-        Warehouse.id == warehouse_id,
-        Warehouse.is_deleted == False,
-    ).first()
-
-    if not warehouse:
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Warehouse not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -292,21 +337,16 @@ async def warehouse_edit(
     csrf_token: CSRFToken,
     db: DB,
     warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Warehouse edit form page."""
-    warehouse = db.query(Warehouse).filter(
-        Warehouse.id == warehouse_id,
-        Warehouse.is_deleted == False,
-    ).first()
-
-    if not warehouse:
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Warehouse not found")
 
-    parent_warehouses = db.query(Warehouse).filter(
-        Warehouse.is_group == True,
-        Warehouse.is_deleted == False,
-        Warehouse.id != warehouse_id,
-    ).all()
+    # Get parent warehouses excluding current
+    parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -335,41 +375,20 @@ async def warehouse_update(
     csrf: CSRFProtect,
     db: DB,
     warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Update a warehouse."""
-    warehouse = db.query(Warehouse).filter(
-        Warehouse.id == warehouse_id,
-        Warehouse.is_deleted == False,
-    ).first()
-
-    if not warehouse:
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Warehouse not found")
 
     form = await request.form()
-
-    # Basic validation
-    errors = {}
     warehouse_name = _form_str(form, "warehouse_name")
 
+    # Basic client-side validation for UX
     if not warehouse_name:
-        errors["warehouse_name"] = "Warehouse name is required"
-
-    # Check for duplicate name (excluding current)
-    existing = db.query(Warehouse).filter(
-        Warehouse.warehouse_name == warehouse_name,
-        Warehouse.is_deleted == False,
-        Warehouse.id != warehouse_id,
-    ).first()
-    if existing:
-        errors["warehouse_name"] = "A warehouse with this name already exists"
-
-    if errors:
-        parent_warehouses = db.query(Warehouse).filter(
-            Warehouse.is_group == True,
-            Warehouse.is_deleted == False,
-            Warehouse.id != warehouse_id,
-        ).all()
-
+        parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
         context["page_title"] = f"Edit {warehouse.warehouse_name}"
@@ -382,21 +401,45 @@ async def warehouse_update(
         context["warehouse"] = warehouse
         context["type_options"] = get_warehouse_type_options()
         context["parent_warehouses"] = parent_warehouses
-        context["errors"] = errors
+        context["errors"] = {"warehouse_name": "Warehouse name is required"}
 
         template = templates.get_template("modules/inventory/templates/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Update warehouse
-    warehouse.warehouse_name = warehouse_name
-    warehouse.warehouse_type = _form_str(form, "warehouse_type") or None
-    warehouse.parent_warehouse = _form_str(form, "parent_warehouse") or None
-    warehouse.is_group = form.get("is_group") == "on"
-    warehouse.company = _form_str(form, "company") or None
-    db.commit()
+    try:
+        # Update warehouse via service
+        data = WarehouseUpdateData(
+            warehouse_name=warehouse_name,
+            warehouse_type=_form_str(form, "warehouse_type") or None,
+            parent_warehouse=_form_str(form, "parent_warehouse") or None,
+            is_group=form.get("is_group") == "on",
+            company=_form_str(form, "company") or None,
+        )
+        warehouse = service.update_warehouse(warehouse_id, data)
+        db.commit()
 
-    set_flash(response, f"Warehouse '{warehouse.warehouse_name}' updated successfully.", "success")
-    return RedirectResponse(url=f"/inventory/{warehouse.id}", status_code=303)
+        set_flash(response, f"Warehouse '{warehouse.warehouse_name}' updated successfully.", "success")
+        return RedirectResponse(url=f"/inventory/{warehouse.id}", status_code=303)
+
+    except (ValidationError, ConflictError) as e:
+        db.rollback()
+        parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {warehouse.warehouse_name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Inventory", "href": "/inventory"},
+            {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
+            {"label": "Edit"},
+        ])
+        context["warehouse"] = warehouse
+        context["type_options"] = get_warehouse_type_options()
+        context["parent_warehouses"] = parent_warehouses
+        context["errors"] = {"warehouse_name": str(e)}
+
+        template = templates.get_template("modules/inventory/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.delete("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
@@ -407,21 +450,21 @@ async def warehouse_delete(
     csrf: CSRFProtect,
     db: DB,
     warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Delete a warehouse (soft delete)."""
-    warehouse = db.query(Warehouse).filter(
-        Warehouse.id == warehouse_id,
-        Warehouse.is_deleted == False,
-    ).first()
-
-    if not warehouse:
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+        name = warehouse.warehouse_name
+        service.delete_warehouse(warehouse_id)
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Warehouse not found")
-
-    name = warehouse.warehouse_name
-    warehouse.is_deleted = True
-    from datetime import datetime
-    warehouse.deleted_at = datetime.utcnow()
-    db.commit()
+    except ValidationError as e:
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", status_code=422, headers=dict(response.headers))
+        raise HTTPException(status_code=422, detail=str(e))
 
     if is_htmx_request(request):
         htmx_toast(response, f"Warehouse '{name}' deleted.", "success")
@@ -439,14 +482,12 @@ async def warehouse_row(
     csrf_token: CSRFToken,
     db: DB,
     warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Single warehouse row partial for HTMX updates."""
-    warehouse = db.query(Warehouse).filter(
-        Warehouse.id == warehouse_id,
-        Warehouse.is_deleted == False,
-    ).first()
-
-    if not warehouse:
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -467,6 +508,8 @@ async def stock_entries_list(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    service: StockEntryService = Depends(get_stock_entry_service),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
     q: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -475,43 +518,27 @@ async def stock_entries_list(
     dir: str = Query("desc"),
 ):
     """Stock entries list page."""
-    query = db.query(StockEntry).filter(StockEntry.is_deleted == False)
+    # Build filters and pagination
+    filters = StockEntryFilters(
+        search=q,
+        stock_entry_type=type,
+        sort_by=sort,
+        sort_dir=dir,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    # Search
-    if q:
-        search_filter = or_(
-            StockEntry.from_warehouse.ilike(f"%{q}%"),
-            StockEntry.to_warehouse.ilike(f"%{q}%"),
-            StockEntry.erpnext_id.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if type:
-        query = query.filter(StockEntry.stock_entry_type == type)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_column = getattr(StockEntry, sort, StockEntry.posting_date)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    entries = query.offset(offset).limit(per_page).all()
+    # Get entries from service
+    result = service.list_entries(filters, pagination)
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["entries"] = entries
+    context["entries"] = result.items
     context["search_query"] = q or ""
     context["current_type"] = type
     context["type_options"] = get_stock_entry_type_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -538,6 +565,8 @@ async def stock_entries_table(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    service: StockEntryService = Depends(get_stock_entry_service),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
     q: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -547,17 +576,14 @@ async def stock_entries_table(
 ):
     """Stock entries table partial for HTMX updates."""
     return await stock_entries_list(
-        request, response, user, csrf_token, db,
+        request, response, user, csrf_token, db, service, warehouse_service,
         q, type, page, per_page, sort, dir
     )
 
 
-def get_warehouse_options(db):
-    """Get warehouse options for select dropdown."""
-    warehouses = db.query(Warehouse).filter(
-        Warehouse.is_deleted == False,
-        Warehouse.is_group == False,
-    ).order_by(Warehouse.warehouse_name).all()
+def _get_warehouse_options(service: WarehouseService):
+    """Get warehouse options for select dropdown using service."""
+    warehouses = service.get_leaf_warehouses()
     return [{"value": w.warehouse_name, "label": w.warehouse_name} for w in warehouses]
 
 
@@ -568,6 +594,7 @@ async def stock_entry_new(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
 ):
     """New stock entry form page."""
     context = get_base_context(request, response, user, csrf_token)
@@ -581,7 +608,7 @@ async def stock_entry_new(
     ])
     context["entry"] = None
     context["type_options"] = get_stock_entry_type_options()
-    context["warehouse_options"] = get_warehouse_options(db)
+    context["warehouse_options"] = _get_warehouse_options(warehouse_service)
     context["errors"] = {}
 
     template = templates.get_template("modules/inventory/templates/pages/stock_entry_form.html")
@@ -596,21 +623,20 @@ async def stock_entry_create(
     csrf_token: CSRFToken,
     csrf: CSRFProtect,
     db: DB,
+    service: StockEntryService = Depends(get_stock_entry_service),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Create a new stock entry."""
-    from datetime import datetime
-    from decimal import Decimal
-
     form = await request.form()
 
-    # Basic validation
-    errors = {}
+    # Extract and validate form data
     stock_entry_type = _form_str(form, "stock_entry_type")
-    posting_date = _form_str(form, "posting_date")
+    posting_date_str = _form_str(form, "posting_date")
 
+    errors = {}
     if not stock_entry_type:
         errors["stock_entry_type"] = "Entry type is required"
-    if not posting_date:
+    if not posting_date_str:
         errors["posting_date"] = "Posting date is required"
 
     if errors:
@@ -625,7 +651,7 @@ async def stock_entry_create(
         ])
         context["entry"] = None
         context["type_options"] = get_stock_entry_type_options()
-        context["warehouse_options"] = get_warehouse_options(db)
+        context["warehouse_options"] = _get_warehouse_options(warehouse_service)
         context["errors"] = errors
         context["form_data"] = dict(form)
 
@@ -633,28 +659,48 @@ async def stock_entry_create(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Parse posting date
+    from datetime import date as date_type
     try:
-        parsed_date = datetime.strptime(posting_date, "%Y-%m-%d")
+        parsed_date = datetime.strptime(posting_date_str, "%Y-%m-%d").date()
     except ValueError:
-        parsed_date = datetime.utcnow()
+        parsed_date = date_type.today()
 
-    # Create entry
-    entry = StockEntry(
-        stock_entry_type=stock_entry_type,
-        posting_date=parsed_date,
-        posting_time=datetime.utcnow().time(),
-        from_warehouse=_form_str(form, "from_warehouse") or None,
-        to_warehouse=_form_str(form, "to_warehouse") or None,
-        purpose=_form_str(form, "purpose") or None,
-        remarks=_form_str(form, "remarks") or None,
-        origin_system="local",
-    )
-    db.add(entry)
-    db.commit()
-    db.refresh(entry)
+    try:
+        # Create entry via service
+        data = StockEntryCreateData(
+            stock_entry_type=stock_entry_type,
+            posting_date=parsed_date,
+            posting_time=datetime.utcnow().strftime("%H:%M:%S"),
+            from_warehouse=_form_str(form, "from_warehouse") or None,
+            to_warehouse=_form_str(form, "to_warehouse") or None,
+            purpose=_form_str(form, "purpose") or None,
+            remarks=_form_str(form, "remarks") or None,
+        )
+        entry = service.create_entry(data)
+        db.commit()
 
-    set_flash(response, "Stock entry created successfully.", "success")
-    return RedirectResponse(url=f"/inventory/stock-entries/{entry.id}", status_code=303)
+        set_flash(response, "Stock entry created successfully.", "success")
+        return RedirectResponse(url=f"/inventory/stock-entries/{entry.id}", status_code=303)
+
+    except ValidationError as e:
+        db.rollback()
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Stock Entry"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Inventory", "href": "/inventory"},
+            {"label": "Stock Entries", "href": "/inventory/stock-entries"},
+            {"label": "New Entry"},
+        ])
+        context["entry"] = None
+        context["type_options"] = get_stock_entry_type_options()
+        context["warehouse_options"] = _get_warehouse_options(warehouse_service)
+        context["errors"] = {"general": str(e)}
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/inventory/templates/pages/stock_entry_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.get("/stock-entries/{entry_id}", response_class=HTMLResponse, dependencies=[RequireInventoryRead])
@@ -665,14 +711,12 @@ async def stock_entry_detail(
     csrf_token: CSRFToken,
     db: DB,
     entry_id: int,
+    service: StockEntryService = Depends(get_stock_entry_service),
 ):
     """Stock entry detail page."""
-    entry = db.query(StockEntry).filter(
-        StockEntry.id == entry_id,
-        StockEntry.is_deleted == False,
-    ).first()
-
-    if not entry:
+    try:
+        entry = service.get_entry(entry_id, include_items=True)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Stock entry not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -698,19 +742,18 @@ async def stock_entry_edit(
     csrf_token: CSRFToken,
     db: DB,
     entry_id: int,
+    service: StockEntryService = Depends(get_stock_entry_service),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Stock entry edit form page."""
-    entry = db.query(StockEntry).filter(
-        StockEntry.id == entry_id,
-        StockEntry.is_deleted == False,
-    ).first()
-
-    if not entry:
+    try:
+        entry = service.get_entry(entry_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Stock entry not found")
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = f"Edit Stock Entry"
+    context["page_title"] = "Edit Stock Entry"
     context["breadcrumbs"] = build_breadcrumbs([
         {"label": "Operations"},
         {"label": "Inventory", "href": "/inventory"},
@@ -720,7 +763,7 @@ async def stock_entry_edit(
     ])
     context["entry"] = entry
     context["type_options"] = get_stock_entry_type_options()
-    context["warehouse_options"] = get_warehouse_options(db)
+    context["warehouse_options"] = _get_warehouse_options(warehouse_service)
     context["errors"] = {}
 
     template = templates.get_template("modules/inventory/templates/pages/stock_entry_form.html")
@@ -736,34 +779,31 @@ async def stock_entry_update(
     csrf: CSRFProtect,
     db: DB,
     entry_id: int,
+    service: StockEntryService = Depends(get_stock_entry_service),
+    warehouse_service: WarehouseService = Depends(get_warehouse_service),
 ):
     """Update a stock entry."""
-    from datetime import datetime
-
-    entry = db.query(StockEntry).filter(
-        StockEntry.id == entry_id,
-        StockEntry.is_deleted == False,
-    ).first()
-
-    if not entry:
+    try:
+        entry = service.get_entry(entry_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Stock entry not found")
 
     form = await request.form()
 
-    # Basic validation
-    errors = {}
+    # Extract and validate form data
     stock_entry_type = _form_str(form, "stock_entry_type")
-    posting_date = _form_str(form, "posting_date")
+    posting_date_str = _form_str(form, "posting_date")
 
+    errors = {}
     if not stock_entry_type:
         errors["stock_entry_type"] = "Entry type is required"
-    if not posting_date:
+    if not posting_date_str:
         errors["posting_date"] = "Posting date is required"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
-        context["page_title"] = f"Edit Stock Entry"
+        context["page_title"] = "Edit Stock Entry"
         context["breadcrumbs"] = build_breadcrumbs([
             {"label": "Operations"},
             {"label": "Inventory", "href": "/inventory"},
@@ -773,29 +813,54 @@ async def stock_entry_update(
         ])
         context["entry"] = entry
         context["type_options"] = get_stock_entry_type_options()
-        context["warehouse_options"] = get_warehouse_options(db)
+        context["warehouse_options"] = _get_warehouse_options(warehouse_service)
         context["errors"] = errors
 
         template = templates.get_template("modules/inventory/templates/pages/stock_entry_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
     # Parse posting date
+    from datetime import date as date_type
     try:
-        parsed_date = datetime.strptime(posting_date, "%Y-%m-%d")
+        parsed_date = datetime.strptime(posting_date_str, "%Y-%m-%d").date()
     except ValueError:
-        parsed_date = entry.posting_date or datetime.utcnow()
+        parsed_date = entry.posting_date.date() if entry.posting_date else date_type.today()
 
-    # Update entry
-    entry.stock_entry_type = stock_entry_type
-    entry.posting_date = parsed_date
-    entry.from_warehouse = _form_str(form, "from_warehouse") or None
-    entry.to_warehouse = _form_str(form, "to_warehouse") or None
-    entry.purpose = _form_str(form, "purpose") or None
-    entry.remarks = _form_str(form, "remarks") or None
-    db.commit()
+    try:
+        # Update entry via service
+        data = StockEntryUpdateData(
+            stock_entry_type=stock_entry_type,
+            posting_date=parsed_date,
+            from_warehouse=_form_str(form, "from_warehouse") or None,
+            to_warehouse=_form_str(form, "to_warehouse") or None,
+            purpose=_form_str(form, "purpose") or None,
+            remarks=_form_str(form, "remarks") or None,
+        )
+        entry = service.update_entry(entry_id, data)
+        db.commit()
 
-    set_flash(response, "Stock entry updated successfully.", "success")
-    return RedirectResponse(url=f"/inventory/stock-entries/{entry.id}", status_code=303)
+        set_flash(response, "Stock entry updated successfully.", "success")
+        return RedirectResponse(url=f"/inventory/stock-entries/{entry.id}", status_code=303)
+
+    except ValidationError as e:
+        db.rollback()
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Stock Entry"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Inventory", "href": "/inventory"},
+            {"label": "Stock Entries", "href": "/inventory/stock-entries"},
+            {"label": f"#{entry.id}", "href": f"/inventory/stock-entries/{entry.id}"},
+            {"label": "Edit"},
+        ])
+        context["entry"] = entry
+        context["type_options"] = get_stock_entry_type_options()
+        context["warehouse_options"] = _get_warehouse_options(warehouse_service)
+        context["errors"] = {"general": str(e)}
+
+        template = templates.get_template("modules/inventory/templates/pages/stock_entry_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.delete("/stock-entries/{entry_id}", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
@@ -806,20 +871,19 @@ async def stock_entry_delete(
     csrf: CSRFProtect,
     db: DB,
     entry_id: int,
+    service: StockEntryService = Depends(get_stock_entry_service),
 ):
     """Delete a stock entry (soft delete)."""
-    entry = db.query(StockEntry).filter(
-        StockEntry.id == entry_id,
-        StockEntry.is_deleted == False,
-    ).first()
-
-    if not entry:
+    try:
+        service.delete_entry(entry_id)
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Stock entry not found")
-
-    entry.is_deleted = True
-    from datetime import datetime
-    entry.deleted_at = datetime.utcnow()
-    db.commit()
+    except ValidationError as e:
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", status_code=422, headers=dict(response.headers))
+        raise HTTPException(status_code=422, detail=str(e))
 
     if is_htmx_request(request):
         htmx_toast(response, "Stock entry deleted.", "success")

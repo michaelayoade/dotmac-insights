@@ -10,20 +10,26 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException, set_flash, validate_csrf, form_str,
-    Supplier, PurchaseInvoice,
-    func, or_, datetime, Decimal,
 )
+from app.services.accounting import AccountingSettingsService, PayablesService
+from app.services.accounting.payables_types import SupplierCreateData, SupplierUpdateData
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
 
-def get_supplier_group_options(db) -> list:
+def _get_payables_service(db: DB, user: SessionUser) -> PayablesService:
+    settings_service = AccountingSettingsService(db, user)
+    return PayablesService(db, settings_service, user)
+
+
+def get_supplier_group_options(service: PayablesService) -> list:
     """Get unique supplier groups for filter dropdown."""
-    groups = db.query(Supplier.supplier_group).filter(
-        Supplier.supplier_group.isnot(None),
-        Supplier.disabled == False,
-    ).distinct().all()
-    return [{"value": g[0], "label": g[0]} for g in groups if g[0]]
+    return [
+        {"value": group, "label": group}
+        for group in service.list_supplier_groups()
+    ]
 
 
 def get_currency_options() -> list:
@@ -51,44 +57,23 @@ async def suppliers_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Suppliers list page."""
-    query = db.query(Supplier).filter(Supplier.disabled == False)
-
-    if q:
-        query = query.filter(
-            or_(
-                Supplier.supplier_name.ilike(f"%{q}%"),
-                Supplier.email_id.ilike(f"%{q}%"),
-                Supplier.tax_id.ilike(f"%{q}%"),
-            )
+    service = _get_payables_service(db, user)
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_supplier_models(
+            search=q,
+            supplier_group=group,
+            include_disabled=False,
+            pagination=pagination,
         )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if group:
-        query = query.filter(Supplier.supplier_group == group)
+    suppliers = result.items
+    total = result.total
 
-    total = query.count()
-    query = query.order_by(Supplier.supplier_name)
-    suppliers = query.offset((page - 1) * per_page).limit(per_page).all()
-
-    # Stats
-    total_suppliers = db.query(func.count(Supplier.id)).filter(Supplier.disabled == False).scalar() or 0
-    active_suppliers = db.query(func.count(Supplier.id)).filter(
-        Supplier.disabled == False,
-        Supplier.on_hold == False,
-    ).scalar() or 0
-
-    # Calculate total payables and overdue
-    total_payables = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
-        PurchaseInvoice.outstanding_amount > 0,
-    ).scalar() or Decimal("0")
-
-    now = datetime.utcnow().date()
-    total_overdue = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
-        PurchaseInvoice.outstanding_amount > 0,
-        PurchaseInvoice.due_date < now,
-    ).scalar() or Decimal("0")
-
-    # Get unique supplier groups for filter
-    group_options = get_supplier_group_options(db)
+    stats = service.get_supplier_stats()
+    group_options = get_supplier_group_options(service)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -100,12 +85,7 @@ async def suppliers_list(
     context["current_search"] = q or ""
     context["current_group"] = group or ""
     context["group_options"] = group_options
-    context["stats"] = {
-        "total_suppliers": total_suppliers,
-        "active_suppliers": active_suppliers,
-        "total_payables": total_payables,
-        "total_overdue": total_overdue,
-    }
+    context["stats"] = stats
     context["pagination"] = build_pagination_context(page, per_page, total)
 
     if is_htmx_request(request):
@@ -129,22 +109,20 @@ async def suppliers_table_partial(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Suppliers table HTMX partial."""
-    query = db.query(Supplier).filter(Supplier.disabled == False)
-
-    if q:
-        query = query.filter(
-            or_(
-                Supplier.supplier_name.ilike(f"%{q}%"),
-                Supplier.email_id.ilike(f"%{q}%"),
-                Supplier.tax_id.ilike(f"%{q}%"),
-            )
+    service = _get_payables_service(db, user)
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_supplier_models(
+            search=q,
+            supplier_group=group,
+            include_disabled=False,
+            pagination=pagination,
         )
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if group:
-        query = query.filter(Supplier.supplier_group == group)
-
-    total = query.count()
-    suppliers = query.order_by(Supplier.supplier_name).offset((page - 1) * per_page).limit(per_page).all()
+    suppliers = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["suppliers"] = suppliers
@@ -172,7 +150,8 @@ async def supplier_new_form(
         {"label": "Suppliers", "href": "/accounting/suppliers"},
         {"label": "New Supplier", "href": "/accounting/suppliers/new", "current": True},
     ])
-    context["group_options"] = get_supplier_group_options(db)
+    service = _get_payables_service(db, user)
+    context["group_options"] = get_supplier_group_options(service)
     context["currency_options"] = get_currency_options()
 
     template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
@@ -205,24 +184,31 @@ async def supplier_create(
         ])
         context["errors"] = errors
         context["form_data"] = dict(form)
-        context["group_options"] = get_supplier_group_options(db)
+        service = _get_payables_service(db, user)
+        context["group_options"] = get_supplier_group_options(service)
         context["currency_options"] = get_currency_options()
         template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    supplier = Supplier(
-        supplier_name=form_str(form, "supplier_name"),
-        supplier_group=form_str(form, "supplier_group") or None,
-        tax_id=form_str(form, "tax_id") or None,
-        email_id=form_str(form, "email_id") or None,
-        mobile_no=form_str(form, "mobile_no") or None,
-        country=form_str(form, "country") or None,
-        default_currency=form_str(form, "default_currency") or None,
-        payment_terms=form_str(form, "payment_terms") or None,
+    service = _get_payables_service(db, user)
+    supplier = service.create_supplier(
+        SupplierCreateData(
+            supplier_name=form_str(form, "supplier_name"),
+            supplier_group=form_str(form, "supplier_group") or None,
+            supplier_type=form_str(form, "supplier_type") or None,
+            tax_id=form_str(form, "tax_id") or None,
+            email_id=form_str(form, "email_id") or None,
+            mobile_no=form_str(form, "mobile_no") or None,
+            country=form_str(form, "country") or None,
+            default_currency=form_str(form, "default_currency") or None,
+            payment_terms=form_str(form, "payment_terms") or None,
+            supplier_primary_address=form_str(form, "address") or None,
+            default_bank_account=form_str(form, "bank_account") or None,
+            is_internal_supplier=form.get("is_internal_supplier") == "on",
+            disabled=False,
+        )
     )
-    db.add(supplier)
     db.commit()
-    db.refresh(supplier)
 
     set_flash(response, "Supplier created successfully", "success")
     return RedirectResponse(url=f"/accounting/suppliers/{supplier.id}", status_code=303)
@@ -238,20 +224,14 @@ async def supplier_detail(
     supplier_id: int,
 ):
     """Supplier detail page."""
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
+    service = _get_payables_service(db, user)
+    try:
+        supplier = service.get_supplier_model(supplier_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Supplier not found") from exc
 
-    # Get purchase invoices for this supplier
-    invoices = db.query(PurchaseInvoice).filter(
-        PurchaseInvoice.supplier == supplier.supplier_name,
-        ).order_by(PurchaseInvoice.posting_date.desc()).limit(20).all()
-
-    # Calculate outstanding
-    outstanding = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
-        PurchaseInvoice.supplier == supplier.supplier_name,
-        PurchaseInvoice.outstanding_amount > 0,
-    ).scalar() or Decimal("0")
+    invoices = service.list_supplier_invoices(supplier.supplier_name, limit=20)
+    outstanding = service.get_supplier_outstanding(supplier.supplier_name)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -283,9 +263,11 @@ async def supplier_edit_form(
     supplier_id: int,
 ):
     """Edit supplier form."""
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
+    service = _get_payables_service(db, user)
+    try:
+        supplier = service.get_supplier_model(supplier_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Supplier not found") from exc
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -296,7 +278,7 @@ async def supplier_edit_form(
         {"label": "Edit", "href": f"/accounting/suppliers/{supplier_id}/edit", "current": True},
     ])
     context["supplier"] = supplier
-    context["group_options"] = get_supplier_group_options(db)
+    context["group_options"] = get_supplier_group_options(service)
     context["currency_options"] = get_currency_options()
 
     template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
@@ -313,9 +295,11 @@ async def supplier_update(
     supplier_id: int,
 ):
     """Update supplier."""
-    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
-    if not supplier:
-        raise HTTPException(status_code=404, detail="Supplier not found")
+    service = _get_payables_service(db, user)
+    try:
+        supplier = service.get_supplier_model(supplier_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Supplier not found") from exc
 
     form = await request.form()
     await validate_csrf(request)
@@ -336,19 +320,28 @@ async def supplier_update(
         context["supplier"] = supplier
         context["errors"] = errors
         context["form_data"] = dict(form)
-        context["group_options"] = get_supplier_group_options(db)
+        context["group_options"] = get_supplier_group_options(service)
         context["currency_options"] = get_currency_options()
         template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    supplier.supplier_name = form_str(form, "supplier_name")
-    supplier.supplier_group = form_str(form, "supplier_group") or None
-    supplier.tax_id = form_str(form, "tax_id") or None
-    supplier.email_id = form_str(form, "email_id") or None
-    supplier.mobile_no = form_str(form, "mobile_no") or None
-    supplier.country = form_str(form, "country") or None
-    supplier.default_currency = form_str(form, "default_currency", supplier.default_currency) or supplier.default_currency
-    supplier.payment_terms = form_str(form, "payment_terms") or None
+    service.update_supplier(
+        supplier_id,
+        SupplierUpdateData(
+            supplier_name=form_str(form, "supplier_name"),
+            supplier_group=form_str(form, "supplier_group") or None,
+            supplier_type=form_str(form, "supplier_type") or None,
+            tax_id=form_str(form, "tax_id") or None,
+            email_id=form_str(form, "email_id") or None,
+            mobile_no=form_str(form, "mobile_no") or None,
+            country=form_str(form, "country") or None,
+            default_currency=form_str(form, "default_currency") or None,
+            payment_terms=form_str(form, "payment_terms") or None,
+            supplier_primary_address=form_str(form, "address") or None,
+            default_bank_account=form_str(form, "bank_account") or None,
+            is_internal_supplier=form.get("is_internal_supplier") == "on",
+        ),
+    )
     db.commit()
 
     set_flash(response, "Supplier updated successfully", "success")

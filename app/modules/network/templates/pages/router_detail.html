@@ -248,13 +248,13 @@
                                 {% for sub in active_subscriptions[:10] %}
                                 <tr class="hover:bg-gray-50/50 transition-colors">
                                     <td class="py-3 pr-4">
-                                        {% if sub.customer %}
+                                        {% if sub.party %}
                                         <div class="flex items-center gap-2">
                                             <div class="w-7 h-7 bg-gradient-to-br from-primary-100 to-primary-200 rounded-lg flex items-center justify-center text-[10px] font-bold text-primary-700">
-                                                {{ sub.customer.name[:2] | upper }}
+                                                {{ sub.party.name[:2] | upper }}
                                             </div>
-                                            <a href="/customers/{{ sub.customer.id }}" class="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors">
-                                                {{ sub.customer.name | truncate(20) }}
+                                            <a href="/parties/{{ sub.party.id }}" class="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors">
+                                                {{ sub.party.name | truncate(20) }}
                                             </a>
                                         </div>
                                         {% else %}
@@ -456,7 +456,7 @@
                         </svg>
                         View All Routers at POP
                     </a>
-                    <a href="/customers?router_id={{ router.id }}" class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group">
+                    <a href="/parties" class="flex items-center gap-3 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors group">
                         <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>

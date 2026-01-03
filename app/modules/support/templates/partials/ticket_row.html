@@ -205,6 +205,34 @@
                         type="button"
                         class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-surface-50"
                         hx-post="/support/tickets/{{ ticket.id }}/status"
+                        hx-vals='{"status": "waiting"}'
+                        hx-target="#ticket-row-{{ ticket.id }}"
+                        hx-swap="outerHTML"
+                        @click="open = false"
+                    >
+                        <span class="inline-flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                            Waiting
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-surface-50"
+                        hx-post="/support/tickets/{{ ticket.id }}/status"
+                        hx-vals='{"status": "on_hold"}'
+                        hx-target="#ticket-row-{{ ticket.id }}"
+                        hx-swap="outerHTML"
+                        @click="open = false"
+                    >
+                        <span class="inline-flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-gray-500"></span>
+                            On Hold
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-surface-50"
+                        hx-post="/support/tickets/{{ ticket.id }}/status"
                         hx-vals='{"status": "resolved"}'
                         hx-target="#ticket-row-{{ ticket.id }}"
                         hx-swap="outerHTML"
@@ -227,6 +255,20 @@
                         <span class="inline-flex items-center gap-2">
                             <span class="w-2 h-2 rounded-full bg-gray-400"></span>
                             Closed
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-surface-50"
+                        hx-post="/support/tickets/{{ ticket.id }}/status"
+                        hx-vals='{"status": "reopened"}'
+                        hx-target="#ticket-row-{{ ticket.id }}"
+                        hx-swap="outerHTML"
+                        @click="open = false"
+                    >
+                        <span class="inline-flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                            Reopened
                         </span>
                     </button>
                     <hr class="my-1 border-gray-100">

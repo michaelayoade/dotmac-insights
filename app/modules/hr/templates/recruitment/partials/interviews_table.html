@@ -25,10 +25,11 @@
                         'Pending': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
                         'Scheduled': 'bg-blue-50 text-blue-700 ring-blue-600/20',
                         'Completed': 'bg-green-50 text-green-700 ring-green-600/20',
-                        'Cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                        'Cancelled': 'bg-red-50 text-red-700 ring-red-600/20',
+                        'No Show': 'bg-orange-50 text-orange-700 ring-orange-600/20'
                     } %}
-                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(interview.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
-                        {{ interview.status or 'Scheduled' }}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(interview.status_label, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ interview.status_label or 'Scheduled' }}
                     </span>
                 </td>
                 <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">

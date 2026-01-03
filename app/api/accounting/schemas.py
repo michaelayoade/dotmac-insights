@@ -688,8 +688,8 @@ class CreditHoldUpdate(BaseModel):
 
 class CustomerCreditStatusResponse(BaseModel):
     """Schema for customer credit status response."""
-    customer_id: int
-    customer_name: str
+    customer_account_id: int
+    party_name: str
     credit_limit: float
     current_balance: float
     available_credit: float

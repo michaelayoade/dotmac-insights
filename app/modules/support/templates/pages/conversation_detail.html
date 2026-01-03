@@ -147,20 +147,20 @@
                     {% if customer %}
                     <div class="flex items-center gap-4 mb-4">
                         <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                            <span class="text-lg font-medium text-primary-700">{{ customer.name[:2] | upper if customer.name else '?' }}</span>
+                            <span class="text-lg font-medium text-primary-700">{{ customer.party.name[:2] | upper if customer.party and customer.party.name else '?' }}</span>
                         </div>
                         <div>
-                            <p class="font-medium text-gray-900">{{ customer.name or 'Unknown' }}</p>
-                            {% if customer.email %}
-                            <p class="text-sm text-gray-500">{{ customer.email }}</p>
+                            <p class="font-medium text-gray-900">{{ customer.party.name if customer.party else 'Unknown' }}</p>
+                            {% if customer.party and customer.party.primary_email %}
+                            <p class="text-sm text-gray-500">{{ customer.party.primary_email }}</p>
                             {% endif %}
                         </div>
                     </div>
                     <div class="space-y-3 pt-4 border-t border-gray-100">
-                        {% if customer.phone %}
+                        {% if customer.party and customer.party.primary_phone %}
                         <div class="flex items-center gap-2 text-sm">
                             <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                            <span class="text-gray-600">{{ customer.phone }}</span>
+                            <span class="text-gray-600">{{ customer.party.primary_phone }}</span>
                         </div>
                         {% endif %}
                         {% if customer.status %}
@@ -170,8 +170,8 @@
                         </div>
                         {% endif %}
                     </div>
-                    <a href="/customers/{{ customer.id }}" class="mt-4 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium">
-                        View Customer Profile
+                    <a href="/parties/{{ customer.party_id }}" class="mt-4 inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        View Party Profile
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </a>
                     {% else %}
@@ -211,6 +211,15 @@
                             #{{ conversation.unified_ticket_id }}
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                         </a>
+                        {% if linked_ticket %}
+                        <p class="text-xs text-gray-500 mt-1">{{ linked_ticket.status.value | replace('_', ' ') | title }}</p>
+                        {% if linked_ticket.resolution_by and not linked_ticket.resolved_at %}
+                        <p class="text-xs text-gray-400">Resolution due {{ linked_ticket.resolution_by | timeago }}</p>
+                        {% endif %}
+                        {% if linked_ticket.response_by and not linked_ticket.first_response_at %}
+                        <p class="text-xs text-gray-400">Response due {{ linked_ticket.response_by | timeago }}</p>
+                        {% endif %}
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>

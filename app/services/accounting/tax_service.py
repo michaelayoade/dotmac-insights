@@ -13,20 +13,23 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.tax import (
+    TaxCode,
     TaxFilingPeriod,
     TaxFilingStatus,
     TaxFilingType,
     TaxPayment,
+    TaxType,
 )
 from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
 
 from .tax_types import (
+    TaxCodeFilters,
     TaxDashboardSummary,
     TaxFilingCreateData,
     TaxFilingFilters,
@@ -45,6 +48,64 @@ class TaxService:
     def __init__(self, db: Session, principal: Optional["Principal"] = None) -> None:
         self.db = db
         self.principal = principal
+
+    # ============= TAX CODES =============
+
+    def list_tax_codes(
+        self,
+        filters: TaxCodeFilters,
+        pagination: PaginationParams,
+    ) -> PaginatedResult[TaxCode]:
+        """List tax codes with filters."""
+        query = self.db.query(TaxCode)
+
+        if filters.query:
+            query = query.filter(
+                or_(
+                    TaxCode.code.ilike(f"%{filters.query}%"),
+                    TaxCode.name.ilike(f"%{filters.query}%"),
+                )
+            )
+
+        if filters.tax_type:
+            try:
+                tax_type_enum = TaxType(filters.tax_type.lower())
+                query = query.filter(TaxCode.tax_type == tax_type_enum)
+            except ValueError:
+                raise ValidationError(f"Invalid tax type: {filters.tax_type}")
+
+        if filters.is_active is not None:
+            query = query.filter(TaxCode.is_active == filters.is_active)
+
+        query = query.order_by(TaxCode.code)
+        return paginate(query, pagination)
+
+    def get_tax_code(self, tax_code_id: int) -> TaxCode:
+        """Get a tax code by ID."""
+        tax_code = self.db.query(TaxCode).filter(TaxCode.id == tax_code_id).first()
+        if not tax_code:
+            raise NotFoundError("Tax code not found")
+        return tax_code
+
+    def get_tax_code_stats(self) -> Dict[str, int]:
+        """Get tax code statistics."""
+        total = self.db.query(func.count(TaxCode.id)).scalar() or 0
+        active = self.db.query(func.count(TaxCode.id)).filter(TaxCode.is_active == True).scalar() or 0
+        sales = self.db.query(func.count(TaxCode.id)).filter(
+            TaxCode.tax_type.in_([TaxType.SALES, TaxType.BOTH])
+        ).scalar() or 0
+        purchase = self.db.query(func.count(TaxCode.id)).filter(
+            TaxCode.tax_type.in_([TaxType.PURCHASE, TaxType.BOTH])
+        ).scalar() or 0
+
+        return {
+            "total": total,
+            "active": active,
+            "sales": sales,
+            "purchase": purchase,
+        }
+
+    # ============= TAX FILING PERIODS =============
 
     # ============= TAX FILING PERIODS =============
 
@@ -86,6 +147,14 @@ class TaxService:
         query = query.order_by(TaxFilingPeriod.due_date.desc())
         return paginate(query, pagination)
 
+    def list_filing_years(self) -> list[int]:
+        """List available filing years (descending)."""
+        years_query = self.db.query(
+            func.distinct(func.extract("year", TaxFilingPeriod.period_start))
+        ).all()
+        years = sorted([int(y[0]) for y in years_query if y[0]], reverse=True)
+        return years
+
     def get_filing_period(self, period_id: int) -> TaxFilingPeriod:
         """Get a tax filing period by ID.
 
@@ -117,6 +186,19 @@ class TaxService:
         return self.db.query(TaxPayment).filter(
             TaxPayment.filing_period_id == period_id
         ).order_by(TaxPayment.payment_date.desc()).all()
+
+    def get_filing_stats(self) -> Dict[str, int]:
+        """Get filing period statistics for the dashboard."""
+        today = date.today()
+        month_start = date(today.year, today.month, 1)
+
+        filed_this_month = self.db.query(func.count(TaxFilingPeriod.id)).filter(
+            TaxFilingPeriod.filed_at >= month_start
+        ).scalar() or 0
+
+        return {
+            "filed_this_month": filed_this_month,
+        }
 
     def create_filing_period(
         self,

@@ -36,6 +36,7 @@ from .subscription_types import (
     StatusTransition,
     SubscriptionStats,
 )
+from .radius_credentials_types import CredentialGenerationContext
 
 if TYPE_CHECKING:
     from app.auth import Principal
@@ -227,6 +228,46 @@ class SubscriptionService:
         except ValueError:
             service_type = SubscriptionType.INTERNET
 
+        # Auto-generate RADIUS credentials if not provided
+        ppp_username = data.ppp_username
+        ppp_password = data.ppp_password
+
+        if not ppp_username or not ppp_password:
+            from .radius_credentials import RADIUSCredentialService
+
+            cred_service = RADIUSCredentialService(self.db, self.principal)
+            config = cred_service.get_config()
+
+            if config.enabled and config.auto_generate_on_create:
+                # Build context - use placeholder subscription_id (will be updated after flush)
+                tariff_name = None
+                if data.tariff_id:
+                    tariff = self.db.query(Tariff).filter(Tariff.id == data.tariff_id).first()
+                    if tariff:
+                        tariff_name = tariff.title
+
+                context = CredentialGenerationContext(
+                    subscription_id=0,  # Placeholder, not used for most formats
+                    party_id=data.party_id,
+                    first_name=party.first_name,
+                    last_name=party.last_name,
+                    email=party.primary_email,
+                    phone=party.primary_phone,
+                    plan_code=data.plan_code,
+                    tariff_name=tariff_name,
+                )
+
+                credentials = cred_service.generate_credentials(
+                    context,
+                    generate_username=not ppp_username,
+                    generate_password=not ppp_password,
+                )
+
+                if not ppp_username:
+                    ppp_username = credentials.username
+                if not ppp_password:
+                    ppp_password = credentials.password
+
         sub = Subscription(
             party_id=data.party_id,
             tariff_id=data.tariff_id,
@@ -247,8 +288,8 @@ class SubscriptionService:
             ipv6_address=data.ipv6_address,
             mac_address=data.mac_address,
             access_method=data.access_method,
-            ppp_username=data.ppp_username,
-            ppp_password=data.ppp_password,
+            ppp_username=ppp_username,
+            ppp_password=ppp_password,
             status=status,
             start_date=data.start_date,
             end_date=data.end_date,

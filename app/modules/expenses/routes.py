@@ -2,6 +2,7 @@
 Expense Claims Routes.
 
 Handles SSR pages for expense claims, cash advances, and categories.
+Business logic is delegated to services in app/services/expenses/.
 """
 from __future__ import annotations
 
@@ -9,19 +10,28 @@ from typing import Optional, Any
 from datetime import date
 from fastapi import APIRouter, Request, Response, Depends, Query, Form, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_, desc, asc
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.web.dependencies import SessionUser, CSRFToken, require_scope
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
+from app.auth import Principal
 from app.models.expense_management import (
-    ExpenseClaim, ExpenseClaimLine, ExpenseClaimStatus,
-    CashAdvance, CashAdvanceStatus, ExpenseCategory
+    ExpenseClaimStatus,
+    CashAdvanceStatus,
 )
 from app.models.employee import Employee
 from app.core.security import set_flash
+from app.services.expenses import (
+    ExpenseService,
+    CashAdvanceService,
+    ExpenseCategoryService,
+    ExpenseClaimFilters,
+    CashAdvanceFilters,
+)
+from app.services.types import PaginationParams
+from app.services.errors import NotFoundError, ValidationError, ConflictError
 
 router = APIRouter(prefix="/expenses", tags=["expenses"])
 templates = get_template_env()
@@ -30,6 +40,29 @@ RequireExpensesRead = Depends(require_scope("expenses:read"))
 RequireExpensesWrite = Depends(require_scope("expenses:write"))
 
 TEMPLATE_PATH = "modules/expenses/templates"
+
+
+# ============= SERVICE DEPENDENCY PROVIDERS =============
+
+def get_expense_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_scope("expenses:read")),
+) -> ExpenseService:
+    return ExpenseService(db)
+
+
+def get_cash_advance_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_scope("expenses:read")),
+) -> CashAdvanceService:
+    return CashAdvanceService(db)
+
+
+def get_category_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_scope("expenses:read")),
+) -> ExpenseCategoryService:
+    return ExpenseCategoryService(db, principal)
 
 
 def _form_str(form: Any, key: str, default: str = "") -> str:
@@ -47,46 +80,39 @@ async def claims_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: Session = Depends(get_db),
+    service: ExpenseService = Depends(get_expense_service),
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
-    sort: str = Query("created_at"),
+    sort: str = Query("claim_date"),
     dir: str = Query("desc"),
 ):
     """Expense claims list page."""
-    query = db.query(ExpenseClaim).options(selectinload(ExpenseClaim.employee))
-
-    # Search
-    if q:
-        search = f"%{q}%"
-        query = query.filter(
-            or_(
-                ExpenseClaim.title.ilike(search),
-                ExpenseClaim.claim_number.ilike(search),
-            )
-        )
-
-    # Status filter
+    # Parse status if provided
+    status_enum = None
     if status:
         try:
-            query = query.filter(ExpenseClaim.status == ExpenseClaimStatus(status))
+            status_enum = ExpenseClaimStatus(status)
         except ValueError:
             pass
 
-    # Sorting
-    sort_col = getattr(ExpenseClaim, sort, ExpenseClaim.created_at)
-    query = query.order_by(desc(sort_col) if dir == "desc" else asc(sort_col))
+    # Build filters
+    filters = ExpenseClaimFilters(
+        search=q,
+        status=status_enum,
+        sort_by=sort,
+        sort_dir=dir,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    # Pagination
-    total = query.count()
-    claims = query.offset((page - 1) * per_page).limit(per_page).all()
+    # Get claims via service
+    result = service.list_claims(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Expense Claims"
-    context["claims"] = claims
+    context["claims"] = result.items
     context["q"] = q
     context["status"] = status
     context["sort"] = sort
@@ -94,8 +120,8 @@ async def claims_list(
     context["pagination"] = {
         "page": page,
         "per_page": per_page,
-        "total": total,
-        "total_pages": (total + per_page - 1) // per_page,
+        "total": result.total,
+        "total_pages": (result.total + per_page - 1) // per_page,
     }
 
     # HTMX partial response
@@ -113,17 +139,17 @@ async def claims_table(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: Session = Depends(get_db),
+    service: ExpenseService = Depends(get_expense_service),
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
-    sort: str = Query("created_at"),
+    sort: str = Query("claim_date"),
     dir: str = Query("desc"),
 ):
     """Claims table partial for HTMX."""
     return await claims_list(
-        request, response, user, csrf_token, db,
+        request, response, user, csrf_token, service,
         q, status, page, per_page, sort, dir
     )
 
@@ -216,24 +242,35 @@ async def advances_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: Session = Depends(get_db),
+    service: CashAdvanceService = Depends(get_cash_advance_service),
     status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
 ):
     """Cash advances list page."""
-    query = db.query(CashAdvance).options(selectinload(CashAdvance.employee))
-
+    # Parse status if provided
+    status_enum = None
     if status:
         try:
-            query = query.filter(CashAdvance.status == CashAdvanceStatus(status))
+            status_enum = CashAdvanceStatus(status)
         except ValueError:
             pass
 
-    advances = query.order_by(desc(CashAdvance.created_at)).all()
+    # Build filters
+    filters = CashAdvanceFilters(
+        status=status_enum,
+        sort_by="request_date",
+        sort_dir="desc",
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+
+    # Get advances via service
+    result = service.list_advances(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Cash Advances"
-    context["advances"] = advances
+    context["advances"] = result.items
     context["status"] = status
 
     template = templates.get_template(f"{TEMPLATE_PATH}/pages/advances_list.html")
@@ -246,15 +283,15 @@ async def categories_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: Session = Depends(get_db),
+    service: ExpenseCategoryService = Depends(get_category_service),
 ):
     """Expense categories list page."""
-    categories = db.query(ExpenseCategory).order_by(ExpenseCategory.name).all()
+    result = service.list_categories(pagination=PaginationParams(offset=0, limit=1000))
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Expense Categories"
-    context["categories"] = categories
+    context["categories"] = result.items
 
     template = templates.get_template(f"{TEMPLATE_PATH}/pages/categories_list.html")
     return HTMLResponse(template.render(context))
@@ -361,14 +398,12 @@ async def advance_detail(
     user: SessionUser,
     csrf_token: CSRFToken,
     advance_id: int,
-    db: Session = Depends(get_db),
+    service: CashAdvanceService = Depends(get_cash_advance_service),
 ):
     """Cash advance detail page."""
-    advance = db.query(CashAdvance).options(
-        selectinload(CashAdvance.employee)
-    ).filter(CashAdvance.id == advance_id).first()
-
-    if not advance:
+    try:
+        advance = service.get_advance(advance_id)
+    except NotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Cash advance not found"
@@ -390,14 +425,13 @@ async def advance_edit(
     user: SessionUser,
     csrf_token: CSRFToken,
     advance_id: int,
+    service: CashAdvanceService = Depends(get_cash_advance_service),
     db: Session = Depends(get_db),
 ):
     """Edit cash advance form."""
-    advance = db.query(CashAdvance).options(
-        selectinload(CashAdvance.employee)
-    ).filter(CashAdvance.id == advance_id).first()
-
-    if not advance:
+    try:
+        advance = service.get_advance(advance_id)
+    except NotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Cash advance not found"
@@ -407,7 +441,7 @@ async def advance_edit(
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = f"Edit Cash Advance"
+    context["page_title"] = "Edit Cash Advance"
     context["advance"] = advance
     context["employee_options"] = [{"value": e.id, "label": e.name} for e in employees]
     context["status_options"] = get_advance_status_options()
@@ -475,32 +509,26 @@ async def advance_update(
 async def advance_submit(
     request: Request,
     response: Response,
+    user: SessionUser,
     advance_id: int,
+    service: CashAdvanceService = Depends(get_cash_advance_service),
     db: Session = Depends(get_db),
 ):
     """Submit cash advance for approval."""
     from app.core.security import validate_csrf
-    from sqlalchemy import func
     await validate_csrf(request)
 
-    advance = db.query(CashAdvance).filter(CashAdvance.id == advance_id).first()
-    if not advance:
+    try:
+        advance = service.get_advance(advance_id)
+        service.submit(advance, user_id=user.id, company_code=None)
+        db.commit()
+        set_flash(response, "Cash advance submitted for approval.", "success")
+    except NotFoundError:
         set_flash(response, "Cash advance not found.", "error")
         return RedirectResponse(url="/expenses/advances", status_code=303)
+    except ValidationError as e:
+        set_flash(response, str(e), "error")
 
-    if advance.status != CashAdvanceStatus.DRAFT:
-        set_flash(response, "Only draft advances can be submitted.", "error")
-        return RedirectResponse(url=f"/expenses/advances/{advance_id}", status_code=303)
-
-    # Generate advance number
-    if not advance.advance_number:
-        max_id = db.query(func.max(CashAdvance.id)).scalar() or 0
-        advance.advance_number = f"ADV-{max_id + 1:06d}"
-
-    advance.status = CashAdvanceStatus.PENDING_APPROVAL
-    db.commit()
-
-    set_flash(response, "Cash advance submitted for approval.", "success")
     return RedirectResponse(url=f"/expenses/advances/{advance_id}", status_code=303)
 
 
@@ -514,7 +542,6 @@ async def category_new(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: Session = Depends(get_db),
 ):
     """New expense category form."""
     context = get_base_context(request, response, user, csrf_token)
@@ -582,12 +609,12 @@ async def category_edit(
     user: SessionUser,
     csrf_token: CSRFToken,
     category_id: int,
-    db: Session = Depends(get_db),
+    service: ExpenseCategoryService = Depends(get_category_service),
 ):
     """Edit expense category form."""
-    category = db.query(ExpenseCategory).filter(ExpenseCategory.id == category_id).first()
-
-    if not category:
+    try:
+        category = service.get_category(category_id)
+    except NotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Category not found"
@@ -663,15 +690,12 @@ async def claim_detail(
     user: SessionUser,
     csrf_token: CSRFToken,
     claim_id: int,
-    db: Session = Depends(get_db),
+    service: ExpenseService = Depends(get_expense_service),
 ):
     """Expense claim detail page."""
-    claim = db.query(ExpenseClaim).options(
-        selectinload(ExpenseClaim.employee),
-        selectinload(ExpenseClaim.lines).selectinload(ExpenseClaimLine.category)
-    ).filter(ExpenseClaim.id == claim_id).first()
-
-    if not claim:
+    try:
+        claim = service.get_claim(claim_id, include_lines=True)
+    except NotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Expense claim not found"
@@ -690,27 +714,26 @@ async def claim_detail(
 async def submit_claim(
     request: Request,
     response: Response,
+    user: SessionUser,
     claim_id: int,
+    service: ExpenseService = Depends(get_expense_service),
     db: Session = Depends(get_db),
 ):
     """Submit expense claim for approval."""
     from app.core.security import validate_csrf
     await validate_csrf(request)
 
-    claim = db.query(ExpenseClaim).filter(ExpenseClaim.id == claim_id).first()
-    if not claim:
+    try:
+        claim = service.get_claim(claim_id)
+        service.submit_claim(claim, user_id=user.id, company_code=None)
+        db.commit()
+        set_flash(response, "Claim submitted for approval.", "success")
+    except NotFoundError:
         set_flash(response, "Claim not found.", "error")
         return RedirectResponse(url="/expenses", status_code=303)
+    except ValidationError as e:
+        set_flash(response, str(e), "error")
 
-    if claim.status != ExpenseClaimStatus.DRAFT:
-        set_flash(response, "Only draft claims can be submitted.", "error")
-        return RedirectResponse(url=f"/expenses/{claim_id}", status_code=303)
-
-    claim.status = ExpenseClaimStatus.PENDING_APPROVAL
-    claim.docstatus = 1
-    db.commit()
-
-    set_flash(response, "Claim submitted for approval.", "success")
     return RedirectResponse(url=f"/expenses/{claim_id}", status_code=303)
 
 
@@ -720,29 +743,24 @@ async def approve_claim(
     response: Response,
     user: SessionUser,
     claim_id: int,
+    service: ExpenseService = Depends(get_expense_service),
     db: Session = Depends(get_db),
 ):
     """Approve expense claim."""
     from app.core.security import validate_csrf
-    from datetime import datetime
     await validate_csrf(request)
 
-    claim = db.query(ExpenseClaim).filter(ExpenseClaim.id == claim_id).first()
-    if not claim:
+    try:
+        claim = service.get_claim(claim_id)
+        service.approve_claim(claim, user_id=user.id)
+        db.commit()
+        set_flash(response, "Claim approved.", "success")
+    except NotFoundError:
         set_flash(response, "Claim not found.", "error")
         return RedirectResponse(url="/expenses", status_code=303)
+    except ValidationError as e:
+        set_flash(response, str(e), "error")
 
-    if claim.status != ExpenseClaimStatus.PENDING_APPROVAL:
-        set_flash(response, "Only pending claims can be approved.", "error")
-        return RedirectResponse(url=f"/expenses/{claim_id}", status_code=303)
-
-    claim.status = ExpenseClaimStatus.APPROVED
-    claim.approved_by_id = user.id
-    claim.approved_at = datetime.utcnow()
-    claim.total_sanctioned_amount = claim.total_claimed_amount
-    db.commit()
-
-    set_flash(response, "Claim approved.", "success")
     return RedirectResponse(url=f"/expenses/{claim_id}", status_code=303)
 
 
@@ -752,6 +770,7 @@ async def reject_claim(
     response: Response,
     user: SessionUser,
     claim_id: int,
+    service: ExpenseService = Depends(get_expense_service),
     db: Session = Depends(get_db),
     reason: str = Form(...),
 ):
@@ -759,18 +778,15 @@ async def reject_claim(
     from app.core.security import validate_csrf
     await validate_csrf(request)
 
-    claim = db.query(ExpenseClaim).filter(ExpenseClaim.id == claim_id).first()
-    if not claim:
+    try:
+        claim = service.get_claim(claim_id)
+        service.reject_claim(claim, user_id=user.id, reason=reason)
+        db.commit()
+        set_flash(response, "Claim rejected.", "info")
+    except NotFoundError:
         set_flash(response, "Claim not found.", "error")
         return RedirectResponse(url="/expenses", status_code=303)
+    except ValidationError as e:
+        set_flash(response, str(e), "error")
 
-    if claim.status != ExpenseClaimStatus.PENDING_APPROVAL:
-        set_flash(response, "Only pending claims can be rejected.", "error")
-        return RedirectResponse(url=f"/expenses/{claim_id}", status_code=303)
-
-    claim.status = ExpenseClaimStatus.REJECTED
-    claim.rejection_reason = reason
-    db.commit()
-
-    set_flash(response, "Claim rejected.", "info")
     return RedirectResponse(url=f"/expenses/{claim_id}", status_code=303)

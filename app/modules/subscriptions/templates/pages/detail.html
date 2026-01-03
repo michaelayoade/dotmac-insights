@@ -399,6 +399,20 @@
                             </svg>
                             Provision
                         </button>
+                        {% if subscription.provisioned_at %}
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                            hx-post="/subscriptions/{{ subscription.id }}/provision-update"
+                            hx-swap="none"
+                            data-testid="provision-update-button"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Update
+                        </button>
+                        {% endif %}
                         <button
                             type="button"
                             class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
@@ -488,6 +502,152 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Lifecycle -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="lifecycle-card">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-base font-display font-semibold text-gray-900">Lifecycle</h3>
+            </div>
+            <div class="px-6 py-5 space-y-6">
+                <div>
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-semibold text-gray-900">Plan Changes</p>
+                        <span class="text-xs text-gray-500">
+                            {{ subscription.billing_cycle | title }} billing
+                        </span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">
+                        {% if plan_change_settings.allow_upgrades or plan_change_settings.allow_downgrades %}
+                        Change tiers with proration rules applied.
+                        {% else %}
+                        Plan changes are disabled in settings.
+                        {% endif %}
+                    </p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        {% if plan_change_settings.allow_upgrades and subscription.status.value == 'active' %}
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
+                            hx-get="/subscriptions/{{ subscription.id }}/plan-change-modal?mode=upgrade"
+                            hx-target="#modal-container"
+                            hx-swap="innerHTML"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v12m0 0l-3-3m3 3l3-3"/>
+                            </svg>
+                            Upgrade
+                        </button>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg">
+                            Upgrade unavailable
+                        </span>
+                        {% endif %}
+                        {% if plan_change_settings.allow_downgrades and subscription.status.value == 'active' %}
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors"
+                            hx-get="/subscriptions/{{ subscription.id }}/plan-change-modal?mode=downgrade"
+                            hx-target="#modal-container"
+                            hx-swap="innerHTML"
+                        >
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18V6m0 0l-3 3m3-3l3 3"/>
+                            </svg>
+                            Downgrade
+                        </button>
+                        {% else %}
+                        <span class="inline-flex items-center px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg">
+                            Downgrade unavailable
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-100 pt-5">
+                    <div class="flex items-center justify-between">
+                        <p class="text-sm font-semibold text-gray-900">Renewal</p>
+                        <span class="text-xs text-gray-500">
+                            {% if subscription.end_date %}
+                            Ends {{ subscription.end_date | format_date }}
+                            {% else %}
+                            No end date
+                            {% endif %}
+                        </span>
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Extend the subscription term or set a new end date.
+                    </p>
+                    {% if subscription.status.value != 'cancelled' %}
+                    <button
+                        type="button"
+                        class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                        hx-get="/subscriptions/{{ subscription.id }}/renew-modal"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Renew
+                    </button>
+                    {% else %}
+                    <span class="mt-3 inline-flex items-center px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg">
+                        Renewal disabled for cancelled subscriptions
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="border-t border-gray-100 pt-5">
+                    <p class="text-sm font-semibold text-gray-900">Grace & Termination</p>
+                    <div class="mt-2 grid grid-cols-2 gap-3 text-xs text-gray-600">
+                        <div>
+                            <p class="uppercase tracking-wide text-[0.65rem] text-gray-400">Grace Period</p>
+                            <p class="mt-1 font-medium text-gray-900">{{ grace_period_days }} days</p>
+                        </div>
+                        <div>
+                            <p class="uppercase tracking-wide text-[0.65rem] text-gray-400">Early Termination</p>
+                            <p class="mt-1 font-medium text-gray-900">{{ subscription.currency }} {{ "{:,.0f}".format(early_termination_fee) }}</p>
+                        </div>
+                    </div>
+                    {% if subscription.status.value == 'suspended' %}
+                    <button
+                        type="button"
+                        class="mt-3 inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                        hx-get="/subscriptions/{{ subscription.id }}/grace-modal"
+                        hx-target="#modal-container"
+                        hx-swap="innerHTML"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Extend Grace
+                    </button>
+                    {% else %}
+                    <span class="mt-3 inline-flex items-center px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg">
+                        Grace extension available when suspended
+                    </span>
+                    {% endif %}
+                </div>
+
+                <div class="border-t border-gray-100 pt-5">
+                    <p class="text-sm font-semibold text-gray-900">Automation</p>
+                    <div class="mt-3 grid grid-cols-1 gap-2 text-xs text-gray-600">
+                        <div class="flex items-center justify-between">
+                            <span>Auto-activate on payment</span>
+                            <span class="font-medium text-gray-900">{{ "On" if lifecycle_settings.auto_activate_on_payment else "Off" }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Auto-suspend on nonpayment</span>
+                            <span class="font-medium text-gray-900">{{ "On" if lifecycle_settings.auto_suspend_on_nonpayment else "Off" }}</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span>Auto-cancel after days</span>
+                            <span class="font-medium text-gray-900">{{ lifecycle_settings.auto_cancel_after_days }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Status Actions -->
         {% if status_transitions %}

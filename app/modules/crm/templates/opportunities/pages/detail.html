@@ -1,0 +1,235 @@
+{% extends "layouts/module.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb -->
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-4">
+            <li><a href="/crm" class="text-gray-400 hover:text-gray-500">CRM</a></li>
+            <li class="flex items-center">
+                <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                <a href="/crm/opportunities" class="ml-4 text-gray-400 hover:text-gray-500">Opportunities</a>
+            </li>
+            <li class="flex items-center">
+                <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                <span class="ml-4 text-gray-500">{{ opportunity.name }}</span>
+            </li>
+        </ol>
+    </nav>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+        <p class="text-red-700">{{ error }}</p>
+    </div>
+    {% else %}
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:px-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900">{{ opportunity.name }}</h1>
+                    <div class="mt-2 flex items-center space-x-4">
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                            {% if opportunity.status == 'won' %}bg-green-100 text-green-800
+                            {% elif opportunity.status == 'lost' %}bg-red-100 text-red-800
+                            {% else %}bg-blue-100 text-blue-800{% endif %}">
+                            {{ opportunity.status|capitalize }}
+                        </span>
+                        {% if stage %}
+                        <span class="text-sm text-gray-500">Stage: {{ stage.name }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    {% if opportunity.status == 'open' %}
+                    <button type="button" class="btn btn-success">Mark Won</button>
+                    <button type="button" class="btn btn-danger">Mark Lost</button>
+                    {% endif %}
+                    <button type="button" class="btn btn-secondary">Edit</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stage Progress -->
+        {% if stages and opportunity.status == 'open' %}
+        <div class="px-4 py-4 sm:px-6 border-t border-gray-200">
+            <nav aria-label="Progress">
+                <ol class="flex items-center">
+                    {% for s in stages %}
+                    <li class="relative {% if not loop.last %}pr-8 sm:pr-20{% endif %}">
+                        <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                            {% if not loop.last %}
+                            <div class="h-0.5 w-full {% if s.order < stage.order %}bg-blue-600{% else %}bg-gray-200{% endif %}"></div>
+                            {% endif %}
+                        </div>
+                        <a href="#" class="relative flex h-8 w-8 items-center justify-center rounded-full
+                            {% if s.id == stage.id %}border-2 border-blue-600 bg-white
+                            {% elif s.order < stage.order %}bg-blue-600
+                            {% else %}border-2 border-gray-300 bg-white{% endif %}">
+                            {% if s.order < stage.order %}
+                            <svg class="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                            </svg>
+                            {% elif s.id == stage.id %}
+                            <span class="h-2.5 w-2.5 rounded-full bg-blue-600"></span>
+                            {% else %}
+                            <span class="h-2.5 w-2.5 rounded-full bg-transparent"></span>
+                            {% endif %}
+                            <span class="sr-only">{{ s.name }}</span>
+                        </a>
+                        <span class="absolute top-10 text-xs text-gray-500 whitespace-nowrap">{{ s.name }}</span>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Opportunity Details -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Details</h3>
+                </div>
+                <div class="px-4 py-5 sm:p-6">
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Amount</dt>
+                            <dd class="mt-1 text-2xl font-semibold text-gray-900">${{ '{:,.0f}'.format(opportunity.amount or 0) }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Probability</dt>
+                            <dd class="mt-1 flex items-center">
+                                <span class="text-2xl font-semibold text-gray-900">{{ opportunity.probability or 0 }}%</span>
+                                <div class="ml-3 w-24 bg-gray-200 rounded-full h-3">
+                                    <div class="h-3 rounded-full bg-blue-500" style="width: {{ opportunity.probability or 0 }}%"></div>
+                                </div>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Expected Close</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.expected_close_date.strftime('%B %d, %Y') if opportunity.expected_close_date else 'Not set' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Weighted Value</dt>
+                            <dd class="mt-1 text-sm text-gray-900">${{ '{:,.0f}'.format((opportunity.amount or 0) * (opportunity.probability or 0) / 100) }}</dd>
+                        </div>
+                        {% if party %}
+                        <div class="sm:col-span-2">
+                            <dt class="text-sm font-medium text-gray-500">Contact</dt>
+                            <dd class="mt-1">
+                                <a href="/crm/leads/{{ party.id }}" class="text-blue-600 hover:text-blue-800">{{ party.display_name or party.name }}</a>
+                            </dd>
+                        </div>
+                        {% endif %}
+                        {% if opportunity.notes %}
+                        <div class="sm:col-span-2">
+                            <dt class="text-sm font-medium text-gray-500">Notes</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.notes }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Activities -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200 flex items-center justify-between">
+                    <h3 class="text-lg font-medium text-gray-900">Activities</h3>
+                    <button type="button" class="btn btn-sm btn-secondary">Log Activity</button>
+                </div>
+                <ul class="divide-y divide-gray-200">
+                    {% if activities %}
+                        {% for activity in activities %}
+                        <li class="px-4 py-4">
+                            <div class="flex items-start space-x-3">
+                                <div class="flex-shrink-0">
+                                    <span class="inline-flex items-center justify-center h-8 w-8 rounded-full bg-gray-100">
+                                        <svg class="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                        </svg>
+                                    </span>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm font-medium text-gray-900">{{ activity.subject }}</p>
+                                    <p class="text-sm text-gray-500">{{ activity.scheduled_at.strftime('%b %d, %Y at %H:%M') if activity.scheduled_at else '' }}</p>
+                                </div>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                    {{ activity.activity_type|capitalize }}
+                                </span>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                    <li class="px-4 py-8 text-center text-gray-500">
+                        No activities recorded yet
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Quick Actions -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Actions</h3>
+                </div>
+                <div class="p-4 space-y-2">
+                    <button type="button" class="w-full btn btn-secondary justify-start">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        Schedule Meeting
+                    </button>
+                    <button type="button" class="w-full btn btn-secondary justify-start">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Create Quote
+                    </button>
+                    <button type="button" class="w-full btn btn-secondary justify-start">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        Send Email
+                    </button>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Timeline</h3>
+                </div>
+                <div class="p-4">
+                    <dl class="space-y-4">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Created</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.created_at.strftime('%b %d, %Y') if opportunity.created_at else '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.updated_at.strftime('%b %d, %Y') if opportunity.updated_at else '-' }}</dd>
+                        </div>
+                        {% if opportunity.closed_at %}
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Closed</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.closed_at.strftime('%b %d, %Y') }}</dd>
+                        </div>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

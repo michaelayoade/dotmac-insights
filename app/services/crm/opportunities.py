@@ -87,9 +87,6 @@ class OpportunityService:
             if filters.party_id:
                 query = query.filter(Opportunity.party_id == filters.party_id)
 
-            if filters.customer_id:
-                query = query.filter(Opportunity.customer_id == filters.customer_id)
-
             if filters.owner_id:
                 query = query.filter(Opportunity.owner_id == filters.owner_id)
 
@@ -168,7 +165,6 @@ class OpportunityService:
             campaign=data.campaign,
             campaign_id=data.campaign_id,
             lead_id=data.lead_id,
-            customer_id=data.customer_id,
             status=OpportunityStatus.OPEN,
         )
 

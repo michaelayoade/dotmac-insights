@@ -102,6 +102,7 @@
                         <th class="px-6 py-3">Channel</th>
                         <th class="px-6 py-3 text-center">Messages</th>
                         <th class="px-6 py-3">Status</th>
+                        <th class="px-6 py-3">Ticket</th>
                         <th class="px-6 py-3">Last Activity</th>
                         <th class="px-6 py-3 text-center">Actions</th>
                     </tr>
@@ -109,6 +110,7 @@
                 <tbody class="divide-y divide-gray-100">
                     {% for conv in conversations %}
                     <tr class="hover:bg-surface-50/50">
+                        {% set linked_ticket = linked_tickets.get(conv.unified_ticket_id) if linked_tickets is defined else None %}
                         <td class="px-6 py-4">
                             <a href="/support/conversations/{{ conv.id }}" class="group">
                                 <p class="font-medium text-gray-900 group-hover:text-primary-600">
@@ -120,7 +122,7 @@
                                 </p>
                                 <p class="text-sm text-gray-500 mt-0.5">
                                     {% if conv.chatwoot_id %}Chatwoot #{{ conv.chatwoot_id }}{% endif %}
-                                    {% if conv.customer_id %} &bull; Customer #{{ conv.customer_id }}{% endif %}
+                                    {% if conv.customer_account_id %} &bull; Account #{{ conv.customer_account_id }}{% endif %}
                                 </p>
                             </a>
                         </td>
@@ -162,6 +164,16 @@
                             </span>
                         </td>
                         <td class="px-6 py-4">
+                            {% if linked_ticket %}
+                            <div class="flex flex-col gap-1">
+                                <a href="/support/tickets/{{ linked_ticket.id }}" class="text-sm font-medium text-primary-600 hover:text-primary-700">#{{ linked_ticket.ticket_number or linked_ticket.id }}</a>
+                                <span class="text-xs text-gray-500">{{ linked_ticket.status.value | replace('_', ' ') | title }}</span>
+                            </div>
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
                             {% if conv.last_activity_at %}
                             <p class="text-sm text-gray-900">{{ conv.last_activity_at.strftime('%b %d, %Y') }}</p>
                             <p class="text-xs text-gray-500">{{ conv.last_activity_at.strftime('%H:%M') }}</p>
@@ -178,7 +190,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">
+                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">
                             <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
                             <p class="font-medium">No conversations found</p>
                             <p class="text-sm mt-1">Try adjusting your filters or search query</p>

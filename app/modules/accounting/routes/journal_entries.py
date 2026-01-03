@@ -10,11 +10,24 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException, set_flash, form_str,
-    Account, GLEntry, JournalEntry, JournalEntryItem, JournalEntryType,
-    func, or_, datetime, Decimal, selectinload,
+    JournalEntryType,
+    datetime, Decimal,
 )
+from app.services.accounting import JournalEntryService, LedgerService
+from app.services.accounting.journal_entry_types import JECreateData, JEFilters, JELineData, JEUpdateData
+from app.services.accounting.ledger_types import AccountFilters
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
+
+
+def _get_journal_entry_service(db: DB, user: SessionUser) -> JournalEntryService:
+    return JournalEntryService(db, user)
+
+
+def _get_ledger_service(db: DB, user: SessionUser) -> LedgerService:
+    return LedgerService(db, user)
 
 
 def get_voucher_type_options():
@@ -34,32 +47,6 @@ def get_docstatus_options():
     ]
 
 
-def get_je_stats(db) -> dict:
-    """Calculate journal entry statistics."""
-    now = datetime.utcnow()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    total_count = db.query(func.count(JournalEntry.id)).scalar() or 0
-
-    draft_count = db.query(func.count(JournalEntry.id)).filter(
-        JournalEntry.docstatus == 0
-    ).scalar() or 0
-
-    posted_count = db.query(func.count(JournalEntry.id)).filter(
-        JournalEntry.docstatus == 1
-    ).scalar() or 0
-
-    this_month = db.query(func.count(JournalEntry.id)).filter(
-        JournalEntry.posting_date >= month_start,
-        JournalEntry.docstatus == 1,
-    ).scalar() or 0
-
-    return {
-        "total_count": total_count,
-        "draft_count": draft_count,
-        "posted_count": posted_count,
-        "this_month": this_month,
-    }
 
 
 @router.get("/journal-entries", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -78,40 +65,37 @@ async def journal_entries_list(
     dir: str = Query("desc", description="Sort direction"),
 ):
     """Journal Entries list page."""
-    # Build query with eager loading
-    query = db.query(JournalEntry).options(selectinload(JournalEntry.items))
-
-    # Search
-    if q:
-        search_filter = or_(
-            JournalEntry.erpnext_id.ilike(f"%{q}%"),
-            JournalEntry.user_remark.ilike(f"%{q}%"),
-            JournalEntry.cheque_no.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if voucher_type:
-        query = query.filter(JournalEntry.voucher_type == voucher_type)
-
+    service = _get_journal_entry_service(db, user)
+    docstatus_value = None
     if docstatus:
-        query = query.filter(JournalEntry.docstatus == int(docstatus))
+        try:
+            docstatus_value = int(docstatus)
+        except ValueError:
+            docstatus_value = None
 
-    # Count total
-    total = query.count()
+    voucher_enum = None
+    if voucher_type:
+        try:
+            voucher_enum = JournalEntryType(voucher_type)
+        except ValueError:
+            voucher_enum = None
 
-    # Sort
-    sort_column = getattr(JournalEntry, sort, JournalEntry.posting_date)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
+    filters = JEFilters(
+        search=q,
+        voucher_type=voucher_enum,
+        docstatus=docstatus_value,
+        sort_by=sort,
+        sort_dir=dir,
+    )
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_entries(filters, pagination)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Paginate
-    offset = (page - 1) * per_page
-    entries = query.offset(offset).limit(per_page).all()
-
-    # Get stats
-    stats = get_je_stats(db)
+    entries = result.items
+    total = result.total
+    stats = service.get_entry_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -175,11 +159,12 @@ async def journal_entry_new(
     account: Optional[str] = Query(None, description="Pre-fill account"),
 ):
     """New journal entry form page."""
-    # Get accounts for dropdown
-    accounts = db.query(Account).filter(
-        Account.disabled == False,
-        Account.is_group == False,
-    ).order_by(Account.account_name).all()
+    ledger_service = _get_ledger_service(db, user)
+    accounts_result = ledger_service.list_accounts(
+        AccountFilters(is_group=False, include_disabled=False, sort_by="account_name"),
+        PaginationParams(limit=2000, offset=0),
+    )
+    accounts = accounts_result.items
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -212,10 +197,12 @@ async def journal_entry_create(
     form = await request.form()
 
     # Get accounts for error re-render
-    accounts = db.query(Account).filter(
-        Account.disabled == False,
-        Account.is_group == False,
-    ).order_by(Account.account_name).all()
+    ledger_service = _get_ledger_service(db, user)
+    accounts_result = ledger_service.list_accounts(
+        AccountFilters(is_group=False, include_disabled=False, sort_by="account_name"),
+        PaginationParams(limit=2000, offset=0),
+    )
+    accounts = accounts_result.items
 
     # Validate
     errors = {}
@@ -295,36 +282,45 @@ async def journal_entry_create(
         template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Create journal entry
-    entry = JournalEntry(
-        voucher_type=JournalEntryType(voucher_type_value),
-        posting_date=datetime.strptime(posting_date, "%Y-%m-%d"),
-        user_remark=user_remark,
-        cheque_no=cheque_no,
-        total_debit=total_debit,
-        total_credit=total_credit,
-        docstatus=0,  # Draft
-    )
-    db.add(entry)
-    db.flush()
-
-    # Add line items
-    for item_data in line_items:
-        # Find account ID
-        acct = db.query(Account).filter(Account.account_name == item_data["account"]).first()
-        if acct:
-            je_item = JournalEntryItem(
-                journal_entry_id=entry.id,
-                account=item_data["account"],
-                account_id=acct.id,
-                debit=item_data["debit"],
-                credit=item_data["credit"],
-                idx=item_data["idx"],
+    service = _get_journal_entry_service(db, user)
+    try:
+        entry = service.create_entry(
+            JECreateData(
+                posting_date=datetime.strptime(posting_date, "%Y-%m-%d").date(),
+                voucher_type=JournalEntryType(voucher_type_value),
+                user_remark=user_remark,
+                cheque_no=cheque_no,
+                lines=[
+                    JELineData(
+                        account=item["account"],
+                        debit=item["debit"],
+                        credit=item["credit"],
+                        description=item["description"],
+                    )
+                    for item in line_items
+                ],
             )
-            db.add(je_item)
+        )
+    except ValidationError as exc:
+        errors["form"] = str(exc)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Journal Entry"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/accounts"},
+            {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+            {"label": "New Entry"},
+        ])
+        context["entry"] = None
+        context["voucher_type_options"] = get_voucher_type_options()
+        context["accounts"] = accounts
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["line_items"] = line_items
+        template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     db.commit()
-    db.refresh(entry)
 
     set_flash(response, "Journal entry created successfully.", "success")
     return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
@@ -340,12 +336,11 @@ async def journal_entry_detail(
     entry_id: int,
 ):
     """Journal entry detail page."""
-    entry = db.query(JournalEntry).options(
-        selectinload(JournalEntry.items)
-    ).filter(JournalEntry.id == entry_id).first()
-
-    if not entry:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
+    service = _get_journal_entry_service(db, user)
+    try:
+        entry = service.get_entry(entry_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Journal entry not found") from exc
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -371,22 +366,23 @@ async def journal_entry_edit(
     entry_id: int,
 ):
     """Journal entry edit form page."""
-    entry = db.query(JournalEntry).options(
-        selectinload(JournalEntry.items)
-    ).filter(JournalEntry.id == entry_id).first()
-
-    if not entry:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
+    service = _get_journal_entry_service(db, user)
+    try:
+        entry = service.get_entry(entry_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Journal entry not found") from exc
 
     if entry.docstatus != 0:
         set_flash(response, "Only draft entries can be edited.", "error")
         return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
 
     # Get accounts for dropdown
-    accounts = db.query(Account).filter(
-        Account.disabled == False,
-        Account.is_group == False,
-    ).order_by(Account.account_name).all()
+    ledger_service = _get_ledger_service(db, user)
+    accounts_result = ledger_service.list_accounts(
+        AccountFilters(is_group=False, include_disabled=False, sort_by="account_name"),
+        PaginationParams(limit=2000, offset=0),
+    )
+    accounts = accounts_result.items
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -417,12 +413,11 @@ async def journal_entry_update(
     entry_id: int,
 ):
     """Update a journal entry."""
-    entry = db.query(JournalEntry).options(
-        selectinload(JournalEntry.items)
-    ).filter(JournalEntry.id == entry_id).first()
-
-    if not entry:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
+    service = _get_journal_entry_service(db, user)
+    try:
+        entry = service.get_entry(entry_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Journal entry not found") from exc
 
     if entry.docstatus != 0:
         set_flash(response, "Only draft entries can be edited.", "error")
@@ -431,10 +426,12 @@ async def journal_entry_update(
     form = await request.form()
 
     # Get accounts for error re-render
-    accounts = db.query(Account).filter(
-        Account.disabled == False,
-        Account.is_group == False,
-    ).order_by(Account.account_name).all()
+    ledger_service = _get_ledger_service(db, user)
+    accounts_result = ledger_service.list_accounts(
+        AccountFilters(is_group=False, include_disabled=False, sort_by="account_name"),
+        PaginationParams(limit=2000, offset=0),
+    )
+    accounts = accounts_result.items
 
     # Validate (similar to create)
     errors = {}
@@ -512,30 +509,45 @@ async def journal_entry_update(
         template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    # Update entry
-    entry.voucher_type = JournalEntryType(voucher_type_value)
-    entry.posting_date = datetime.strptime(posting_date, "%Y-%m-%d")
-    entry.user_remark = user_remark
-    entry.cheque_no = cheque_no
-    entry.total_debit = total_debit
-    entry.total_credit = total_credit
+    try:
+        entry = service.update_entry_with_lines(
+            entry_id,
+            JECreateData(
+                posting_date=datetime.strptime(posting_date, "%Y-%m-%d").date(),
+                voucher_type=JournalEntryType(voucher_type_value),
+                user_remark=user_remark,
+                cheque_no=cheque_no,
+                lines=[
+                    JELineData(
+                        account=item["account"],
+                        debit=item["debit"],
+                        credit=item["credit"],
+                        description=item["description"],
+                    )
+                    for item in line_items
+                ],
+            ),
+        )
+    except ValidationError as exc:
+        errors["form"] = str(exc)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit JE-{entry.id}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/accounts"},
+            {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+            {"label": f"JE-{entry.id}", "href": f"/accounting/journal-entries/{entry.id}"},
+            {"label": "Edit"},
+        ])
+        context["entry"] = entry
+        context["voucher_type_options"] = get_voucher_type_options()
+        context["accounts"] = accounts
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["line_items"] = line_items
 
-    # Delete old items and add new ones
-    for item in entry.items:
-        db.delete(item)
-
-    for item_data in line_items:
-        acct = db.query(Account).filter(Account.account_name == item_data["account"]).first()
-        if acct:
-            je_item = JournalEntryItem(
-                journal_entry_id=entry.id,
-                account=item_data["account"],
-                account_id=acct.id,
-                debit=item_data["debit"],
-                credit=item_data["credit"],
-                idx=item_data["idx"],
-            )
-            db.add(je_item)
+        template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     db.commit()
 
@@ -554,32 +566,15 @@ async def journal_entry_post(
     entry_id: int,
 ):
     """Post a journal entry to the general ledger."""
-    entry = db.query(JournalEntry).options(
-        selectinload(JournalEntry.items)
-    ).filter(JournalEntry.id == entry_id).first()
+    service = _get_journal_entry_service(db, user)
+    try:
+        entry = service.post_entry(entry_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Journal entry not found") from exc
+    except ValidationError as exc:
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url=f"/accounting/journal-entries/{entry_id}", status_code=303)
 
-    if not entry:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
-
-    if entry.docstatus != 0:
-        set_flash(response, "Only draft entries can be posted.", "error")
-        return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
-
-    # Create GL entries
-    for item in entry.items:
-        gl_entry = GLEntry(
-            posting_date=entry.posting_date,
-            account=item.account,
-            debit=item.debit,
-            credit=item.credit,
-            voucher_type="Journal Entry",
-            voucher_no=f"JE-{entry.id}",
-            is_cancelled=False,
-        )
-        db.add(gl_entry)
-
-    # Update entry status
-    entry.docstatus = 1
     db.commit()
 
     set_flash(response, "Journal entry posted to GL successfully.", "success")

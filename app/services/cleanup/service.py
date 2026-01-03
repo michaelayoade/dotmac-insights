@@ -284,7 +284,7 @@ class CleanupService:
             Updated CleanupScan
         """
         import re
-        from app.models.contact import Contact
+        from app.models.party import Party
 
         scan = self.get_scan(scan_id)
         if not scan:
@@ -305,8 +305,8 @@ class CleanupService:
             scan.progress_pct = 10
             self.db.commit()
 
-            contacts = self.db.query(Contact).all()
-            records_scanned += len(contacts)
+            parties = self.db.query(Party).all()
+            records_scanned += len(parties)
 
             # Email format validation
             email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
@@ -314,20 +314,20 @@ class CleanupService:
             # Track emails for duplicate detection
             email_counts: dict[str, list[int]] = {}
 
-            for contact in contacts:
+            for party in parties:
                 # Check for missing required fields
                 if not issue_types or CleanupIssueType.MISSING_REQUIRED.value in issue_types:
                     missing_fields = []
-                    if not contact.name:
+                    if not party.name:
                         missing_fields.append("name")
-                    if not contact.email and not contact.phone:
+                    if not party.primary_email and not party.primary_phone:
                         missing_fields.append("email or phone")
 
                     if missing_fields:
                         existing = self.db.query(CleanupIssue).filter(
                             CleanupIssue.entity_type == CleanupEntityType.CONTACT,
                             CleanupIssue.issue_type == CleanupIssueType.MISSING_REQUIRED,
-                            CleanupIssue.record_ids.contains([contact.id]),
+                            CleanupIssue.record_ids.contains([party.id]),
                             CleanupIssue.status == IssueStatus.OPEN,
                         ).first()
 
@@ -337,22 +337,22 @@ class CleanupService:
                                 entity_type=CleanupEntityType.CONTACT,
                                 issue_type=CleanupIssueType.MISSING_REQUIRED,
                                 severity=IssueSeverity.MEDIUM,
-                                title=f"Missing required fields on contact",
-                                description=f"Contact '{contact.name or 'Unknown'}' is missing: {', '.join(missing_fields)}",
+                                title="Missing required fields on party",
+                                description=f"Party '{party.name or 'Unknown'}' is missing: {', '.join(missing_fields)}",
                                 field_name=missing_fields[0] if len(missing_fields) == 1 else "multiple",
-                                record_ids=[contact.id],
-                                sample_values=[{"id": contact.id, "name": contact.name, "email": contact.email}],
+                                record_ids=[party.id],
+                                sample_values=[{"id": party.id, "name": party.name, "email": party.primary_email}],
                             )
                             self.db.add(issue)
                             issues_found += 1
 
                 # Check for invalid email format
-                if contact.email and (not issue_types or CleanupIssueType.INVALID_FORMAT.value in issue_types):
-                    if not email_pattern.match(contact.email):
+                if party.primary_email and (not issue_types or CleanupIssueType.INVALID_FORMAT.value in issue_types):
+                    if not email_pattern.match(party.primary_email):
                         existing = self.db.query(CleanupIssue).filter(
                             CleanupIssue.entity_type == CleanupEntityType.CONTACT,
                             CleanupIssue.issue_type == CleanupIssueType.INVALID_FORMAT,
-                            CleanupIssue.record_ids.contains([contact.id]),
+                            CleanupIssue.record_ids.contains([party.id]),
                             CleanupIssue.status == IssueStatus.OPEN,
                         ).first()
 
@@ -362,21 +362,21 @@ class CleanupService:
                                 entity_type=CleanupEntityType.CONTACT,
                                 issue_type=CleanupIssueType.INVALID_FORMAT,
                                 severity=IssueSeverity.LOW,
-                                title=f"Invalid email format",
-                                description=f"Contact '{contact.name}' has invalid email: {contact.email}",
+                                title="Invalid email format",
+                                description=f"Party '{party.name or 'Unknown'}' has invalid email: {party.primary_email}",
                                 field_name="email",
-                                record_ids=[contact.id],
-                                sample_values=[{"id": contact.id, "email": contact.email}],
+                                record_ids=[party.id],
+                                sample_values=[{"id": party.id, "email": party.primary_email}],
                             )
                             self.db.add(issue)
                             issues_found += 1
 
                 # Track for duplicate detection
-                if contact.email:
-                    email_lower = contact.email.lower()
+                if party.primary_email:
+                    email_lower = party.primary_email.lower()
                     if email_lower not in email_counts:
                         email_counts[email_lower] = []
-                    email_counts[email_lower].append(contact.id)
+                    email_counts[email_lower].append(party.id)
 
             # Check for duplicates
             if not issue_types or CleanupIssueType.DUPLICATE.value in issue_types:
@@ -402,8 +402,8 @@ class CleanupService:
                             entity_type=CleanupEntityType.CONTACT,
                             issue_type=CleanupIssueType.DUPLICATE,
                             severity=IssueSeverity.HIGH,
-                            title=f"Duplicate contacts with email: {email}",
-                            description=f"Found {len(contact_ids)} contacts with the same email address",
+                            title=f"Duplicate parties with email: {email}",
+                            description=f"Found {len(contact_ids)} parties with the same email address",
                             field_name="email",
                             record_ids=contact_ids,
                             sample_values=[{"email": email, "count": len(contact_ids)}],
@@ -575,7 +575,7 @@ class CleanupService:
         Returns:
             Updated CleanupJob with preview data
         """
-        from app.models.contact import Contact
+        from app.models.party import Party
 
         job = self.get_job(job_id)
         if not job:
@@ -591,14 +591,14 @@ class CleanupService:
 
         # Handle Contact entity type
         if job.entity_type == CleanupEntityType.CONTACT:
-            contacts = self.db.query(Contact).filter(Contact.id.in_(record_ids)).all()
+            parties = self.db.query(Party).filter(Party.id.in_(record_ids)).all()
 
-            for contact in contacts:
+            for party in parties:
                 before = {
-                    "id": contact.id,
-                    "name": contact.name,
-                    "email": contact.email,
-                    "phone": contact.phone,
+                    "id": party.id,
+                    "name": party.name,
+                    "email": party.primary_email,
+                    "phone": party.primary_phone,
                 }
                 after = before.copy()
                 changes = []
@@ -606,21 +606,21 @@ class CleanupService:
                 # Apply action preview
                 if action_type == CleanupActionType.NORMALIZE:
                     # Normalize email to lowercase
-                    if contact.email and contact.email != contact.email.lower():
-                        after["email"] = contact.email.lower()
+                    if party.primary_email and party.primary_email != party.primary_email.lower():
+                        after["email"] = party.primary_email.lower()
                         changes.append("email")
 
                     # Normalize phone (remove spaces, dashes)
-                    if contact.phone:
-                        normalized_phone = "".join(c for c in contact.phone if c.isdigit() or c == "+")
-                        if normalized_phone != contact.phone:
+                    if party.primary_phone:
+                        normalized_phone = "".join(c for c in party.primary_phone if c.isdigit() or c == "+")
+                        if normalized_phone != party.primary_phone:
                             after["phone"] = normalized_phone
                             changes.append("phone")
 
                     # Normalize name (trim, proper case)
-                    if contact.name:
-                        normalized_name = " ".join(contact.name.split()).title()
-                        if normalized_name != contact.name:
+                    if party.name:
+                        normalized_name = " ".join(party.name.split()).title()
+                        if normalized_name != party.name:
                             after["name"] = normalized_name
                             changes.append("name")
 
@@ -628,7 +628,7 @@ class CleanupService:
                     # Set default values for missing fields
                     defaults = action_config.get("defaults", {})
                     for field, default_value in defaults.items():
-                        if not getattr(contact, field, None):
+                        if not getattr(party, field, None):
                             after[field] = default_value
                             changes.append(field)
 
@@ -639,7 +639,7 @@ class CleanupService:
 
                 if changes:
                     preview_data.append({
-                        "record_id": contact.id,
+                        "record_id": party.id,
                         "before": before,
                         "after": after,
                         "changes": changes,
@@ -663,7 +663,7 @@ class CleanupService:
         Returns:
             Updated CleanupJob
         """
-        from app.models.contact import Contact
+        from app.models.party import Party, PartyStatus
 
         job = self.get_job(job_id)
         if not job:
@@ -687,19 +687,20 @@ class CleanupService:
         try:
             # Handle Contact entity type
             if job.entity_type == CleanupEntityType.CONTACT:
-                contacts = self.db.query(Contact).filter(Contact.id.in_(target_record_ids)).all()
+                parties = self.db.query(Party).filter(Party.id.in_(target_record_ids)).all()
 
-                for contact in contacts:
+                for party in parties:
                     try:
                         # Store original state for rollback
                         original = {
-                            "id": contact.id,
-                            "name": contact.name,
-                            "email": contact.email,
-                            "phone": contact.phone,
+                            "id": party.id,
+                            "name": party.name,
+                            "email": party.primary_email,
+                            "phone": party.primary_phone,
+                            "status": party.status,
                         }
-                        rollback_data[str(contact.id)] = {
-                            "table": "contacts",
+                        rollback_data[str(party.id)] = {
+                            "table": "parties",
                             "snapshot": original,
                         }
 
@@ -707,47 +708,44 @@ class CleanupService:
 
                         if action_type == CleanupActionType.NORMALIZE:
                             # Normalize email to lowercase
-                            if contact.email and contact.email != contact.email.lower():
-                                old_email = contact.email
-                                contact.email = contact.email.lower()
-                                changes["email"] = {"before": old_email, "after": contact.email}
+                            if party.primary_email and party.primary_email != party.primary_email.lower():
+                                old_email = party.primary_email
+                                party.primary_email = party.primary_email.lower()
+                                changes["email"] = {"before": old_email, "after": party.primary_email}
 
                             # Normalize phone
-                            if contact.phone:
-                                old_phone = contact.phone
-                                normalized_phone = "".join(c for c in contact.phone if c.isdigit() or c == "+")
-                                if normalized_phone != contact.phone:
-                                    contact.phone = normalized_phone
+                            if party.primary_phone:
+                                old_phone = party.primary_phone
+                                normalized_phone = "".join(c for c in party.primary_phone if c.isdigit() or c == "+")
+                                if normalized_phone != party.primary_phone:
+                                    party.primary_phone = normalized_phone
                                     changes["phone"] = {"before": old_phone, "after": normalized_phone}
 
                             # Normalize name
-                            if contact.name:
-                                old_name = contact.name
-                                normalized_name = " ".join(contact.name.split()).title()
-                                if normalized_name != contact.name:
-                                    contact.name = normalized_name
+                            if party.name:
+                                old_name = party.name
+                                normalized_name = " ".join(party.name.split()).title()
+                                if normalized_name != party.name:
+                                    party.name = normalized_name
                                     changes["name"] = {"before": old_name, "after": normalized_name}
 
                         elif action_type == CleanupActionType.SET_DEFAULT:
                             defaults = action_config.get("defaults", {})
                             for field, default_value in defaults.items():
-                                if hasattr(contact, field) and not getattr(contact, field):
-                                    old_value = getattr(contact, field)
-                                    setattr(contact, field, default_value)
+                                if hasattr(party, field) and not getattr(party, field):
+                                    old_value = getattr(party, field)
+                                    setattr(party, field, default_value)
                                     changes[field] = {"before": old_value, "after": default_value}
 
                         elif action_type == CleanupActionType.DELETE:
                             # Soft delete if supported, otherwise mark
-                            if hasattr(contact, "is_deleted"):
-                                contact.is_deleted = True
-                                changes["is_deleted"] = {"before": False, "after": True}
-                            else:
-                                # Skip actual deletion for safety
-                                changes["status"] = {"before": "active", "after": "marked_for_deletion"}
+                            old_status = party.status
+                            party.status = PartyStatus.INACTIVE
+                            changes["status"] = {"before": old_status, "after": party.status}
 
                         if changes:
                             changes_log.append({
-                                "record_id": contact.id,
+                                "record_id": party.id,
                                 "timestamp": utc_now().isoformat(),
                                 "changes": changes,
                             })
@@ -756,7 +754,7 @@ class CleanupService:
                     except Exception as e:
                         records_failed += 1
                         changes_log.append({
-                            "record_id": contact.id,
+                            "record_id": party.id,
                             "timestamp": utc_now().isoformat(),
                             "error": str(e),
                         })
@@ -796,7 +794,7 @@ class CleanupService:
         Returns:
             Updated CleanupJob
         """
-        from app.models.contact import Contact
+        from app.models.party import Party, PartyStatus
 
         job = self.get_job(job_id)
         if not job:
@@ -817,17 +815,22 @@ class CleanupService:
                     record_id = int(record_id_str)
                     snapshot = data.get("snapshot", {})
 
-                    contact = self.db.query(Contact).filter(Contact.id == record_id).first()
-                    if contact and snapshot:
+                    party = self.db.query(Party).filter(Party.id == record_id).first()
+                    if party and snapshot:
                         # Restore original values
                         if "name" in snapshot:
-                            contact.name = snapshot["name"]
+                            party.name = snapshot["name"]
                         if "email" in snapshot:
-                            contact.email = snapshot["email"]
+                            party.primary_email = snapshot["email"]
                         if "phone" in snapshot:
-                            contact.phone = snapshot["phone"]
-                        if "is_deleted" in snapshot and hasattr(contact, "is_deleted"):
-                            contact.is_deleted = snapshot.get("is_deleted", False)
+                            party.primary_phone = snapshot["phone"]
+                        if "status" in snapshot:
+                            status_value = snapshot["status"]
+                            party.status = (
+                                status_value
+                                if isinstance(status_value, PartyStatus)
+                                else PartyStatus(status_value)
+                            )
 
             # Reopen associated issues
             if job.issue_ids:

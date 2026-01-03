@@ -26,7 +26,7 @@ from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.expense import Expense, ExpenseStatus
 from app.models.subscription import Subscription
-from app.models.customer import Customer
+from app.models.party import CustomerAccount, PartyRole
 from app.cache import cached, CACHE_TTL, get_redis_client
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -234,20 +234,24 @@ async def get_revenue_by_customer(
     """Revenue breakdown by top customers."""
     start, end = _get_date_range(start_date, end_date, months=12)
 
+    segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "Unknown")
     results = db.query(
-        Customer.id,
-        Customer.name,
-        Customer.customer_type,
+        CustomerAccount.id,
+        CustomerAccount.party_id,
+        segment_expr.label("segment"),
         func.sum(Payment.amount).label("total_revenue"),
         func.count(Payment.id).label("payment_count"),
     ).join(
-        Payment, Payment.customer_id == Customer.id
+        Payment, Payment.customer_account_id == CustomerAccount.id
+    ).outerjoin(
+        PartyRole,
+        and_(PartyRole.party_id == CustomerAccount.party_id, PartyRole.role == "customer"),
     ).filter(
         Payment.payment_date >= start,
         Payment.payment_date <= end,
         Payment.status == PaymentStatus.COMPLETED,
     ).group_by(
-        Customer.id, Customer.name, Customer.customer_type
+        CustomerAccount.id, CustomerAccount.party_id, segment_expr
     ).order_by(
         func.sum(Payment.amount).desc()
     ).limit(top).all()
@@ -262,9 +266,9 @@ async def get_revenue_by_customer(
     for row in results:
         pct = float(row.total_revenue / total_revenue * 100) if total_revenue else 0
         customers.append({
-            "customer_id": row.id,
-            "customer_name": row.name,
-            "customer_type": row.customer_type,
+            "customer_account_id": row.id,
+            "party_id": row.party_id,
+            "customer_type": row.segment,
             "total_revenue": float(row.total_revenue or 0),
             "payment_count": row.payment_count,
             "percentage": round(pct, 2),
@@ -653,22 +657,26 @@ async def get_profitability_by_segment(
     start, end = _get_date_range(start_date, end_date, months=12)
 
     # Revenue by customer type
+    segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "Unknown")
     results = db.query(
-        Customer.customer_type,
+        segment_expr.label("segment"),
         func.sum(Payment.amount).label("revenue"),
-        func.count(func.distinct(Customer.id)).label("customer_count"),
+        func.count(func.distinct(CustomerAccount.id)).label("customer_count"),
     ).join(
-        Payment, Payment.customer_id == Customer.id
+        Payment, Payment.customer_account_id == CustomerAccount.id
+    ).outerjoin(
+        PartyRole,
+        and_(PartyRole.party_id == CustomerAccount.party_id, PartyRole.role == "customer"),
     ).filter(
         Payment.payment_date >= start,
         Payment.payment_date <= end,
         Payment.status == PaymentStatus.COMPLETED,
-    ).group_by(Customer.customer_type).all()
+    ).group_by(segment_expr).all()
 
     total_revenue = sum(float(r.revenue or 0) for r in results)
     segments = [
         {
-            "segment": row.customer_type or "Unknown",
+            "segment": row.segment or "Unknown",
             "revenue": float(row.revenue or 0),
             "customer_count": row.customer_count,
             "avg_revenue_per_customer": round(float(row.revenue / row.customer_count), 2) if row.customer_count else 0,

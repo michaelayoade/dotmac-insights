@@ -126,6 +126,37 @@ class StatusChangeSchema(BaseModel):
     reason: Optional[str] = None
 
 
+class ProvisioningActionSchema(BaseModel):
+    """Schema for provisioning operations."""
+
+    force: bool = Field(False, description="Force re-provision even if already provisioned")
+    triggered_by: Optional[str] = Field(None, description="Identifier for audit trail")
+
+
+class GraceExtensionSchema(BaseModel):
+    """Schema for extending grace period."""
+
+    days: int = Field(..., ge=1, le=90, description="Number of days to extend")
+    reason: Optional[str] = Field(None, max_length=500, description="Reason for extension")
+
+
+class BulkStatusChangeSchema(BaseModel):
+    """Schema for bulk status change."""
+
+    subscription_ids: List[int] = Field(..., min_length=1, max_length=100)
+    new_status: str = Field(..., pattern="^(active|suspended|cancelled)$")
+    reason: Optional[str] = None
+
+
+class BulkPlanChangeSchema(BaseModel):
+    """Schema for bulk plan change."""
+
+    subscription_ids: List[int] = Field(..., min_length=1, max_length=100)
+    new_tariff_id: int
+    effective: str = Field("next_cycle", pattern="^(immediate|next_cycle)$")
+    prorate: bool = False
+
+
 # =============================================================================
 # CRUD ENDPOINTS
 # =============================================================================
@@ -576,6 +607,278 @@ async def get_available_transitions(
         }
     except NotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# =============================================================================
+# PROVISIONING OPERATIONS
+# =============================================================================
+
+@router.post("/{subscription_id}/provision", dependencies=[Depends(Require("subscriptions:update"))])
+async def queue_provision(
+    subscription_id: int,
+    data: ProvisioningActionSchema = ProvisioningActionSchema(),
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Queue provisioning for a subscription.
+
+    This validates the subscription is ready for provisioning and queues
+    a background task. The actual provisioning happens asynchronously.
+    """
+    from app.services.subscriptions import ProvisioningService
+    from app.services.subscriptions.subscription_types import ProvisioningRequest
+
+    service = ProvisioningService(db, principal)
+
+    result = service.queue_provision(ProvisioningRequest(
+        subscription_id=subscription_id,
+        force=data.force,
+        triggered_by=data.triggered_by or principal.name or "api",
+    ))
+
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+
+    return {
+        "success": True,
+        "message": result.message,
+        "action": result.action,
+        "log_id": result.log_id,
+    }
+
+
+@router.post("/{subscription_id}/deprovision", dependencies=[Depends(Require("subscriptions:update"))])
+async def queue_deprovision(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Queue deprovisioning for a subscription.
+
+    This removes the subscription from the router/NAS.
+    """
+    from app.services.subscriptions import ProvisioningService
+
+    service = ProvisioningService(db, principal)
+
+    result = service.queue_deprovision(
+        subscription_id,
+        triggered_by=principal.name or "api",
+    )
+
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+
+    return {
+        "success": True,
+        "message": result.message,
+        "action": result.action,
+        "log_id": result.log_id,
+    }
+
+
+@router.post("/{subscription_id}/disconnect", dependencies=[Depends(Require("subscriptions:update"))])
+async def queue_disconnect(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Force disconnect active session for a subscription.
+
+    This sends a CoA (Change of Authorization) to terminate the active session.
+    """
+    from app.services.subscriptions import ProvisioningService
+
+    service = ProvisioningService(db, principal)
+
+    result = service.queue_disconnect(
+        subscription_id,
+        triggered_by=principal.name or "api",
+    )
+
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+
+    return {
+        "success": True,
+        "message": result.message,
+        "action": result.action,
+        "log_id": result.log_id,
+    }
+
+
+@router.post("/{subscription_id}/provision-update", dependencies=[Depends(Require("subscriptions:update"))])
+async def queue_provision_update(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Queue provisioning update for a subscription.
+
+    Use this after changing speed, IP, or other network settings
+    to push the changes to the router.
+    """
+    from app.services.subscriptions import ProvisioningService
+
+    service = ProvisioningService(db, principal)
+
+    result = service.queue_update(
+        subscription_id,
+        triggered_by=principal.name or "api",
+    )
+
+    if not result.success:
+        raise HTTPException(status_code=400, detail=result.message)
+
+    return {
+        "success": True,
+        "message": result.message,
+        "action": result.action,
+        "log_id": result.log_id,
+    }
+
+
+# =============================================================================
+# GRACE PERIOD
+# =============================================================================
+
+@router.post("/{subscription_id}/extend-grace", dependencies=[Depends(Require("subscriptions:update"))])
+async def extend_grace_period(
+    subscription_id: int,
+    data: GraceExtensionSchema,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Extend grace period for a suspended subscription.
+
+    This extends the subscription's end date, giving the customer
+    more time before service is terminated.
+    """
+    service = SubscriptionService(db, principal)
+
+    try:
+        subscription = service.extend_grace_period(
+            subscription_id,
+            days=data.days,
+            reason=data.reason or "Grace period extended via API",
+        )
+        db.commit()
+        return {
+            "message": f"Grace period extended by {data.days} days",
+            "subscription": _serialize_subscription(subscription),
+        }
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# =============================================================================
+# BULK OPERATIONS
+# =============================================================================
+
+@router.post("/bulk/status", dependencies=[Depends(Require("subscriptions:update"))])
+async def bulk_status_change(
+    data: BulkStatusChangeSchema,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Change status for multiple subscriptions.
+    """
+    service = SubscriptionService(db, principal)
+    results = []
+    successful = 0
+    failed = 0
+
+    for sub_id in data.subscription_ids:
+        try:
+            if data.new_status == "active":
+                subscription = service.activate(sub_id)
+            elif data.new_status == "suspended":
+                subscription = service.suspend(sub_id, reason=data.reason)
+            elif data.new_status == "cancelled":
+                subscription = service.cancel(sub_id, reason=data.reason)
+            else:
+                raise ValidationError(f"Invalid status: {data.new_status}")
+
+            results.append({"id": sub_id, "success": True, "status": data.new_status})
+            successful += 1
+        except (NotFoundError, ValidationError, ConflictError) as e:
+            results.append({"id": sub_id, "success": False, "error": str(e)})
+            failed += 1
+
+    db.commit()
+
+    return {
+        "total": len(data.subscription_ids),
+        "successful": successful,
+        "failed": failed,
+        "results": results,
+    }
+
+
+@router.post("/bulk/plan", dependencies=[Depends(Require("subscriptions:update"))])
+async def bulk_plan_change(
+    data: BulkPlanChangeSchema,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> Dict[str, Any]:
+    """
+    Change plan for multiple subscriptions.
+    """
+    service = SubscriptionService(db, principal)
+    results = []
+    successful = 0
+    failed = 0
+
+    for sub_id in data.subscription_ids:
+        try:
+            # Determine if upgrade or downgrade by comparing prices
+            subscription = service.get_subscription(sub_id)
+            from app.services.subscriptions import TariffService
+            tariff_service = TariffService(db, principal)
+            new_tariff = tariff_service.get_tariff(data.new_tariff_id)
+
+            if new_tariff.price > subscription.price:
+                result = service.upgrade(
+                    subscription_id=sub_id,
+                    new_tariff_id=data.new_tariff_id,
+                    effective=data.effective,
+                    prorate=data.prorate,
+                )
+            else:
+                result = service.downgrade(
+                    subscription_id=sub_id,
+                    new_tariff_id=data.new_tariff_id,
+                    effective=data.effective,
+                    prorate=data.prorate,
+                )
+
+            results.append({
+                "id": sub_id,
+                "success": True,
+                "old_plan": result.old_plan,
+                "new_plan": result.new_plan,
+            })
+            successful += 1
+        except (NotFoundError, ValidationError, ConflictError) as e:
+            results.append({"id": sub_id, "success": False, "error": str(e)})
+            failed += 1
+
+    db.commit()
+
+    return {
+        "total": len(data.subscription_ids),
+        "successful": successful,
+        "failed": failed,
+        "results": results,
+    }
 
 
 # =============================================================================

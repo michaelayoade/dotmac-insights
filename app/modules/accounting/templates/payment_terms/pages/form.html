@@ -1,0 +1,274 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">
+            {{ 'Edit Payment Terms' if is_edit else 'New Payment Terms' }}
+        </h1>
+        <p class="mt-1.5 text-gray-500 font-body">
+            {{ 'Update payment terms template' if is_edit else 'Create a new payment terms template' }}
+        </p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="{{ '/accounting/payment-terms/' ~ terms.id if is_edit else '/accounting/payment-terms' }}"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Cancel
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form
+    method="POST"
+    action="{{ '/accounting/payment-terms/' ~ terms.id if is_edit else '/accounting/payment-terms' }}"
+    x-data="paymentTermsForm()"
+>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Form -->
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Template Details</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label for="template_name" class="block text-sm font-medium text-gray-700 mb-1">Template Name *</label>
+                        <input
+                            type="text"
+                            id="template_name"
+                            name="template_name"
+                            value="{{ terms.template_name if terms else '' }}"
+                            required
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            placeholder="e.g., Net 30, 2/10 Net 30"
+                        >
+                    </div>
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            rows="3"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            placeholder="Optional description of these payment terms"
+                        >{{ terms.description if terms else '' }}</textarea>
+                    </div>
+                    {% if is_edit %}
+                    <div class="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            id="is_active"
+                            name="is_active"
+                            {{ 'checked' if terms.is_active else '' }}
+                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        >
+                        <label for="is_active" class="text-sm font-medium text-gray-700">Active</label>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Payment Schedule -->
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-gray-900">Payment Schedule</h2>
+                    <button
+                        type="button"
+                        @click="addSchedule()"
+                        class="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-500"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                        </svg>
+                        Add Installment
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <template x-for="(schedule, idx) in schedules" :key="idx">
+                        <div class="p-4 bg-surface-50 rounded-lg ring-1 ring-gray-200">
+                            <div class="flex items-start justify-between mb-3">
+                                <span class="text-sm font-medium text-gray-700" x-text="'Installment ' + (idx + 1)"></span>
+                                <button
+                                    type="button"
+                                    @click="removeSchedule(idx)"
+                                    class="text-gray-400 hover:text-red-500"
+                                    x-show="schedules.length > 1"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Credit Days</label>
+                                    <input
+                                        type="number"
+                                        :name="'schedule_' + idx + '_credit_days'"
+                                        x-model.number="schedule.credit_days"
+                                        min="0"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Credit Months</label>
+                                    <input
+                                        type="number"
+                                        :name="'schedule_' + idx + '_credit_months'"
+                                        x-model.number="schedule.credit_months"
+                                        min="0"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Day of Month</label>
+                                    <input
+                                        type="number"
+                                        :name="'schedule_' + idx + '_day_of_month'"
+                                        x-model.number="schedule.day_of_month"
+                                        min="1"
+                                        max="31"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                        placeholder="Optional"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Percentage *</label>
+                                    <input
+                                        type="number"
+                                        :name="'schedule_' + idx + '_percentage'"
+                                        x-model.number="schedule.percentage"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        required
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Discount %</label>
+                                    <input
+                                        type="number"
+                                        :name="'schedule_' + idx + '_discount'"
+                                        x-model.number="schedule.discount"
+                                        min="0"
+                                        max="100"
+                                        step="0.1"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Discount Days</label>
+                                    <input
+                                        type="number"
+                                        :name="'schedule_' + idx + '_discount_days'"
+                                        x-model.number="schedule.discount_days"
+                                        min="0"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                    >
+                                </div>
+                                <div class="col-span-2">
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                                    <input
+                                        type="text"
+                                        :name="'schedule_' + idx + '_description'"
+                                        x-model="schedule.description"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 text-sm"
+                                        placeholder="e.g., First installment"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-sm text-blue-700">
+                            Total percentage: <strong x-text="totalPercentage + '%'"></strong>
+                            <span x-show="totalPercentage != 100" class="text-amber-600">(should equal 100%)</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar with Submit -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <button
+                    type="submit"
+                    class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    {{ 'Update Payment Terms' if is_edit else 'Create Payment Terms' }}
+                </button>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-3">Tips</h3>
+                <ul class="text-xs text-gray-500 space-y-2">
+                    <li class="flex gap-2">
+                        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Schedule percentages must sum to 100%
+                    </li>
+                    <li class="flex gap-2">
+                        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Use Day of Month for end-of-month terms
+                    </li>
+                    <li class="flex gap-2">
+                        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        "2/10 Net 30" = 2% discount if paid in 10 days
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+function paymentTermsForm() {
+    return {
+        schedules: {{ schedules | tojson if schedules else '[{"credit_days": 30, "credit_months": 0, "day_of_month": null, "percentage": 100, "discount": 0, "discount_days": 0, "description": ""}]' | safe }},
+        get totalPercentage() {
+            return this.schedules.reduce((sum, s) => sum + (parseFloat(s.percentage) || 0), 0).toFixed(1);
+        },
+        addSchedule() {
+            this.schedules.push({
+                credit_days: 0,
+                credit_months: 0,
+                day_of_month: null,
+                percentage: 0,
+                discount: 0,
+                discount_days: 0,
+                description: ''
+            });
+        },
+        removeSchedule(idx) {
+            if (this.schedules.length > 1) {
+                this.schedules.splice(idx, 1);
+            }
+        }
+    };
+}
+</script>
+{% endblock %}

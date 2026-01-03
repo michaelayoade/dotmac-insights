@@ -1,0 +1,43 @@
+<!-- Payslips Grid Partial -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% if payslips %}
+        {% for payslip in payslips %}
+        <a href="/hr/my/payslips/{{ payslip.id }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:ring-primary-200 transition-all block">
+            <div class="flex items-start justify-between">
+                <div>
+                    <h3 class="font-semibold text-gray-900">{{ payslip.posting_date.strftime('%B %Y') if payslip.posting_date else '-' }}</h3>
+                    <p class="text-sm text-gray-500 mt-1">Posted: {{ payslip.posting_date.strftime('%b %d, %Y') if payslip.posting_date else '-' }}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-500">Net Pay</span>
+                    <span class="text-xl font-bold text-gray-900">{{ '{:,.2f}'.format(payslip.net_pay or 0) }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    {% else %}
+        <div class="col-span-full bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center">
+            <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">No Payslips</h3>
+            <p class="text-gray-500">No payslips available for the selected period.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Pagination -->
+{% if pagination.pages > 1 %}
+<div class="flex items-center justify-center gap-2 mt-6">
+    {% if pagination.page > 1 %}
+    <a href="?page={{ pagination.page - 1 }}{% if current_year %}&year={{ current_year }}{% endif %}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Previous</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm text-gray-500">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.page < pagination.pages %}
+    <a href="?page={{ pagination.page + 1 }}{% if current_year %}&year={{ current_year }}{% endif %}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Next</a>
+    {% endif %}
+</div>
+{% endif %}

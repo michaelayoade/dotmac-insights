@@ -1,0 +1,156 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/hr/payroll/structures" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-display font-bold text-gray-900">{{ structure.salary_structure_name }}</h1>
+                <p class="mt-1 text-sm text-gray-500">
+                    {% if structure.is_active == 'Yes' or structure.is_active == True %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/hr/payroll/structures/{{ structure.id }}/edit" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                Edit
+            </a>
+            <button
+                hx-delete="/hr/payroll/structures/{{ structure.id }}"
+                hx-confirm="Are you sure you want to deactivate this salary structure?"
+                class="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                Deactivate
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Info -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Structure Details</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Structure Name</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ structure.salary_structure_name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Company</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ structure.company or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Payroll Frequency</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ structure.payroll_frequency or '-' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Currency</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ structure.currency or 'NGN' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Status</dt>
+                <dd class="mt-1">
+                    {% if structure.is_active == 'Yes' or structure.is_active == True %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                    {% endif %}
+                </dd>
+            </div>
+            {% if structure.payment_account %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Payment Account</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ structure.payment_account }}</dd>
+            </div>
+            {% endif %}
+            {% if structure.mode_of_payment %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Mode of Payment</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ structure.mode_of_payment }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <!-- Earnings -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Earnings</h2>
+        {% if structure.earnings %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Component</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Abbr</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Formula</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for earning in structure.earnings | sort(attribute='idx') %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{{ earning.salary_component }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ earning.abbr or '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">
+                            {% if earning.amount_based_on_formula %}
+                            <span class="text-gray-400 italic">Formula</span>
+                            {% else %}
+                            {{ earning.amount | default(0, true) }}
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 text-sm text-gray-600 font-mono">{{ earning.formula or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 text-center py-8">No earnings defined</p>
+        {% endif %}
+    </div>
+
+    <!-- Deductions -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Deductions</h2>
+        {% if structure.deductions %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Component</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Abbr</th>
+                        <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                        <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Formula</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for deduction in structure.deductions | sort(attribute='idx') %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm font-medium text-gray-900">{{ deduction.salary_component }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ deduction.abbr or '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">
+                            {% if deduction.amount_based_on_formula %}
+                            <span class="text-gray-400 italic">Formula</span>
+                            {% else %}
+                            {{ deduction.amount | default(0, true) }}
+                            {% endif %}
+                        </td>
+                        <td class="px-3 py-3 text-sm text-gray-600 font-mono">{{ deduction.formula or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500 text-center py-8">No deductions defined</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

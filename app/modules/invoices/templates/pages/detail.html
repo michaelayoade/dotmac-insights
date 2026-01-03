@@ -9,7 +9,7 @@
             <span class="text-gray-900">{{ invoice.invoice_number or 'INV-' ~ invoice.id }}</span>
         </nav>
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ invoice.invoice_number or 'Invoice #' ~ invoice.id }}</h1>
-        <p class="mt-1.5 text-gray-500 font-body">{{ invoice.contact.name if invoice.contact else (invoice.customer.customer_name if invoice.customer else 'Customer Invoice') }}</p>
+        <p class="mt-1.5 text-gray-500 font-body">{{ invoice.customer_account.party.name if invoice.customer_account and invoice.customer_account.party else 'Customer Invoice' }}</p>
     </div>
     <div class="flex items-center gap-3">
         {% if invoice.status.value in ['pending', 'partially_paid', 'overdue'] %}
@@ -52,7 +52,7 @@
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Customer</dt>
-                        <dd class="mt-1.5 text-gray-900">{{ invoice.contact.name if invoice.contact else (invoice.customer.customer_name if invoice.customer else '-') }}</dd>
+                        <dd class="mt-1.5 text-gray-900">{{ invoice.customer_account.party.name if invoice.customer_account and invoice.customer_account.party else '-' }}</dd>
                     </div>
                     <div>
                         <dt class="text-sm font-medium text-gray-500">Invoice Date</dt>

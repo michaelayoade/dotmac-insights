@@ -17,7 +17,7 @@
                     <a href="/invoices/credit-notes/{{ cn.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ cn.credit_number or 'CN-' ~ cn.id }}</a>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
-                    {{ cn.contact.name if cn.contact else '-' }}
+                    {{ cn.customer_account.party.name if cn.customer_account and cn.customer_account.party else '-' }}
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ cn.issue_date.strftime('%b %d, %Y') if cn.issue_date else '-' }}</td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">

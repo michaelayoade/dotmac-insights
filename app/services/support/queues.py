@@ -56,6 +56,7 @@ class QueueService:
         self,
         active_only: bool = True,
         include_private: bool = False,
+        include_all: bool = False,
         company: Optional[str] = None,
     ) -> List[SupportQueue]:
         """List support queues.
@@ -63,6 +64,7 @@ class QueueService:
         Args:
             active_only: Only return active queues.
             include_private: Include private queues (for current user).
+            include_all: Skip visibility filtering (admin use).
             company: Filter by company.
 
         Returns:
@@ -79,16 +81,17 @@ class QueueService:
             query = query.filter(SupportQueue.is_active == True)
 
         # Visibility filter
-        if include_private and self.principal:
-            user_id = getattr(self.principal, "id", None)
-            query = query.filter(
-                or_(
-                    SupportQueue.is_public == True,
-                    SupportQueue.owner_id == user_id,
+        if not include_all:
+            if include_private and self.principal:
+                user_id = getattr(self.principal, "id", None)
+                query = query.filter(
+                    or_(
+                        SupportQueue.is_public == True,
+                        SupportQueue.owner_id == user_id,
+                    )
                 )
-            )
-        else:
-            query = query.filter(SupportQueue.is_public == True)
+            else:
+                query = query.filter(SupportQueue.is_public == True)
 
         return query.order_by(SupportQueue.display_order.asc(), SupportQueue.name.asc()).all()
 

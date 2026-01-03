@@ -36,6 +36,9 @@ __all__ = ["EmailTemplateService"]
 TEMPLATE_TYPES = [
     "TICKET_CREATED",
     "TICKET_ASSIGNED",
+    "TICKET_IN_PROGRESS",
+    "TICKET_WAITING",
+    "TICKET_ON_HOLD",
     "TICKET_REPLIED",
     "TICKET_RESOLVED",
     "TICKET_CLOSED",
@@ -505,6 +508,118 @@ Best regards,
 """,
             },
             {
+                "name": "Ticket Assigned",
+                "template_type": "TICKET_ASSIGNED",
+                "subject": "[{{ticket_id}}] Ticket assigned: {{ticket_subject}}",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>Your support ticket has been assigned to {{agent_name}}.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>We'll follow up as soon as we have an update.</p>
+<p>You can track your ticket at: <a href="{{ticket_url}}">{{ticket_url}}</a></p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+Your support ticket has been assigned to {{agent_name}}.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+We'll follow up as soon as we have an update.
+
+You can track your ticket at: {{ticket_url}}
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
+                "name": "Ticket In Progress",
+                "template_type": "TICKET_IN_PROGRESS",
+                "subject": "[{{ticket_id}}] We're working on your ticket",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>Your support ticket is now in progress.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>We'll update you when we have more information.</p>
+<p>You can track your ticket at: <a href="{{ticket_url}}">{{ticket_url}}</a></p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+Your support ticket is now in progress.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+We'll update you when we have more information.
+
+You can track your ticket at: {{ticket_url}}
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
+                "name": "Ticket Waiting on Customer",
+                "template_type": "TICKET_WAITING",
+                "subject": "[{{ticket_id}}] Waiting for your response",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>We're waiting for more information to continue working on your ticket.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>Please reply with any additional details so we can proceed.</p>
+<p>You can update your ticket at: <a href="{{ticket_url}}">{{ticket_url}}</a></p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+We're waiting for more information to continue working on your ticket.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+Please reply with any additional details so we can proceed.
+
+You can update your ticket at: {{ticket_url}}
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
+                "name": "Ticket On Hold",
+                "template_type": "TICKET_ON_HOLD",
+                "subject": "[{{ticket_id}}] Ticket on hold",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>Your support ticket is on hold while we wait on an external dependency.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>We'll update you as soon as we can resume work.</p>
+<p>You can track your ticket at: <a href="{{ticket_url}}">{{ticket_url}}</a></p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+Your support ticket is on hold while we wait on an external dependency.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+We'll update you as soon as we can resume work.
+
+You can track your ticket at: {{ticket_url}}
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
                 "name": "Ticket Replied",
                 "template_type": "TICKET_REPLIED",
                 "subject": "Re: [{{ticket_id}}] {{ticket_subject}}",
@@ -547,6 +662,87 @@ Ticket: {{ticket_id}}
 Subject: {{ticket_subject}}
 
 If you have any further questions, you can reply to this email or reopen the ticket.
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
+                "name": "Ticket Closed",
+                "template_type": "TICKET_CLOSED",
+                "subject": "[{{ticket_id}}] Ticket closed",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>Your support ticket has been closed.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>If you still need help, reply to this email to reopen the ticket.</p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+Your support ticket has been closed.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+If you still need help, reply to this email to reopen the ticket.
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
+                "name": "Ticket Reopened",
+                "template_type": "TICKET_REOPENED",
+                "subject": "[{{ticket_id}}] Ticket reopened",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>Your support ticket has been reopened and is back in our queue.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>We'll follow up as soon as possible.</p>
+<p>You can track your ticket at: <a href="{{ticket_url}}">{{ticket_url}}</a></p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+Your support ticket has been reopened and is back in our queue.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+We'll follow up as soon as possible.
+
+You can track your ticket at: {{ticket_url}}
+
+Best regards,
+{{company_name}} Support
+""",
+            },
+            {
+                "name": "Ticket Escalated",
+                "template_type": "TICKET_ESCALATED",
+                "subject": "[{{ticket_id}}] Ticket escalated",
+                "body_html": """
+<p>Hello {{customer_name}},</p>
+<p>Your support ticket has been escalated to ensure it receives additional attention.</p>
+<p><strong>Ticket:</strong> {{ticket_id}}<br>
+<strong>Subject:</strong> {{ticket_subject}}</p>
+<p>We'll keep you updated on progress.</p>
+<p>You can track your ticket at: <a href="{{ticket_url}}">{{ticket_url}}</a></p>
+<p>Best regards,<br>{{company_name}} Support</p>
+""",
+                "body_text": """Hello {{customer_name}},
+
+Your support ticket has been escalated to ensure it receives additional attention.
+
+Ticket: {{ticket_id}}
+Subject: {{ticket_subject}}
+
+We'll keep you updated on progress.
+
+You can track your ticket at: {{ticket_url}}
 
 Best regards,
 {{company_name}} Support

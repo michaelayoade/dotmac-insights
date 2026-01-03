@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from app.models.subscription import Subscription
     from app.models.party import Party
     from app.models.invoice import Invoice
-    from app.models.ar_payment import ARPayment
+    from app.models.payment import Payment
 
 
 class ServiceTransaction(Base):
@@ -69,7 +69,7 @@ class ServiceTransaction(Base):
         index=True,
     )
     payment_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("ar_payments.id", ondelete="SET NULL"),
+        ForeignKey("payments.id", ondelete="SET NULL"),
         nullable=True,
     )
     credit_note_id: Mapped[Optional[int]] = mapped_column(
@@ -82,8 +82,8 @@ class ServiceTransaction(Base):
     new_value: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Flexible metadata
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # Flexible metadata (attribute name can't be "metadata" on declarative models)
+    metadata_json: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
 
     # Effective date (when the transaction takes effect)
     effective_date: Mapped[date] = mapped_column(Date, default=date.today, index=True)

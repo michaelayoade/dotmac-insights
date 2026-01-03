@@ -1,5 +1,7 @@
 """
 Leave Policies Endpoints
+
+Uses LeaveService for all business logic.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,14 +12,20 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import Require
-from app.models.hr_leave import LeavePolicy, LeavePolicyDetail
-from .helpers import decimal_or_default
+from app.services.hr.leave import LeaveService
+from app.services.hr.leave_types import (
+    LeavePolicyCreateData,
+    LeavePolicyUpdateData,
+    LeavePolicyDetailData,
+)
+from app.services.hr.errors import ValidationError as HRValidationError
 
 router = APIRouter()
 
 # =============================================================================
 # LEAVE POLICY
 # =============================================================================
+
 
 class LeavePolicyDetailPayload(BaseModel):
     leave_type: str
@@ -36,6 +44,30 @@ class LeavePolicyUpdate(BaseModel):
     details: Optional[List[LeavePolicyDetailPayload]] = Field(default=None)
 
 
+def _serialize_policy(p, include_details: bool = False) -> Dict[str, Any]:
+    """Serialize a LeavePolicy model to dict."""
+    result = {
+        "id": p.id,
+        "erpnext_id": p.erpnext_id,
+        "leave_policy_name": p.leave_policy_name,
+        "detail_count": len(p.details) if p.details else 0,
+    }
+    if include_details:
+        result["details"] = [
+            {
+                "id": d.id,
+                "leave_type": d.leave_type,
+                "leave_type_id": d.leave_type_id,
+                "annual_allocation": float(d.annual_allocation) if d.annual_allocation else 0,
+                "idx": d.idx,
+            }
+            for d in sorted(p.details, key=lambda x: x.idx)
+        ]
+        result["created_at"] = p.created_at.isoformat() if p.created_at else None
+        result["updated_at"] = p.updated_at.isoformat() if p.updated_at else None
+    return result
+
+
 @router.get("/leave-policies", dependencies=[Depends(Require("hr:read"))])
 def list_leave_policies(
     search: Optional[str] = None,
@@ -44,27 +76,22 @@ def list_leave_policies(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List leave policies with filtering."""
-    query = db.query(LeavePolicy)
+    service = LeaveService(db)
+    policies = service.list_leave_policies()
 
+    # Apply search filter
     if search:
-        query = query.filter(LeavePolicy.leave_policy_name.ilike(f"%{search}%"))
+        search_lower = search.lower()
+        policies = [p for p in policies if search_lower in p.leave_policy_name.lower()]
 
-    total = query.count()
-    policies = query.order_by(LeavePolicy.leave_policy_name).offset(offset).limit(limit).all()
+    total = len(policies)
+    policies = policies[offset : offset + limit]
 
     return {
         "total": total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": p.id,
-                "erpnext_id": p.erpnext_id,
-                "leave_policy_name": p.leave_policy_name,
-                "detail_count": len(p.details),
-            }
-            for p in policies
-        ],
+        "data": [_serialize_policy(p) for p in policies],
     }
 
 
@@ -74,29 +101,13 @@ def get_leave_policy(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get leave policy detail with details."""
-    p = db.query(LeavePolicy).filter(LeavePolicy.id == policy_id).first()
-    if not p:
+    service = LeaveService(db)
+    try:
+        p = service.get_leave_policy(policy_id)
+    except HRValidationError:
         raise HTTPException(status_code=404, detail="Leave policy not found")
 
-    details = [
-        {
-            "id": d.id,
-            "leave_type": d.leave_type,
-            "leave_type_id": d.leave_type_id,
-            "annual_allocation": float(d.annual_allocation) if d.annual_allocation else 0,
-            "idx": d.idx,
-        }
-        for d in sorted(p.details, key=lambda x: x.idx)
-    ]
-
-    return {
-        "id": p.id,
-        "erpnext_id": p.erpnext_id,
-        "leave_policy_name": p.leave_policy_name,
-        "details": details,
-        "created_at": p.created_at.isoformat() if p.created_at else None,
-        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
-    }
+    return _serialize_policy(p, include_details=True)
 
 
 @router.post("/leave-policies", dependencies=[Depends(Require("hr:write"))])
@@ -105,24 +116,31 @@ def create_leave_policy(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new leave policy with details."""
-    policy = LeavePolicy(
-        leave_policy_name=payload.leave_policy_name,
-    )
-    db.add(policy)
-    db.flush()
+    service = LeaveService(db)
 
+    details = []
     if payload.details:
-        for idx, d in enumerate(payload.details):
-            detail = LeavePolicyDetail(
-                leave_policy_id=policy.id,
-                leave_type=d.leave_type,
-                leave_type_id=d.leave_type_id,
-                annual_allocation=decimal_or_default(d.annual_allocation),
-                idx=d.idx if d.idx is not None else idx,
+        for d in payload.details:
+            details.append(
+                LeavePolicyDetailData(
+                    leave_type=d.leave_type,
+                    leave_type_id=d.leave_type_id,
+                    annual_allocation=d.annual_allocation or Decimal("0"),
+                )
             )
-            db.add(detail)
 
-    db.commit()
+    create_data = LeavePolicyCreateData(
+        leave_policy_name=payload.leave_policy_name,
+        details=details,
+    )
+
+    try:
+        policy = service.create_leave_policy(create_data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return get_leave_policy(policy.id, db)
 
 
@@ -133,27 +151,35 @@ def update_leave_policy(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Update a leave policy and optionally replace details."""
-    policy = db.query(LeavePolicy).filter(LeavePolicy.id == policy_id).first()
-    if not policy:
-        raise HTTPException(status_code=404, detail="Leave policy not found")
+    service = LeaveService(db)
 
-    if payload.leave_policy_name is not None:
-        policy.leave_policy_name = payload.leave_policy_name
-
+    details = None
     if payload.details is not None:
-        db.query(LeavePolicyDetail).filter(LeavePolicyDetail.leave_policy_id == policy.id).delete(synchronize_session=False)
-        for idx, d in enumerate(payload.details):
-            detail = LeavePolicyDetail(
-                leave_policy_id=policy.id,
-                leave_type=d.leave_type,
-                leave_type_id=d.leave_type_id,
-                annual_allocation=decimal_or_default(d.annual_allocation),
-                idx=d.idx if d.idx is not None else idx,
+        details = []
+        for d in payload.details:
+            details.append(
+                LeavePolicyDetailData(
+                    leave_type=d.leave_type,
+                    leave_type_id=d.leave_type_id,
+                    annual_allocation=d.annual_allocation or Decimal("0"),
+                )
             )
-            db.add(detail)
 
-    db.commit()
-    return get_leave_policy(policy.id, db)
+    update_data = LeavePolicyUpdateData(
+        leave_policy_name=payload.leave_policy_name,
+        details=details,
+    )
+
+    try:
+        service.update_leave_policy(policy_id, update_data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Leave policy not found")
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return get_leave_policy(policy_id, db)
 
 
 @router.delete("/leave-policies/{policy_id}", dependencies=[Depends(Require("hr:write"))])
@@ -162,10 +188,13 @@ def delete_leave_policy(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Delete a leave policy and its details."""
-    policy = db.query(LeavePolicy).filter(LeavePolicy.id == policy_id).first()
-    if not policy:
+    service = LeaveService(db)
+    try:
+        policy = service.get_leave_policy(policy_id)
+        db.delete(policy)
+        db.commit()
+    except HRValidationError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Leave policy not found")
 
-    db.delete(policy)
-    db.commit()
     return {"message": "Leave policy deleted", "id": policy_id}

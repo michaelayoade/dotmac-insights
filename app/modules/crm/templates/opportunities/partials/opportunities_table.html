@@ -1,0 +1,92 @@
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Opportunity</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stage</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Probability</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expected Close</th>
+                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" class="relative px-6 py-3"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+            {% if opportunities %}
+                {% for opp in opportunities %}
+                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/crm/opportunities/{{ opp.id }}'">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">{{ opp.name }}</div>
+                        {% if opp.party %}
+                        <div class="text-sm text-gray-500">{{ opp.party.name }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {{ opp.stage.name if opp.stage else 'No Stage' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        ${{ '{:,.0f}'.format(opp.amount or 0) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-900">{{ opp.probability or 0 }}%</span>
+                            <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full bg-blue-500" style="width: {{ opp.probability or 0 }}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {{ opp.expected_close_date.strftime('%b %d, %Y') if opp.expected_close_date else '-' }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                            {% if opp.status == 'won' %}bg-green-100 text-green-800
+                            {% elif opp.status == 'lost' %}bg-red-100 text-red-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ opp.status|capitalize }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <a href="/crm/opportunities/{{ opp.id }}" class="text-blue-600 hover:text-blue-900">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No opportunities found</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by creating a new opportunity.</p>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+        <div>
+            <p class="text-sm text-gray-700">
+                Showing <span class="font-medium">{{ (page - 1) * per_page + 1 }}</span> to <span class="font-medium">{{ [page * per_page, total]|min }}</span> of <span class="font-medium">{{ total }}</span>
+            </p>
+        </div>
+        <div>
+            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                {% if page > 1 %}
+                <a href="?page={{ page - 1 }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">Previous</a>
+                {% endif %}
+                {% if page < total_pages %}
+                <a href="?page={{ page + 1 }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">Next</a>
+                {% endif %}
+            </nav>
+        </div>
+    </div>
+</div>
+{% endif %}

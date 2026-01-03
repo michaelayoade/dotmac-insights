@@ -8,11 +8,9 @@ Permission Requirements:
 from __future__ import annotations
 
 from typing import Optional
-from datetime import datetime
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, or_
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import (
@@ -23,12 +21,12 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.workflow_task import (
-    WorkflowTask,
     WorkflowTaskStatus,
     WorkflowTaskPriority,
     WorkflowTaskModule,
 )
 from app.core.security import is_htmx_request, htmx_toast
+from app.services.workflow_task_service import WorkflowTaskService
 
 # Permission dependencies
 RequireTasksRead = Depends(require_scope("tasks:read"))
@@ -62,52 +60,6 @@ def get_module_options():
     ]
 
 
-def get_task_stats(db, user_id: Optional[int] = None) -> dict:
-    """Calculate task statistics."""
-    base_query = db.query(func.count(WorkflowTask.id))
-
-    if user_id:
-        base_query = base_query.filter(WorkflowTask.assignee_user_id == user_id)
-
-    total_count = base_query.scalar() or 0
-
-    pending_count = base_query.filter(
-        WorkflowTask.status == WorkflowTaskStatus.PENDING.value
-    ).scalar() or 0
-
-    in_progress_count = db.query(func.count(WorkflowTask.id)).filter(
-        WorkflowTask.status == WorkflowTaskStatus.IN_PROGRESS.value
-    )
-    if user_id:
-        in_progress_count = in_progress_count.filter(WorkflowTask.assignee_user_id == user_id)
-    in_progress_count = in_progress_count.scalar() or 0
-
-    completed_count = db.query(func.count(WorkflowTask.id)).filter(
-        WorkflowTask.status == WorkflowTaskStatus.COMPLETED.value
-    )
-    if user_id:
-        completed_count = completed_count.filter(WorkflowTask.assignee_user_id == user_id)
-    completed_count = completed_count.scalar() or 0
-
-    # Overdue count
-    overdue_count = db.query(func.count(WorkflowTask.id)).filter(
-        WorkflowTask.status == WorkflowTaskStatus.PENDING.value,
-        WorkflowTask.due_at < datetime.utcnow(),
-        WorkflowTask.due_at.isnot(None),
-    )
-    if user_id:
-        overdue_count = overdue_count.filter(WorkflowTask.assignee_user_id == user_id)
-    overdue_count = overdue_count.scalar() or 0
-
-    return {
-        "total_count": total_count,
-        "pending_count": pending_count,
-        "in_progress_count": in_progress_count,
-        "completed_count": completed_count,
-        "overdue_count": overdue_count,
-    }
-
-
 @router.get("", response_class=HTMLResponse, dependencies=[RequireTasksRead])
 async def tasks_list(
     request: Request,
@@ -123,43 +75,38 @@ async def tasks_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Workflow tasks list page - shows tasks assigned to current user."""
-    # Build query - by default show tasks assigned to current user
-    query = db.query(WorkflowTask)
+    service = WorkflowTaskService(db)
+    offset = (page - 1) * per_page
 
-    # For now, show all tasks (in production, filter by user.id)
-    # query = query.filter(WorkflowTask.assignee_user_id == user.id)
-
-    # Search
-    if q:
-        search_filter = or_(
-            WorkflowTask.title.ilike(f"%{q}%"),
-            WorkflowTask.description.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if status:
-        query = query.filter(WorkflowTask.status == status)
-    if module:
-        query = query.filter(WorkflowTask.module == module)
-    if priority:
-        query = query.filter(WorkflowTask.priority == priority)
-
-    # Count total
-    total = query.count()
-
-    # Sort - pending first, then by due date, then by priority
-    query = query.order_by(
-        WorkflowTask.due_at.asc().nullslast(),
-        WorkflowTask.created_at.desc()
+    # Get tasks for current user using service
+    tasks = service.get_my_tasks(
+        user_id=user.id,
+        status=status,
+        module=module,
+        priority=priority,
+        search=q,
+        limit=per_page,
+        offset=offset,
     )
 
-    # Paginate
-    offset = (page - 1) * per_page
-    tasks = query.offset(offset).limit(per_page).all()
+    # Get total count for pagination
+    total = service.count_my_tasks(
+        user_id=user.id,
+        status=status,
+        module=module,
+        priority=priority,
+        search=q,
+    )
 
-    # Get stats
-    stats = get_task_stats(db)
+    # Get stats using service
+    summary = service.get_task_summary(user.id)
+    stats = {
+        "pending_count": summary.get("pending", 0),
+        "overdue_count": summary.get("overdue", 0),
+        "in_progress_count": summary.get("by_priority", {}).get("in_progress", 0),
+        "completed_count": summary.get("completed_today", 0),
+        "total_count": summary.get("pending", 0) + summary.get("due_today", 0),
+    }
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -221,7 +168,10 @@ async def start_task(
     task_id: int,
 ):
     """Mark a task as in progress."""
-    task = db.query(WorkflowTask).filter(WorkflowTask.id == task_id).first()
+    service = WorkflowTaskService(db)
+
+    # Get task with ownership check
+    task = service.get_task_by_id(task_id, user_id=user.id)
 
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -229,7 +179,7 @@ async def start_task(
     if task.status != WorkflowTaskStatus.PENDING.value:
         htmx_toast(response, "Task is not pending", "error")
     else:
-        task.status = WorkflowTaskStatus.IN_PROGRESS.value
+        task = service.update_task_status(task_id, WorkflowTaskStatus.IN_PROGRESS.value, user.id)
         db.commit()
         htmx_toast(response, "Task started", "success")
 
@@ -251,7 +201,10 @@ async def complete_task(
     task_id: int,
 ):
     """Mark a task as completed."""
-    task = db.query(WorkflowTask).filter(WorkflowTask.id == task_id).first()
+    service = WorkflowTaskService(db)
+
+    # Get task with ownership check
+    task = service.get_task_by_id(task_id, user_id=user.id)
 
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -259,9 +212,7 @@ async def complete_task(
     if task.status == WorkflowTaskStatus.COMPLETED.value:
         htmx_toast(response, "Task is already completed", "info")
     else:
-        task.status = WorkflowTaskStatus.COMPLETED.value
-        task.completed_at = datetime.utcnow()
-        # task.completed_by_id = user.id  # In production
+        task = service.update_task_status(task_id, WorkflowTaskStatus.COMPLETED.value, user.id)
         db.commit()
         htmx_toast(response, "Task completed", "success")
 
@@ -283,7 +234,10 @@ async def cancel_task(
     task_id: int,
 ):
     """Cancel a task."""
-    task = db.query(WorkflowTask).filter(WorkflowTask.id == task_id).first()
+    service = WorkflowTaskService(db)
+
+    # Get task with ownership check
+    task = service.get_task_by_id(task_id, user_id=user.id)
 
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -291,7 +245,7 @@ async def cancel_task(
     if task.status in [WorkflowTaskStatus.COMPLETED.value, WorkflowTaskStatus.CANCELLED.value]:
         htmx_toast(response, "Cannot cancel this task", "error")
     else:
-        task.status = WorkflowTaskStatus.CANCELLED.value
+        task = service.update_task_status(task_id, WorkflowTaskStatus.CANCELLED.value, user.id)
         db.commit()
         htmx_toast(response, "Task cancelled", "success")
 

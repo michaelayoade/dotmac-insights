@@ -19,6 +19,8 @@ from sqlalchemy.orm import Session
 from app.models.document_lines import InvoiceLine
 from app.models.invoice import Invoice, InvoiceSource, InvoiceStatus
 from app.models.party import CustomerAccount
+from sqlalchemy import or_
+
 from app.services.base import paginate, safe_filter, scoped_query
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
@@ -33,6 +35,16 @@ __all__ = ["InvoiceService"]
 
 # Allowed filter fields for safe_filter
 ALLOWED_FILTERS = {"customer_account_id", "status"}
+ALLOWED_SORTS = {
+    "invoice_date",
+    "posting_date",
+    "due_date",
+    "status",
+    "invoice_number",
+    "total_amount",
+    "balance",
+    "id",
+}
 
 
 class InvoiceService:
@@ -93,8 +105,22 @@ class InvoiceService:
         if filters.overdue_only:
             query = query.filter(Invoice.status == InvoiceStatus.OVERDUE)
 
-        # Default ordering
-        query = query.order_by(Invoice.invoice_date.desc(), Invoice.id.desc())
+        if filters.search:
+            if len(filters.search) < 2:
+                raise ValidationError("Search query must be at least 2 characters")
+            query = query.filter(
+                or_(
+                    Invoice.invoice_number.ilike(f"%{filters.search}%"),
+                    Invoice.description.ilike(f"%{filters.search}%"),
+                )
+            )
+
+        sort_key = filters.sort_by if filters.sort_by in ALLOWED_SORTS else "invoice_date"
+        sort_column = getattr(Invoice, sort_key, Invoice.invoice_date)
+        if filters.sort_dir == "asc":
+            query = query.order_by(sort_column.asc(), Invoice.id.asc())
+        else:
+            query = query.order_by(sort_column.desc(), Invoice.id.desc())
 
         return paginate(query, pagination)
 

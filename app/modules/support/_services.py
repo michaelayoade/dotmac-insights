@@ -26,8 +26,11 @@ from app.models.unified_ticket import (
     TicketSource,
 )
 from app.models.agent import Agent, Team, TeamMember
+from app.models.party import Party
 from app.models.support_canned import CannedResponse
+from app.models.support_kb import KBArticle, KBCategory
 from app.models.support_sla import SLAPolicy
+from app.models.ticket import HDTicketComment, HDTicketActivity
 from app.models.employee import Employee
 from app.services.errors import NotFoundError, ValidationError
 
@@ -62,6 +65,68 @@ class SupportWebService:
         self.user_id = user_id
         self.principal = principal
 
+    def _coerce_status(self, value: Any) -> Optional[TicketStatus]:
+        """Coerce a status value into a TicketStatus enum."""
+        if value is None:
+            return None
+        if isinstance(value, TicketStatus):
+            return value
+        if isinstance(value, str):
+            try:
+                return TicketStatus(value)
+            except ValueError:
+                raise ValidationError(f"Invalid status value: {value}")
+        raise ValidationError(f"Invalid status value: {value}")
+
+    def _apply_status_change(
+        self,
+        ticket: UnifiedTicket,
+        status: TicketStatus,
+        resolution: Optional[str] = None,
+        resolution_type: Optional[str] = None,
+    ) -> None:
+        """Apply lifecycle-aware status changes on a ticket."""
+        now = datetime.utcnow()
+        previous_status = self._coerce_status(ticket.status)
+
+        if status == TicketStatus.RESOLVED:
+            if resolution is not None or resolution_type is not None:
+                ticket.resolve(resolution or "", resolution_type)
+                return
+            if ticket.resolution or ticket.resolution_type:
+                ticket.resolve(ticket.resolution or "", ticket.resolution_type)
+                return
+            ticket.status = TicketStatus.RESOLVED
+            ticket.resolved_at = now
+            if ticket.created_at:
+                ticket.resolution_time_seconds = int(
+                    (ticket.resolved_at - ticket.created_at).total_seconds()
+                )
+            return
+
+        if status == TicketStatus.CLOSED:
+            if ticket.resolved_at is None and previous_status != TicketStatus.RESOLVED:
+                if resolution is not None or resolution_type is not None or ticket.resolution or ticket.resolution_type:
+                    ticket.resolve(resolution or (ticket.resolution or ""), resolution_type or ticket.resolution_type)
+                else:
+                    ticket.resolved_at = now
+                    if ticket.created_at:
+                        ticket.resolution_time_seconds = int(
+                            (ticket.resolved_at - ticket.created_at).total_seconds()
+                        )
+            ticket.close()
+            return
+
+        if status == TicketStatus.REOPENED:
+            ticket.reopen()
+            return
+
+        ticket.status = status
+        if previous_status in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
+            ticket.resolved_at = None
+            ticket.closed_at = None
+            ticket.resolution_time_seconds = None
+
     # =========================================================================
     # DASHBOARD STATISTICS
     # =========================================================================
@@ -70,13 +135,16 @@ class SupportWebService:
         """Get support dashboard statistics."""
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         week_ago = today - timedelta(days=7)
+        now = datetime.utcnow()
+        due_soon = now + timedelta(hours=24)
 
         # Ticket counts - use .value for PostgreSQL enum compatibility
         open_statuses = [
             TicketStatus.OPEN.value,
             TicketStatus.IN_PROGRESS.value,
             TicketStatus.WAITING.value,
-            TicketStatus.REOPENED.value
+            TicketStatus.ON_HOLD.value,
+            TicketStatus.REOPENED.value,
         ]
         total_open = self.db.query(func.count(UnifiedTicket.id)).filter(
             UnifiedTicket.is_deleted == False,
@@ -127,6 +195,36 @@ class SupportWebService:
 
         priority_distribution = {row.priority: row.count for row in priority_counts}
 
+        response_due_soon = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.response_by.isnot(None),
+            UnifiedTicket.first_response_at.is_(None),
+            UnifiedTicket.response_by >= now,
+            UnifiedTicket.response_by <= due_soon,
+        ).scalar() or 0
+
+        response_overdue = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.response_by.isnot(None),
+            UnifiedTicket.first_response_at.is_(None),
+            UnifiedTicket.response_by < now,
+        ).scalar() or 0
+
+        resolution_due_soon = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.resolution_by.isnot(None),
+            UnifiedTicket.resolved_at.is_(None),
+            UnifiedTicket.resolution_by >= now,
+            UnifiedTicket.resolution_by <= due_soon,
+        ).scalar() or 0
+
+        resolution_overdue = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.resolution_by.isnot(None),
+            UnifiedTicket.resolved_at.is_(None),
+            UnifiedTicket.resolution_by < now,
+        ).scalar() or 0
+
         return {
             "total_open": total_open,
             "urgent_tickets": urgent_tickets,
@@ -135,6 +233,10 @@ class SupportWebService:
             "created_today": created_today,
             "status_distribution": status_distribution,
             "priority_distribution": priority_distribution,
+            "response_due_soon": response_due_soon,
+            "response_overdue": response_overdue,
+            "resolution_due_soon": resolution_due_soon,
+            "resolution_overdue": resolution_overdue,
         }
 
     def get_agent_stats(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -355,14 +457,63 @@ class SupportWebService:
             NotFoundError: If ticket not found.
         """
         ticket = self.get_ticket(ticket_id)
+        missing = object()
 
-        data["updated_at"] = datetime.utcnow()
-        if self.user_id:
-            data["updated_by_id"] = self.user_id
+        status = data.pop("status", missing)
+        resolution = data.pop("resolution", missing)
+        resolution_type = data.pop("resolution_type", missing)
+        assigned_to_id = data.pop("assigned_to_id", missing)
+        assigned_team_id = data.pop("assigned_team_id", missing)
+        assigned_team = data.pop("assigned_team", missing)
+
+        if any(value is not missing for value in [assigned_to_id, assigned_team_id, assigned_team]):
+            explicit_unassign = (
+                assigned_to_id is not missing and assigned_to_id is None and
+                assigned_team_id is not missing and assigned_team_id is None and
+                (assigned_team is missing or not assigned_team)
+            )
+            if explicit_unassign:
+                ticket.assigned_to_id = None
+                ticket.assigned_team_id = None
+                ticket.assigned_team = None
+                ticket.assigned_at = None
+            else:
+                new_assigned_to_id = ticket.assigned_to_id if assigned_to_id is missing else assigned_to_id
+                new_assigned_team_id = ticket.assigned_team_id if assigned_team_id is missing else assigned_team_id
+                new_assigned_team = ticket.assigned_team if assigned_team is missing else assigned_team
+                if new_assigned_to_id is None and new_assigned_team_id is None and not new_assigned_team:
+                    ticket.assigned_to_id = None
+                    ticket.assigned_team_id = None
+                    ticket.assigned_team = None
+                    ticket.assigned_at = None
+                else:
+                    if new_assigned_to_id is not None:
+                        ticket.assigned_to_id = new_assigned_to_id
+                    if new_assigned_team_id is not None:
+                        ticket.assigned_team_id = new_assigned_team_id
+                    ticket.assigned_team = new_assigned_team or None
+                    ticket.assigned_at = datetime.utcnow()
+                    if self._coerce_status(ticket.status) == TicketStatus.OPEN:
+                        ticket.status = TicketStatus.IN_PROGRESS
+
+        if resolution is not missing:
+            ticket.resolution = resolution
+        if resolution_type is not missing:
+            ticket.resolution_type = resolution_type
+
+        if status is not missing:
+            status_enum = self._coerce_status(status)
+            resolved_value = resolution if resolution is not missing else None
+            resolved_type = resolution_type if resolution_type is not missing else None
+            self._apply_status_change(ticket, status_enum, resolved_value, resolved_type)
 
         for key, value in data.items():
             if hasattr(ticket, key) and value is not None:
                 setattr(ticket, key, value)
+
+        ticket.updated_at = datetime.utcnow()
+        if self.user_id:
+            ticket.updated_by_id = self.user_id
 
         return ticket
 
@@ -408,24 +559,18 @@ class SupportWebService:
         if not ids:
             return 0
 
-        now = datetime.utcnow()
-        updates = {
-            "status": status.value if hasattr(status, 'value') else status,
-            "updated_at": now,
-        }
-        if self.user_id:
-            updates["updated_by_id"] = self.user_id
-
-        # Auto-set resolution date for resolved/closed
-        if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
-            updates["resolution_date"] = now
-
-        updated = self.db.query(UnifiedTicket).filter(
+        tickets = self.db.query(UnifiedTicket).filter(
             UnifiedTicket.id.in_(ids),
             UnifiedTicket.is_deleted == False,
-        ).update(updates, synchronize_session=False)
+        ).all()
 
-        return updated
+        for ticket in tickets:
+            self._apply_status_change(ticket, status)
+            ticket.updated_at = datetime.utcnow()
+            if self.user_id:
+                ticket.updated_by_id = self.user_id
+
+        return len(tickets)
 
     def bulk_update_priority(self, ids: List[int], priority: TicketPriority) -> int:
         """Bulk update priority for multiple tickets.
@@ -511,15 +656,8 @@ class SupportWebService:
         ticket = self.get_ticket(ticket_id)
 
         if field == "status":
-            try:
-                status = TicketStatus(value)
-                ticket.status = status.value
-                # Auto-set resolution date for resolved/closed
-                if status in [TicketStatus.RESOLVED, TicketStatus.CLOSED]:
-                    if ticket.resolution_date is None:
-                        ticket.resolution_date = datetime.utcnow()
-            except ValueError:
-                raise ValidationError(f"Invalid status value: {value}")
+            status = self._coerce_status(value)
+            self._apply_status_change(ticket, status)
 
         elif field == "priority":
             try:
@@ -653,3 +791,346 @@ class SupportWebService:
             "per_page": per_page,
             "pages": pages,
         }
+
+    # =========================================================================
+    # PARTY LOOKUP
+    # =========================================================================
+
+    def get_party(self, party_id: int) -> Optional[Party]:
+        """Get a party by ID."""
+        return self.db.query(Party).filter(Party.id == party_id).first()
+
+    def search_parties(
+        self,
+        query: str,
+        limit: int = 10,
+    ) -> List[Party]:
+        """Search for parties by name, email, or phone."""
+        if not query or len(query) < 2:
+            return []
+
+        search_filter = or_(
+            Party.name.ilike(f"%{query}%"),
+            Party.email.ilike(f"%{query}%"),
+            Party.phone.ilike(f"%{query}%"),
+        )
+        return self.db.query(Party).filter(search_filter).limit(limit).all()
+
+    # =========================================================================
+    # COMMENTS AND ACTIVITY
+    # =========================================================================
+
+    def add_comment(
+        self,
+        ticket_id: int,
+        body: str,
+        is_public: bool = True,
+        author_id: Optional[int] = None,
+    ) -> HDTicketComment:
+        """Add a comment to a ticket.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        # Verify ticket exists
+        ticket = self.get_ticket(ticket_id)
+
+        comment = HDTicketComment(
+            ticket_id=ticket.hd_ticket_id,  # Link to HD ticket
+            body=body,
+            is_public=is_public,
+            author_id=author_id or self.user_id,
+            created_at=datetime.utcnow(),
+        )
+        self.db.add(comment)
+        self.db.flush()
+
+        # Update ticket last activity
+        ticket.updated_at = datetime.utcnow()
+        if self.user_id:
+            ticket.updated_by_id = self.user_id
+
+        return comment
+
+    def get_comments(
+        self,
+        ticket_id: int,
+        public_only: bool = False,
+    ) -> List[HDTicketComment]:
+        """Get comments for a ticket."""
+        ticket = self.get_ticket(ticket_id)
+
+        query = self.db.query(HDTicketComment).filter(
+            HDTicketComment.ticket_id == ticket.hd_ticket_id
+        )
+
+        if public_only:
+            query = query.filter(HDTicketComment.is_public == True)
+
+        return query.order_by(HDTicketComment.created_at.desc()).all()
+
+    def get_activity_timeline(
+        self,
+        ticket_id: int,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Get activity timeline for a ticket.
+
+        Returns a combined list of comments and activity events.
+        """
+        ticket = self.get_ticket(ticket_id)
+
+        # Get comments
+        comments = self.db.query(HDTicketComment).filter(
+            HDTicketComment.ticket_id == ticket.hd_ticket_id
+        ).order_by(HDTicketComment.created_at.desc()).limit(limit).all()
+
+        # Get activities
+        activities = self.db.query(HDTicketActivity).filter(
+            HDTicketActivity.ticket_id == ticket.hd_ticket_id
+        ).order_by(HDTicketActivity.created_at.desc()).limit(limit).all()
+
+        # Combine and sort
+        timeline = []
+
+        for comment in comments:
+            timeline.append({
+                "type": "comment",
+                "id": comment.id,
+                "body": comment.body,
+                "is_public": comment.is_public,
+                "author_id": comment.author_id,
+                "created_at": comment.created_at,
+            })
+
+        for activity in activities:
+            timeline.append({
+                "type": "activity",
+                "id": activity.id,
+                "action": activity.action,
+                "field": activity.field,
+                "old_value": activity.old_value,
+                "new_value": activity.new_value,
+                "actor_id": activity.actor_id,
+                "created_at": activity.created_at,
+            })
+
+        # Sort by created_at descending
+        timeline.sort(key=lambda x: x["created_at"], reverse=True)
+        return timeline[:limit]
+
+    # =========================================================================
+    # KNOWLEDGE BASE
+    # =========================================================================
+
+    def list_kb_articles(
+        self,
+        category_id: Optional[int] = None,
+        published_only: bool = True,
+        q: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> Dict[str, Any]:
+        """List knowledge base articles with pagination."""
+        query = self.db.query(KBArticle)
+
+        if published_only:
+            query = query.filter(KBArticle.is_published == True)
+
+        if category_id:
+            query = query.filter(KBArticle.category_id == category_id)
+
+        if q:
+            search_filter = or_(
+                KBArticle.title.ilike(f"%{q}%"),
+                KBArticle.content.ilike(f"%{q}%"),
+            )
+            query = query.filter(search_filter)
+
+        total = query.count()
+        offset = (page - 1) * per_page
+        items = query.order_by(KBArticle.created_at.desc()).offset(offset).limit(per_page).all()
+        pages = (total + per_page - 1) // per_page
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": pages,
+        }
+
+    def get_kb_article(self, article_id: int) -> Optional[KBArticle]:
+        """Get a KB article by ID."""
+        return self.db.query(KBArticle).filter(KBArticle.id == article_id).first()
+
+    def create_kb_article(self, data: Dict[str, Any]) -> KBArticle:
+        """Create a new KB article.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        data.setdefault("created_at", datetime.utcnow())
+        if self.user_id:
+            data.setdefault("created_by_id", self.user_id)
+
+        article = KBArticle(**data)
+        self.db.add(article)
+        self.db.flush()
+        return article
+
+    def update_kb_article(self, article_id: int, data: Dict[str, Any]) -> Optional[KBArticle]:
+        """Update a KB article.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        article = self.get_kb_article(article_id)
+        if not article:
+            return None
+
+        for key, value in data.items():
+            if hasattr(article, key):
+                setattr(article, key, value)
+
+        article.updated_at = datetime.utcnow()
+        if self.user_id:
+            article.updated_by_id = self.user_id
+
+        return article
+
+    def delete_kb_article(self, article_id: int) -> bool:
+        """Delete a KB article.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        article = self.get_kb_article(article_id)
+        if not article:
+            return False
+
+        self.db.delete(article)
+        self.db.flush()
+        return True
+
+    def get_kb_categories(self) -> List[KBCategory]:
+        """Get all KB categories."""
+        return self.db.query(KBCategory).order_by(KBCategory.name).all()
+
+    def get_kb_stats(self) -> Dict[str, Any]:
+        """Get KB statistics."""
+        total_articles = self.db.query(func.count(KBArticle.id)).scalar() or 0
+        published_articles = self.db.query(func.count(KBArticle.id)).filter(
+            KBArticle.is_published == True
+        ).scalar() or 0
+        draft_articles = total_articles - published_articles
+        total_categories = self.db.query(func.count(KBCategory.id)).scalar() or 0
+
+        return {
+            "total_articles": total_articles,
+            "published_articles": published_articles,
+            "draft_articles": draft_articles,
+            "total_categories": total_categories,
+        }
+
+    # =========================================================================
+    # CANNED RESPONSES CRUD
+    # =========================================================================
+
+    def get_canned_response(self, response_id: int) -> Optional[CannedResponse]:
+        """Get a canned response by ID."""
+        return self.db.query(CannedResponse).filter(CannedResponse.id == response_id).first()
+
+    def create_canned_response(self, data: Dict[str, Any]) -> CannedResponse:
+        """Create a new canned response.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        data.setdefault("created_at", datetime.utcnow())
+        if self.user_id:
+            data.setdefault("created_by_id", self.user_id)
+
+        response = CannedResponse(**data)
+        self.db.add(response)
+        self.db.flush()
+        return response
+
+    def update_canned_response(
+        self, response_id: int, data: Dict[str, Any]
+    ) -> Optional[CannedResponse]:
+        """Update a canned response.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        response = self.get_canned_response(response_id)
+        if not response:
+            return None
+
+        for key, value in data.items():
+            if hasattr(response, key):
+                setattr(response, key, value)
+
+        response.updated_at = datetime.utcnow()
+        if self.user_id:
+            response.updated_by_id = self.user_id
+
+        return response
+
+    def delete_canned_response(self, response_id: int) -> bool:
+        """Delete a canned response.
+
+        Does NOT commit - caller must call db.commit().
+        """
+        response = self.get_canned_response(response_id)
+        if not response:
+            return False
+
+        self.db.delete(response)
+        self.db.flush()
+        return True
+
+    # =========================================================================
+    # EXPORT
+    # =========================================================================
+
+    def export_tickets(
+        self,
+        status: Optional[str] = None,
+        priority: Optional[str] = None,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Export tickets for CSV/Excel export.
+
+        Returns a list of dicts suitable for export.
+        """
+        query = self.db.query(UnifiedTicket).filter(
+            UnifiedTicket.is_deleted == False
+        )
+
+        if status:
+            query = query.filter(UnifiedTicket.status == status)
+        if priority:
+            query = query.filter(UnifiedTicket.priority == priority)
+        if start_date:
+            query = query.filter(UnifiedTicket.created_at >= start_date)
+        if end_date:
+            query = query.filter(UnifiedTicket.created_at <= end_date)
+
+        tickets = query.order_by(UnifiedTicket.created_at.desc()).all()
+
+        export_data = []
+        for ticket in tickets:
+            export_data.append({
+                "ticket_number": ticket.ticket_number,
+                "subject": ticket.subject,
+                "status": ticket.status.value if hasattr(ticket.status, 'value') else ticket.status,
+                "priority": ticket.priority.value if hasattr(ticket.priority, 'value') else ticket.priority,
+                "type": ticket.ticket_type,
+                "channel": ticket.channel,
+                "contact_name": ticket.contact_name,
+                "contact_email": ticket.contact_email,
+                "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+                "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else None,
+                "resolved_at": ticket.resolved_at.isoformat() if ticket.resolved_at else None,
+                "closed_at": ticket.closed_at.isoformat() if ticket.closed_at else None,
+                "resolution_time_seconds": ticket.resolution_time_seconds,
+            })
+
+        return export_data

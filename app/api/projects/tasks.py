@@ -32,7 +32,6 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
 from app.models.employee import Employee
 from app.api.projects.crud import _decimal_or_default
 from app.api.projects.schemas import TaskCreate, TaskUpdate
@@ -464,4 +463,3 @@ async def delete_task(
     db.delete(task)
     db.commit()
     return {"message": "Task deleted", "id": task_id}
-

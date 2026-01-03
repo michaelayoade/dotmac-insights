@@ -40,6 +40,8 @@ class AccountFilters:
     is_group: Optional[bool] = None
     include_disabled: bool = False
     search: Optional[str] = None
+    sort_by: str = "account_name"
+    sort_dir: str = "asc"
 
 
 @dataclass

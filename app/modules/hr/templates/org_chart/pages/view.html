@@ -1,0 +1,210 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Organization Chart</h1>
+            <p class="mt-1 text-sm text-gray-500">Visual hierarchy of your organization</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <form method="get" class="flex items-center gap-2">
+                <label class="text-sm text-gray-600">Depth:</label>
+                <select name="depth" onchange="this.form.submit()" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    {% for d in [2, 3, 4, 5, 6, 7, 8] %}
+                    <option value="{{ d }}" {% if depth == d %}selected{% endif %}>{{ d }} levels</option>
+                    {% endfor %}
+                </select>
+                {% if root_id %}
+                <input type="hidden" name="root_id" value="{{ root_id }}">
+                {% endif %}
+            </form>
+            {% if root_id %}
+            <a href="/hr/org-chart" class="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-surface-50 font-medium text-sm text-gray-600">
+                Show All
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Org Chart Container -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 overflow-x-auto">
+        {% if org_data %}
+        <div class="min-w-max" x-data="orgChart({{ org_data | tojson | e }})">
+            <!-- Tree rendering -->
+            <div class="flex flex-col items-center">
+                <template x-for="node in nodes" :key="node.id">
+                    <div class="org-tree-container">
+                        <!-- Recursive tree component -->
+                        <div x-html="renderNode(node)"></div>
+                    </div>
+                </template>
+            </div>
+        </div>
+        {% else %}
+        <div class="text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-display font-semibold text-gray-900">No organization data</h3>
+            <p class="mt-2 text-sm text-gray-500">The organization chart requires employees with reports_to relationships.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.org-node {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0 1rem;
+    position: relative;
+}
+
+.org-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    min-width: 180px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+
+.org-card:hover {
+    border-color: #4f46e5;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+}
+
+.org-card-name {
+    font-weight: 600;
+    color: #111827;
+    font-size: 0.875rem;
+}
+
+.org-card-title {
+    color: #6b7280;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+.org-card-dept {
+    color: #9ca3af;
+    font-size: 0.625rem;
+    margin-top: 0.25rem;
+}
+
+.org-children {
+    display: flex;
+    justify-content: center;
+    padding-top: 1.5rem;
+    position: relative;
+}
+
+.org-children::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 1px;
+    height: 1.5rem;
+    background: #e5e7eb;
+}
+
+.org-children > .org-node::before {
+    content: '';
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    width: 1px;
+    height: 1.5rem;
+    background: #e5e7eb;
+}
+
+.org-children > .org-node:not(:first-child):not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: -1.5rem;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.org-children > .org-node:first-child:not(:only-child)::after {
+    content: '';
+    position: absolute;
+    top: -1.5rem;
+    left: 50%;
+    right: 0;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.org-children > .org-node:last-child:not(:only-child)::after {
+    content: '';
+    position: absolute;
+    top: -1.5rem;
+    left: 0;
+    right: 50%;
+    height: 1px;
+    background: #e5e7eb;
+}
+
+.org-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    margin: 0 auto 0.5rem;
+}
+</style>
+
+<script>
+function orgChart(data) {
+    return {
+        nodes: data,
+
+        getInitials(name) {
+            if (!name) return '?';
+            return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+        },
+
+        renderNode(node) {
+            const initials = this.getInitials(node.name);
+            const hasChildren = node.children && node.children.length > 0;
+
+            let html = `
+                <div class="org-node">
+                    <a href="/hr/employees/${node.id}" class="org-card">
+                        <div class="org-avatar">${initials}</div>
+                        <div class="org-card-name">${node.name}</div>
+                        ${node.designation ? `<div class="org-card-title">${node.designation}</div>` : ''}
+                        ${node.department ? `<div class="org-card-dept">${node.department}</div>` : ''}
+                    </a>
+            `;
+
+            if (hasChildren) {
+                html += `<div class="org-children">`;
+                for (const child of node.children) {
+                    html += this.renderNode(child);
+                }
+                html += `</div>`;
+            }
+
+            html += `</div>`;
+            return html;
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -10,11 +10,21 @@ from ._deps import (
     RequireAccountingRead,
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs,
-    Invoice, InvoiceStatus, PurchaseInvoice, PurchaseInvoiceStatus,
     datetime, Decimal, date,
 )
+from app.services.accounting import AccountingSettingsService, PayablesService, ReceivablesService
 
 router = APIRouter()
+
+
+def _get_receivables_service(db: DB, user: SessionUser) -> ReceivablesService:
+    settings_service = AccountingSettingsService(db, user)
+    return ReceivablesService(db, settings_service, user)
+
+
+def _get_payables_service(db: DB, user: SessionUser) -> PayablesService:
+    settings_service = AccountingSettingsService(db, user)
+    return PayablesService(db, settings_service, user)
 
 
 class AgingBucket(TypedDict):
@@ -74,11 +84,8 @@ async def ar_aging(
     db: DB,
 ):
     """Accounts Receivable Aging dashboard."""
-    # Get outstanding invoices
-    outstanding_invoices = db.query(Invoice).filter(
-        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
-        Invoice.balance > 0,
-    ).order_by(Invoice.due_date).all()
+    receivables_service = _get_receivables_service(db, user)
+    outstanding_invoices = receivables_service.list_outstanding_invoices()
 
     buckets = calculate_aging_buckets(outstanding_invoices)
 
@@ -109,11 +116,8 @@ async def ap_aging(
     db: DB,
 ):
     """Accounts Payable Aging dashboard."""
-    # Get outstanding purchase invoices
-    outstanding_bills = db.query(PurchaseInvoice).filter(
-        PurchaseInvoice.status.in_([PurchaseInvoiceStatus.SUBMITTED, PurchaseInvoiceStatus.UNPAID, PurchaseInvoiceStatus.OVERDUE]),
-        PurchaseInvoice.outstanding_amount > 0,
-    ).order_by(PurchaseInvoice.due_date).all()
+    payables_service = _get_payables_service(db, user)
+    outstanding_bills = payables_service.list_outstanding_bills()
 
     buckets = calculate_aging_buckets(outstanding_bills)
 

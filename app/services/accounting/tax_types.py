@@ -12,6 +12,7 @@ from typing import List, Optional
 
 __all__ = [
     # Tax Filing types
+    "TaxCodeFilters",
     "TaxFilingFilters",
     "TaxFilingCreateData",
     "TaxFilingUpdateData",
@@ -27,6 +28,15 @@ class TaxFilingFilters:
     tax_type: Optional[str] = None
     status: Optional[str] = None
     year: Optional[int] = None
+
+
+@dataclass
+class TaxCodeFilters:
+    """Filters for listing tax codes."""
+
+    query: Optional[str] = None
+    tax_type: Optional[str] = None
+    is_active: Optional[bool] = None
 
 
 @dataclass

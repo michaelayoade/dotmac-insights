@@ -241,25 +241,16 @@
                 <h2 class="text-lg font-display font-semibold text-gray-900">Customer</h2>
             </div>
             <div class="p-6">
-                {% if payment.contact %}
+                {% if payment.customer_account and payment.customer_account.party %}
                 <div class="flex items-center gap-3 mb-4">
                     <span class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
-                        {{ (payment.contact.name[:2] if payment.contact.name else payment.contact.email[:2]).upper() }}
+                        {{ payment.customer_account.party.name[:2].upper() }}
                     </span>
                     <div>
-                        <p class="font-medium text-gray-900">{{ payment.contact.name or payment.contact.email }}</p>
-                        {% if payment.contact.email %}
-                        <p class="text-xs text-gray-500">{{ payment.contact.email }}</p>
+                        <p class="font-medium text-gray-900">{{ payment.customer_account.party.name }}</p>
+                        {% if payment.customer_account.party.primary_email %}
+                        <p class="text-xs text-gray-500">{{ payment.customer_account.party.primary_email }}</p>
                         {% endif %}
-                    </div>
-                </div>
-                {% elif payment.customer %}
-                <div class="flex items-center gap-3 mb-4">
-                    <span class="flex-shrink-0 w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
-                        {{ payment.customer.name[:2].upper() }}
-                    </span>
-                    <div>
-                        <p class="font-medium text-gray-900">{{ payment.customer.name }}</p>
                     </div>
                 </div>
                 {% else %}

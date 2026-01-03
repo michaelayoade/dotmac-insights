@@ -1,5 +1,7 @@
 """
 Salary Assignments Endpoints
+
+Uses PayrollService for all business logic.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,16 +12,23 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.auth import Require
-from app.models.hr_payroll import SalaryStructureAssignment
-from app.models.employee import Employee
-from .helpers import decimal_or_default
+from app.auth import Require, get_current_principal
+from app.models.auth import User
+from app.services.hr.payroll import PayrollService
+from app.services.hr.payroll_types import (
+    StructureAssignmentFilters,
+    StructureAssignmentCreateData,
+    StructureAssignmentUpdateData,
+)
+from app.services.types import PaginationParams
+from app.services.hr.errors import SalaryStructureAssignmentNotFoundError, ValidationError as HRValidationError
 
 router = APIRouter()
 
 # =============================================================================
 # SALARY STRUCTURE ASSIGNMENT
 # =============================================================================
+
 
 class SalaryStructureAssignmentCreate(BaseModel):
     employee: str
@@ -49,6 +58,29 @@ class SalaryStructureAssignmentUpdate(BaseModel):
     docstatus: Optional[int] = None
 
 
+def _serialize_assignment(a, include_timestamps: bool = False) -> Dict[str, Any]:
+    """Serialize a SalaryStructureAssignment model to dict."""
+    result = {
+        "id": a.id,
+        "erpnext_id": a.erpnext_id,
+        "employee": a.employee,
+        "employee_id": a.employee_id,
+        "employee_name": a.employee_name,
+        "salary_structure": a.salary_structure,
+        "salary_structure_id": a.salary_structure_id,
+        "from_date": a.from_date.isoformat() if a.from_date else None,
+        "base": float(a.base) if a.base else 0,
+        "company": a.company,
+    }
+    if include_timestamps:
+        result["variable"] = float(a.variable) if a.variable else 0
+        result["income_tax_slab"] = a.income_tax_slab
+        result["docstatus"] = a.docstatus
+        result["created_at"] = a.created_at.isoformat() if a.created_at else None
+        result["updated_at"] = a.updated_at.isoformat() if a.updated_at else None
+    return result
+
+
 @router.get("/salary-structure-assignments", dependencies=[Depends(Require("hr:read"))])
 def list_salary_structure_assignments(
     employee_id: Optional[int] = None,
@@ -60,39 +92,23 @@ def list_salary_structure_assignments(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List salary structure assignments with filtering."""
-    query = db.query(SalaryStructureAssignment)
+    service = PayrollService(db)
 
-    if employee_id:
-        query = query.filter(SalaryStructureAssignment.employee_id == employee_id)
-    if salary_structure_id:
-        query = query.filter(SalaryStructureAssignment.salary_structure_id == salary_structure_id)
-    if from_date:
-        query = query.filter(SalaryStructureAssignment.from_date >= from_date)
-    if company:
-        query = query.filter(SalaryStructureAssignment.company.ilike(f"%{company}%"))
+    filters = StructureAssignmentFilters(
+        employee_id=employee_id,
+        salary_structure_id=salary_structure_id,
+        from_date=from_date,
+        company=company,
+    )
+    pagination = PaginationParams(offset=offset, limit=limit)
 
-    total = query.count()
-    assignments = query.order_by(SalaryStructureAssignment.from_date.desc()).offset(offset).limit(limit).all()
+    result = service.list_structure_assignments(filters, pagination)
 
     return {
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
-        "data": [
-            {
-                "id": a.id,
-                "erpnext_id": a.erpnext_id,
-                "employee": a.employee,
-                "employee_id": a.employee_id,
-                "employee_name": a.employee_name,
-                "salary_structure": a.salary_structure,
-                "salary_structure_id": a.salary_structure_id,
-                "from_date": a.from_date.isoformat() if a.from_date else None,
-                "base": float(a.base) if a.base else 0,
-                "company": a.company,
-            }
-            for a in assignments
-        ],
+        "data": [_serialize_assignment(a) for a in result.items],
     }
 
 
@@ -102,50 +118,44 @@ def get_salary_structure_assignment(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get salary structure assignment detail."""
-    a = db.query(SalaryStructureAssignment).filter(SalaryStructureAssignment.id == assignment_id).first()
-    if not a:
+    service = PayrollService(db)
+    try:
+        a = service.get_structure_assignment(assignment_id)
+    except SalaryStructureAssignmentNotFoundError:
         raise HTTPException(status_code=404, detail="Salary structure assignment not found")
 
-    return {
-        "id": a.id,
-        "erpnext_id": a.erpnext_id,
-        "employee": a.employee,
-        "employee_id": a.employee_id,
-        "employee_name": a.employee_name,
-        "salary_structure": a.salary_structure,
-        "salary_structure_id": a.salary_structure_id,
-        "from_date": a.from_date.isoformat() if a.from_date else None,
-        "base": float(a.base) if a.base else 0,
-        "variable": float(a.variable) if a.variable else 0,
-        "income_tax_slab": a.income_tax_slab,
-        "company": a.company,
-        "docstatus": a.docstatus,
-        "created_at": a.created_at.isoformat() if a.created_at else None,
-        "updated_at": a.updated_at.isoformat() if a.updated_at else None,
-    }
+    return _serialize_assignment(a, include_timestamps=True)
 
 
 @router.post("/salary-structure-assignments", dependencies=[Depends(Require("hr:write"))])
 def create_salary_structure_assignment(
     payload: SalaryStructureAssignmentCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new salary structure assignment."""
-    assignment = SalaryStructureAssignment(
+    service = PayrollService(db, current_user)
+
+    create_data = StructureAssignmentCreateData(
         employee=payload.employee,
-        employee_id=payload.employee_id,
+        employee_id=payload.employee_id or 0,
         employee_name=payload.employee_name,
         salary_structure=payload.salary_structure,
-        salary_structure_id=payload.salary_structure_id,
+        salary_structure_id=payload.salary_structure_id or 0,
         from_date=payload.from_date,
-        base=decimal_or_default(payload.base),
-        variable=decimal_or_default(payload.variable),
+        base=payload.base or Decimal("0"),
+        variable=payload.variable or Decimal("0"),
         income_tax_slab=payload.income_tax_slab,
         company=payload.company,
-        docstatus=payload.docstatus or 0,
     )
-    db.add(assignment)
-    db.commit()
+
+    try:
+        assignment = service.create_structure_assignment(create_data)
+        db.commit()
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
     return get_salary_structure_assignment(assignment.id, db)
 
 
@@ -154,36 +164,45 @@ def update_salary_structure_assignment(
     assignment_id: int,
     payload: SalaryStructureAssignmentUpdate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a salary structure assignment."""
-    assignment = db.query(SalaryStructureAssignment).filter(SalaryStructureAssignment.id == assignment_id).first()
-    if not assignment:
+    service = PayrollService(db, current_user)
+
+    update_data = StructureAssignmentUpdateData(
+        from_date=payload.from_date,
+        base=payload.base,
+        variable=payload.variable,
+        income_tax_slab=payload.income_tax_slab,
+    )
+
+    try:
+        service.update_structure_assignment(assignment_id, update_data)
+        db.commit()
+    except SalaryStructureAssignmentNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Salary structure assignment not found")
+    except HRValidationError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
-    decimal_fields = ["base", "variable"]
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        if value is not None:
-            if field in decimal_fields:
-                setattr(assignment, field, decimal_or_default(value))
-            else:
-                setattr(assignment, field, value)
-
-    db.commit()
-    return get_salary_structure_assignment(assignment.id, db)
+    return get_salary_structure_assignment(assignment_id, db)
 
 
 @router.delete("/salary-structure-assignments/{assignment_id}", dependencies=[Depends(Require("hr:write"))])
 def delete_salary_structure_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete a salary structure assignment."""
-    assignment = db.query(SalaryStructureAssignment).filter(SalaryStructureAssignment.id == assignment_id).first()
-    if not assignment:
+    service = PayrollService(db, current_user)
+
+    try:
+        service.delete_structure_assignment(assignment_id)
+        db.commit()
+    except SalaryStructureAssignmentNotFoundError:
+        db.rollback()
         raise HTTPException(status_code=404, detail="Salary structure assignment not found")
 
-    db.delete(assignment)
-    db.commit()
     return {"message": "Salary structure assignment deleted", "id": assignment_id}
-
-

@@ -10,9 +10,12 @@ from ._deps import (
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
     is_htmx_request, HTTPException,
-    Invoice, InvoiceStatus,
-    func, or_, datetime, Decimal,
+    InvoiceStatus,
 )
+from app.services.accounting import AccountingSettingsService, InvoiceService, ReceivablesService
+from app.services.accounting.invoice_types import InvoiceFilters
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -25,35 +28,13 @@ def get_invoice_status_options():
     ]
 
 
-def get_invoice_stats(db) -> dict:
-    """Calculate invoice statistics."""
-    now = datetime.utcnow()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+def _get_invoice_service(db: DB, user: SessionUser) -> InvoiceService:
+    return InvoiceService(db, user)
 
-    # Total count
-    total_count = db.query(func.count(Invoice.id)).scalar() or 0
 
-    # Outstanding (pending + partially_paid)
-    outstanding = db.query(func.sum(Invoice.balance)).filter(
-        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID])
-    ).scalar() or Decimal("0")
-
-    # Overdue
-    overdue = db.query(func.sum(Invoice.balance)).filter(
-        Invoice.status == InvoiceStatus.OVERDUE
-    ).scalar() or Decimal("0")
-
-    # Paid this month
-    paid_this_month = db.query(func.sum(Invoice.amount_paid)).filter(
-        Invoice.paid_date >= month_start
-    ).scalar() or Decimal("0")
-
-    return {
-        "total_count": total_count,
-        "outstanding": outstanding,
-        "overdue": overdue,
-        "paid_this_month": paid_this_month,
-    }
+def _get_receivables_service(db: DB, user: SessionUser) -> ReceivablesService:
+    settings_service = AccountingSettingsService(db, user)
+    return ReceivablesService(db, settings_service, user)
 
 
 @router.get("/invoices", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -71,36 +52,31 @@ async def invoices_list(
     dir: str = Query("desc", description="Sort direction"),
 ):
     """Invoices list page."""
-    # Build query
-    query = db.query(Invoice)
-
-    # Search
-    if q:
-        search_filter = or_(
-            Invoice.invoice_number.ilike(f"%{q}%"),
-            Invoice.description.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
+    service = _get_invoice_service(db, user)
+    status_enum = None
     if status:
-        query = query.filter(Invoice.status == status)
+        try:
+            status_enum = InvoiceStatus(status)
+        except ValueError:
+            status_enum = None
 
-    # Count total
-    total = query.count()
+    filters = InvoiceFilters(
+        search=q,
+        status=status_enum,
+        sort_by=sort,
+        sort_dir=dir,
+    )
+    pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
+    try:
+        result = service.list_invoices(filters, pagination)
+    except ValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Sort
-    sort_column = getattr(Invoice, sort, Invoice.invoice_date)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
+    invoices = result.items
+    total = result.total
 
-    # Paginate
-    offset = (page - 1) * per_page
-    invoices = query.offset(offset).limit(per_page).all()
-
-    # Get stats
-    stats = get_invoice_stats(db)
+    stats_service = _get_receivables_service(db, user)
+    stats = stats_service.get_invoice_list_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -161,12 +137,11 @@ async def invoice_detail(
     invoice_id: int,
 ):
     """Invoice detail page."""
-    invoice = db.query(Invoice).filter(
-        Invoice.id == invoice_id,
-        ).first()
-
-    if not invoice:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+    service = _get_invoice_service(db, user)
+    try:
+        invoice = service.get_invoice(invoice_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Invoice not found") from exc
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)

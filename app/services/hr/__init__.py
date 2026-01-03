@@ -291,9 +291,23 @@ from app.services.hr.settings_types import (
     DeductionConfigUpdateData,
 )
 
+from app.services.hr.analytics import HRAnalyticsService
+from app.services.hr.analytics_types import (
+    HRDashboardSummary,
+    ModuleSummary,
+    HeadcountByDepartment,
+    DepartmentHeadcountTrend,
+    DesignationDistribution,
+    TeamMetrics,
+    WorkforceAnalytics,
+    TurnoverAnalytics,
+    TrendPoint,
+)
+
 __all__ = [
     # Services
     "OrganizationService",
+    "HRAnalyticsService",
     "EmployeeService",
     "LeaveService",
     "AttendanceService",
@@ -552,4 +566,14 @@ __all__ = [
     "DeductionConfigFilters",
     "DeductionConfigCreateData",
     "DeductionConfigUpdateData",
+    # Analytics types
+    "HRDashboardSummary",
+    "ModuleSummary",
+    "HeadcountByDepartment",
+    "DepartmentHeadcountTrend",
+    "DesignationDistribution",
+    "TeamMetrics",
+    "WorkforceAnalytics",
+    "TurnoverAnalytics",
+    "TrendPoint",
 ]

@@ -22,7 +22,7 @@ from app.web.module_types import ModuleConfig
 MODULE_CONFIG = ModuleConfig(
     id="subscriptions",
     name="Subscriptions",
-    description="Service subscriptions, tariffs, and recurring billing",
+    description="Service subscriptions, lifecycle, billing, and network operations",
     icon="repeat",
     prefix="/subscriptions",
     group="Infrastructure",
@@ -40,9 +40,18 @@ NAVIGATION = [
         "scope": "subscriptions:read",
         "order": 15,
         "links": [
+            {"label": "Dashboard", "href": "/subscriptions/dashboard", "icon": "bar-chart"},
             {"label": "Subscriptions", "href": "/subscriptions", "icon": "repeat"},
+            {"label": "Usage", "href": "/subscriptions/usage", "icon": "activity"},
+            {"label": "Sessions", "href": "/subscriptions/sessions", "icon": "globe"},
+            {"label": "Provisioning", "href": "/subscriptions/provisioning", "icon": "server"},
+            {"label": "Transactions", "href": "/subscriptions/transactions", "icon": "receipt"},
+            {"label": "Billing", "href": "/subscriptions/billing", "icon": "credit-card"},
+            {"label": "Finance", "href": "/subscriptions/finance", "icon": "dollar-sign"},
             {"label": "Tariffs", "href": "/subscriptions/tariffs", "icon": "list"},
+            {"label": "Data Bundles", "href": "/subscriptions/bundles", "icon": "package"},
             {"label": "Payments", "href": "/subscriptions/payments", "icon": "credit-card"},
+            {"label": "Settings", "href": "/subscriptions/settings", "icon": "settings"},
         ],
     },
 ]
@@ -55,11 +64,15 @@ NAVIGATION = [
 from .routes import router as subscriptions_router
 from .tariff_routes import router as tariff_router
 from .payment_routes import router as payment_router
+from .service_routes import router as service_router
+from .bundle_routes import router as bundle_router
 
 # Create combined router
 router = APIRouter(tags=["subscriptions"])
 router.include_router(subscriptions_router)
 router.include_router(tariff_router)
 router.include_router(payment_router)
+router.include_router(service_router)
+router.include_router(bundle_router)
 
 __all__ = ["MODULE_CONFIG", "NAVIGATION", "router"]

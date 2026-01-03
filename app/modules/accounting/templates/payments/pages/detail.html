@@ -107,14 +107,10 @@
                             Customer
                         </dt>
                         <dd class="mt-1.5 text-sm text-gray-900 font-body" data-testid="payment-customer">
-                            {% if payment.customer %}
-                            <a href="/customers/{{ payment.customer.id }}" class="text-primary-600 hover:text-primary-500 transition-colors">
-                                {{ payment.customer.name }}
+                            {% if payment.customer_account and payment.customer_account.party %}
+                            <a href="/parties/{{ payment.customer_account.party.id }}" class="text-primary-600 hover:text-primary-500 transition-colors">
+                                {{ payment.customer_account.party.name }}
                             </a>
-                            {% elif payment.contact %}
-                            <span class="text-gray-900 font-body">
-                                {{ payment.contact.name }}
-                            </span>
                             {% else %}
                             <span class="text-gray-400 italic">No customer</span>
                             {% endif %}

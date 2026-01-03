@@ -18,7 +18,7 @@ from decimal import Decimal
 
 from app.database import get_db
 from app.config import settings
-from app.models.customer import Customer, CustomerStatus, CustomerType, BillingType
+from app.models.party import Party, PartyRole, CustomerAccount
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
@@ -70,26 +70,36 @@ async def get_data_completeness(
     """
     _apply_statement_timeout(db)
 
+    party_pop = (
+        db.query(
+            Subscription.party_id.label("party_id"),
+            func.min(Router.pop_id).label("pop_id"),
+        )
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(Router.pop_id.isnot(None))
+        .group_by(Subscription.party_id)
+        .subquery()
+    )
+
     # Single query for all customer field counts using CASE WHEN aggregation
     customer_stats = db.query(
-        func.count(Customer.id).label("total"),
-        func.count(case((and_(Customer.email.isnot(None), Customer.email != ""), 1))).label("email"),
-        func.count(case((Customer.billing_email.isnot(None), 1))).label("billing_email"),
-        func.count(case((and_(Customer.phone.isnot(None), Customer.phone != ""), 1))).label("phone"),
-        func.count(case((Customer.phone_secondary.isnot(None), 1))).label("phone_secondary"),
-        func.count(case((and_(Customer.address.isnot(None), Customer.address != ""), 1))).label("address"),
-        func.count(case((and_(Customer.city.isnot(None), Customer.city != ""), 1))).label("city"),
-        func.count(case((and_(Customer.state.isnot(None), Customer.state != ""), 1))).label("state"),
-        func.count(case((Customer.zip_code.isnot(None), 1))).label("zip_code"),
-        func.count(case((and_(Customer.latitude.isnot(None), Customer.longitude.isnot(None)), 1))).label("gps_coordinates"),
-        func.count(case((Customer.pop_id.isnot(None), 1))).label("pop_assigned"),
-        func.count(case((Customer.account_number.isnot(None), 1))).label("account_number"),
-        func.count(case((Customer.signup_date.isnot(None), 1))).label("signup_date"),
+        func.count(CustomerAccount.id).label("total"),
+        func.count(case((and_(Party.primary_email.isnot(None), Party.primary_email != ""), 1))).label("email"),
+        func.count(case((CustomerAccount.billing_email.isnot(None), 1))).label("billing_email"),
+        func.count(case((and_(Party.primary_phone.isnot(None), Party.primary_phone != ""), 1))).label("phone"),
+        func.count(case((func.jsonb_array_length(Party.addresses) > 0, 1))).label("address"),
+        func.count(case((party_pop.c.pop_id.isnot(None), 1))).label("pop_assigned"),
+        func.count(case((CustomerAccount.account_number.isnot(None), 1))).label("account_number"),
+        func.count(case((CustomerAccount.created_at.isnot(None), 1))).label("signup_date"),
         # System linkage
-        func.count(case((Customer.splynx_id.isnot(None), 1))).label("splynx_linked"),
-        func.count(case((Customer.erpnext_id.isnot(None), 1))).label("erpnext_linked"),
-        func.count(case((Customer.chatwoot_contact_id.isnot(None), 1))).label("chatwoot_linked"),
-        func.count(case((Customer.zoho_id.isnot(None), 1))).label("zoho_linked"),
+        func.count(case((CustomerAccount.external_ids["splynx_id"].astext.isnot(None), 1))).label("splynx_linked"),
+        func.count(case((CustomerAccount.external_ids["erpnext_id"].astext.isnot(None), 1))).label("erpnext_linked"),
+        func.count(case((CustomerAccount.external_ids["chatwoot_id"].astext.isnot(None), 1))).label("chatwoot_linked"),
+        func.count(case((CustomerAccount.external_ids["zoho_id"].astext.isnot(None), 1))).label("zoho_linked"),
+    ).select_from(CustomerAccount).join(
+        Party, CustomerAccount.party_id == Party.id
+    ).outerjoin(
+        party_pop, party_pop.c.party_id == CustomerAccount.party_id
     ).first()
 
     total_customers = customer_stats.total
@@ -101,12 +111,7 @@ async def get_data_completeness(
         "email": customer_stats.email,
         "billing_email": customer_stats.billing_email,
         "phone": customer_stats.phone,
-        "phone_secondary": customer_stats.phone_secondary,
         "address": customer_stats.address,
-        "city": customer_stats.city,
-        "state": customer_stats.state,
-        "zip_code": customer_stats.zip_code,
-        "gps_coordinates": customer_stats.gps_coordinates,
         "pop_assigned": customer_stats.pop_assigned,
         "account_number": customer_stats.account_number,
         "signup_date": customer_stats.signup_date,
@@ -121,7 +126,7 @@ async def get_data_completeness(
     }
 
     # Calculate completeness percentages
-    critical_fields = ["email", "phone", "address", "city"]
+    critical_fields = ["email", "phone", "address"]
     critical_score = sum(customer_fields[f] for f in critical_fields) / (len(critical_fields) * total_customers) * 100
     all_fields_score = sum(customer_fields.values()) / (len(customer_fields) * total_customers) * 100
 
@@ -181,8 +186,8 @@ async def get_data_completeness(
 
     ticket_stats = db.query(
         func.count(Ticket.id).label("total"),
-        func.count(case((Ticket.customer_id.isnot(None), 1))).label("linked"),
-        func.count(case((Ticket.customer_id.is_(None), 1))).label("orphaned"),
+        func.count(case((Ticket.customer_account_id.isnot(None), 1))).label("linked"),
+        func.count(case((Ticket.customer_account_id.is_(None), 1))).label("orphaned"),
         func.count(case((Ticket.assigned_employee_id.isnot(None), 1))).label("assigned"),
     ).first()
 
@@ -252,15 +257,6 @@ def _generate_completeness_recommendations(fields: Dict, total: int, linkage: Di
             "impact": "Needed for support and urgent communications",
         })
 
-    if fields["gps_coordinates"] / total < 0.5:
-        recommendations.append({
-            "priority": "medium",
-            "category": "location",
-            "issue": f"Missing GPS coordinates for {total - fields['gps_coordinates']} customers",
-            "action": "Geocode customer addresses or collect during installation",
-            "impact": "Improves network planning and service area analysis",
-        })
-
     if fields["pop_assigned"] / total < 0.95:
         recommendations.append({
             "priority": "high",
@@ -299,27 +295,36 @@ async def get_customer_segments(
     _apply_statement_timeout(db)
     # Status distribution
     status_dist = db.query(
-        Customer.status,
-        func.count(Customer.id).label("count"),
-        func.sum(Customer.mrr).label("total_mrr")
-    ).group_by(Customer.status).all()
+        CustomerAccount.status,
+        func.count(CustomerAccount.id).label("count"),
+        func.sum(CustomerAccount.mrr).label("total_mrr")
+    ).group_by(CustomerAccount.status).all()
+
+    segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "unknown")
+    billing_expr = func.coalesce(PartyRole.metadata_["billing_type"].astext, "unknown")
 
     # Customer type distribution
     type_dist = db.query(
-        Customer.customer_type,
-        func.count(Customer.id).label("count"),
-        func.sum(Customer.mrr).label("total_mrr")
-    ).group_by(Customer.customer_type).all()
+        segment_expr.label("segment"),
+        func.count(CustomerAccount.id).label("count"),
+        func.sum(CustomerAccount.mrr).label("total_mrr")
+    ).outerjoin(
+        PartyRole,
+        and_(PartyRole.party_id == CustomerAccount.party_id, PartyRole.role == "customer"),
+    ).group_by(segment_expr).all()
 
     # Billing type distribution
     billing_dist = db.query(
-        Customer.billing_type,
-        func.count(Customer.id).label("count"),
-        func.sum(Customer.mrr).label("total_mrr")
-    ).group_by(Customer.billing_type).all()
+        billing_expr.label("billing_type"),
+        func.count(CustomerAccount.id).label("count"),
+        func.sum(CustomerAccount.mrr).label("total_mrr")
+    ).outerjoin(
+        PartyRole,
+        and_(PartyRole.party_id == CustomerAccount.party_id, PartyRole.role == "customer"),
+    ).group_by(billing_expr).all()
 
     # Tenure segments - single aggregated query
-    days_since_signup = func.date_part("day", func.current_date() - Customer.signup_date)
+    days_since_signup = func.date_part("day", func.current_date() - CustomerAccount.created_at)
     tenure_bucket = case(
         (days_since_signup <= 30, 'New (0-30 days)'),
         (days_since_signup <= 90, 'Growing (31-90 days)'),
@@ -331,9 +336,9 @@ async def get_customer_segments(
     tenure_data = (
         db.query(
             tenure_bucket.label("segment"),
-            func.count(Customer.id).label("count"),
+            func.count(CustomerAccount.id).label("count"),
         )
-        .filter(Customer.signup_date.isnot(None))
+        .filter(CustomerAccount.created_at.isnot(None))
         .group_by(tenure_bucket)
         .all()
     )
@@ -351,17 +356,17 @@ async def get_customer_segments(
 
     # MRR segments - single aggregated query
     mrr_bucket = case(
-        (or_(Customer.mrr.is_(None), Customer.mrr == 0), 'No MRR'),
-        (Customer.mrr < 10000, 'Low (<10K)'),
-        (Customer.mrr < 50000, 'Medium (10K-50K)'),
-        (Customer.mrr < 200000, 'High (50K-200K)'),
+        (or_(CustomerAccount.mrr.is_(None), CustomerAccount.mrr == 0), 'No MRR'),
+        (CustomerAccount.mrr < 10000, 'Low (<10K)'),
+        (CustomerAccount.mrr < 50000, 'Medium (10K-50K)'),
+        (CustomerAccount.mrr < 200000, 'High (50K-200K)'),
         else_='Enterprise (200K+)'
     )
 
     mrr_data = (
         db.query(
             mrr_bucket.label("segment"),
-            func.count(Customer.id).label("count"),
+            func.count(CustomerAccount.id).label("count"),
         )
         .group_by(mrr_bucket)
         .all()
@@ -371,29 +376,48 @@ async def get_customer_segments(
     mrr_map = {row.segment: row.count for row in mrr_data}
     mrr_segments = [{"segment": seg, "count": mrr_map.get(seg, 0)} for seg in mrr_order]
 
-    # Geographic distribution (top cities)
+    party_pop = (
+        db.query(
+            Subscription.party_id.label("party_id"),
+            func.min(Router.pop_id).label("pop_id"),
+        )
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(Router.pop_id.isnot(None))
+        .group_by(Subscription.party_id)
+        .subquery()
+    )
+
+    # Geographic distribution (top cities from POP locations)
     city_dist = db.query(
-        Customer.city,
-        func.count(Customer.id).label("count"),
-        func.sum(Customer.mrr).label("total_mrr")
-    ).filter(Customer.city.isnot(None)).group_by(Customer.city).order_by(
-        func.count(Customer.id).desc()
+        Pop.city,
+        func.count(distinct(party_pop.c.party_id)).label("count"),
+        func.sum(CustomerAccount.mrr).label("total_mrr")
+    ).join(
+        party_pop, party_pop.c.pop_id == Pop.id
+    ).join(
+        CustomerAccount, CustomerAccount.party_id == party_pop.c.party_id
+    ).filter(Pop.city.isnot(None)).group_by(Pop.city).order_by(
+        func.count(distinct(party_pop.c.party_id)).desc()
     ).limit(limit).all()
 
     # POP distribution
     pop_dist = db.query(
         Pop.name,
         Pop.city,
-        func.count(Customer.id).label("customer_count"),
-        func.sum(Customer.mrr).label("total_mrr")
-    ).join(Customer, Customer.pop_id == Pop.id).group_by(
+        func.count(distinct(party_pop.c.party_id)).label("customer_count"),
+        func.sum(CustomerAccount.mrr).label("total_mrr")
+    ).join(
+        party_pop, party_pop.c.pop_id == Pop.id
+    ).join(
+        CustomerAccount, CustomerAccount.party_id == party_pop.c.party_id
+    ).group_by(
         Pop.id, Pop.name, Pop.city
-    ).order_by(func.count(Customer.id).desc()).limit(limit).all()
+    ).order_by(func.count(distinct(party_pop.c.party_id)).desc()).limit(limit).all()
 
     return {
         "by_status": [
             {
-                "status": row.status.value if row.status else "unknown",
+                "status": row.status if row.status else "unknown",
                 "count": row.count,
                 "mrr": float(row.total_mrr or 0),
             }
@@ -401,7 +425,7 @@ async def get_customer_segments(
         ],
         "by_type": [
             {
-                "type": row.customer_type.value if row.customer_type else "unknown",
+                "type": row.segment or "unknown",
                 "count": row.count,
                 "mrr": float(row.total_mrr or 0),
             }
@@ -409,7 +433,7 @@ async def get_customer_segments(
         ],
         "by_billing_type": [
             {
-                "billing_type": row.billing_type.value if row.billing_type else "unknown",
+                "billing_type": row.billing_type or "unknown",
                 "count": row.count,
                 "mrr": float(row.total_mrr or 0),
             }
@@ -447,7 +471,7 @@ async def get_customer_health(
     Customer health analysis including payment behavior, support needs, and risk indicators.
     """
     _apply_statement_timeout(db)
-    total_active = db.query(Customer).filter(Customer.status == CustomerStatus.ACTIVE).count()
+    total_active = db.query(CustomerAccount).filter(CustomerAccount.status == "active").count()
 
     # Payment behavior analysis
     # Customers with overdue invoices
@@ -485,15 +509,15 @@ async def get_customer_health(
 
     # Support intensity (tickets per customer)
     tickets_per_customer = db.query(
-        Ticket.customer_id,
+        Ticket.customer_account_id,
         func.count(Ticket.id).label("ticket_count")
     ).filter(
-        Ticket.customer_id.isnot(None),
+        Ticket.customer_account_id.isnot(None),
         Ticket.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
-    ).group_by(Ticket.customer_id).subquery()
+    ).group_by(Ticket.customer_account_id).subquery()
 
     ticket_intensity = db.query(
-        func.count(tickets_per_customer.c.customer_id).label("customers_with_tickets_30d"),
+        func.count(tickets_per_customer.c.customer_account_id).label("customers_with_tickets_30d"),
         func.sum(case((tickets_per_customer.c.ticket_count >= 3, 1), else_=0)).label("high_support_customers")
     ).one()
     customers_with_tickets_30d = int(ticket_intensity.customers_with_tickets_30d or 0)
@@ -514,13 +538,13 @@ async def get_customer_health(
     customers_with_conversations_30d = int(convo_intensity.customers_with_conversations_30d or 0)
 
     # Churn indicators
-    recently_cancelled = db.query(Customer).filter(
-        Customer.status == CustomerStatus.INACTIVE,
-        Customer.cancellation_date >= datetime.now(timezone.utc) - timedelta(days=30)
+    recently_cancelled = db.query(CustomerAccount).filter(
+        CustomerAccount.status == "cancelled",
+        CustomerAccount.cancelled_at >= datetime.now(timezone.utc) - timedelta(days=30)
     ).count()
 
-    recently_suspended = db.query(Customer).filter(
-        Customer.status == CustomerStatus.SUSPENDED
+    recently_suspended = db.query(CustomerAccount).filter(
+        CustomerAccount.status == "suspended"
     ).count()
 
     # Inactive customers (no recent activity)
@@ -574,19 +598,19 @@ async def get_churn_risk(
 ) -> Dict[str, Any]:
     """Alias endpoint summarizing churn risks."""
     _apply_statement_timeout(db)
-    overdue_customers = db.query(distinct(Invoice.customer_id)).filter(
+    overdue_customers = db.query(distinct(Invoice.customer_account_id)).filter(
         Invoice.status == InvoiceStatus.OVERDUE
     ).count()
-    recently_cancelled = db.query(Customer).filter(
-        Customer.status == CustomerStatus.INACTIVE,
-        Customer.cancellation_date >= datetime.now(timezone.utc) - timedelta(days=30)
+    recently_cancelled = db.query(CustomerAccount).filter(
+        CustomerAccount.status == "cancelled",
+        CustomerAccount.cancelled_at >= datetime.now(timezone.utc) - timedelta(days=30)
     ).count()
-    suspended = db.query(Customer).filter(Customer.status == CustomerStatus.SUSPENDED).count()
-    high_ticket_customers = db.query(func.count(Customer.id)).join(
-        Ticket, Ticket.customer_id == Customer.id
+    suspended = db.query(CustomerAccount).filter(CustomerAccount.status == "suspended").count()
+    high_ticket_customers = db.query(func.count(CustomerAccount.id)).join(
+        Ticket, Ticket.customer_account_id == CustomerAccount.id
     ).filter(
         Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED])
-    ).group_by(Customer.id).having(func.count(Ticket.id) >= 3).count()
+    ).group_by(CustomerAccount.id).having(func.count(Ticket.id) >= 3).count()
 
     return {
         "summary": {
@@ -613,18 +637,18 @@ async def get_plan_changes(
             Subscription.start_date.isnot(None),
             Subscription.start_date >= start_dt,
         )
-        .order_by(Subscription.customer_id, Subscription.start_date)
+        .order_by(Subscription.party_id, Subscription.start_date)
         .all()
     )
 
     transitions: List[Dict[str, Any]] = []
     customers_with_changes = set()
 
-    for _, cust_subs in groupby(subs, key=lambda s: s.customer_id):
+    for _, cust_subs in groupby(subs, key=lambda s: s.party_id):
         history = list(cust_subs)
         if len(history) < 2:
             continue
-        customers_with_changes.add(history[0].customer_id)
+        customers_with_changes.add(history[0].party_id)
         history = sorted(history, key=lambda s: s.start_date or datetime.min)
         for prev, curr in zip(history, history[1:]):
             prev_price = float(prev.price or 0)
@@ -637,7 +661,7 @@ async def get_plan_changes(
                 change_type = "lateral"
             transitions.append(
                 {
-                    "customer_id": curr.customer_id,
+                    "party_id": curr.party_id,
                     "from_plan": prev.plan_name,
                     "to_plan": curr.plan_name,
                     "price_change": round(curr_price - prev_price, 2),
@@ -654,7 +678,7 @@ async def get_plan_changes(
     downgrade_mrr = sum(abs(t["price_change"]) for t in transitions if t["change_type"] == "downgrade")
     net_mrr = upgrade_mrr - downgrade_mrr
 
-    active_customers = db.query(func.count(Customer.id)).filter(Customer.status == CustomerStatus.ACTIVE).scalar() or 0
+    active_customers = db.query(func.count(CustomerAccount.id)).filter(CustomerAccount.status == "active").scalar() or 0
 
     transition_counts: Dict[str, Dict[str, Any]] = {}
     for t in transitions:
@@ -721,7 +745,7 @@ async def get_relationship_map(
     _apply_statement_timeout(db)
     # Entity counts
     entities = {
-        "customers": db.query(Customer).count(),
+        "customer_accounts": db.query(CustomerAccount).count(),
         "subscriptions": db.query(Subscription).count(),
         "invoices": db.query(Invoice).count(),
         "payments": db.query(Payment).count(),
@@ -738,9 +762,9 @@ async def get_relationship_map(
 
     # Relationship coverage
     relationships = {
-        "subscriptions_to_customers": {
-            "linked": db.query(Subscription).filter(Subscription.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Subscription).filter(Subscription.customer_id.is_(None)).count(),
+        "subscriptions_to_parties": {
+            "linked": db.query(Subscription).filter(Subscription.party_id.isnot(None)).count(),
+            "orphaned": db.query(Subscription).filter(Subscription.party_id.is_(None)).count(),
         },
         "subscriptions_to_tariffs": {
             "linked": db.query(Subscription).filter(Subscription.tariff_id.isnot(None)).count(),
@@ -763,20 +787,24 @@ async def get_relationship_map(
             "orphaned": db.query(Conversation).filter(Conversation.customer_account_id.is_(None)).count(),
         },
         "tickets_to_customers": {
-            "linked": db.query(Ticket).filter(Ticket.customer_id.isnot(None)).count(),
-            "orphaned": db.query(Ticket).filter(Ticket.customer_id.is_(None)).count(),
+            "linked": db.query(Ticket).filter(Ticket.customer_account_id.isnot(None)).count(),
+            "orphaned": db.query(Ticket).filter(Ticket.customer_account_id.is_(None)).count(),
         },
         "tickets_to_employees": {
             "assigned": db.query(Ticket).filter(Ticket.assigned_employee_id.isnot(None)).count(),
             "unassigned": db.query(Ticket).filter(Ticket.assigned_employee_id.is_(None)).count(),
         },
-        "customers_to_pops": {
-            "linked": db.query(Customer).filter(Customer.pop_id.isnot(None)).count(),
-            "orphaned": db.query(Customer).filter(Customer.pop_id.is_(None)).count(),
+        "customer_accounts_to_pops": {
+            "linked": db.query(distinct(Subscription.party_id)).join(
+                Router, Subscription.router_id == Router.id
+            ).filter(Router.pop_id.isnot(None)).count(),
+            "orphaned": db.query(distinct(Subscription.party_id)).outerjoin(
+                Router, Subscription.router_id == Router.id
+            ).filter(or_(Router.pop_id.is_(None), Subscription.router_id.is_(None))).count(),
         },
         "leads_converted": {
-            "converted": db.query(Lead).filter(Lead.customer_id.isnot(None)).count(),
-            "not_converted": db.query(Lead).filter(Lead.customer_id.is_(None)).count(),
+            "converted": db.query(Lead).filter(Lead.customer_account_id.isnot(None)).count(),
+            "not_converted": db.query(Lead).filter(Lead.customer_account_id.is_(None)).count(),
         },
     }
 
@@ -797,16 +825,16 @@ async def get_relationship_map(
         func.count(distinct(Payment.id)).label("payments"),
         func.count(distinct(Conversation.id)).label("conversations"),
         func.count(distinct(Ticket.id)).label("tickets"),
-    ).select_from(Customer).outerjoin(
-        Subscription, Subscription.customer_id == Customer.id
+    ).select_from(CustomerAccount).outerjoin(
+        Subscription, Subscription.party_id == CustomerAccount.party_id
     ).outerjoin(
-        Invoice, Invoice.customer_id == Customer.id
+        Invoice, Invoice.customer_account_id == CustomerAccount.id
     ).outerjoin(
-        Payment, Payment.customer_id == Customer.id
+        Payment, Payment.customer_account_id == CustomerAccount.id
     ).outerjoin(
-        Conversation, Conversation.customer_id == Customer.id
+        Conversation, Conversation.customer_account_id == CustomerAccount.id
     ).outerjoin(
-        Ticket, Ticket.customer_id == Customer.id
+        Ticket, Ticket.customer_account_id == CustomerAccount.id
     ).first()
 
     return {
@@ -834,18 +862,23 @@ async def get_financial_insights(
     _apply_statement_timeout(db)
     try:
         # Total MRR
-        total_mrr = db.query(func.sum(Customer.mrr)).filter(
-            Customer.status == CustomerStatus.ACTIVE
+        total_mrr = db.query(func.sum(CustomerAccount.mrr)).filter(
+            CustomerAccount.status == "active"
         ).scalar() or 0
+
+        segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "unknown")
 
         # Revenue by customer type
         mrr_by_type = db.query(
-            Customer.customer_type,
-            func.sum(Customer.mrr).label("mrr"),
-            func.count(Customer.id).label("count")
+            segment_expr.label("segment"),
+            func.sum(CustomerAccount.mrr).label("mrr"),
+            func.count(CustomerAccount.id).label("count")
+        ).outerjoin(
+            PartyRole,
+            and_(PartyRole.party_id == CustomerAccount.party_id, PartyRole.role == "customer"),
         ).filter(
-            Customer.status == CustomerStatus.ACTIVE
-        ).group_by(Customer.customer_type).all()
+            CustomerAccount.status == "active"
+        ).group_by(segment_expr).all()
 
         # Invoice aging
         aging_buckets: Dict[str, Dict[str, Any]] = {
@@ -917,7 +950,7 @@ async def get_financial_insights(
                 "total": float(total_mrr),
                 "by_customer_type": [
                     {
-                        "type": row.customer_type.value if row.customer_type else "unknown",
+                        "type": row.segment or "unknown",
                         "mrr": float(row.mrr or 0),
                         "customer_count": row.count,
                         "avg_mrr": round(float(row.mrr or 0) / max(int(getattr(row, "count", 1) or 1), 1), 2),
@@ -1036,13 +1069,39 @@ async def get_operational_insights(
     ).limit(10).all()
 
     # POP utilization
+    party_pop = (
+        db.query(
+            Subscription.party_id.label("party_id"),
+            func.min(Router.pop_id).label("pop_id"),
+        )
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(Router.pop_id.isnot(None))
+        .group_by(Subscription.party_id)
+        .subquery()
+    )
+    active_party_pop = (
+        db.query(
+            Subscription.party_id.label("party_id"),
+            func.min(Router.pop_id).label("pop_id"),
+        )
+        .join(Router, Subscription.router_id == Router.id)
+        .filter(
+            Router.pop_id.isnot(None),
+            Subscription.status == SubscriptionStatus.ACTIVE,
+        )
+        .group_by(Subscription.party_id)
+        .subquery()
+    )
+
     pop_stats = db.query(
         Pop.name,
         Pop.city,
-        func.count(Customer.id).label("customer_count"),
-        func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active_customers")
+        func.count(distinct(party_pop.c.party_id)).label("customer_count"),
+        func.count(distinct(active_party_pop.c.party_id)).label("active_customers"),
     ).outerjoin(
-        Customer, Customer.pop_id == Pop.id
+        party_pop, party_pop.c.pop_id == Pop.id
+    ).outerjoin(
+        active_party_pop, active_party_pop.c.pop_id == Pop.id
     ).group_by(Pop.id, Pop.name, Pop.city).all()
 
     return {
@@ -1088,13 +1147,15 @@ async def get_network_health(
         Pop.id,
         Pop.name,
         Pop.city,
-        func.count(Customer.id).label("customers"),
-        func.sum(case((Customer.status == CustomerStatus.ACTIVE, 1), else_=0)).label("active_customers"),
+        func.count(distinct(party_pop.c.party_id)).label("customers"),
+        func.count(distinct(active_party_pop.c.party_id)).label("active_customers"),
     ).outerjoin(
-        Customer, Customer.pop_id == Pop.id
+        party_pop, party_pop.c.pop_id == Pop.id
+    ).outerjoin(
+        active_party_pop, active_party_pop.c.pop_id == Pop.id
     ).group_by(
         Pop.id, Pop.name, Pop.city
-    ).order_by(func.count(Customer.id).desc()).limit(50).all()
+    ).order_by(func.count(distinct(party_pop.c.party_id)).desc()).limit(50).all()
 
     routers = db.query(func.count(Router.id)).scalar() or 0
     pops = db.query(func.count(Pop.id)).scalar() or 0
@@ -1138,14 +1199,14 @@ async def detect_anomalies(
     patterns: List[Dict[str, Any]] = []
 
     # Check for customers with subscriptions but no invoices in 90 days
-    active_with_sub_no_invoice = db.query(Customer).join(
-        Subscription, Subscription.customer_id == Customer.id
+    active_with_sub_no_invoice = db.query(CustomerAccount).join(
+        Subscription, Subscription.party_id == CustomerAccount.party_id
     ).filter(
-        Customer.status == CustomerStatus.ACTIVE,
+        CustomerAccount.status == "active",
         Subscription.status == SubscriptionStatus.ACTIVE
     ).outerjoin(
         Invoice, and_(
-            Invoice.customer_id == Customer.id,
+            Invoice.customer_account_id == CustomerAccount.id,
             Invoice.invoice_date >= datetime.now(timezone.utc) - timedelta(days=90)
         )
     ).filter(Invoice.id.is_(None)).count()
@@ -1173,14 +1234,16 @@ async def detect_anomalies(
 
     # Customers with many open tickets
     high_ticket_base = db.query(
-        Customer.id.label("id"),
-        Customer.name.label("name"),
+        CustomerAccount.id.label("id"),
+        Party.name.label("name"),
         func.count(Ticket.id).label("open_tickets")
     ).join(
-        Ticket, Ticket.customer_id == Customer.id
+        Party, CustomerAccount.party_id == Party.id
+    ).join(
+        Ticket, Ticket.customer_account_id == CustomerAccount.id
     ).filter(
         Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED])
-    ).group_by(Customer.id, Customer.name).having(
+    ).group_by(CustomerAccount.id, Party.name).having(
         func.count(Ticket.id) >= 5
     )
     high_ticket_sub = high_ticket_base.subquery()
@@ -1203,11 +1266,11 @@ async def detect_anomalies(
 
     # Duplicate customer detection (same email or phone)
     duplicate_email_sub = db.query(
-        Customer.email
+        Party.primary_email
     ).filter(
-        Customer.email.isnot(None),
-        Customer.email != ""
-    ).group_by(Customer.email).having(func.count(Customer.id) > 1).subquery()
+        Party.primary_email.isnot(None),
+        Party.primary_email != ""
+    ).group_by(Party.primary_email).having(func.count(Party.id) > 1).subquery()
     duplicate_emails = db.query(func.count()).select_from(duplicate_email_sub).scalar() or 0
 
     if duplicate_emails:
@@ -1219,11 +1282,11 @@ async def detect_anomalies(
         })
 
     duplicate_phone_sub = db.query(
-        Customer.phone
+        Party.primary_phone
     ).filter(
-        Customer.phone.isnot(None),
-        Customer.phone != ""
-    ).group_by(Customer.phone).having(func.count(Customer.id) > 1).subquery()
+        Party.primary_phone.isnot(None),
+        Party.primary_phone != ""
+    ).group_by(Party.primary_phone).having(func.count(Party.id) > 1).subquery()
     duplicate_phones = db.query(func.count()).select_from(duplicate_phone_sub).scalar() or 0
 
     if duplicate_phones:
@@ -1294,26 +1357,32 @@ async def get_data_availability(
     _apply_statement_timeout(db)
 
     # Check data freshness
-    latest_sync = db.query(func.max(Customer.last_synced_at)).scalar()
+    latest_sync = db.query(func.max(CustomerAccount.created_at)).scalar()
 
     # Data availability by source
     sources = {
         "splynx": {
-            "customers": db.query(Customer).filter(Customer.splynx_id.isnot(None)).count(),
+            "customers": db.query(CustomerAccount).filter(
+                CustomerAccount.external_ids["splynx_id"].astext.isnot(None)
+            ).count(),
             "subscriptions": db.query(Subscription).filter(Subscription.splynx_id.isnot(None)).count(),
             "invoices": db.query(Invoice).filter(Invoice.splynx_id.isnot(None)).count(),
             "payments": db.query(Payment).filter(Payment.splynx_id.isnot(None)).count(),
             "tickets": db.query(Ticket).filter(Ticket.splynx_id.isnot(None)).count(),
         },
         "erpnext": {
-            "customers": db.query(Customer).filter(Customer.erpnext_id.isnot(None)).count(),
+            "customers": db.query(CustomerAccount).filter(
+                CustomerAccount.external_ids["erpnext_id"].astext.isnot(None)
+            ).count(),
             "invoices": db.query(Invoice).filter(Invoice.erpnext_id.isnot(None)).count(),
             "payments": db.query(Payment).filter(Payment.erpnext_id.isnot(None)).count(),
             "employees": db.query(Employee).filter(Employee.erpnext_id.isnot(None)).count(),
             "tickets": db.query(Ticket).filter(Ticket.erpnext_id.isnot(None)).count(),
         },
         "chatwoot": {
-            "customers": db.query(Customer).filter(Customer.chatwoot_contact_id.isnot(None)).count(),
+            "customers": db.query(CustomerAccount).filter(
+                CustomerAccount.external_ids["chatwoot_id"].astext.isnot(None)
+            ).count(),
             "conversations": db.query(Conversation).filter(Conversation.chatwoot_id.isnot(None)).count(),
         },
     }
@@ -1321,13 +1390,13 @@ async def get_data_availability(
     # What data is missing that we need
     missing_data = []
 
-    total_customers = db.query(Customer).count()
+    total_customers = db.query(CustomerAccount).count()
 
     # Critical missing data
-    no_contact = db.query(Customer).filter(
+    no_contact = db.query(Party).filter(
         and_(
-            or_(Customer.email.is_(None), Customer.email == ""),
-            or_(Customer.phone.is_(None), Customer.phone == "")
+            or_(Party.primary_email.is_(None), Party.primary_email == ""),
+            or_(Party.primary_phone.is_(None), Party.primary_phone == "")
         )
     ).count()
 
@@ -1340,9 +1409,8 @@ async def get_data_availability(
             "description": "Customers without email AND phone - cannot be contacted",
         })
 
-    no_location = db.query(Customer).filter(
-        and_(Customer.latitude.is_(None), Customer.longitude.is_(None)),
-        or_(Customer.address.is_(None), Customer.address == "")
+    no_location = db.query(Party).filter(
+        func.jsonb_array_length(Party.addresses) == 0
     ).count()
 
     if no_location > 0:

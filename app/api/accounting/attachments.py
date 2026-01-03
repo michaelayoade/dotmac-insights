@@ -2,41 +2,45 @@
 from __future__ import annotations
 
 import os
-import re
-import uuid
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
-from app.models.document_attachment import DocumentAttachment
-
-from .helpers import paginate
+from app.services.accounting import DocumentAttachmentService
+from app.services.accounting.attachments_types import (
+    AttachmentUploadData,
+    AttachmentUpdateData,
+)
+from app.services.errors import NotFoundError
 
 router = APIRouter()
 
-# Configuration - should come from settings
-UPLOAD_DIR = "/tmp/attachments"
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".gif", ".doc", ".docx", ".xls", ".xlsx", ".csv", ".txt"}
+
+# SERVICE DEPENDENCIES
+
+
+def get_attachment_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> DocumentAttachmentService:
+    """Dependency to get a DocumentAttachmentService instance."""
+    return DocumentAttachmentService(db, principal)
 
 
 # DOCUMENT ATTACHMENTS
+
 
 @router.get("/documents/{doctype}/{doc_id}/attachments", dependencies=[Depends(Require("accounting:read"))])
 def list_document_attachments(
     doctype: str,
     doc_id: int,
-    db: Session = Depends(get_db),
+    service: DocumentAttachmentService = Depends(get_attachment_service),
 ) -> Dict[str, Any]:
     """List attachments for a document."""
-    attachments = db.query(DocumentAttachment).filter(
-        DocumentAttachment.doctype == doctype,
-        DocumentAttachment.document_id == doc_id,
-    ).order_by(DocumentAttachment.uploaded_at.desc()).all()
+    attachments = service.list_attachments(doctype, doc_id)
 
     return {
         "total": len(attachments),
@@ -66,72 +70,42 @@ async def upload_attachment(
     description: Optional[str] = Form(None),
     is_primary: bool = Form(False),
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: DocumentAttachmentService = Depends(get_attachment_service),
 ) -> Dict[str, Any]:
     """Upload an attachment for a document."""
-    # Validate file extension
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="File name is required")
-    file_ext = os.path.splitext(file.filename)[1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type {file_ext} not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
-        )
-
-    # Read file content
+    # Read file content first (async operation stays in route)
     content = await file.read()
     file_size = len(content)
 
-    if file_size > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
+    # Validate file using service
+    validation = service.validate_file(file.filename or "", file_size)
+    if not validation.is_valid:
+        raise HTTPException(status_code=400, detail=validation.error)
 
-    # Generate unique filename with path traversal protection
-    unique_id = uuid.uuid4().hex[:8]
-    # Sanitize filename: remove path components and special characters
-    original_filename = os.path.basename(file.filename or "upload")
-    # Remove any remaining special characters except . - _
-    sanitized_filename = re.sub(r'[^\w.\-]', '_', original_filename)
-    # Prevent double extensions like .pdf.exe
-    if sanitized_filename.count('.') > 1:
-        parts = sanitized_filename.rsplit('.', 1)
-        sanitized_filename = parts[0].replace('.', '_') + '.' + parts[1]
-    safe_filename = f"{unique_id}_{sanitized_filename}"
+    # Ensure upload directory exists
+    service.ensure_upload_directory(doctype, doc_id)
 
-    # Create upload directory if needed
-    doc_dir = os.path.join(UPLOAD_DIR, doctype, str(doc_id))
-    os.makedirs(doc_dir, exist_ok=True)
+    # Get file path for storage
+    file_path = service.get_upload_path(doctype, doc_id, validation.sanitized_filename)
 
-    # Save file
-    file_path = os.path.join(doc_dir, safe_filename)
+    # Write file to disk (I/O stays in route)
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # If setting as primary, unset any existing primary
-    if is_primary:
-        db.query(DocumentAttachment).filter(
-            DocumentAttachment.doctype == doctype,
-            DocumentAttachment.document_id == doc_id,
-            DocumentAttachment.is_primary == True,
-        ).update({"is_primary": False})
-
-    # Create attachment record
-    attachment = DocumentAttachment(
+    # Create attachment record using service
+    upload_data = AttachmentUploadData(
         doctype=doctype,
         document_id=doc_id,
-        file_name=file.filename,
+        file_name=file.filename or "upload",
         file_path=file_path,
         file_type=file.content_type,
         file_size=file_size,
         attachment_type=attachment_type,
-        is_primary=is_primary,
         description=description,
-        uploaded_by_id=principal.id,
+        is_primary=is_primary,
     )
-    db.add(attachment)
+
+    attachment = service.create_attachment(upload_data)
     db.commit()
     db.refresh(attachment)
 
@@ -146,15 +120,13 @@ async def upload_attachment(
 @router.get("/attachments/{attachment_id}", dependencies=[Depends(Require("accounting:read"))])
 def get_attachment(
     attachment_id: int,
-    db: Session = Depends(get_db),
+    service: DocumentAttachmentService = Depends(get_attachment_service),
 ) -> Dict[str, Any]:
     """Get attachment details."""
-    attachment = db.query(DocumentAttachment).filter(
-        DocumentAttachment.id == attachment_id
-    ).first()
-
-    if not attachment:
-        raise HTTPException(status_code=404, detail="Attachment not found")
+    try:
+        attachment = service.get_attachment(attachment_id)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
     return {
         "id": attachment.id,
@@ -176,27 +148,24 @@ def get_attachment(
 def delete_attachment(
     attachment_id: int,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: DocumentAttachmentService = Depends(get_attachment_service),
 ) -> Dict[str, Any]:
     """Delete an attachment."""
-    attachment = db.query(DocumentAttachment).filter(
-        DocumentAttachment.id == attachment_id
-    ).first()
+    try:
+        # Delete record and get file path
+        file_path = service.delete_attachment(attachment_id)
+        db.commit()
 
-    if not attachment:
-        raise HTTPException(status_code=404, detail="Attachment not found")
+        # Delete file from disk (I/O stays in route)
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass  # File might already be deleted
 
-    # Delete file from disk
-    if os.path.exists(attachment.file_path):
-        try:
-            os.remove(attachment.file_path)
-        except OSError:
-            pass  # File might already be deleted
-
-    db.delete(attachment)
-    db.commit()
-
-    return {"message": "Attachment deleted"}
+        return {"message": "Attachment deleted"}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.patch("/attachments/{attachment_id}", dependencies=[Depends(Require("books:write"))])
@@ -206,80 +175,43 @@ def update_attachment(
     attachment_type: Optional[str] = None,
     is_primary: Optional[bool] = None,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: DocumentAttachmentService = Depends(get_attachment_service),
 ) -> Dict[str, Any]:
     """Update attachment metadata."""
-    attachment = db.query(DocumentAttachment).filter(
-        DocumentAttachment.id == attachment_id
-    ).first()
+    try:
+        update_data = AttachmentUpdateData(
+            description=description,
+            attachment_type=attachment_type,
+            is_primary=is_primary,
+        )
+        attachment = service.update_attachment(attachment_id, update_data)
+        db.commit()
 
-    if not attachment:
-        raise HTTPException(status_code=404, detail="Attachment not found")
-
-    if description is not None:
-        attachment.description = description
-
-    if attachment_type is not None:
-        attachment.attachment_type = attachment_type
-
-    if is_primary is not None:
-        if is_primary:
-            # Unset any existing primary
-            db.query(DocumentAttachment).filter(
-                DocumentAttachment.doctype == attachment.doctype,
-                DocumentAttachment.document_id == attachment.document_id,
-                DocumentAttachment.is_primary == True,
-                DocumentAttachment.id != attachment_id,
-            ).update({"is_primary": False})
-        attachment.is_primary = is_primary
-
-    db.commit()
-
-    return {
-        "message": "Attachment updated",
-        "id": attachment.id,
-    }
+        return {
+            "message": "Attachment updated",
+            "id": attachment.id,
+        }
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # ATTACHMENT REQUIREMENTS
+
 
 @router.get("/documents/{doctype}/{doc_id}/attachment-requirements", dependencies=[Depends(Require("accounting:read"))])
 def check_attachment_requirements(
     doctype: str,
     doc_id: int,
-    db: Session = Depends(get_db),
+    service: DocumentAttachmentService = Depends(get_attachment_service),
 ) -> Dict[str, Any]:
     """Check if attachment requirements are met for a document."""
-    from app.models.accounting_ext import AccountingControl
-
-    # Get accounting control settings
-    control = db.query(AccountingControl).first()
-
-    required = False
-    has_attachment = False
-
-    # Check if attachment is required for this doctype
-    if control:
-        if doctype == "supplier_payment" and getattr(control, "require_attachment_supplier_payment", False):
-            required = True
-        elif doctype == "journal_entry" and getattr(control, "require_attachment_journal_entry", False):
-            required = True
-        elif doctype == "purchase_invoice" and getattr(control, "require_attachment_purchase_invoice", False):
-            required = True
-
-    # Check if document has attachments
-    attachment_count = db.query(DocumentAttachment).filter(
-        DocumentAttachment.doctype == doctype,
-        DocumentAttachment.document_id == doc_id,
-    ).count()
-
-    has_attachment = attachment_count > 0
+    result = service.check_requirements(doctype, doc_id)
 
     return {
-        "doctype": doctype,
-        "document_id": doc_id,
-        "attachment_required": required,
-        "has_attachment": has_attachment,
-        "attachment_count": attachment_count,
-        "requirement_met": not required or has_attachment,
+        "doctype": result.doctype,
+        "document_id": result.document_id,
+        "attachment_required": result.attachment_required,
+        "has_attachment": result.has_attachment,
+        "attachment_count": result.attachment_count,
+        "requirement_met": result.requirement_met,
     }

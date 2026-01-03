@@ -1,0 +1,66 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col gap-2 mb-6">
+    <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900">Service Transactions</h1>
+    <p class="text-sm text-gray-500 font-body">Audit trail for lifecycle and billing events.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/subscriptions/templates/partials/service_nav.html" %}
+
+<form class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <input type="number" name="subscription_id" value="{{ filters.subscription_id or '' }}" class="rounded-xl border-gray-200 text-sm" placeholder="Subscription ID">
+        <input type="number" name="party_id" value="{{ filters.party_id or '' }}" class="rounded-xl border-gray-200 text-sm" placeholder="Party ID">
+        <input type="text" name="transaction_type" value="{{ filters.transaction_type }}" class="rounded-xl border-gray-200 text-sm" placeholder="Type">
+        <input type="text" name="status" value="{{ filters.status }}" class="rounded-xl border-gray-200 text-sm" placeholder="Status">
+        <input type="date" name="date_from" value="{{ filters.date_from }}" class="rounded-xl border-gray-200 text-sm">
+        <input type="date" name="date_to" value="{{ filters.date_to }}" class="rounded-xl border-gray-200 text-sm">
+    </div>
+    <div class="mt-4 flex items-center justify-end gap-2">
+        <a href="/subscriptions/transactions" class="text-sm text-gray-500 hover:text-gray-700">Reset</a>
+        <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-primary-600 hover:bg-primary-500">Filter</button>
+    </div>
+</form>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full text-sm">
+        <thead class="bg-surface-50 text-gray-500 uppercase text-xs tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Type</th>
+                <th class="px-4 py-3 text-left">Description</th>
+                <th class="px-4 py-3 text-left">Status</th>
+                <th class="px-4 py-3 text-right">Amount</th>
+                <th class="px-4 py-3 text-left">Effective</th>
+                <th class="px-4 py-3 text-left">Subscription</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% if transactions %}
+            {% for txn in transactions %}
+            <tr class="hover:bg-surface-50">
+                <td class="px-4 py-3 text-gray-900">{{ txn.transaction_type }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ txn.description }}</td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium
+                        {% if txn.status == 'completed' %}bg-emerald-50 text-emerald-700{% elif txn.status == 'failed' %}bg-red-50 text-red-700{% elif txn.status == 'pending' %}bg-amber-50 text-amber-700{% else %}bg-gray-50 text-gray-700{% endif %}
+                    ">{{ txn.status }}</span>
+                </td>
+                <td class="px-4 py-3 text-right text-gray-900">{{ txn.currency }} {{ "{:,.2f}".format(txn.amount) }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ txn.effective_date or "-" }}</td>
+                <td class="px-4 py-3 text-gray-700">
+                    <a href="/subscriptions/{{ txn.subscription_id }}" class="text-primary-600 hover:text-primary-500">#{{ txn.subscription_id }}</a>
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-4 py-10 text-center text-gray-500">No transactions found.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

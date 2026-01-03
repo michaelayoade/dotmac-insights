@@ -1,0 +1,119 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{% if component %}/hr/payroll/components/{{ component.id }}{% else %}/hr/payroll/components{% endif %}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">{{ page_title }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{% if component %}Edit component settings{% else %}Create a new salary component{% endif %}</p>
+        </div>
+    </div>
+
+    <form method="post" action="{% if component %}/hr/payroll/components/{{ component.id }}{% else %}/hr/payroll/components{% endif %}" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Basic Info -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Basic Information</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Component Name *</label>
+                    <input type="text" name="salary_component_name" value="{{ form_data.salary_component_name if form_data else (component.salary_component_name if component else '') }}" required
+                        class="w-full px-4 py-2.5 border {% if errors.salary_component_name %}border-red-300{% else %}border-gray-200{% endif %} rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="e.g., Basic Salary">
+                    {% if errors.salary_component_name %}
+                    <p class="mt-1 text-sm text-red-600">{{ errors.salary_component_name }}</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Abbreviation</label>
+                    <input type="text" name="salary_component_abbr" value="{{ form_data.salary_component_abbr if form_data else (component.salary_component_abbr if component else '') }}"
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="e.g., BASIC">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Component Type *</label>
+                    <select name="component_type" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        {% for value, label in component_types %}
+                        <option value="{{ value }}" {% if (form_data.component_type if form_data else (component.component_type.value if component else 'earning')) == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Amount</label>
+                    <input type="number" name="default_amount" step="0.01" min="0" value="{{ form_data.default_amount if form_data else (component.default_amount if component else '0') }}"
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="0.00">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea name="description" rows="2"
+                        class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        placeholder="Brief description of this component">{{ form_data.description if form_data else (component.description if component else '') }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Options -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Component Options</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:bg-surface-50 cursor-pointer">
+                    <input type="checkbox" name="is_tax_applicable" {% if (form_data and form_data.get('is_tax_applicable')) or (component and component.is_tax_applicable) %}checked{% endif %}
+                        class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                    <div>
+                        <span class="block text-sm font-medium text-gray-900">Tax Applicable</span>
+                        <span class="block text-xs text-gray-500">This component is subject to tax deductions</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:bg-surface-50 cursor-pointer">
+                    <input type="checkbox" name="depends_on_payment_days" {% if (form_data and form_data.get('depends_on_payment_days')) or (component and component.depends_on_payment_days) %}checked{% endif %}
+                        class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                    <div>
+                        <span class="block text-sm font-medium text-gray-900">Depends on Payment Days</span>
+                        <span class="block text-xs text-gray-500">Amount is prorated based on days worked</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:bg-surface-50 cursor-pointer">
+                    <input type="checkbox" name="is_flexible_benefit" {% if (form_data and form_data.get('is_flexible_benefit')) or (component and component.is_flexible_benefit) %}checked{% endif %}
+                        class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                    <div>
+                        <span class="block text-sm font-medium text-gray-900">Flexible Benefit</span>
+                        <span class="block text-xs text-gray-500">Part of flexible benefits plan</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-3 p-4 border border-gray-200 rounded-xl hover:bg-surface-50 cursor-pointer">
+                    <input type="checkbox" name="is_payable" {% if (form_data and form_data.get('is_payable')) or (component and component.is_payable) or (not component and not form_data) %}checked{% endif %}
+                        class="mt-1 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                    <div>
+                        <span class="block text-sm font-medium text-gray-900">Is Payable</span>
+                        <span class="block text-xs text-gray-500">Included in salary payment</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Formula -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Calculation Formula (Optional)</h2>
+            <p class="text-sm text-gray-500 mb-4">Use a formula to calculate this component. Available variables: base, gross, payment_days, total_days.</p>
+            <textarea name="formula" rows="3"
+                class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 font-mono text-sm"
+                placeholder="e.g., base * 0.05">{{ form_data.formula if form_data else (component.formula if component else '') }}</textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <a href="{% if component %}/hr/payroll/components/{{ component.id }}{% else %}/hr/payroll/components{% endif %}" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                Cancel
+            </a>
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                {{ 'Update Component' if component else 'Create Component' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -32,7 +32,7 @@ from app.models import (
     Milestone,
     MilestoneStatus,
 )
-from app.models.customer import Customer
+from app.models.party import CustomerAccount
 from app.models.employee import Employee
 
 router = APIRouter()
@@ -45,7 +45,7 @@ router = APIRouter()
 async def list_projects(
     status: Optional[str] = None,
     priority: Optional[str] = None,
-    customer_id: Optional[int] = None,
+    customer_account_id: Optional[int] = None,
     project_type: Optional[str] = None,
     department: Optional[str] = None,
     search: Optional[str] = None,
@@ -73,8 +73,8 @@ async def list_projects(
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid priority: {priority}")
 
-    if customer_id:
-        query = query.filter(Project.customer_id == customer_id)
+    if customer_account_id:
+        query = query.filter(Project.customer_account_id == customer_account_id)
 
     if project_type:
         query = query.filter(Project.project_type == project_type)
@@ -119,7 +119,7 @@ async def list_projects(
                 "status": p.status.value if p.status else None,
                 "priority": p.priority.value if p.priority else None,
                 "department": p.department,
-                "customer_id": p.customer_id,
+                "customer_account_id": p.customer_account_id,
                 "percent_complete": float(p.percent_complete) if p.percent_complete else 0,
                 "expected_start_date": p.expected_start_date.isoformat() if p.expected_start_date else None,
                 "expected_end_date": p.expected_end_date.isoformat() if p.expected_end_date else None,
@@ -148,13 +148,14 @@ async def get_project(
 
     # Get customer info
     customer = None
-    if project.customer_id:
-        cust = db.query(Customer).filter(Customer.id == project.customer_id).first()
-        if cust:
+    if project.customer_account_id:
+        account = db.query(CustomerAccount).filter(CustomerAccount.id == project.customer_account_id).first()
+        if account and account.party:
             customer = {
-                "id": cust.id,
-                "name": cust.name,
-                "email": cust.email,
+                "id": account.id,
+                "party_id": account.party_id,
+                "name": account.party.name,
+                "email": account.party.primary_email,
             }
 
     # Get project manager info
@@ -273,5 +274,4 @@ async def get_project(
         "expenses": expenses,
         "write_back_status": getattr(project, "write_back_status", None),
     }
-
 

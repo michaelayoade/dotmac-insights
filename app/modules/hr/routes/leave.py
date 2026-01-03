@@ -1,6 +1,8 @@
 """
 HR Leave Routes - Leave Management with SSR + HTMX.
 
+Uses LeaveService for all business logic.
+
 Permission Requirements:
 - hr:read - View leave applications, types, allocations
 - hr:write - Create, update, manage leave
@@ -12,7 +14,6 @@ from datetime import date
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -22,9 +23,20 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.hr_leave import LeaveApplication, LeaveType, LeaveAllocation, LeaveApplicationStatus
+from app.models.hr_leave import LeaveApplicationStatus
 from app.models.employee import Employee
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.hr.leave import LeaveService
+from app.services.hr.leave_types import ApplicationFilters, ApplicationCreateData, AllocationFilters
+from app.services.types import PaginationParams
+from app.services.hr.errors import (
+    LeaveApplicationNotFoundError,
+    LeaveTypeNotFoundError,
+    LeaveStatusTransitionError,
+    InsufficientLeaveBalanceError,
+    LeaveOverlapError,
+    ValidationError as HRValidationError,
+)
 
 RequireHRRead = Depends(require_scope("hr:read"))
 RequireHRWrite = Depends(require_scope("hr:write"))
@@ -70,11 +82,14 @@ def get_status_options():
 
 
 def get_leave_type_options(db):
-    types = db.query(LeaveType).order_by(LeaveType.leave_type_name).all()
+    """Get leave types using service layer."""
+    service = LeaveService(db)
+    types = service.list_leave_types()
     return [{"value": str(t.id), "label": t.leave_type_name} for t in types]
 
 
 def get_employee_options(db):
+    """Get employees - still uses direct DB as EmployeeService would be used here."""
     employees = db.query(Employee).filter(Employee.is_deleted == False).order_by(Employee.name).all()
     return [{"value": str(e.id), "label": e.name} for e in employees]
 
@@ -95,32 +110,28 @@ async def leave_applications_list(
     dir: str = Query("desc"),
 ):
     """Leave applications list page."""
-    query = db.query(LeaveApplication)
+    service = LeaveService(db)
 
-    if q:
-        search_filter = or_(
-            LeaveApplication.employee_name.ilike(f"%{q}%"),
-            LeaveApplication.employee.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
+    # Parse status enum
+    status_enum = None
     if status:
-        query = query.filter(LeaveApplication.status == status)
-    if leave_type:
-        query = query.filter(LeaveApplication.leave_type_id == int(leave_type))
+        try:
+            status_enum = LeaveApplicationStatus(status)
+        except ValueError:
+            pass
 
-    total = query.count()
-
-    sort_column = getattr(LeaveApplication, sort, LeaveApplication.from_date)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
-
+    filters = ApplicationFilters(
+        status=status_enum,
+        leave_type_id=int(leave_type) if leave_type else None,
+        search=q,
+    )
     offset = (page - 1) * per_page
-    applications = query.offset(offset).limit(per_page).all()
+    pagination = PaginationParams(offset=offset, limit=per_page)
+
+    result = service.list_applications(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["applications"] = applications
+    context["applications"] = result.items
     context["search_query"] = q or ""
     context["current_status"] = status
     context["current_leave_type"] = leave_type
@@ -128,7 +139,7 @@ async def leave_applications_list(
     context["leave_type_options"] = get_leave_type_options(db)
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/hr/templates/leave/partials/applications_table.html")
@@ -201,6 +212,7 @@ async def leave_application_create(
     db: DB,
 ):
     form = await request.form()
+    service = LeaveService(db)
 
     errors = {}
     employee_id = _form_int(form, "employee_id")
@@ -235,16 +247,16 @@ async def leave_application_create(
         template = templates.get_template("modules/hr/templates/leave/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    if employee_id is None or leave_type_id is None or from_date is None or to_date is None:
-        raise HTTPException(status_code=400, detail="Invalid leave application data")
-
+    # Resolve employee and leave type
     employee = db.query(Employee).filter(Employee.id == employee_id).first()
     if not employee:
         errors["employee_id"] = "Employee not found"
 
-    leave_type = db.query(LeaveType).filter(LeaveType.id == leave_type_id).first()
-    if not leave_type:
+    try:
+        leave_type = service.get_leave_type(leave_type_id)
+    except LeaveTypeNotFoundError:
         errors["leave_type_id"] = "Leave type not found"
+        leave_type = None
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -264,12 +276,8 @@ async def leave_application_create(
         template = templates.get_template("modules/hr/templates/leave/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    if employee is None or leave_type is None:
-        raise HTTPException(status_code=400, detail="Invalid leave application data")
-
-    total_days = (to_date - from_date).days + 1
-
-    application = LeaveApplication(
+    # Create application via service
+    create_data = ApplicationCreateData(
         employee_id=employee_id,
         employee=employee.erpnext_id or str(employee.id),
         employee_name=employee.name,
@@ -277,15 +285,33 @@ async def leave_application_create(
         leave_type=leave_type.leave_type_name,
         from_date=from_date,
         to_date=to_date,
-        total_leave_days=total_days,
-        posting_date=date.today(),
-        description=_form_str(form, "description") or None,
         half_day=_form_str(form, "half_day") == "on",
-        status=LeaveApplicationStatus.OPEN,
+        description=_form_str(form, "description") or None,
+        company=employee.company,
     )
-    db.add(application)
-    db.commit()
-    db.refresh(application)
+
+    try:
+        application = service.create_application(create_data)
+        db.commit()
+    except (InsufficientLeaveBalanceError, LeaveOverlapError, HRValidationError) as e:
+        db.rollback()
+        errors["_form"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Apply for Leave"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Leave", "href": "/hr/leave"},
+            {"label": "Apply for Leave"},
+        ])
+        context["application"] = None
+        context["leave_type_options"] = get_leave_type_options(db)
+        context["employee_options"] = get_employee_options(db)
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/hr/templates/leave/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, "Leave application submitted successfully.", "success")
     return RedirectResponse(url=f"/hr/leave/{application.id}", status_code=303)
@@ -300,9 +326,11 @@ async def leave_application_detail(
     db: DB,
     application_id: int,
 ):
-    application = db.query(LeaveApplication).filter(LeaveApplication.id == application_id).first()
+    service = LeaveService(db)
 
-    if not application:
+    try:
+        application = service.get_application(application_id)
+    except LeaveApplicationNotFoundError:
         raise HTTPException(status_code=404, detail="Leave application not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -328,12 +356,20 @@ async def leave_application_approve(
     db: DB,
     application_id: int,
 ):
-    application = db.query(LeaveApplication).filter(LeaveApplication.id == application_id).first()
-    if not application:
-        raise HTTPException(status_code=404, detail="Leave application not found")
+    service = LeaveService(db)
 
-    application.status = LeaveApplicationStatus.APPROVED
-    db.commit()
+    try:
+        service.approve_application(application_id)
+        db.commit()
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
+    except (LeaveStatusTransitionError, InsufficientLeaveBalanceError) as e:
+        db.rollback()
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        set_flash(response, str(e), "error")
+        return RedirectResponse(url=f"/hr/leave/{application_id}", status_code=303)
 
     if is_htmx_request(request):
         htmx_toast(response, "Leave application approved.", "success")
@@ -353,12 +389,20 @@ async def leave_application_reject(
     db: DB,
     application_id: int,
 ):
-    application = db.query(LeaveApplication).filter(LeaveApplication.id == application_id).first()
-    if not application:
-        raise HTTPException(status_code=404, detail="Leave application not found")
+    service = LeaveService(db)
 
-    application.status = LeaveApplicationStatus.REJECTED
-    db.commit()
+    try:
+        service.reject_application(application_id)
+        db.commit()
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
+    except LeaveStatusTransitionError as e:
+        db.rollback()
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", headers=dict(response.headers))
+        set_flash(response, str(e), "error")
+        return RedirectResponse(url=f"/hr/leave/{application_id}", status_code=303)
 
     if is_htmx_request(request):
         htmx_toast(response, "Leave application rejected.", "success")
@@ -378,12 +422,14 @@ async def leave_application_delete(
     db: DB,
     application_id: int,
 ):
-    application = db.query(LeaveApplication).filter(LeaveApplication.id == application_id).first()
-    if not application:
-        raise HTTPException(status_code=404, detail="Leave application not found")
+    service = LeaveService(db)
 
-    db.delete(application)
-    db.commit()
+    try:
+        application = service.get_application(application_id)
+        db.delete(application)
+        db.commit()
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
 
     if is_htmx_request(request):
         htmx_toast(response, "Leave application deleted.", "success")
@@ -405,14 +451,22 @@ async def leave_types_list(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
-    query = db.query(LeaveType)
+    """Leave types list page using LeaveService."""
+    service = LeaveService(db)
+    all_types = service.list_leave_types()
 
+    # Apply search filter (service doesn't support search yet)
     if q:
-        query = query.filter(LeaveType.leave_type_name.ilike(f"%{q}%"))
+        q_lower = q.lower()
+        all_types = [t for t in all_types if q_lower in t.leave_type_name.lower()]
 
-    total = query.count()
+    # Sort by name
+    all_types = sorted(all_types, key=lambda t: t.leave_type_name)
+
+    # Manual pagination
+    total = len(all_types)
     offset = (page - 1) * per_page
-    leave_types = query.order_by(LeaveType.leave_type_name).offset(offset).limit(per_page).all()
+    leave_types = all_types[offset : offset + per_page]
 
     context = get_base_context(request, response, user, csrf_token)
     context["leave_types"] = leave_types
@@ -446,17 +500,32 @@ async def leave_allocations_list(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
-    query = db.query(LeaveAllocation)
+    """Leave allocations list page using LeaveService."""
+    service = LeaveService(db)
+    offset = (page - 1) * per_page
 
     if q:
-        query = query.filter(or_(
-            LeaveAllocation.employee_name.ilike(f"%{q}%"),
-            LeaveAllocation.leave_type.ilike(f"%{q}%"),
-        ))
-
-    total = query.count()
-    offset = (page - 1) * per_page
-    allocations = query.order_by(LeaveAllocation.from_date.desc()).offset(offset).limit(per_page).all()
+        # Search requires post-filtering since service doesn't support text search
+        all_result = service.list_allocations(
+            AllocationFilters(),
+            PaginationParams(offset=0, limit=10000),
+        )
+        q_lower = q.lower()
+        filtered = [
+            a for a in all_result.items
+            if (a.employee_name and q_lower in a.employee_name.lower())
+            or (a.leave_type and q_lower in a.leave_type.lower())
+        ]
+        total = len(filtered)
+        allocations = filtered[offset : offset + per_page]
+    else:
+        # No search - use service pagination directly
+        result = service.list_allocations(
+            AllocationFilters(),
+            PaginationParams(offset=offset, limit=per_page),
+        )
+        allocations = result.items
+        total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["allocations"] = allocations

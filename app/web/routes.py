@@ -86,10 +86,8 @@ async def dashboard(
     for inv in recent_invoices:
         # Get customer name from contact or customer relationship
         cust_name = None
-        if inv.contact:
-            cust_name = inv.contact.name
-        elif inv.customer:
-            cust_name = inv.customer.name
+        if inv.customer_account and inv.customer_account.party:
+            cust_name = inv.customer_account.party.name
         activities.append({
             "user_name": cust_name or "Customer",
             "user_initials": (cust_name or "C")[:2].upper(),
@@ -505,6 +503,10 @@ from app.modules.support.routes import (
     csat_router as support_csat_router,
     routing_router as support_routing_router,
     tags_router as support_tags_router,
+    queues_router as support_queues_router,
+    escalations_router as support_escalations_router,
+    channels_router as support_channels_router,
+    webhooks_router as support_webhooks_router,
 )
 
 # Operations module (NEW - aggregates projects, field_service, inventory, assets, vehicles)
@@ -523,9 +525,10 @@ from app.modules.analytics.routes import router as analytics_router
 from app.modules.settings.routes import router as settings_router
 
 # Standalone modules that are kept for direct access (linked via redirects from parent modules)
-from app.modules.customers.routes import router as customers_router
 from app.modules.invoices.routes import router as invoices_router
 from app.modules.subscriptions.routes import router as subscriptions_router
+from app.modules.subscriptions.service_routes import router as subscriptions_services_router
+from app.modules.subscribers.routes import router as subscribers_router
 from app.modules.subscriptions.tariff_routes import router as tariffs_router
 from app.modules.subscriptions.payment_routes import router as payment_subscriptions_router
 from app.modules.expenses.routes import router as expenses_router
@@ -577,11 +580,16 @@ web_router.include_router(support_automation_router)
 web_router.include_router(support_csat_router)
 web_router.include_router(support_routing_router)
 web_router.include_router(support_tags_router)
+web_router.include_router(support_queues_router)
+web_router.include_router(support_escalations_router)
+web_router.include_router(support_channels_router)
+web_router.include_router(support_webhooks_router)
 
 # Standalone modules (linked from parent modules)
-web_router.include_router(customers_router)
 web_router.include_router(invoices_router)
 web_router.include_router(subscriptions_router)
+web_router.include_router(subscriptions_services_router)
+web_router.include_router(subscribers_router)
 web_router.include_router(tariffs_router)
 web_router.include_router(payment_subscriptions_router)
 web_router.include_router(expenses_router)

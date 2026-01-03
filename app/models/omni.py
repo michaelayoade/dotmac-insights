@@ -219,6 +219,8 @@ class OmniWebhookEvent(Base):
     headers: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     processed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     received_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
 
     def __repr__(self) -> str:

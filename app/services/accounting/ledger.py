@@ -41,6 +41,15 @@ if TYPE_CHECKING:
 
 __all__ = ["LedgerService"]
 
+# Allowed sort columns for accounts
+ALLOWED_ACCOUNT_SORTS = {
+    "account_name",
+    "account_number",
+    "root_type",
+    "account_type",
+    "id",
+}
+
 # Allowed sort columns for GL entries
 ALLOWED_GL_SORTS = {
     "posting_date",
@@ -116,10 +125,82 @@ class LedgerService:
                 raise ValidationError(
                     "Search query must be at least 2 characters"
                 )
-            query = query.filter(Account.account_name.ilike(f"%{filters.search}%"))
+            query = query.filter(
+                or_(
+                    Account.account_name.ilike(f"%{filters.search}%"),
+                    Account.account_number.ilike(f"%{filters.search}%"),
+                )
+            )
 
-        query = query.order_by(Account.account_name)
+        sort_key = (
+            filters.sort_by if filters.sort_by in ALLOWED_ACCOUNT_SORTS else "account_name"
+        )
+        sort_column = getattr(Account, sort_key, Account.account_name)
+        if filters.sort_dir == "desc":
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc())
         return paginate(query, pagination)
+
+    def get_account_stats(self) -> Dict[str, Any]:
+        """Get summary stats for chart of accounts."""
+        total_count = self.db.query(func.count(Account.id)).filter(
+            Account.disabled == False
+        ).scalar() or 0
+
+        group_count = self.db.query(func.count(Account.id)).filter(
+            Account.disabled == False,
+            Account.is_group == True,
+        ).scalar() or 0
+
+        by_root_type = {}
+        for root_type in AccountType:
+            count = self.db.query(func.count(Account.id)).filter(
+                Account.disabled == False,
+                Account.root_type == root_type,
+            ).scalar() or 0
+            by_root_type[root_type.value] = count
+
+        return {
+            "total_count": total_count,
+            "group_count": group_count,
+            "ledger_count": total_count - group_count,
+            "by_root_type": by_root_type,
+        }
+
+    def get_gl_stats(self) -> Dict[str, Any]:
+        """Get summary stats for general ledger."""
+        now = date.today()
+        month_start = date(now.year, now.month, 1)
+
+        total_count = self.db.query(func.count(GLEntry.id)).filter(
+            GLEntry.is_cancelled == False
+        ).scalar() or 0
+
+        this_month_count = self.db.query(func.count(GLEntry.id)).filter(
+            GLEntry.is_cancelled == False,
+            GLEntry.posting_date >= month_start,
+        ).scalar() or 0
+
+        total_debit = self.db.query(func.sum(GLEntry.debit)).filter(
+            GLEntry.is_cancelled == False
+        ).scalar() or Decimal("0")
+
+        total_credit = self.db.query(func.sum(GLEntry.credit)).filter(
+            GLEntry.is_cancelled == False
+        ).scalar() or Decimal("0")
+
+        return {
+            "total_count": total_count,
+            "this_month_count": this_month_count,
+            "total_debit": total_debit,
+            "total_credit": total_credit,
+        }
+
+    def list_voucher_types(self) -> List[str]:
+        """List distinct voucher types for GL entries."""
+        rows = self.db.query(GLEntry.voucher_type).distinct().all()
+        return [row[0] for row in rows if row[0]]
 
     def get_account(self, account_id: int) -> Account:
         """Get an account by ID.
@@ -139,6 +220,26 @@ class LedgerService:
         if not account:
             raise NotFoundError(f"Account {account_id} not found")
         return account
+
+    def get_account_by_name(self, account_name: str) -> Optional[Account]:
+        """Get an account by name (active only)."""
+        return (
+            self.db.query(Account)
+            .filter(Account.account_name == account_name, Account.disabled == False)
+            .first()
+        )
+
+    def list_child_accounts(self, parent_account: str) -> List[Account]:
+        """List active child accounts for a parent account name."""
+        return (
+            self.db.query(Account)
+            .filter(
+                Account.parent_account == parent_account,
+                Account.disabled == False,
+            )
+            .order_by(Account.account_name)
+            .all()
+        )
 
     def get_account_balance(self, account: Account) -> AccountBalanceInfo:
         """Calculate current balance for an account.
