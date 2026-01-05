@@ -1,0 +1,366 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
+    <div>
+        <div class="flex items-center gap-3 mb-2">
+            <a href="/subscriptions/payments" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ subscription.plan_name }}</h1>
+            {% set status_colors = {
+                'active': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                'paused': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                'cancelled': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                'completed': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                'past_due': 'bg-red-50 text-red-700 ring-red-600/20',
+                'expired': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+            } %}
+            <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(subscription.status.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                {{ subscription.status.value.replace('_', ' ') | title }}
+            </span>
+        </div>
+        <p class="mt-1.5 text-gray-500 font-body">
+            {{ subscription.interval.value | title }} billing via {{ subscription.provider.value | title }}
+        </p>
+    </div>
+    <div class="flex items-center gap-3">
+        {% for action in actions %}
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl shadow-warm-sm transition-all duration-200
+            {% if action.color == 'emerald' %}
+            text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100
+            {% elif action.color == 'amber' %}
+            text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100
+            {% elif action.color == 'red' %}
+            text-red-700 bg-red-50 border border-red-200 hover:bg-red-100
+            {% elif action.color == 'blue' %}
+            text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100
+            {% else %}
+            text-gray-700 bg-white border border-gray-200 hover:bg-surface-50
+            {% endif %}"
+            hx-get="/subscriptions/payments/{{ subscription.id }}/action-modal?action={{ action.action }}"
+            hx-target="#modal-container"
+            hx-swap="innerHTML"
+        >
+            {% if action.icon == 'pause' %}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {% elif action.icon == 'play' %}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            {% elif action.icon == 'x' %}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            {% elif action.icon == 'refresh' %}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            {% endif %}
+            {{ action.label }}
+        </button>
+        {% endfor %}
+
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
+            hx-get="/subscriptions/payments/{{ subscription.id }}/link-modal"
+            hx-target="#modal-container"
+            hx-swap="innerHTML"
+        >
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+            </svg>
+            {% if subscription.service_subscription_id %}Manage Link{% else %}Link Service{% endif %}
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Subscription Details Card -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="payment-subscription-details">
+            <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Subscription Details</h2>
+            </div>
+            <div class="p-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                    <!-- Amount -->
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Amount</dt>
+                        <dd class="text-xl font-display font-bold text-gray-900 tabular-nums">
+                            {{ subscription.currency or '₦' }} {{ "{:,.0f}".format(subscription.amount) }}
+                            <span class="text-sm font-normal text-gray-500">/ {{ subscription.interval.value | lower }}</span>
+                        </dd>
+                    </div>
+
+                    <!-- Provider -->
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Payment Provider</dt>
+                        <dd class="text-sm text-gray-900">
+                            {% set provider_badge_colors = {
+                                'paystack': 'bg-cyan-50 text-cyan-700 ring-cyan-600/20',
+                                'flutterwave': 'bg-orange-50 text-orange-700 ring-orange-600/20'
+                            } %}
+                            <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ provider_badge_colors.get(subscription.provider.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                                {{ subscription.provider.value | title }}
+                            </span>
+                        </dd>
+                    </div>
+
+                    <!-- Customer Email -->
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Customer Email</dt>
+                        <dd class="text-sm text-gray-900">{{ subscription.customer_email or '-' }}</dd>
+                    </div>
+
+                    <!-- Provider Subscription Code -->
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Provider Code</dt>
+                        <dd class="text-sm text-gray-900 font-mono">{{ subscription.provider_subscription_code or '-' }}</dd>
+                    </div>
+
+                    <!-- Next Billing Date -->
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Billing</dt>
+                        <dd class="text-sm text-gray-900">
+                            {% if subscription.next_billing_date %}
+                            {{ subscription.next_billing_date.strftime('%d %B %Y') }}
+                            {% else %}
+                            <span class="text-gray-400">-</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+
+                    <!-- Start Date -->
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Started</dt>
+                        <dd class="text-sm text-gray-900">
+                            {% if subscription.started_at %}
+                            {{ subscription.started_at.strftime('%d %B %Y') }}
+                            {% else %}
+                            {{ subscription.created_at.strftime('%d %B %Y') }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+
+                <!-- Linked Service Subscription -->
+                {% if service_subscription %}
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Linked Service Subscription</h3>
+                    <a
+                        href="/subscriptions/{{ service_subscription.id }}"
+                        class="flex items-center gap-4 p-4 bg-surface-50 rounded-xl hover:bg-surface-100 transition-colors"
+                    >
+                        <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center ring-2 ring-blue-200/50">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold text-gray-900">{{ service_subscription.plan_name }}</p>
+                            <p class="text-xs text-gray-500">{{ service_subscription.status.value | title }} · {{ service_subscription.service_type.value | title }}</p>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="transaction-history">
+            <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Transaction History</h2>
+            </div>
+            {% if transactions %}
+            <div class="divide-y divide-gray-100">
+                {% for txn in transactions %}
+                <div class="px-6 py-4 hover:bg-surface-50/50 transition-colors">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            {% set txn_status_colors = {
+                                'SUCCESS': 'from-emerald-100 to-emerald-200 ring-emerald-200/50 text-emerald-600',
+                                'FAILED': 'from-red-100 to-rose-200 ring-red-200/50 text-red-600',
+                                'PENDING': 'from-amber-100 to-amber-200 ring-amber-200/50 text-amber-600'
+                            } %}
+                            <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br {{ txn_status_colors.get(txn.status.name, 'from-gray-100 to-slate-200 ring-gray-200/50 text-gray-600') }} ring-1 flex items-center justify-center">
+                                {% if txn.status.name == 'SUCCESS' %}
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                {% elif txn.status.name == 'FAILED' %}
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                                {% else %}
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">
+                                    {{ txn.currency or '₦' }} {{ "{:,.0f}".format(txn.amount) }}
+                                </p>
+                                <p class="text-xs text-gray-500">{{ txn.reference or txn.gateway_reference or '-' }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-500">{{ txn.created_at.strftime('%d %b %Y') }}</p>
+                            <p class="text-xs text-gray-400">{{ txn.created_at.strftime('%H:%M') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="p-8 text-center">
+                <p class="text-sm text-gray-500">No transactions recorded yet</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Billing Stats Card -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="billing-stats">
+            <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Billing Stats</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-500">Total Charges</span>
+                    <span class="text-sm font-semibold text-gray-900 tabular-nums">{{ subscription.total_charges or 0 }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-500">Successful</span>
+                    <span class="text-sm font-semibold text-emerald-600 tabular-nums">{{ subscription.successful_charges or 0 }}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-500">Failed</span>
+                    <span class="text-sm font-semibold text-red-600 tabular-nums">{{ subscription.failed_charges or 0 }}</span>
+                </div>
+                <div class="pt-4 border-t border-gray-100">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-500">Total Collected</span>
+                        <span class="text-lg font-display font-bold text-gray-900 tabular-nums">
+                            {{ subscription.currency or '₦' }} {{ "{:,.0f}".format(subscription.total_collected or 0) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Card -->
+        {% if subscription.party %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="customer-info">
+            <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Customer</h2>
+            </div>
+            <div class="p-6">
+                <a href="/parties/{{ subscription.party.id }}" class="block group">
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center text-primary-700 font-semibold text-lg ring-2 ring-primary-200/50">
+                            {{ subscription.party.name[:1] | upper }}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
+                                {{ subscription.party.name }}
+                            </p>
+                            {% if subscription.party.primary_email %}
+                            <p class="text-xs text-gray-500 truncate">{{ subscription.party.primary_email }}</p>
+                            {% endif %}
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </div>
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Retry Info (if past due) -->
+        {% if subscription.status.value == 'past_due' %}
+        <div class="bg-red-50 rounded-2xl ring-1 ring-red-100 overflow-hidden" data-testid="retry-info">
+            <div class="px-6 py-4 border-b border-red-100 bg-red-100/50">
+                <h2 class="text-sm font-semibold text-red-800">Payment Failed</h2>
+            </div>
+            <div class="p-6 space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-red-700">Retry Attempts</span>
+                    <span class="font-semibold text-red-800">{{ subscription.retry_count or 0 }} / {{ subscription.max_retries or 3 }}</span>
+                </div>
+                {% if subscription.last_charge_status %}
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-red-700">Last Status</span>
+                    <span class="font-medium text-red-800">{{ subscription.last_charge_status }}</span>
+                </div>
+                {% endif %}
+                {% if subscription.last_charge_date %}
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-red-700">Last Attempt</span>
+                    <span class="text-red-800">{{ subscription.last_charge_date.strftime('%d %b %Y %H:%M') }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Timestamps -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="timestamps">
+            <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Timeline</h2>
+            </div>
+            <div class="p-6 space-y-3">
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-500">Created</span>
+                    <span class="text-gray-900">{{ subscription.created_at.strftime('%d %b %Y') }}</span>
+                </div>
+                {% if subscription.started_at %}
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-500">Started</span>
+                    <span class="text-gray-900">{{ subscription.started_at.strftime('%d %b %Y') }}</span>
+                </div>
+                {% endif %}
+                {% if subscription.paused_at %}
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-500">Paused</span>
+                    <span class="text-amber-600">{{ subscription.paused_at.strftime('%d %b %Y') }}</span>
+                </div>
+                {% endif %}
+                {% if subscription.cancelled_at %}
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-500">Cancelled</span>
+                    <span class="text-red-600">{{ subscription.cancelled_at.strftime('%d %b %Y') }}</span>
+                </div>
+                {% endif %}
+                {% if subscription.ended_at %}
+                <div class="flex justify-between items-center text-sm">
+                    <span class="text-gray-500">Ended</span>
+                    <span class="text-gray-900">{{ subscription.ended_at.strftime('%d %b %Y') }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Container -->
+<div id="modal-container"></div>
+{% endblock %}

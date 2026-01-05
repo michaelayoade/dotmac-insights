@@ -10,7 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import settings
 from app.sync.base import BaseSyncClient, CircuitBreakerOpenError
 from app.models.sync_log import SyncSource
-from app.models.customer import Customer
+from app.models.party import Party, PartyExternalId, PartyRole, PartyType, CustomerAccount
 from app.models.conversation import Conversation, Message, ConversationStatus
 from app.models.employee import Employee
 
@@ -143,10 +143,27 @@ class ChatwootSync(BaseSyncClient):
 
     async def sync_all(self, full_sync: bool = False):
         """Sync all entities from Chatwoot."""
-        async with httpx.AsyncClient(timeout=60) as client:
-            await self.sync_agents(client, full_sync)  # Sync agents first to link employees
+        async with httpx.AsyncClient(timeout=120) as client:
+            # Phase 1: Configuration entities (need to exist before core entities)
+            await self.sync_inboxes(client, full_sync)
+            await self.sync_teams(client, full_sync)
+            await self.sync_labels(client, full_sync)
+            await self.sync_custom_attributes(client, full_sync)
+            await self.sync_canned_responses(client, full_sync)
+            await self.sync_automation_rules(client, full_sync)
+
+            # Phase 2: Core entities (existing)
+            await self.sync_agents(client, full_sync)
             await self.sync_contacts(client, full_sync)
             await self.sync_conversations(client, full_sync)
+
+            # Phase 3: Dependent entities
+            await self.sync_csat(client, full_sync)
+
+            # Phase 4: Content
+            await self.sync_help_center(client, full_sync)
+
+            # Note: Reports are synced by separate scheduled task
 
     async def sync_contacts_task(self, full_sync: bool = False):
         """Wrapper for Celery task - syncs Contacts with its own client."""
@@ -168,6 +185,16 @@ class ChatwootSync(BaseSyncClient):
         self.start_sync("agents", "full" if full_sync else "incremental")
 
         try:
+            party_ext = (
+                self.db.query(PartyExternalId)
+                .filter(PartyExternalId.system == "chatwoot")
+                .all()
+            )
+            party_by_ext = {p.external_id: p.party_id for p in party_ext}
+            party_by_email = {
+                (p.primary_email or "").lower(): p
+                for p in self.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+            }
             response = await self._request(
                 client,
                 "GET",
@@ -184,6 +211,61 @@ class ChatwootSync(BaseSyncClient):
 
                 if not email:
                     continue
+
+                party = None
+                if chatwoot_agent_id is not None:
+                    party_id = party_by_ext.get(str(chatwoot_agent_id))
+                    if party_id:
+                        party = self.db.query(Party).get(party_id)
+
+                email_norm = email.strip().lower()
+                if not party:
+                    party = party_by_email.get(email_norm)
+
+                if not party:
+                    party = Party(
+                        type=PartyType.PERSON.value,
+                        name=name or None,
+                        emails=[],
+                        phones=[],
+                    )
+                    self.db.add(party)
+                    self.db.flush()
+
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email_norm for e in emails):
+                    emails.append(
+                        {
+                            "address": email_norm,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+                    party_by_email[email_norm] = party
+
+                if not party.name:
+                    party.name = name or party.name
+
+                if chatwoot_agent_id is not None and str(chatwoot_agent_id) not in party_by_ext:
+                    self.db.add(
+                        PartyExternalId(
+                            party_id=party.id,
+                            system="chatwoot",
+                            external_id=str(chatwoot_agent_id),
+                            external_key_type="agent_id",
+                        )
+                    )
+                    party_by_ext[str(chatwoot_agent_id)] = party.id
+
+                has_support_role = (
+                    self.db.query(PartyRole)
+                    .filter(PartyRole.party_id == party.id, PartyRole.role == "support_agent", PartyRole.until.is_(None))
+                    .first()
+                )
+                if not has_support_role:
+                    self.db.add(PartyRole(party_id=party.id, role="support_agent"))
 
                 # Find matching employee by email
                 employee = self.db.query(Employee).filter(
@@ -222,6 +304,16 @@ class ChatwootSync(BaseSyncClient):
         self.start_sync("contacts", "full" if full_sync else "incremental")
 
         try:
+            party_ext = (
+                self.db.query(PartyExternalId)
+                .filter(PartyExternalId.system == "chatwoot")
+                .all()
+            )
+            party_by_ext = {p.external_id: p.party_id for p in party_ext}
+            party_by_email = {
+                (p.primary_email or "").lower(): p
+                for p in self.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+            }
             contacts = await self._fetch_paginated(
                 client,
                 f"/accounts/{self.account_id}/contacts",
@@ -236,27 +328,93 @@ class ChatwootSync(BaseSyncClient):
                 phone = contact_data.get("phone_number")
                 _name = contact_data.get("name", "")  # Available for future use
 
-                customer = None
+                party = None
+
+                if chatwoot_id is not None:
+                    party_id = party_by_ext.get(str(chatwoot_id))
+                    if party_id:
+                        party = self.db.query(Party).get(party_id)
 
                 # Match by email first
-                if email:
-                    customer = self.db.query(Customer).filter(
-                        Customer.email == email
-                    ).first()
+                if email and not party:
+                    party = party_by_email.get(email.strip().lower())
 
                 # Then try by phone
-                if not customer and phone:
+                if not party and phone:
                     # Normalize phone number (remove spaces, dashes)
                     normalized_phone = phone.replace(" ", "").replace("-", "")
-                    customer = self.db.query(Customer).filter(
-                        Customer.phone.ilike(f"%{normalized_phone[-10:]}%")
-                    ).first()
+                    party = (
+                        self.db.query(Party)
+                        .filter(Party.primary_phone.ilike(f"%{normalized_phone[-10:]}%"))
+                        .first()
+                    )
 
-                if customer:
-                    customer.chatwoot_contact_id = chatwoot_id
-                    customer.last_synced_at = datetime.now(timezone.utc)
-                    self.increment_updated()
-                    logger.debug("chatwoot_contact_linked", customer_id=customer.id, chatwoot_id=chatwoot_id)
+                if not party:
+                    party = Party(
+                        type=PartyType.PERSON.value,
+                        name=contact_data.get("name") or None,
+                        emails=[],
+                        phones=[],
+                    )
+                    self.db.add(party)
+                    self.db.flush()
+
+                if email:
+                    email_norm = email.strip().lower()
+                    emails = list(party.emails or [])
+                    if not any((e.get("address") or "").lower() == email_norm for e in emails):
+                        emails.append(
+                            {
+                                "address": email_norm,
+                                "label": "primary",
+                                "is_primary": len(emails) == 0,
+                                "verified": False,
+                            }
+                        )
+                        party.emails = emails
+                        party_by_email[email_norm] = party
+
+                if phone:
+                    phones = list(party.phones or [])
+                    if not any((p.get("number") or "") == phone for p in phones):
+                        phones.append(
+                            {
+                                "number": phone,
+                                "label": "primary",
+                                "is_primary": len(phones) == 0,
+                                "can_sms": False,
+                                "can_whatsapp": False,
+                            }
+                        )
+                        party.phones = phones
+
+                if not party.name:
+                    party.name = contact_data.get("name") or party.name
+
+                if chatwoot_id is not None and str(chatwoot_id) not in party_by_ext:
+                    self.db.add(
+                        PartyExternalId(
+                            party_id=party.id,
+                            system="chatwoot",
+                            external_id=str(chatwoot_id),
+                            external_key_type="contact_id",
+                        )
+                    )
+                    party_by_ext[str(chatwoot_id)] = party.id
+
+                has_contact_role = (
+                    self.db.query(PartyRole)
+                    .filter(PartyRole.party_id == party.id, PartyRole.role == "customer", PartyRole.until.is_(None))
+                    .first()
+                )
+                if not has_contact_role:
+                    has_account = (
+                        self.db.query(CustomerAccount)
+                        .filter(CustomerAccount.party_id == party.id)
+                        .first()
+                    )
+                    if has_account:
+                        self.db.add(PartyRole(party_id=party.id, role="customer"))
 
             self.db.commit()
             self.complete_sync()
@@ -311,13 +469,27 @@ class ChatwootSync(BaseSyncClient):
                     Conversation.chatwoot_id == chatwoot_id
                 ).first()
 
-                # Find customer by contact_id
+                # Find party by contact_id and customer account via party map
                 contact_id = conv_data.get("meta", {}).get("sender", {}).get("id")
-                customer = None
+                customer_account_id = None
                 if contact_id:
-                    customer = self.db.query(Customer).filter(
-                        Customer.chatwoot_contact_id == contact_id
-                    ).first()
+                    party_ext = (
+                        self.db.query(PartyExternalId)
+                        .filter(
+                            PartyExternalId.system == "chatwoot",
+                            PartyExternalId.external_id == str(contact_id),
+                            PartyExternalId.external_key_type == "contact_id",
+                        )
+                        .first()
+                    )
+                    if party_ext:
+                        account = (
+                            self.db.query(CustomerAccount)
+                            .filter(CustomerAccount.party_id == party_ext.party_id)
+                            .first()
+                        )
+                        if account:
+                            customer_account_id = account.id
 
                 # Map status
                 status_str = str(conv_data.get("status", 0))
@@ -392,7 +564,7 @@ class ChatwootSync(BaseSyncClient):
                 labels_str = ",".join(labels) if labels else None
 
                 if existing:
-                    existing.customer_id = customer.id if customer else None
+                    existing.customer_account_id = customer_account_id
                     existing.chatwoot_contact_id = contact_id
                     existing.status = status
                     existing.inbox_name = inbox.get("name")
@@ -421,7 +593,7 @@ class ChatwootSync(BaseSyncClient):
                 else:
                     conversation = Conversation(
                         chatwoot_id=chatwoot_id,
-                        customer_id=customer.id if customer else None,
+                        customer_account_id=customer_account_id,
                         chatwoot_contact_id=contact_id,
                         status=status,
                         inbox_name=inbox.get("name"),
@@ -574,3 +746,97 @@ class ChatwootSync(BaseSyncClient):
                 conversation_id=conversation_chatwoot_id,
                 error=str(e),
             )
+
+    # =========================================================================
+    # New sync methods - delegate to chatwoot_parts modules
+    # =========================================================================
+
+    async def sync_inboxes(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync inboxes from Chatwoot to OmniChannel model."""
+        from app.sync.chatwoot_parts.inboxes import sync_inboxes
+        await sync_inboxes(self, client, full_sync)
+
+    async def sync_inboxes_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Inboxes with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_inboxes(client, full_sync)
+
+    async def sync_teams(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync teams from Chatwoot to Team model."""
+        from app.sync.chatwoot_parts.teams import sync_teams
+        await sync_teams(self, client, full_sync)
+
+    async def sync_teams_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Teams with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_teams(client, full_sync)
+
+    async def sync_labels(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync labels from Chatwoot to TicketTag model."""
+        from app.sync.chatwoot_parts.labels import sync_labels
+        await sync_labels(self, client, full_sync)
+
+    async def sync_labels_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Labels with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_labels(client, full_sync)
+
+    async def sync_canned_responses(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync canned responses from Chatwoot to CannedResponse model."""
+        from app.sync.chatwoot_parts.canned_responses import sync_canned_responses
+        await sync_canned_responses(self, client, full_sync)
+
+    async def sync_canned_responses_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Canned Responses with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_canned_responses(client, full_sync)
+
+    async def sync_custom_attributes(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync custom attribute definitions from Chatwoot to TicketCustomField model."""
+        from app.sync.chatwoot_parts.custom_attributes import sync_custom_attributes
+        await sync_custom_attributes(self, client, full_sync)
+
+    async def sync_custom_attributes_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Custom Attributes with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_custom_attributes(client, full_sync)
+
+    async def sync_automation_rules(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync automation rules from Chatwoot to AutomationRule model."""
+        from app.sync.chatwoot_parts.automation_rules import sync_automation_rules
+        await sync_automation_rules(self, client, full_sync)
+
+    async def sync_automation_rules_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Automation Rules with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_automation_rules(client, full_sync)
+
+    async def sync_csat(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync CSAT survey responses from Chatwoot conversations."""
+        from app.sync.chatwoot_parts.csat import sync_csat
+        await sync_csat(self, client, full_sync)
+
+    async def sync_csat_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs CSAT with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_csat(client, full_sync)
+
+    async def sync_reports(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync report metrics from Chatwoot to ChatwootMetricSnapshot model."""
+        from app.sync.chatwoot_parts.reports import sync_reports
+        await sync_reports(self, client, full_sync)
+
+    async def sync_reports_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Reports with its own client."""
+        async with httpx.AsyncClient(timeout=120) as client:
+            await self.sync_reports(client, full_sync)
+
+    async def sync_help_center(self, client: httpx.AsyncClient, full_sync: bool = False):
+        """Sync Help Center content from Chatwoot to KB models."""
+        from app.sync.chatwoot_parts.help_center import sync_help_center
+        await sync_help_center(self, client, full_sync)
+
+    async def sync_help_center_task(self, full_sync: bool = False):
+        """Wrapper for Celery task - syncs Help Center with its own client."""
+        async with httpx.AsyncClient(timeout=60) as client:
+            await self.sync_help_center(client, full_sync)

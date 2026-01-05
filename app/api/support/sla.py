@@ -1,28 +1,34 @@
-"""SLA policies and business calendar endpoints."""
+"""SLA policies and business calendar endpoints.
+
+These routes are thin wrappers around SLAService.
+All business logic resides in the service layer.
+"""
 from __future__ import annotations
 
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timedelta, timezone
 from decimal import Decimal
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.database import get_db
-from app.models.support_sla import (
-    BusinessCalendar,
-    BusinessCalendarHoliday,
-    SLAPolicy,
-    SLATarget,
-    SLABreachLog,
-    SLATargetType,
-    BusinessHourType,
-)
-from app.models.ticket import Ticket
-from app.auth import Require
+from app.models.support_sla import BusinessHourType, SLATargetType
+from app.auth import Require, get_current_user, Principal
 from app.cache import cached, CACHE_TTL
+from app.services.support import SLAService
+from app.services.support.types import (
+    BusinessCalendarCreate,
+    BusinessCalendarUpdate,
+    HolidayCreate,
+    SLAPolicyCreate,
+    SLAPolicyUpdate,
+    SLATargetCreate,
+    SLATargetUpdate,
+    SLABreachFilters,
+)
+from app.services.errors import NotFoundError, ValidationError, DuplicateError
 
 router = APIRouter()
 
@@ -84,8 +90,27 @@ class SLATargetCreateRequest(BaseModel):
     warning_threshold_pct: int = 80
 
 
+class SLATargetUpdateRequest(BaseModel):
+    target_type: Optional[str] = None
+    priority: Optional[str] = None
+    target_hours: Optional[Decimal] = None
+    warning_threshold_pct: Optional[int] = None
+
+
 class SLACalculateRequest(BaseModel):
     ticket_id: int
+
+
+# =============================================================================
+# DEPENDENCY INJECTION
+# =============================================================================
+
+def get_sla_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_user),
+) -> SLAService:
+    """Provide SLAService instance for dependency injection."""
+    return SLAService(db, principal)
 
 
 # =============================================================================
@@ -95,13 +120,10 @@ class SLACalculateRequest(BaseModel):
 @router.get("/calendars", dependencies=[Depends(Require("support:sla:read"))])
 def list_calendars(
     active_only: bool = True,
-    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> List[Dict[str, Any]]:
     """List all business calendars."""
-    query = db.query(BusinessCalendar)
-    if active_only:
-        query = query.filter(BusinessCalendar.is_active == True)
-    calendars = query.order_by(BusinessCalendar.name).all()
+    calendars = service.list_calendars(is_active=True if active_only else None)
 
     return [
         {
@@ -112,7 +134,7 @@ def list_calendars(
             "timezone": c.timezone,
             "is_default": c.is_default,
             "is_active": c.is_active,
-            "holiday_count": len(c.holidays),
+            "holiday_count": len(c.holidays) if c.holidays else 0,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         }
         for c in calendars
@@ -123,47 +145,37 @@ def list_calendars(
 def create_calendar(
     payload: BusinessCalendarCreateRequest,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Create a business calendar."""
-    # Validate calendar type
     try:
-        BusinessHourType(payload.calendar_type)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid calendar_type: {payload.calendar_type}")
-
-    # Check name uniqueness
-    existing = db.query(BusinessCalendar).filter(BusinessCalendar.name == payload.name).first()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Calendar with name '{payload.name}' already exists")
-
-    # If setting as default, unset other defaults
-    if payload.is_default:
-        db.query(BusinessCalendar).filter(BusinessCalendar.is_default == True).update({"is_default": False})
-
-    calendar = BusinessCalendar(
-        name=payload.name,
-        description=payload.description,
-        calendar_type=payload.calendar_type,
-        timezone=payload.timezone,
-        schedule=payload.schedule,
-        is_default=payload.is_default,
-        is_active=payload.is_active,
-    )
-    db.add(calendar)
-    db.commit()
-    db.refresh(calendar)
-    return {"id": calendar.id, "name": calendar.name}
+        calendar = service.create_calendar(BusinessCalendarCreate(
+            name=payload.name,
+            description=payload.description,
+            calendar_type=payload.calendar_type,
+            timezone=payload.timezone,
+            schedule=payload.schedule,
+            is_default=payload.is_default,
+        ))
+        db.commit()
+        return {"id": calendar.id, "name": calendar.name}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except DuplicateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("/calendars/{calendar_id}", dependencies=[Depends(Require("support:sla:read"))])
 def get_calendar(
     calendar_id: int,
-    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Get calendar details with holidays."""
-    calendar = db.query(BusinessCalendar).filter(BusinessCalendar.id == calendar_id).first()
+    calendar = service.get_calendar(calendar_id)
     if not calendar:
         raise HTTPException(status_code=404, detail="Calendar not found")
+
+    holidays = service.list_holidays(calendar_id)
 
     return {
         "id": calendar.id,
@@ -181,7 +193,7 @@ def get_calendar(
                 "name": h.name,
                 "is_recurring": h.is_recurring,
             }
-            for h in calendar.holidays
+            for h in holidays
         ],
         "created_at": calendar.created_at.isoformat() if calendar.created_at else None,
         "updated_at": calendar.updated_at.isoformat() if calendar.updated_at else None,
@@ -193,70 +205,47 @@ def update_calendar(
     calendar_id: int,
     payload: BusinessCalendarUpdateRequest,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Update a business calendar."""
-    calendar = db.query(BusinessCalendar).filter(BusinessCalendar.id == calendar_id).first()
-    if not calendar:
-        raise HTTPException(status_code=404, detail="Calendar not found")
+    try:
+        calendar = service.update_calendar(
+            calendar_id,
+            BusinessCalendarUpdate(
+                name=payload.name,
+                description=payload.description,
+                calendar_type=payload.calendar_type,
+                timezone=payload.timezone,
+                schedule=payload.schedule,
+                is_default=payload.is_default,
+                is_active=payload.is_active,
+            ),
+        )
+        if not calendar:
+            raise HTTPException(status_code=404, detail="Calendar not found")
 
-    if payload.name is not None:
-        existing = db.query(BusinessCalendar).filter(
-            BusinessCalendar.name == payload.name,
-            BusinessCalendar.id != calendar_id
-        ).first()
-        if existing:
-            raise HTTPException(status_code=409, detail=f"Calendar with name '{payload.name}' already exists")
-        calendar.name = payload.name
-
-    if payload.calendar_type is not None:
-        try:
-            BusinessHourType(payload.calendar_type)
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid calendar_type: {payload.calendar_type}")
-        calendar.calendar_type = payload.calendar_type
-
-    if payload.description is not None:
-        calendar.description = payload.description
-    if payload.timezone is not None:
-        calendar.timezone = payload.timezone
-    if payload.schedule is not None:
-        calendar.schedule = payload.schedule
-    if payload.is_active is not None:
-        calendar.is_active = payload.is_active
-    if payload.is_default is not None:
-        if payload.is_default:
-            db.query(BusinessCalendar).filter(
-                BusinessCalendar.is_default == True,
-                BusinessCalendar.id != calendar_id
-            ).update({"is_default": False})
-        calendar.is_default = payload.is_default
-
-    db.commit()
-    db.refresh(calendar)
-    return {"id": calendar.id, "name": calendar.name}
+        db.commit()
+        return {"id": calendar.id, "name": calendar.name}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except DuplicateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.delete("/calendars/{calendar_id}", dependencies=[Depends(Require("support:sla:write"))])
 def delete_calendar(
     calendar_id: int,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Response:
     """Delete a business calendar."""
-    calendar = db.query(BusinessCalendar).filter(BusinessCalendar.id == calendar_id).first()
-    if not calendar:
-        raise HTTPException(status_code=404, detail="Calendar not found")
-
-    # Check if in use
-    policy_count = db.query(SLAPolicy).filter(SLAPolicy.calendar_id == calendar_id).count()
-    if policy_count > 0:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot delete calendar: {policy_count} SLA policies reference it"
-        )
-
-    db.delete(calendar)
-    db.commit()
-    return Response(status_code=204)
+    try:
+        if not service.delete_calendar(calendar_id):
+            raise HTTPException(status_code=404, detail="Calendar not found")
+        db.commit()
+        return Response(status_code=204)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # =============================================================================
@@ -268,22 +257,22 @@ def add_holiday(
     calendar_id: int,
     payload: HolidayCreateRequest,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Add a holiday to a calendar."""
-    calendar = db.query(BusinessCalendar).filter(BusinessCalendar.id == calendar_id).first()
-    if not calendar:
-        raise HTTPException(status_code=404, detail="Calendar not found")
-
-    holiday = BusinessCalendarHoliday(
-        calendar_id=calendar_id,
-        holiday_date=payload.holiday_date,
-        name=payload.name,
-        is_recurring=payload.is_recurring,
-    )
-    db.add(holiday)
-    db.commit()
-    db.refresh(holiday)
-    return {"id": holiday.id, "holiday_date": holiday.holiday_date.isoformat()}
+    try:
+        holiday = service.add_holiday(
+            calendar_id,
+            HolidayCreate(
+                name=payload.name,
+                holiday_date=datetime.combine(payload.holiday_date, datetime.min.time()),
+                is_recurring=payload.is_recurring,
+            ),
+        )
+        db.commit()
+        return {"id": holiday.id, "holiday_date": holiday.holiday_date.isoformat()}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.delete(
@@ -294,15 +283,11 @@ def remove_holiday(
     calendar_id: int,
     holiday_id: int,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Response:
     """Remove a holiday from a calendar."""
-    holiday = db.query(BusinessCalendarHoliday).filter(
-        BusinessCalendarHoliday.id == holiday_id,
-        BusinessCalendarHoliday.calendar_id == calendar_id
-    ).first()
-    if not holiday:
+    if not service.remove_holiday(calendar_id, holiday_id):
         raise HTTPException(status_code=404, detail="Holiday not found")
-    db.delete(holiday)
     db.commit()
     return Response(status_code=204)
 
@@ -314,13 +299,10 @@ def remove_holiday(
 @router.get("/policies", dependencies=[Depends(Require("support:sla:read"))])
 def list_policies(
     active_only: bool = True,
-    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> List[Dict[str, Any]]:
     """List all SLA policies."""
-    query = db.query(SLAPolicy)
-    if active_only:
-        query = query.filter(SLAPolicy.is_active == True)
-    policies = query.order_by(SLAPolicy.priority, SLAPolicy.name).all()
+    policies = service.list_policies(is_active=True if active_only else None)
 
     return [
         {
@@ -333,7 +315,7 @@ def list_policies(
             "is_default": p.is_default,
             "priority": p.priority,
             "is_active": p.is_active,
-            "target_count": len(p.targets),
+            "target_count": len(p.targets) if p.targets else 0,
             "created_at": p.created_at.isoformat() if p.created_at else None,
         }
         for p in policies
@@ -344,47 +326,42 @@ def list_policies(
 def create_policy(
     payload: SLAPolicyCreateRequest,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Create an SLA policy."""
-    # Check name uniqueness
-    existing = db.query(SLAPolicy).filter(SLAPolicy.name == payload.name).first()
-    if existing:
-        raise HTTPException(status_code=409, detail=f"Policy with name '{payload.name}' already exists")
+    try:
+        # Convert dict conditions to list format if needed
+        conditions = None
+        if payload.conditions:
+            conditions = [payload.conditions] if isinstance(payload.conditions, dict) else payload.conditions
 
-    # Validate calendar if provided
-    if payload.calendar_id:
-        calendar = db.query(BusinessCalendar).filter(BusinessCalendar.id == payload.calendar_id).first()
-        if not calendar:
-            raise HTTPException(status_code=400, detail="Invalid calendar_id")
-
-    # If setting as default, unset other defaults
-    if payload.is_default:
-        db.query(SLAPolicy).filter(SLAPolicy.is_default == True).update({"is_default": False})
-
-    policy = SLAPolicy(
-        name=payload.name,
-        description=payload.description,
-        calendar_id=payload.calendar_id,
-        conditions=payload.conditions,
-        is_default=payload.is_default,
-        priority=payload.priority,
-        is_active=payload.is_active,
-    )
-    db.add(policy)
-    db.commit()
-    db.refresh(policy)
-    return {"id": policy.id, "name": policy.name}
+        policy = service.create_policy(SLAPolicyCreate(
+            name=payload.name,
+            description=payload.description,
+            calendar_id=payload.calendar_id,
+            conditions=conditions,
+            is_default=payload.is_default,
+            priority=payload.priority,
+        ))
+        db.commit()
+        return {"id": policy.id, "name": policy.name}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except DuplicateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.get("/policies/{policy_id}", dependencies=[Depends(Require("support:sla:read"))])
 def get_policy(
     policy_id: int,
-    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Get SLA policy with targets."""
-    policy = db.query(SLAPolicy).filter(SLAPolicy.id == policy_id).first()
+    policy = service.get_policy(policy_id)
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
+
+    targets = service.list_targets(policy_id)
 
     return {
         "id": policy.id,
@@ -404,7 +381,7 @@ def get_policy(
                 "target_hours": float(t.target_hours),
                 "warning_threshold_pct": t.warning_threshold_pct,
             }
-            for t in policy.targets
+            for t in targets
         ],
         "created_at": policy.created_at.isoformat() if policy.created_at else None,
         "updated_at": policy.updated_at.isoformat() if policy.updated_at else None,
@@ -416,58 +393,47 @@ def update_policy(
     policy_id: int,
     payload: SLAPolicyUpdateRequest,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Update an SLA policy."""
-    policy = db.query(SLAPolicy).filter(SLAPolicy.id == policy_id).first()
-    if not policy:
-        raise HTTPException(status_code=404, detail="Policy not found")
+    try:
+        # Convert dict conditions to list format if needed
+        conditions = None
+        if payload.conditions is not None:
+            conditions = [payload.conditions] if isinstance(payload.conditions, dict) else payload.conditions
 
-    if payload.name is not None:
-        existing = db.query(SLAPolicy).filter(
-            SLAPolicy.name == payload.name,
-            SLAPolicy.id != policy_id
-        ).first()
-        if existing:
-            raise HTTPException(status_code=409, detail=f"Policy with name '{payload.name}' already exists")
-        policy.name = payload.name
+        policy = service.update_policy(
+            policy_id,
+            SLAPolicyUpdate(
+                name=payload.name,
+                description=payload.description,
+                calendar_id=payload.calendar_id,
+                conditions=conditions,
+                is_default=payload.is_default,
+                priority=payload.priority,
+                is_active=payload.is_active,
+            ),
+        )
+        if not policy:
+            raise HTTPException(status_code=404, detail="Policy not found")
 
-    if payload.description is not None:
-        policy.description = payload.description
-    if payload.calendar_id is not None:
-        if payload.calendar_id:
-            calendar = db.query(BusinessCalendar).filter(BusinessCalendar.id == payload.calendar_id).first()
-            if not calendar:
-                raise HTTPException(status_code=400, detail="Invalid calendar_id")
-        policy.calendar_id = payload.calendar_id
-    if payload.conditions is not None:
-        policy.conditions = payload.conditions
-    if payload.priority is not None:
-        policy.priority = payload.priority
-    if payload.is_active is not None:
-        policy.is_active = payload.is_active
-    if payload.is_default is not None:
-        if payload.is_default:
-            db.query(SLAPolicy).filter(
-                SLAPolicy.is_default == True,
-                SLAPolicy.id != policy_id
-            ).update({"is_default": False})
-        policy.is_default = payload.is_default
-
-    db.commit()
-    db.refresh(policy)
-    return {"id": policy.id, "name": policy.name}
+        db.commit()
+        return {"id": policy.id, "name": policy.name}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except DuplicateError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
 
 @router.delete("/policies/{policy_id}", dependencies=[Depends(Require("support:sla:write"))])
 def delete_policy(
     policy_id: int,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Response:
     """Delete an SLA policy."""
-    policy = db.query(SLAPolicy).filter(SLAPolicy.id == policy_id).first()
-    if not policy:
+    if not service.delete_policy(policy_id):
         raise HTTPException(status_code=404, detail="Policy not found")
-    db.delete(policy)
     db.commit()
     return Response(status_code=204)
 
@@ -481,45 +447,56 @@ def add_target(
     policy_id: int,
     payload: SLATargetCreateRequest,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Add or update an SLA target for a policy."""
-    policy = db.query(SLAPolicy).filter(SLAPolicy.id == policy_id).first()
-    if not policy:
-        raise HTTPException(status_code=404, detail="Policy not found")
-
-    # Validate target type
     try:
-        SLATargetType(payload.target_type)
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid target_type: {payload.target_type}")
-
-    # Check for existing target with same type and priority
-    existing = db.query(SLATarget).filter(
-        SLATarget.policy_id == policy_id,
-        SLATarget.target_type == payload.target_type,
-        SLATarget.priority == payload.priority
-    ).first()
-
-    if existing:
-        # Update existing target
-        existing.target_hours = payload.target_hours
-        existing.warning_threshold_pct = payload.warning_threshold_pct
+        target = service.add_target(
+            policy_id,
+            SLATargetCreate(
+                target_type=payload.target_type,
+                priority=payload.priority,
+                target_hours=float(payload.target_hours),
+                warning_threshold_pct=payload.warning_threshold_pct,
+            ),
+        )
         db.commit()
-        db.refresh(existing)
-        return {"id": existing.id, "updated": True}
+        return {"id": target.id}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    # Create new target
-    target = SLATarget(
-        policy_id=policy_id,
-        target_type=payload.target_type,
-        priority=payload.priority,
-        target_hours=payload.target_hours,
-        warning_threshold_pct=payload.warning_threshold_pct,
-    )
-    db.add(target)
-    db.commit()
-    db.refresh(target)
-    return {"id": target.id, "updated": False}
+
+@router.patch(
+    "/policies/{policy_id}/targets/{target_id}",
+    dependencies=[Depends(Require("support:sla:write"))],
+)
+def update_target(
+    policy_id: int,
+    target_id: int,
+    payload: SLATargetUpdateRequest,
+    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
+) -> Dict[str, Any]:
+    """Update an SLA target."""
+    try:
+        target = service.update_target(
+            policy_id,
+            target_id,
+            SLATargetUpdate(
+                target_type=payload.target_type,
+                priority=payload.priority,
+                target_hours=float(payload.target_hours) if payload.target_hours else None,
+                warning_threshold_pct=payload.warning_threshold_pct,
+            ),
+        )
+        if not target:
+            raise HTTPException(status_code=404, detail="Target not found")
+        db.commit()
+        return {"id": target.id}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.delete(
@@ -530,15 +507,11 @@ def remove_target(
     policy_id: int,
     target_id: int,
     db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Response:
     """Remove an SLA target."""
-    target = db.query(SLATarget).filter(
-        SLATarget.id == target_id,
-        SLATarget.policy_id == policy_id
-    ).first()
-    if not target:
+    if not service.remove_target(policy_id, target_id):
         raise HTTPException(status_code=404, detail="Target not found")
-    db.delete(target)
     db.commit()
     return Response(status_code=204)
 
@@ -550,54 +523,31 @@ def remove_target(
 @router.post("/calculate", dependencies=[Depends(Require("support:sla:read"))])
 def calculate_sla(
     payload: SLACalculateRequest,
-    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Calculate SLA status for a ticket.
 
     Returns applicable policy, targets, and current status.
     This is a preview - actual SLA assignment happens via the SLA engine service.
     """
-    ticket = db.query(Ticket).filter(Ticket.id == payload.ticket_id).first()
-    if not ticket:
-        raise HTTPException(status_code=404, detail="Ticket not found")
+    result = service.calculate_policy_deadlines(payload.ticket_id)
 
-    # Find applicable policy (simplified - full logic in sla_engine)
-    policy = db.query(SLAPolicy).filter(
-        SLAPolicy.is_active == True
-    ).order_by(SLAPolicy.priority).first()
-
-    if not policy:
+    if not result.get("policy"):
         return {
-            "ticket_id": ticket.id,
+            "ticket_id": payload.ticket_id,
             "policy": None,
-            "message": "No applicable SLA policy found",
+            "message": result.get("message", "No applicable SLA policy found"),
         }
 
-    targets = []
-    for target in policy.targets:
-        # Filter by ticket priority if target has priority specified
-        if target.priority and target.priority != ticket.priority.value:
-            continue
-        targets.append({
-            "target_type": target.target_type,
-            "priority": target.priority,
-            "target_hours": float(target.target_hours),
-            "warning_threshold_pct": target.warning_threshold_pct,
-        })
-
     return {
-        "ticket_id": ticket.id,
-        "policy": {
-            "id": policy.id,
-            "name": policy.name,
-            "calendar_id": policy.calendar_id,
-        },
-        "applicable_targets": targets,
-        "ticket_priority": ticket.priority.value if ticket.priority else None,
-        "ticket_created_at": ticket.created_at.isoformat() if ticket.created_at else None,
-        "first_response_at": ticket.first_responded_on.isoformat() if ticket.first_responded_on else None,
-        "response_by": ticket.response_by.isoformat() if ticket.response_by else None,
-        "resolution_by": ticket.resolution_by.isoformat() if ticket.resolution_by else None,
+        "ticket_id": payload.ticket_id,
+        "policy": result["policy"],
+        "applicable_targets": result.get("targets", []),
+        "response_by": result.get("response_by"),
+        "resolution_by": result.get("resolution_by"),
+        "ticket_priority": result.get("ticket_priority"),
+        "ticket_created_at": result.get("ticket_created_at"),
+        "first_response_at": result.get("first_response_at"),
     }
 
 
@@ -611,21 +561,19 @@ def list_breaches(
     target_type: Optional[str] = None,
     days: int = Query(default=30, le=90),
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
-    db: Session = Depends(get_db),
+    offset: int = Query(default=0, ge=0),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """List SLA breaches."""
-    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
-    query = db.query(SLABreachLog).filter(SLABreachLog.breached_at >= start_dt)
+    filters = SLABreachFilters(
+        policy_id=policy_id,
+        target_type=target_type,
+        start_date=start_dt,
+    )
 
-    if policy_id:
-        query = query.filter(SLABreachLog.policy_id == policy_id)
-    if target_type:
-        query = query.filter(SLABreachLog.target_type == target_type)
-
-    total = query.count()
-    breaches = query.order_by(SLABreachLog.breached_at.desc()).offset(offset).limit(limit).all()
+    breaches, total = service.list_breaches(filters=filters, skip=offset, limit=limit)
 
     return {
         "total": total,
@@ -652,51 +600,23 @@ def list_breaches(
 @cached("sla-breaches-summary", ttl=CACHE_TTL["medium"])
 async def breach_summary(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db),
+    service: SLAService = Depends(get_sla_service),
 ) -> Dict[str, Any]:
     """Get SLA breach summary statistics."""
-    start_dt = datetime.now(timezone.utc) - __import__('datetime').timedelta(days=days)
+    start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
-    # Total breaches
-    total_breaches = db.query(func.count(SLABreachLog.id)).filter(
-        SLABreachLog.breached_at >= start_dt
-    ).scalar() or 0
-
-    # Breaches by type
-    by_type = db.query(
-        SLABreachLog.target_type,
-        func.count(SLABreachLog.id).label("count"),
-        func.avg(SLABreachLog.actual_hours - SLABreachLog.target_hours).label("avg_overrun_hours"),
-    ).filter(
-        SLABreachLog.breached_at >= start_dt
-    ).group_by(SLABreachLog.target_type).all()
-
-    # Breaches by policy
-    by_policy = db.query(
-        SLABreachLog.policy_id,
-        SLAPolicy.name,
-        func.count(SLABreachLog.id).label("count"),
-    ).join(SLAPolicy, SLABreachLog.policy_id == SLAPolicy.id, isouter=True).filter(
-        SLABreachLog.breached_at >= start_dt
-    ).group_by(SLABreachLog.policy_id, SLAPolicy.name).all()
+    summary = service.get_breach_summary(start_date=start_dt)
 
     return {
         "period_days": days,
-        "total_breaches": total_breaches,
+        "total_breaches": summary.total_breaches,
         "by_target_type": [
-            {
-                "target_type": row.target_type,
-                "count": row.count,
-                "avg_overrun_hours": round(float(row.avg_overrun_hours or 0), 2),
-            }
-            for row in by_type
+            {"target_type": ttype, "count": count}
+            for ttype, count in summary.by_target_type.items()
         ],
         "by_policy": [
-            {
-                "policy_id": row.policy_id,
-                "policy_name": row.name,
-                "count": row.count,
-            }
-            for row in by_policy
+            {"policy_name": name, "count": count}
+            for name, count in summary.by_policy.items()
         ],
+        "avg_overdue_hours": round(summary.avg_overdue_hours, 2),
     }

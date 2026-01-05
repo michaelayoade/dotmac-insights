@@ -1,3 +1,22 @@
+# Stage 1: Build CSS with Node.js
+FROM node:20-slim AS css-builder
+
+WORKDIR /app
+
+# Copy package files and Tailwind config
+COPY package.json package-lock.json* ./
+COPY tailwind.config.js postcss.config.js ./
+COPY src/ ./src/
+COPY app/templates/ ./app/templates/
+COPY app/modules/ ./app/modules/
+
+# Install dependencies and build CSS
+RUN npm ci && \
+    mkdir -p app/static/css && \
+    npm run css:build
+
+
+# Stage 2: Build Python dependencies
 FROM python:3.11-slim AS builder
 
 ENV POETRY_VERSION=1.7.1 \
@@ -46,6 +65,9 @@ RUN useradd -m appuser
 
 # Copy application code
 COPY --chown=appuser:appuser . .
+
+# Copy compiled CSS from css-builder stage
+COPY --from=css-builder --chown=appuser:appuser /app/app/static/css/styles.css ./app/static/css/styles.css
 USER appuser
 
 # Expose port

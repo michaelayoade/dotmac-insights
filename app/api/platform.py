@@ -92,11 +92,11 @@ class SystemConfigResponse(BaseModel):
 FLAG_DESCRIPTIONS = {
     # Contacts flags
     "CONTACTS_DUAL_WRITE_ENABLED": {
-        "description": "Sync unified contacts to legacy customers table",
+        "description": "Sync parties to legacy customer/contact tables",
         "category": "contacts",
     },
     "CONTACTS_OUTBOUND_SYNC_ENABLED": {
-        "description": "Push contact changes to external systems (Splynx, ERPNext)",
+        "description": "Push party identity changes to external systems (Splynx, ERPNext)",
         "category": "contacts",
     },
     "CONTACTS_OUTBOUND_DRY_RUN": {

@@ -1,0 +1,350 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="min-w-0">
+        <nav class="flex mb-2" aria-label="Breadcrumb">
+            <ol class="flex items-center space-x-2 text-sm">
+                <li><a href="/crm" class="text-gray-400 hover:text-gray-600">CRM</a></li>
+                <li class="flex items-center">
+                    <svg class="h-4 w-4 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                    <span class="ml-2 text-gray-500">Customer Health</span>
+                </li>
+            </ol>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Customer Health</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Retention analytics & health scoring</p>
+    </div>
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center gap-3">
+        <select
+            name="grade"
+            class="rounded-xl border-0 py-2.5 pl-4 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/crm/health"
+            hx-target="body"
+            hx-push-url="true"
+            hx-trigger="change"
+            hx-include="[name='risk']"
+            data-testid="grade-filter"
+        >
+            <option value="">All Grades</option>
+            {% for opt in grade_options %}
+            <option value="{{ opt.value }}" {% if grade_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+            {% endfor %}
+        </select>
+        <select
+            name="risk"
+            class="rounded-xl border-0 py-2.5 pl-4 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/crm/health"
+            hx-target="body"
+            hx-push-url="true"
+            hx-trigger="change"
+            hx-include="[name='grade']"
+            data-testid="risk-filter"
+        >
+            <option value="">All Risk Levels</option>
+            {% for opt in risk_options %}
+            <option value="{{ opt.value }}" {% if risk_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Health Score Distribution -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Health Grades -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Health Score Distribution</h2>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-center mb-6">
+                    <div class="relative w-48 h-48">
+                        <!-- Donut chart visualization -->
+                        <svg viewBox="0 0 36 36" class="w-full h-full">
+                            {% set total = health_stats.total if health_stats.total > 0 else 1 %}
+                            {% set exc_pct = health_stats.excellent / total * 100 %}
+                            {% set good_pct = health_stats.good / total * 100 %}
+                            {% set risk_pct = health_stats.at_risk / total * 100 %}
+                            {% set crit_pct = health_stats.critical / total * 100 %}
+
+                            <!-- Background circle -->
+                            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#f3f4f6" stroke-width="3"/>
+
+                            <!-- Excellent (green) -->
+                            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#22c55e" stroke-width="3"
+                                stroke-dasharray="{{ exc_pct }} {{ 100 - exc_pct }}"
+                                stroke-dashoffset="25" class="transition-all"/>
+
+                            <!-- Good (blue) -->
+                            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#3b82f6" stroke-width="3"
+                                stroke-dasharray="{{ good_pct }} {{ 100 - good_pct }}"
+                                stroke-dashoffset="{{ 25 - exc_pct }}" class="transition-all"/>
+
+                            <!-- At Risk (yellow) -->
+                            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#eab308" stroke-width="3"
+                                stroke-dasharray="{{ risk_pct }} {{ 100 - risk_pct }}"
+                                stroke-dashoffset="{{ 25 - exc_pct - good_pct }}" class="transition-all"/>
+
+                            <!-- Critical (red) -->
+                            <circle cx="18" cy="18" r="15.915" fill="none" stroke="#ef4444" stroke-width="3"
+                                stroke-dasharray="{{ crit_pct }} {{ 100 - crit_pct }}"
+                                stroke-dashoffset="{{ 25 - exc_pct - good_pct - risk_pct }}" class="transition-all"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-3xl font-bold text-gray-900">{{ health_stats.total }}</span>
+                            <span class="text-sm text-gray-500">Customers</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="grid grid-cols-2 gap-3">
+                    <a href="/crm/health?grade=excellent" class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                        <span class="text-sm text-gray-600">Excellent</span>
+                        <span class="ml-auto text-sm font-semibold text-gray-900">{{ health_stats.excellent }}</span>
+                    </a>
+                    <a href="/crm/health?grade=good" class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="w-3 h-3 rounded-full bg-blue-500"></span>
+                        <span class="text-sm text-gray-600">Good</span>
+                        <span class="ml-auto text-sm font-semibold text-gray-900">{{ health_stats.good }}</span>
+                    </a>
+                    <a href="/crm/health?grade=at_risk" class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span class="text-sm text-gray-600">At Risk</span>
+                        <span class="ml-auto text-sm font-semibold text-gray-900">{{ health_stats.at_risk }}</span>
+                    </a>
+                    <a href="/crm/health?grade=critical" class="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span class="text-sm text-gray-600">Critical</span>
+                        <span class="ml-auto text-sm font-semibold text-gray-900">{{ health_stats.critical }}</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Churn Risk -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Churn Risk Analysis</h2>
+            </div>
+            <div class="p-6 space-y-4">
+                <!-- Risk Bars -->
+                {% set total_churn = churn_stats.low + churn_stats.medium + churn_stats.high + churn_stats.critical %}
+                {% set max_churn = [churn_stats.low, churn_stats.medium, churn_stats.high, churn_stats.critical] | max %}
+                {% set max_churn = max_churn if max_churn > 0 else 1 %}
+
+                <a href="/crm/health?risk=low" class="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Low Risk</span>
+                        <span class="text-sm font-semibold text-green-600">{{ churn_stats.low }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div class="h-full bg-green-500 rounded-full transition-all" style="width: {{ (churn_stats.low / max_churn * 100) if max_churn > 0 else 0 }}%"></div>
+                    </div>
+                </a>
+
+                <a href="/crm/health?risk=medium" class="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Medium Risk</span>
+                        <span class="text-sm font-semibold text-yellow-600">{{ churn_stats.medium }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div class="h-full bg-yellow-500 rounded-full transition-all" style="width: {{ (churn_stats.medium / max_churn * 100) if max_churn > 0 else 0 }}%"></div>
+                    </div>
+                </a>
+
+                <a href="/crm/health?risk=high" class="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">High Risk</span>
+                        <span class="text-sm font-semibold text-orange-600">{{ churn_stats.high }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div class="h-full bg-orange-500 rounded-full transition-all" style="width: {{ (churn_stats.high / max_churn * 100) if max_churn > 0 else 0 }}%"></div>
+                    </div>
+                </a>
+
+                <a href="/crm/health?risk=critical" class="block p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-medium text-gray-700">Critical Risk</span>
+                        <span class="text-sm font-semibold text-red-600">{{ churn_stats.critical }}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div class="h-full bg-red-500 rounded-full transition-all" style="width: {{ (churn_stats.critical / max_churn * 100) if max_churn > 0 else 0 }}%"></div>
+                    </div>
+                </a>
+
+                {% if churn_stats.high + churn_stats.critical > 0 %}
+                <div class="mt-4 p-4 bg-red-50 rounded-xl border border-red-100">
+                    <div class="flex items-start gap-3">
+                        <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-red-800">{{ churn_stats.high + churn_stats.critical }} customers at high/critical risk</p>
+                            <p class="text-xs text-red-600 mt-0.5">Review and take action to prevent churn</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Customer Health Table -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Customer Health List</h2>
+            <span class="text-sm text-gray-500">{{ customers | length }} customers</span>
+        </div>
+        {% if customers %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100" data-testid="health-table">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Health Score</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Grade</th>
+                        <th scope="col" class="px-6 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider">Churn Risk</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Win Rate</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Total Value</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Opportunities</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-100">
+                    {% for customer in customers %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                                    <span class="text-sm font-semibold text-primary-700">{{ customer.name[0] | upper if customer.name else '?' }}</span>
+                                </div>
+                                <div class="ml-4">
+                                    <div class="text-sm font-medium text-gray-900">{{ customer.name }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <div class="flex items-center justify-center">
+                                <div class="w-16 bg-gray-200 rounded-full h-2.5 mr-2">
+                                    <div class="h-2.5 rounded-full transition-all
+                                        {% if customer.health_grade == 'excellent' %}bg-green-500
+                                        {% elif customer.health_grade == 'good' %}bg-blue-500
+                                        {% elif customer.health_grade == 'at_risk' %}bg-yellow-500
+                                        {% else %}bg-red-500{% endif %}"
+                                        style="width: {{ customer.health_score }}%"></div>
+                                </div>
+                                <span class="text-sm font-semibold text-gray-900">{{ customer.health_score }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if customer.health_grade == 'excellent' %}bg-green-100 text-green-800
+                                {% elif customer.health_grade == 'good' %}bg-blue-100 text-blue-800
+                                {% elif customer.health_grade == 'at_risk' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ customer.health_grade | replace('_', ' ') | title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if customer.churn_risk == 'low' %}bg-green-100 text-green-800
+                                {% elif customer.churn_risk == 'medium' %}bg-yellow-100 text-yellow-800
+                                {% elif customer.churn_risk == 'high' %}bg-orange-100 text-orange-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ customer.churn_risk | title }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
+                            {{ customer.win_rate }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-semibold">
+                            {{ customer.total_value }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-right">
+                            <span class="text-green-600">{{ customer.won_opportunities }} won</span> /
+                            <span class="text-red-600">{{ customer.lost_opportunities }} lost</span> /
+                            {{ customer.total_opportunities }} total
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="px-6 py-16 text-center" data-testid="empty-state">
+            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+            </svg>
+            <h3 class="mt-4 text-lg font-medium text-gray-900">No customer health data</h3>
+            <p class="mt-2 text-sm text-gray-500">No customers match the selected filters.</p>
+            {% if grade_filter or risk_filter %}
+            <a href="/crm/health" class="mt-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700">
+                Clear filters
+                <svg class="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Quick Actions</h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+            <a href="/crm/health?grade=critical" class="flex items-center gap-4 px-6 py-5 hover:bg-surface-50 transition-colors group">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600 group-hover:bg-red-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-gray-900 group-hover:text-red-600 transition-colors">Critical Customers</p>
+                    <p class="text-sm text-gray-500">Review urgent cases</p>
+                </div>
+            </a>
+            <a href="/crm/health?risk=high" class="flex items-center gap-4 px-6 py-5 hover:bg-surface-50 transition-colors group">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-orange-600 group-hover:bg-orange-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-gray-900 group-hover:text-orange-600 transition-colors">Churn Risk</p>
+                    <p class="text-sm text-gray-500">High risk customers</p>
+                </div>
+            </a>
+            <a href="/crm/opportunities" class="flex items-center gap-4 px-6 py-5 hover:bg-surface-50 transition-colors group">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-gray-900 group-hover:text-blue-600 transition-colors">Opportunities</p>
+                    <p class="text-sm text-gray-500">View all deals</p>
+                </div>
+            </a>
+            <a href="/crm" class="flex items-center gap-4 px-6 py-5 hover:bg-surface-50 transition-colors group">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-gray-600 group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-gray-900 group-hover:text-primary-600 transition-colors">Dashboard</p>
+                    <p class="text-sm text-gray-500">Return to CRM</p>
+                </div>
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

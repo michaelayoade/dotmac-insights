@@ -267,11 +267,45 @@ class ExportService:
             raise ExportError(f"Unknown report type: {report_type}")
 
         template = self.template_env.get_template(template_name)
-        return template.render(
+        return str(template.render(
             data=data,
             company_name=self.company_name,
             now=datetime.now(),
-        )
+        ))
+
+    def _get_report_css(self) -> str:
+        """Return base CSS for report PDFs."""
+        return """
+        @page {
+            size: A4;
+            margin: 24mm 18mm;
+        }
+        body {
+            font-family: "Arial", sans-serif;
+            font-size: 11px;
+            color: #1f2933;
+        }
+        h1, h2, h3 {
+            margin: 0 0 8px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        th, td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+        th {
+            background: #f8fafc;
+            font-weight: 600;
+        }
+        .text-right {
+            text-align: right;
+        }
+        """
 
     def _format_number(self, value: Any) -> str:
         """Format number for display."""

@@ -33,6 +33,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "inbox: Inbox/conversations module tests")
     config.addinivalue_line("markers", "inventory: Inventory module tests")
     config.addinivalue_line("markers", "expenses: Expenses module tests")
+    config.addinivalue_line("markers", "marketing: Marketing module tests")
 
 # Force SQLite for tests (use per-session temp DB unless overridden)
 if "TEST_DATABASE_URL" not in os.environ:
@@ -108,7 +109,7 @@ def auth_client_with_scope(base_client):
     Usage:
         def test_something(auth_client_with_scope):
             client = auth_client_with_scope(["contacts:read"])
-            resp = client.get("/api/contacts")
+            resp = client.get("/api/v1/crm/contacts")
             assert resp.status_code == 200
     """
     def _make_client(scopes: list[str], is_superuser: bool = False, user_id: int = 1):
@@ -139,7 +140,7 @@ def service_token_client(base_client):
     Usage:
         def test_service_token(service_token_client):
             client = service_token_client(["contacts:read"])
-            resp = client.get("/api/contacts")
+            resp = client.get("/api/v1/crm/contacts")
             assert resp.status_code == 200
     """
     def _make_client(scopes: list[str], token_id: int = 1):
@@ -169,7 +170,7 @@ def unauthenticated_client():
 
     Usage:
         def test_unauthenticated_rejected(unauthenticated_client):
-            resp = unauthenticated_client.get("/api/contacts")
+            resp = unauthenticated_client.get("/api/v1/crm/contacts")
             assert resp.status_code == 401
     """
     # Don't override get_current_principal - let it raise 401

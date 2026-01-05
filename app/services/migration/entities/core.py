@@ -1,11 +1,11 @@
-"""Core entity definitions: contacts, customers, employees, departments, designations."""
+"""Core entity definitions: parties, customer accounts, employees, departments, designations."""
 from .base import FieldType, EntityConfig
 
 CORE_ENTITIES: dict[str, EntityConfig] = {
-    "contacts": {
-        "model_name": "Contact",
-        "display_name": "Contacts",
-        "description": "Unified contacts (leads, prospects, customers, persons)",
+    "parties": {
+        "model_name": "Party",
+        "display_name": "Parties",
+        "description": "Unified identity records (persons and organizations)",
         "fields": {
             "id": {"type": FieldType.INTEGER, "description": "Internal ID"},
             "name": {"type": FieldType.STRING, "required": True, "max_length": 255, "normalizer": "name", "description": "Contact name"},
@@ -34,10 +34,10 @@ CORE_ENTITIES: dict[str, EntityConfig] = {
         "supports_rollback": True,
     },
 
-    "customers": {
-        "model_name": "Customer",
-        "display_name": "Customers (Legacy)",
-        "description": "Legacy customer records",
+    "customer_accounts": {
+        "model_name": "CustomerAccount",
+        "display_name": "Customer Accounts",
+        "description": "Customer account records linked to parties",
         "fields": {
             "id": {"type": FieldType.INTEGER, "description": "Internal ID"},
             "name": {"type": FieldType.STRING, "required": True, "max_length": 255, "normalizer": "name", "description": "Customer name"},

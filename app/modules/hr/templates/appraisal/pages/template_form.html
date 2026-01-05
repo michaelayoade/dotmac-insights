@@ -1,0 +1,31 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="{{ '/hr/appraisal/templates/' ~ template.id if template else '/hr/appraisal/templates' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ 'Edit Appraisal Template' if template else 'New Appraisal Template' }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ 'Update template details' if template else 'Create a new appraisal template' }}</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="template_name" class="block text-sm font-medium text-gray-700 mb-1.5">Template Name <span class="text-red-500">*</span></label>
+                <input type="text" name="template_name" id="template_name" required value="{{ template.template_name if template else (form_data.template_name if form_data else '') }}" placeholder="e.g., Quarterly Review" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                {% if errors.template_name %}<p class="mt-1.5 text-sm text-red-600">{{ errors.template_name }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 mb-1.5">Description</label>
+                <textarea name="description" id="description" rows="4" placeholder="Template description..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm resize-none">{{ template.description if template else (form_data.description if form_data else '') }}</textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="/hr/appraisal/templates" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">{{ 'Update Template' if template else 'Create Template' }}</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

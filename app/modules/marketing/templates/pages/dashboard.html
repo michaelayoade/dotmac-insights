@@ -1,0 +1,133 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Marketing Dashboard</h1>
+        <p class="mt-1 text-sm text-gray-500">Journeys, campaigns, and channel performance at a glance</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/marketing/campaigns/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Campaign
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set stats = stats | default([]) %}
+
+<div class="space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4" data-testid="stats-grid">
+        {% if stats %}
+            {% for stat in stats %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">{{ stat.label }}</p>
+                        <p class="text-2xl font-bold text-gray-900 mt-1">{{ stat.value }}</p>
+                    </div>
+                    <div class="w-12 h-12 {{ stat.icon_bg }} rounded-xl flex items-center justify-center">
+                        <span class="{{ stat.icon_color }}">
+                            {% include "components/icons/" ~ stat.icon ~ ".html" ignore missing %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 col-span-full text-sm text-gray-500">
+                No metrics available yet.
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Upcoming Sends</h2>
+                    <a href="/marketing/email/campaigns" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View all</a>
+                </div>
+                {% set sends = upcoming_sends | default([]) %}
+                <div class="divide-y divide-gray-100">
+                    {% if sends %}
+                        {% for send in sends %}
+                        <div class="px-6 py-4 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">{{ send.name }}</p>
+                                <p class="text-xs text-gray-500">{{ send.channel }} · {{ send.audience }}</p>
+                            </div>
+                            <span class="text-sm text-gray-600">{{ send.scheduled }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="px-6 py-6 text-sm text-gray-500">No upcoming sends.</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Active Journeys</h2>
+                    <a href="/marketing/journeys" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Manage</a>
+                </div>
+                {% set journeys = journeys | default([]) %}
+                {% if journeys %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
+                        {% for journey in journeys %}
+                        {% include "modules/marketing/templates/partials/journey_card.html" %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="px-6 py-6 text-sm text-gray-500">No active journeys yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Scheduled Social Posts</h2>
+                    <a href="/marketing/social/calendar" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Calendar</a>
+                </div>
+                {% set posts = social_posts | default([]) %}
+                {% if posts %}
+                    <div class="p-6 space-y-4">
+                        {% for post in posts %}
+                        {% include "modules/marketing/templates/partials/social_post_card.html" %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="px-6 py-6 text-sm text-gray-500">No scheduled posts.</div>
+                {% endif %}
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Top Audiences</h2>
+                {% set audiences = audiences | default([]) %}
+                {% if audiences %}
+                    <div class="mt-4 space-y-3">
+                        {% for audience in audiences %}
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">{{ audience.name }}</p>
+                                <p class="text-xs text-gray-500">{{ audience.count }} members</p>
+                            </div>
+                            <span class="text-xs font-medium text-emerald-600">{{ audience.growth }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="mt-4 text-sm text-gray-500">No audiences to display.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

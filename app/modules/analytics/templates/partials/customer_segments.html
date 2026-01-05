@@ -1,0 +1,13 @@
+{# Customer Segments Partial - HTMX refreshable #}
+<div class="space-y-4">
+    {% if segments.by_status %}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {% for status, data in segments.by_status.items() %}
+        <div class="text-center p-3 rounded-lg bg-gray-50">
+            <div class="text-xl font-bold text-gray-900">{{ "{:,}".format(data.count | default(0)) }}</div>
+            <div class="text-xs text-gray-500 capitalize">{{ status | replace("_", " ") }}</div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

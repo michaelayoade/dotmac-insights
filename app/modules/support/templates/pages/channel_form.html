@@ -1,0 +1,93 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6 max-w-3xl">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/support/channels" class="hover:text-primary-600">Channels</a>
+            <svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            <span class="text-gray-900 font-medium">{{ 'Edit' if channel is defined else 'New' }}</span>
+        </nav>
+        <h1 class="text-2xl font-display font-bold text-gray-900">{{ 'Edit Channel' if channel is defined else 'New Channel' }}</h1>
+        <p class="mt-1 text-sm text-gray-500">Configure inbound/outbound channel settings.</p>
+    </div>
+
+    <form method="post" action="{{ '/support/channels/' ~ channel.id if channel is defined else '/support/channels' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div>
+            <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input
+                id="name"
+                name="name"
+                type="text"
+                value="{{ form_data.name or '' }}"
+                class="w-full px-4 py-2.5 rounded-xl border {{ 'border-red-300' if errors.name else 'border-gray-200' }} focus:ring-2 focus:ring-primary-100 focus:border-primary-400 text-sm"
+                placeholder="e.g. Support Email"
+            >
+            {% if errors.name %}<p class="text-xs text-red-600 mt-1">{{ errors.name }}</p>{% endif %}
+        </div>
+
+        <div>
+            <label for="type" class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <select
+                id="type"
+                name="type"
+                class="w-full px-4 py-2.5 rounded-xl border {{ 'border-red-300' if errors.type else 'border-gray-200' }} focus:ring-2 focus:ring-primary-100 focus:border-primary-400 text-sm"
+                {% if channel is defined %}disabled{% endif %}
+            >
+                <option value="">Select type...</option>
+                {% for opt in channel_types %}
+                <option value="{{ opt }}" {% if form_data.type == opt %}selected{% endif %}>{{ opt | title }}</option>
+                {% endfor %}
+            </select>
+            {% if errors.type %}<p class="text-xs text-red-600 mt-1">{{ errors.type }}</p>{% endif %}
+            {% if channel is defined %}
+            <input type="hidden" name="type" value="{{ form_data.type }}">
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="webhook_secret" class="block text-sm font-medium text-gray-700 mb-1">Webhook Secret</label>
+            <input
+                id="webhook_secret"
+                name="webhook_secret"
+                type="text"
+                value="{{ form_data.webhook_secret or '' }}"
+                class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-100 focus:border-primary-400 text-sm"
+                placeholder="Optional"
+            >
+        </div>
+
+        <div>
+            <label for="config_json" class="block text-sm font-medium text-gray-700 mb-1">Config (JSON)</label>
+            <textarea
+                id="config_json"
+                name="config_json"
+                rows="6"
+                class="w-full px-4 py-2.5 rounded-xl border {{ 'border-red-300' if errors.config_json else 'border-gray-200' }} focus:ring-2 focus:ring-primary-100 focus:border-primary-400 text-sm font-mono"
+                placeholder='{"host":"imap.example.com","username":"support@example.com"}'
+            >{{ form_data.config_json or '' }}</textarea>
+            {% if errors.config_json %}<p class="text-xs text-red-600 mt-1">{{ errors.config_json }}</p>{% endif %}
+        </div>
+
+        <div class="flex items-center gap-2">
+            <input
+                id="is_active"
+                name="is_active"
+                type="checkbox"
+                class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                {% if form_data.is_active %}checked{% endif %}
+            >
+            <label for="is_active" class="text-sm text-gray-700">Active</label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <a href="/support/channels" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="px-4 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-xl hover:bg-primary-700">
+                {{ 'Save Changes' if channel is defined else 'Create Channel' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

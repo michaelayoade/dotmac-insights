@@ -1,0 +1,207 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            {% for crumb in breadcrumbs %}
+            {% if not crumb.is_current %}
+            <a href="{{ crumb.href }}" class="hover:text-gray-700 transition-colors">{{ crumb.label }}</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            {% else %}
+            <span class="text-gray-900 font-medium">{{ crumb.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ page_title }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage group settings, roles, and members</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Admin Tabs -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">
+        {% for tab in admin_tabs %}
+        <a
+            href="{{ tab.href }}"
+            class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors {{ 'border-primary-500 text-primary-600' if current_tab == tab.id else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+        >
+            {{ tab.label }}
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Group Details Form -->
+    <div class="lg:col-span-2">
+        <form method="post" action="/settings/admin/groups/{{ group.id }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Group Details</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Group Name</label>
+                        <input
+                            type="text"
+                            id="name"
+                            name="name"
+                            value="{{ group.name }}"
+                            required
+                            {{ 'disabled' if not can_edit else '' }}
+                            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all {{ 'bg-gray-50' if not can_edit else '' }}"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            rows="3"
+                            {{ 'disabled' if not can_edit else '' }}
+                            class="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all {{ 'bg-gray-50' if not can_edit else '' }}"
+                        >{{ group.description or '' }}</textarea>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            id="is_active"
+                            name="is_active"
+                            value="true"
+                            {{ 'checked' if group.is_active else '' }}
+                            {{ 'disabled' if not can_edit else '' }}
+                            class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        >
+                        <label for="is_active" class="text-sm text-gray-700">Active</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Assign Roles</h2>
+                <p class="text-sm text-gray-500 mb-4">Members of this group will inherit all permissions from the selected roles.</p>
+
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                    {% for role in all_roles %}
+                    <label class="flex items-start gap-3 p-3 rounded-xl border border-gray-100 hover:bg-surface-50 cursor-pointer transition-colors">
+                        <input
+                            type="checkbox"
+                            name="roles"
+                            value="{{ role.id }}"
+                            {{ 'checked' if role.id|string in group_role_ids else '' }}
+                            {{ 'disabled' if not can_edit else '' }}
+                            class="mt-0.5 w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        >
+                        <div>
+                            <div class="font-medium text-gray-900">{{ role.name }}</div>
+                            {% if role.description %}
+                            <div class="text-sm text-gray-500">{{ role.description }}</div>
+                            {% endif %}
+                            <div class="text-xs text-gray-400 mt-1">{{ role.permissions | length }} permissions</div>
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% if can_edit %}
+            <div class="flex items-center gap-4">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Save Changes
+                </button>
+                <a
+                    href="/settings/admin/groups"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                    Back to Groups
+                </a>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Members Panel -->
+    <div class="lg:col-span-1">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">Members</h2>
+                <span class="text-sm text-gray-500">{{ group.members | length }} member(s)</span>
+            </div>
+
+            {% if can_edit %}
+            <form method="post" action="/settings/admin/groups/{{ group.id }}/members" class="mb-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="flex gap-2">
+                    <select
+                        name="user_id"
+                        class="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                        <option value="">Select user...</option>
+                        {% for u in available_users %}
+                        <option value="{{ u.id }}">{{ u.name or u.email }}</option>
+                        {% endfor %}
+                    </select>
+                    <button
+                        type="submit"
+                        class="px-3 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
+                    >
+                        Add
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+
+            <div class="space-y-2 max-h-96 overflow-y-auto" id="members-list">
+                {% for member in group.members %}
+                <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 group">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm">
+                            {{ (member.user.name or member.user.email)[0:1] | upper }}
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-gray-900">{{ member.user.name or 'No name' }}</div>
+                            <div class="text-xs text-gray-500">{{ member.user.email }}</div>
+                        </div>
+                    </div>
+                    {% if can_edit %}
+                    <button
+                        type="button"
+                        class="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        hx-delete="/settings/admin/groups/{{ group.id }}/members/{{ member.user_id }}"
+                        hx-confirm="Remove {{ member.user.name or member.user.email }} from this group?"
+                        hx-target="closest .flex"
+                        hx-swap="outerHTML"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="text-center py-8 text-gray-500">
+                    <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    <p class="text-sm">No members in this group</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

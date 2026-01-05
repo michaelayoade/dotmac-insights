@@ -1,0 +1,118 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Tax Filing Periods</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage tax obligations and filing deadlines</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/accounting/tax/filing/new"
+            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            New Filing Period
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Outstanding</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ base_currency }} {{ "{:,.2f}".format(dashboard.total_outstanding or 0) }}</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Overdue</p>
+        <p class="mt-1 text-2xl font-bold text-red-600">{{ dashboard.total_overdue_count or 0 }}</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Due Soon</p>
+        <p class="mt-1 text-2xl font-bold text-amber-600">{{ (dashboard.upcoming_due or []) | length }}</p>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Filed This Month</p>
+        <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.filed_this_month or 0 }}</p>
+    </div>
+</div>
+
+<!-- Overdue Alert -->
+{% if dashboard.overdue and dashboard.overdue | length > 0 %}
+<div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r-xl">
+    <div class="flex">
+        <div class="flex-shrink-0">
+            <svg class="h-5 w-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">Overdue Tax Filings</h3>
+            <div class="mt-2 text-sm text-red-700">
+                <ul class="list-disc pl-5 space-y-1">
+                    {% for item in dashboard.overdue %}
+                    <li>{{ item.tax_type | upper }} {{ item.period_name }} - {{ item.days_overdue }} days overdue ({{ base_currency }} {{ "{:,.2f}".format(item.outstanding) }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <select
+            name="tax_type"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/accounting/tax/filing/table"
+            hx-target="#filing-table"
+            hx-push-url="true"
+            hx-trigger="change"
+        >
+            <option value="">All Tax Types</option>
+            <option value="vat" {{ 'selected' if current_type == 'vat' }}>VAT</option>
+            <option value="wht" {{ 'selected' if current_type == 'wht' }}>Withholding Tax</option>
+            <option value="cit" {{ 'selected' if current_type == 'cit' }}>Corporate Income Tax</option>
+            <option value="paye" {{ 'selected' if current_type == 'paye' }}>PAYE</option>
+        </select>
+        <select
+            name="status"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/accounting/tax/filing/table"
+            hx-target="#filing-table"
+            hx-push-url="true"
+            hx-trigger="change"
+        >
+            <option value="">All Status</option>
+            <option value="open" {{ 'selected' if current_status == 'open' }}>Open</option>
+            <option value="filed" {{ 'selected' if current_status == 'filed' }}>Filed</option>
+            <option value="paid" {{ 'selected' if current_status == 'paid' }}>Paid</option>
+            <option value="closed" {{ 'selected' if current_status == 'closed' }}>Closed</option>
+        </select>
+        <select
+            name="year"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/accounting/tax/filing/table"
+            hx-target="#filing-table"
+            hx-push-url="true"
+            hx-trigger="change"
+        >
+            <option value="">All Years</option>
+            {% for y in years %}
+            <option value="{{ y }}" {{ 'selected' if current_year == y }}>{{ y }}</option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+<!-- Filing Periods Table -->
+<div id="filing-table">
+    {% include "modules/accounting/templates/tax/partials/filing_table.html" %}
+</div>
+{% endblock %}

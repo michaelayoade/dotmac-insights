@@ -1,0 +1,43 @@
+<tr class="hover:bg-surface-50 transition-colors" data-testid="contact-row-{{ contact.id }}" data-row-id="{{ contact.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-2">
+        <input
+            type="checkbox"
+            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            data-bulk-checkbox
+            data-bulk-id="{{ contact.id }}"
+            @change="toggleOne('{{ contact.id }}', $el.checked)"
+            :checked="isSelected('{{ contact.id }}')"
+            data-testid="select-contact-{{ contact.id }}"
+            aria-label="Select contact {{ contact.name or 'Contact' }}"
+        >
+    </td>
+    <td class="py-4 pl-2 pr-3">
+        <a
+            href="/crm/contacts/{{ contact.id }}"
+            class="text-sm font-medium text-gray-900 hover:text-primary-600 transition-colors"
+            data-testid="contact-name"
+        >
+            {{ contact.name or "Unnamed Contact" }}
+        </a>
+    </td>
+    <td class="px-3 py-4">
+        <span class="text-sm text-gray-700 font-body" data-testid="contact-email">
+            {{ contact.primary_email or "-" }}
+        </span>
+    </td>
+    <td class="px-3 py-4">
+        <span class="text-sm text-gray-700 font-body" data-testid="contact-phone">
+            {{ contact.primary_phone or "-" }}
+        </span>
+    </td>
+    <td class="px-3 py-4" data-type="{{ contact.contact_type }}">
+        <span class="text-sm text-gray-700 font-body" data-testid="contact-type">
+            {{ contact.contact_type | replace('_', ' ') | title if contact.contact_type else "Unknown" }}
+        </span>
+    </td>
+    <td class="px-3 py-4">
+        <span class="badge inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset bg-gray-50 text-gray-600 ring-gray-500/20" data-status="{{ contact.status }}" data-testid="contact-status">
+            {{ contact.status | replace('_', ' ') | title if contact.status else "Active" }}
+        </span>
+    </td>
+</tr>

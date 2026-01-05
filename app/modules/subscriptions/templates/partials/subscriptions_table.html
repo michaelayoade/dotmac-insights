@@ -1,0 +1,108 @@
+{# Subscriptions table partial - returned for HTMX updates #}
+
+{% if subscriptions %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="subscriptions-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/table?sort=plan_name&dir={% if sort_key == 'plan_name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#subscriptions-table-container"
+                        hx-include="[name='q'], [name='status'], [name='service_type']"
+                        hx-push-url="true"
+                        data-testid="sort-plan"
+                    >
+                        Plan
+                        {% if sort_key == 'plan_name' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% else %}
+                        <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Customer
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Type
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/table?sort=price&dir={% if sort_key == 'price' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#subscriptions-table-container"
+                        hx-include="[name='q'], [name='status'], [name='service_type']"
+                        hx-push-url="true"
+                    >
+                        Price
+                        {% if sort_key == 'price' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Status
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell">
+                    Network
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100" id="subscriptions-tbody">
+            {% for subscription in subscriptions %}
+            {% include "modules/subscriptions/templates/partials/subscription_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center empty-state data-testid="subscriptions-empty-state"> data-testid="empty-state" data-empty-type="subscriptions">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center mb-6 ring-2 ring-blue-200/50">
+        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No subscriptions found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_status or current_service_type %}
+        No subscriptions match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by creating your first service subscription for a customer.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_status or current_service_type) %}
+    <a
+        href="/subscriptions/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        data-testid="empty-add-subscription-btn"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Your First Subscription
+    </a>
+    {% endif %}
+</div>
+{% endif %}

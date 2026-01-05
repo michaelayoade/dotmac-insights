@@ -22,6 +22,7 @@ from app.models.accounting import (
     GLEntry,
     Supplier,
 )
+from app.services.activity_logger import ActivityLogger
 
 logger = structlog.get_logger(__name__)
 
@@ -117,7 +118,16 @@ class DataImportService:
         except Exception as e:  # noqa: BLE001
             logger.error("Failed to read CSV", file_path=file_path, error=str(e))
             raise
-        return self.import_rows(domain, rows, purge=purge)
+        result = self.import_rows(domain, rows, purge=purge)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="ops.import.csv",
+            entity_type="import",
+            entity_id=domain,
+            summary=f"Imported CSV for {domain}",
+            metadata={"rows": len(rows), "purge": purge},
+        )
+        return result
 
     def import_rows(self, domain: str, rows: List[Dict[str, str]], purge: bool = False) -> Dict[str, int]:
         """Import in-memory rows for the given domain."""
@@ -151,6 +161,14 @@ class DataImportService:
                 logger.error("Error processing import row", domain=domain, error=str(e))
                 self.stats[domain]["errors"] += 1
         self.db.commit()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="ops.import.rows",
+            entity_type="import",
+            entity_id=domain,
+            summary=f"Imported rows for {domain}",
+            metadata={"rows": len(rows), "purge": purge, "stats": self.stats.get(domain)},
+        )
         return self.stats[domain]
 
     # ------------------------------------------------------------------ Domain handlers

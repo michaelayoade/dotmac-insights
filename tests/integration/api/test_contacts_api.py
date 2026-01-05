@@ -124,7 +124,7 @@ class TestContactCreate:
     def test_create_organization_contact_success(self, auth_client, sample_contact_payload):
         """Create an organization contact successfully."""
         client = auth_client(["contacts:write"])
-        resp = client.post("/api/contacts/", json=sample_contact_payload)
+        resp = client.post("/api/v1/crm/contacts/", json=sample_contact_payload)
 
         assert resp.status_code == 201
         data = resp.json()
@@ -139,7 +139,7 @@ class TestContactCreate:
     def test_create_lead_contact_success(self, auth_client, sample_lead_payload):
         """Create a lead contact successfully."""
         client = auth_client(["contacts:write"])
-        resp = client.post("/api/contacts/", json=sample_lead_payload)
+        resp = client.post("/api/v1/crm/contacts/", json=sample_lead_payload)
 
         assert resp.status_code == 201
         data = resp.json()
@@ -175,7 +175,7 @@ class TestContactCreate:
             "email": "jane@parentorg.com",
             "phone": "+234 809 876 5432",
         }
-        resp = client.post("/api/contacts/", json=person_payload)
+        resp = client.post("/api/v1/crm/contacts/", json=person_payload)
 
         assert resp.status_code == 201
         data = resp.json()
@@ -195,7 +195,7 @@ class TestContactCreate:
             "is_organization": False,
             "email": "orphan@test.com",
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 400
         assert "parent_id" in resp.json()["detail"].lower()
@@ -212,7 +212,7 @@ class TestContactCreate:
             "is_organization": False,
             "email": "invalid@test.com",
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 400
         assert "not found" in resp.json()["detail"].lower()
@@ -236,7 +236,7 @@ class TestContactCreate:
             "is_organization": False,
             "email": "under@test.com",
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 400
         assert "organization" in resp.json()["detail"].lower()
@@ -244,7 +244,7 @@ class TestContactCreate:
     def test_create_contact_without_write_scope_fails(self, auth_client, sample_contact_payload):
         """Cannot create contact without contacts:write scope."""
         client = auth_client(["contacts:read"])
-        resp = client.post("/api/contacts/", json=sample_contact_payload)
+        resp = client.post("/api/v1/crm/contacts/", json=sample_contact_payload)
 
         assert resp.status_code == 403
 
@@ -260,7 +260,7 @@ class TestContactCreate:
             "email": "tagged@test.com",
             "tags": ["vip", "enterprise", "priority"],
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 201
         data = resp.json()
@@ -282,7 +282,7 @@ class TestContactCreate:
                 "preferred_time": "morning",
             },
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 201
         data = resp.json()
@@ -297,7 +297,7 @@ class TestContactRead:
         contact = create_test_contact(name="Readable Contact")
 
         client = auth_client(["contacts:read"])
-        resp = client.get(f"/api/contacts/{contact.id}")
+        resp = client.get(f"/api/v1/crm/contacts/{contact.id}")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -307,7 +307,7 @@ class TestContactRead:
     def test_get_nonexistent_contact_returns_404(self, auth_client):
         """Get a non-existent contact returns 404."""
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/99999")
+        resp = client.get("/api/v1/crm/contacts/99999")
 
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
@@ -317,7 +317,7 @@ class TestContactRead:
         contact = create_test_contact(name="Unreadable Contact")
 
         client = auth_client(["support:read"])  # Wrong scope
-        resp = client.get(f"/api/contacts/{contact.id}")
+        resp = client.get(f"/api/v1/crm/contacts/{contact.id}")
 
         assert resp.status_code == 403
 
@@ -330,7 +330,7 @@ class TestContactUpdate:
         contact = create_test_contact(name="Original Name", city="Lagos")
 
         client = auth_client(["contacts:write"])
-        resp = client.patch(f"/api/contacts/{contact.id}", json={
+        resp = client.patch(f"/api/v1/crm/contacts/{contact.id}", json={
             "name": "Updated Name",
             "city": "Abuja",
             "phone": "+234 111 222 3333",
@@ -347,7 +347,7 @@ class TestContactUpdate:
         contact = create_test_contact(status=ContactStatus.ACTIVE)
 
         client = auth_client(["contacts:write"])
-        resp = client.patch(f"/api/contacts/{contact.id}", json={
+        resp = client.patch(f"/api/v1/crm/contacts/{contact.id}", json={
             "status": "suspended",
         })
 
@@ -359,7 +359,7 @@ class TestContactUpdate:
         contact = create_test_contact(contact_type=ContactType.LEAD)
 
         client = auth_client(["contacts:write"])
-        resp = client.patch(f"/api/contacts/{contact.id}", json={
+        resp = client.patch(f"/api/v1/crm/contacts/{contact.id}", json={
             "contact_type": "customer",
         })
 
@@ -386,7 +386,7 @@ class TestContactUpdate:
         )
 
         client = auth_client(["contacts:write"])
-        resp = client.patch(f"/api/contacts/{person2.id}", json={
+        resp = client.patch(f"/api/v1/crm/contacts/{person2.id}", json={
             "is_primary_contact": True,
         })
 
@@ -400,7 +400,7 @@ class TestContactUpdate:
     def test_update_nonexistent_contact_returns_404(self, auth_client):
         """Update non-existent contact returns 404."""
         client = auth_client(["contacts:write"])
-        resp = client.patch("/api/contacts/99999", json={"name": "Ghost"})
+        resp = client.patch("/api/v1/crm/contacts/99999", json={"name": "Ghost"})
 
         assert resp.status_code == 404
 
@@ -409,7 +409,7 @@ class TestContactUpdate:
         contact = create_test_contact()
 
         client = auth_client(["contacts:read"])
-        resp = client.patch(f"/api/contacts/{contact.id}", json={"name": "Hacked"})
+        resp = client.patch(f"/api/v1/crm/contacts/{contact.id}", json={"name": "Hacked"})
 
         assert resp.status_code == 403
 
@@ -422,7 +422,7 @@ class TestContactDelete:
         contact = create_test_contact(status=ContactStatus.ACTIVE)
 
         client = auth_client(["contacts:write"])
-        resp = client.delete(f"/api/contacts/{contact.id}")
+        resp = client.delete(f"/api/v1/crm/contacts/{contact.id}")
 
         assert resp.status_code == 200
         assert resp.json()["success"] is True
@@ -437,7 +437,7 @@ class TestContactDelete:
         contact_id = contact.id
 
         client = auth_client(["contacts:write"])
-        resp = client.delete(f"/api/contacts/{contact_id}?hard=true")
+        resp = client.delete(f"/api/v1/crm/contacts/{contact_id}?hard=true")
 
         assert resp.status_code == 200
         assert "deleted" in resp.json()["message"].lower()
@@ -469,7 +469,7 @@ class TestContactDelete:
         child2_id = child2.id
 
         client = auth_client(["contacts:write"])
-        resp = client.delete(f"/api/contacts/{org_id}?hard=true")
+        resp = client.delete(f"/api/v1/crm/contacts/{org_id}?hard=true")
 
         assert resp.status_code == 200
 
@@ -487,7 +487,7 @@ class TestContactDelete:
     def test_delete_nonexistent_contact_returns_404(self, auth_client):
         """Delete non-existent contact returns 404."""
         client = auth_client(["contacts:write"])
-        resp = client.delete("/api/contacts/99999")
+        resp = client.delete("/api/v1/crm/contacts/99999")
 
         assert resp.status_code == 404
 
@@ -508,7 +508,7 @@ class TestContactList:
         client = auth_client(["contacts:read"])
 
         # First page
-        resp = client.get("/api/contacts/?page=1&page_size=10")
+        resp = client.get("/api/v1/crm/contacts/?page=1&page_size=10")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["data"]) == 10
@@ -517,7 +517,7 @@ class TestContactList:
         assert data["offset"] == 0
 
         # Second page
-        resp = client.get("/api/contacts/?page=2&page_size=10")
+        resp = client.get("/api/v1/crm/contacts/?page=2&page_size=10")
         data = resp.json()
         assert len(data["data"]) == 10
         assert data["offset"] == 10
@@ -529,7 +529,7 @@ class TestContactList:
         create_test_contact(name="Customer 1", contact_type=ContactType.CUSTOMER)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?contact_type=lead")
+        resp = client.get("/api/v1/crm/contacts/?contact_type=lead")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -541,7 +541,7 @@ class TestContactList:
         create_test_contact(name="Suspended 1", status=ContactStatus.SUSPENDED)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?status=suspended")
+        resp = client.get("/api/v1/crm/contacts/?status=suspended")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -553,7 +553,7 @@ class TestContactList:
         create_test_contact(name="Enterprise 1", category=ContactCategory.ENTERPRISE)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?category=enterprise")
+        resp = client.get("/api/v1/crm/contacts/?category=enterprise")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -566,7 +566,7 @@ class TestContactList:
         create_test_contact(name="Other Owner", owner_id=200)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?owner_id=100")
+        resp = client.get("/api/v1/crm/contacts/?owner_id=100")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -578,7 +578,7 @@ class TestContactList:
         create_test_contact(name="Abuja 1", territory="Abuja")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?territory=Lagos")
+        resp = client.get("/api/v1/crm/contacts/?territory=Lagos")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -590,7 +590,7 @@ class TestContactList:
         create_test_contact(name="Lekki Contact", city="Lekki")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?city=Ike")
+        resp = client.get("/api/v1/crm/contacts/?city=Ike")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -602,7 +602,7 @@ class TestContactList:
         create_test_contact(name="Individual 1", is_organization=False)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?is_organization=true")
+        resp = client.get("/api/v1/crm/contacts/?is_organization=true")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -614,7 +614,7 @@ class TestContactList:
         create_test_contact(name="Clear", outstanding_balance=Decimal("0"))
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?has_outstanding=true")
+        resp = client.get("/api/v1/crm/contacts/?has_outstanding=true")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -630,7 +630,7 @@ class TestContactList:
         create_test_contact(name="Regular Contact", tags=["regular"])
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?tag=vip")
+        resp = client.get("/api/v1/crm/contacts/?tag=vip")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -642,7 +642,7 @@ class TestContactList:
         create_test_contact(name="Beta Industries")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?search=Acme")
+        resp = client.get("/api/v1/crm/contacts/?search=Acme")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -653,7 +653,7 @@ class TestContactList:
         create_test_contact(name="Email Search", email="unique.email@domain.com")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?search=unique.email")
+        resp = client.get("/api/v1/crm/contacts/?search=unique.email")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -665,7 +665,7 @@ class TestContactList:
         create_test_contact(name="Alpha Company")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?sort_by=name&sort_order=asc")
+        resp = client.get("/api/v1/crm/contacts/?sort_by=name&sort_order=asc")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -678,7 +678,7 @@ class TestContactList:
         create_test_contact(name="Newer Contact")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?sort_by=created_at&sort_order=desc")
+        resp = client.get("/api/v1/crm/contacts/?sort_by=created_at&sort_order=desc")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -697,7 +697,7 @@ class TestContactListSpecialized:
         create_test_contact(name="Customer 1", contact_type=ContactType.CUSTOMER)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/leads")
+        resp = client.get("/api/v1/crm/contacts/leads")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -711,7 +711,7 @@ class TestContactListSpecialized:
         create_test_contact(name="Customer 2", contact_type=ContactType.CUSTOMER)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/customers")
+        resp = client.get("/api/v1/crm/contacts/customers")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -723,7 +723,7 @@ class TestContactListSpecialized:
         create_test_contact(name="Individual 1", is_organization=False)
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/organizations")
+        resp = client.get("/api/v1/crm/contacts/organizations")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -753,7 +753,7 @@ class TestContactPersons:
         )
 
         client = auth_client(["contacts:read"])
-        resp = client.get(f"/api/contacts/{org.id}/persons")
+        resp = client.get(f"/api/v1/crm/contacts/{org.id}/persons")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -770,7 +770,7 @@ class TestContactPersons:
         )
 
         client = auth_client(["contacts:read"])
-        resp = client.get(f"/api/contacts/{individual.id}/persons")
+        resp = client.get(f"/api/v1/crm/contacts/{individual.id}/persons")
 
         assert resp.status_code == 400
         assert "organization" in resp.json()["detail"].lower()
@@ -778,7 +778,7 @@ class TestContactPersons:
     def test_get_persons_nonexistent_contact(self, auth_client):
         """Get persons for non-existent contact returns 404."""
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/99999/persons")
+        resp = client.get("/api/v1/crm/contacts/99999/persons")
 
         assert resp.status_code == 404
 
@@ -800,7 +800,7 @@ class TestQualityIssueFilters:
         create_test_contact(name="Has Email", email="has@email.com")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?quality_issue=missing_email")
+        resp = client.get("/api/v1/crm/contacts/?quality_issue=missing_email")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -819,7 +819,7 @@ class TestQualityIssueFilters:
         create_test_contact(name="Has Phone", phone="+234 123 456")
 
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?quality_issue=missing_phone")
+        resp = client.get("/api/v1/crm/contacts/?quality_issue=missing_phone")
 
         assert resp.status_code == 200
         data = resp.json()
@@ -845,7 +845,7 @@ class TestContactValidation:
             "status": "active",
             "email": "test@test.com",
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 422
 
@@ -861,7 +861,7 @@ class TestContactValidation:
         }
         # Note: The API may accept non-standard emails depending on validation
         # This test verifies whatever the current behavior is
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
         # If validation is strict, expect 422; otherwise 201
         assert resp.status_code in [201, 422]
 
@@ -874,7 +874,7 @@ class TestContactValidation:
             "category": "business",
             "status": "active",
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 422
 
@@ -888,21 +888,21 @@ class TestContactValidation:
             "status": "active",
             "lead_score": 150,  # Invalid: > 100
         }
-        resp = client.post("/api/contacts/", json=payload)
+        resp = client.post("/api/v1/crm/contacts/", json=payload)
 
         assert resp.status_code == 422
 
     def test_list_contacts_invalid_page(self, auth_client):
         """Page must be >= 1."""
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?page=0")
+        resp = client.get("/api/v1/crm/contacts/?page=0")
 
         assert resp.status_code == 422
 
     def test_list_contacts_invalid_page_size(self, auth_client):
         """Page size must be 1-100."""
         client = auth_client(["contacts:read"])
-        resp = client.get("/api/contacts/?page_size=200")
+        resp = client.get("/api/v1/crm/contacts/?page_size=200")
 
         assert resp.status_code == 422
 
@@ -920,15 +920,15 @@ class TestContactRBAC:
         contact = create_test_contact(name="Superuser Test")
 
         # Read
-        resp = superuser_client.get(f"/api/contacts/{contact.id}")
+        resp = superuser_client.get(f"/api/v1/crm/contacts/{contact.id}")
         assert resp.status_code == 200
 
         # Update
-        resp = superuser_client.patch(f"/api/contacts/{contact.id}", json={"name": "Updated"})
+        resp = superuser_client.patch(f"/api/v1/crm/contacts/{contact.id}", json={"name": "Updated"})
         assert resp.status_code == 200
 
         # List
-        resp = superuser_client.get("/api/contacts/")
+        resp = superuser_client.get("/api/v1/crm/contacts/")
         assert resp.status_code == 200
 
     def test_read_only_scope(self, auth_client, create_test_contact):
@@ -937,11 +937,11 @@ class TestContactRBAC:
         client = auth_client(["contacts:read"])
 
         # Can read
-        resp = client.get(f"/api/contacts/{contact.id}")
+        resp = client.get(f"/api/v1/crm/contacts/{contact.id}")
         assert resp.status_code == 200
 
         # Cannot write
-        resp = client.post("/api/contacts/", json={
+        resp = client.post("/api/v1/crm/contacts/", json={
             "name": "New Contact",
             "contact_type": "customer",
             "category": "business",
@@ -950,11 +950,11 @@ class TestContactRBAC:
         assert resp.status_code == 403
 
         # Cannot update
-        resp = client.patch(f"/api/contacts/{contact.id}", json={"name": "Hacked"})
+        resp = client.patch(f"/api/v1/crm/contacts/{contact.id}", json={"name": "Hacked"})
         assert resp.status_code == 403
 
         # Cannot delete
-        resp = client.delete(f"/api/contacts/{contact.id}")
+        resp = client.delete(f"/api/v1/crm/contacts/{contact.id}")
         assert resp.status_code == 403
 
     def test_write_scope_includes_read(self, auth_client, create_test_contact):
@@ -963,9 +963,9 @@ class TestContactRBAC:
         client = auth_client(["contacts:write", "contacts:read"])
 
         # Can read
-        resp = client.get(f"/api/contacts/{contact.id}")
+        resp = client.get(f"/api/v1/crm/contacts/{contact.id}")
         assert resp.status_code == 200
 
         # Can write
-        resp = client.patch(f"/api/contacts/{contact.id}", json={"name": "Updated"})
+        resp = client.patch(f"/api/v1/crm/contacts/{contact.id}", json={"name": "Updated"})
         assert resp.status_code == 200

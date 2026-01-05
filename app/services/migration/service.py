@@ -11,7 +11,7 @@ import io
 import json
 import os
 from datetime import datetime
-from typing import Any, Optional, BinaryIO
+from typing import Any, Optional, BinaryIO, cast
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -254,9 +254,9 @@ class MigrationService:
             raise ValueError("Could not decode CSV file")
 
         reader = csv.DictReader(io.StringIO(text))
-        columns = reader.fieldnames or []
+        columns = list(reader.fieldnames) if reader.fieldnames else []
 
-        rows = []
+        rows: list[dict[str, Any]] = []
         total = 0
         for row in reader:
             total += 1
@@ -270,9 +270,9 @@ class MigrationService:
         data = json.loads(file_content.decode("utf-8"))
 
         if isinstance(data, list):
-            rows = data
+            rows = cast(list[dict[str, Any]], data)
         elif isinstance(data, dict) and "data" in data:
-            rows = data["data"]
+            rows = cast(list[dict[str, Any]], data["data"])
         else:
             raise ValueError("JSON must be an array or have a 'data' array")
 
@@ -351,8 +351,8 @@ class MigrationService:
                 "postcode": "postal_code",
                 "address": "address_line1",
                 "tax_id": "vat_id",
-                "cust_id": "customer_id",
-                "customer": "customer_id",
+                "cust_id": "customer_account_id",
+                "customer": "customer_account_id",
                 "emp_id": "employee_id",
                 "employee": "employee_id",
                 "proj_id": "project_id",
@@ -516,6 +516,8 @@ class MigrationService:
         """
         if not job.source_file_path or not os.path.exists(job.source_file_path):
             raise ValueError("Source file not found")
+        if job.source_type is None:
+            raise ValueError("Source type not set for migration job")
 
         with open(job.source_file_path, "rb") as f:
             content = f.read()
@@ -582,11 +584,11 @@ class MigrationService:
 
         # Get field normalizers from entity config
         entity_fields = get_entity_fields(job.entity_type.value)
-        field_normalizers = {
-            name: cfg.get("normalizer")
-            for name, cfg in entity_fields.items()
-            if cfg.get("normalizer")
-        }
+        field_normalizers: dict[str, str] = {}
+        for name, cfg in entity_fields.items():
+            normalizer = cfg.get("normalizer")
+            if normalizer:
+                field_normalizers[name] = normalizer
 
         cleaned, warnings = self.cleaner.clean_row(mapped, field_normalizers)
         return cleaned, warnings

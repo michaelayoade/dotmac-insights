@@ -1,0 +1,214 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            {% for crumb in breadcrumbs %}
+            {% if not crumb.is_current %}
+            <a href="{{ crumb.href }}" class="hover:text-gray-700 transition-colors">{{ crumb.label }}</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            {% else %}
+            <span class="text-gray-900 font-medium">{{ crumb.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">HR Settings</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Configure leave, attendance, payroll, and compliance settings</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- HR Tabs -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">
+        {% for tab in hr_tabs %}
+        <a
+            href="{{ tab.href }}"
+            class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors {{ 'border-primary-500 text-primary-600' if current_tab == tab.id else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+        >
+            {{ tab.label }}
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+
+<form action="/settings/hr" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="space-y-6">
+        <!-- Leave Policy Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: true }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Leave Policy</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Max Carryforward Days</label>
+                        <input type="number" name="max_carryforward_days" value="{{ settings.max_carryforward_days or 5 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Min Leave Notice (days)</label>
+                        <input type="number" name="min_leave_notice_days" value="{{ settings.min_leave_notice_days or 1 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Sick Leave Auto-Approve (days)</label>
+                        <input type="number" name="sick_leave_auto_approve_days" value="{{ settings.sick_leave_auto_approve_days or 0 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Medical Certificate After (days)</label>
+                        <input type="number" name="medical_certificate_required_after_days" value="{{ settings.medical_certificate_required_after_days or 2 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="allow_negative_leave_balance" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.allow_negative_leave_balance else '' }} {{ 'disabled' if not can_edit else '' }}>
+                    <span class="text-sm text-gray-700">Allow negative leave balance</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Attendance Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: true }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Attendance</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Late Entry Grace (minutes)</label>
+                        <input type="number" name="late_entry_grace_minutes" value="{{ settings.late_entry_grace_minutes or 15 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Half Day Hours Threshold</label>
+                        <input type="number" name="half_day_hours_threshold" value="{{ settings.half_day_hours_threshold or 4.0 }}" min="0" step="0.5" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Geolocation Radius (meters)</label>
+                        <input type="number" name="geolocation_radius_meters" value="{{ settings.geolocation_radius_meters or 100 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="geolocation_required" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.geolocation_required else '' }} {{ 'disabled' if not can_edit else '' }}>
+                    <span class="text-sm text-gray-700">Require geolocation for check-in</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Payroll Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: true }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Payroll</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Salary Payment Day</label>
+                        <input type="number" name="salary_payment_day" value="{{ settings.salary_payment_day or 25 }}" min="1" max="31" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Payroll Cutoff Day</label>
+                        <input type="number" name="payroll_cutoff_day" value="{{ settings.payroll_cutoff_day or 20 }}" min="1" max="31" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Max Advance Percent</label>
+                        <input type="number" name="max_advance_percent" value="{{ settings.max_advance_percent or 50 }}" min="0" max="100" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="allow_salary_advance" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.allow_salary_advance else '' }} {{ 'disabled' if not can_edit else '' }}>
+                    <span class="text-sm text-gray-700">Allow salary advances</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Benefits Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: false }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Benefits & Pension</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Pension Employer %</label>
+                        <input type="number" name="pension_employer_percent" value="{{ settings.pension_employer_percent or 10.0 }}" min="0" step="0.5" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Pension Employee %</label>
+                        <input type="number" name="pension_employee_percent" value="{{ settings.pension_employee_percent or 8.0 }}" min="0" step="0.5" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="pension_enabled" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.pension_enabled else '' }} {{ 'disabled' if not can_edit else '' }}>
+                        <span class="text-sm text-gray-700">Pension enabled</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="gratuity_enabled" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.gratuity_enabled else '' }} {{ 'disabled' if not can_edit else '' }}>
+                        <span class="text-sm text-gray-700">Gratuity enabled</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: false }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Compliance & Lifecycle</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Standard Work Hours/Day</label>
+                        <input type="number" name="standard_work_hours_per_day" value="{{ settings.standard_work_hours_per_day or 8.0 }}" min="1" max="24" step="0.5" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Max Work Hours/Day</label>
+                        <input type="number" name="max_work_hours_per_day" value="{{ settings.max_work_hours_per_day or 12.0 }}" min="1" max="24" step="0.5" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Default Probation (months)</label>
+                        <input type="number" name="default_probation_months" value="{{ settings.default_probation_months or 3 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Default Notice Period (days)</label>
+                        <input type="number" name="default_notice_period_days" value="{{ settings.default_notice_period_days or 30 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if can_edit %}
+        <div class="flex justify-end">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Save Changes
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}

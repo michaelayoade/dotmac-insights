@@ -1,0 +1,77 @@
+{% if responses %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="canned-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Title</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Shortcut</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Scope</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Preview</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for resp in responses %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <p class="font-medium text-gray-900">{{ resp.name }}</p>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    {% if resp.shortcode %}
+                    <code class="px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs font-mono">{{ resp.shortcode }}</code>
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                        {% if resp.scope == 'personal' %}bg-purple-50 text-purple-700
+                        {% elif resp.scope == 'team' %}bg-blue-50 text-blue-700
+                        {% else %}bg-emerald-50 text-emerald-700{% endif %}">
+                        {{ resp.scope.title() }}
+                    </span>
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600 max-w-md truncate">
+                    {{ resp.content[:100] }}{% if resp.content|length > 100 %}...{% endif %}
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href="/support/canned-responses/{{ resp.id }}/edit" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="Edit">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                        </a>
+                        <button hx-delete="/support/canned-responses/{{ resp.id }}" hx-target="closest tr" hx-swap="outerHTML" hx-confirm="Delete this canned response?"
+                            class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg" title="Delete">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total_pages > 1 %}
+{% set query_params = [] %}
+{% if search_query %}
+{% set _ = query_params.append("q=" ~ search_query) %}
+{% endif %}
+{% if current_scope %}
+{% set _ = query_params.append("scope=" ~ current_scope) %}
+{% endif %}
+{% set base_url = "/support/canned-responses" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="canned-empty-state">
+    <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No canned responses found</h3>
+    <p class="text-sm text-gray-500 mb-4">{% if search_query %}Try adjusting your search.{% else %}Create your first canned response to get started.{% endif %}</p>
+    <a href="/support/canned-responses/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Response
+    </a>
+</div>
+{% endif %}

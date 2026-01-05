@@ -1,0 +1,170 @@
+{# IP Addresses table partial - for HTMX updates #}
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100" data-testid="addresses-table">
+        <thead>
+            <tr class="bg-gradient-to-r from-surface-50 to-surface-100/50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display" x-show="isVisible('ip')" x-cloak>
+                    IP Address
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell" x-show="isVisible('hostname')" x-cloak>
+                    Hostname
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell" x-show="isVisible('module')" x-cloak>
+                    Module
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden lg:table-cell" x-show="isVisible('customer')" x-cloak>
+                    Customer
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display" x-show="isVisible('status')" x-cloak>
+                    Status
+                </th>
+                <th class="py-3.5 pl-3 pr-6 w-24">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+            {% if addresses %}
+                {% for addr in addresses %}
+                <tr class="group hover:bg-surface-50 transition-all duration-200" data-testid="address-row-{{ addr.id }}">
+                    <td class="py-4 pl-6 pr-3" x-show="isVisible('ip')" x-cloak>
+                        <div class="flex items-center gap-3">
+                            <div class="flex-shrink-0 w-10 h-10 bg-gradient-to-br {% if addr.is_used %}from-emerald-50 to-teal-100{% else %}from-gray-50 to-gray-100{% endif %} rounded-xl flex items-center justify-center ring-1 {% if addr.is_used %}ring-emerald-200/50{% else %}ring-gray-200/50{% endif %} group-hover:scale-105 transition-transform">
+                                <svg class="w-5 h-5 {% if addr.is_used %}text-emerald-600{% else %}text-gray-400{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <code class="text-sm font-mono font-semibold text-gray-900">{{ addr.ip }}</code>
+                                {% if addr.title %}
+                                <p class="text-[11px] text-gray-400 font-body truncate max-w-[150px]">{{ addr.title }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-3 py-4 hidden md:table-cell" x-show="isVisible('hostname')" x-cloak>
+                        {% if addr.hostname %}
+                        <code class="text-sm text-gray-700 font-mono bg-gray-50 px-2 py-0.5 rounded">{{ addr.hostname }}</code>
+                        {% else %}
+                        <span class="text-xs text-gray-300">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4 hidden sm:table-cell" x-show="isVisible('module')" x-cloak>
+                        {% if addr.module %}
+                        {% set module_colors = {
+                            'customer': 'bg-blue-100 text-blue-700',
+                            'router': 'bg-indigo-100 text-indigo-700',
+                            'device': 'bg-violet-100 text-violet-700',
+                            'server': 'bg-amber-100 text-amber-700'
+                        } %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold {{ module_colors.get(addr.module, 'bg-gray-100 text-gray-700') }} capitalize">
+                            {{ addr.module }}
+                        </span>
+                        {% else %}
+                        <span class="text-xs text-gray-300">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4 hidden lg:table-cell" x-show="isVisible('customer')" x-cloak>
+                        {% if addr.party %}
+                        <a href="/parties/{{ addr.party.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors font-body">
+                            {{ addr.party.name }}
+                        </a>
+                        {% else %}
+                        <span class="text-xs text-gray-300">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-3 py-4" x-show="isVisible('status')" x-cloak>
+                        {% if addr.is_used %}
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-700 ring-1 ring-emerald-300/50">
+                            <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            Used
+                        </span>
+                        {% else %}
+                        <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gray-100 text-gray-500 ring-1 ring-gray-300/50">
+                            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full"></span>
+                            Available
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="py-4 pl-3 pr-6 text-right">
+                        {% if addr.party %}
+                        <a
+                            href="/parties/{{ addr.party.id }}"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all opacity-0 group-hover:opacity-100"
+                        >
+                            View
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-16 text-center" data-testid="addresses-empty-state">
+                    <div class="mx-auto w-20 h-20 bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl flex items-center justify-center mb-5 ring-1 ring-blue-200/50">
+                        <svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/>
+                        </svg>
+                    </div>
+                    {% if search_query %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No matching addresses</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        No IP addresses match your search criteria.
+                    </p>
+                    {% else %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No addresses configured</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        IPv4 addresses will appear here once synced from Splynx.
+                    </p>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+{% if pagination.total_pages > 1 %}
+<div class="px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-surface-50/50 to-transparent">
+    <div class="flex items-center justify-between">
+        <p class="text-sm text-gray-500 font-body">
+            Showing <span class="font-semibold text-gray-700 tabular-nums">{{ (pagination.page - 1) * pagination.per_page + 1 }}</span> to <span class="font-semibold text-gray-700 tabular-nums">{{ [pagination.page * pagination.per_page, pagination.total]|min }}</span> of <span class="font-semibold text-gray-700 tabular-nums">{{ "{:,}".format(pagination.total) }}</span>
+        </p>
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-gray-400 font-medium">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+            <div class="flex gap-1">
+                {% if pagination.page > 1 %}
+                <button
+                    hx-get="/network/ip/addresses/table?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}"
+                    hx-target="#addresses-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Previous
+                </button>
+                {% endif %}
+                {% if pagination.page < pagination.total_pages %}
+                <button
+                    hx-get="/network/ip/addresses/table?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}"
+                    hx-target="#addresses-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    Next
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

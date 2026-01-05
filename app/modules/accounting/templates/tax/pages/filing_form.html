@@ -1,0 +1,137 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/accounting/tax/filing" class="hover:text-primary-600">Tax Filing</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span class="text-gray-900">New Filing Period</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">New Tax Filing Period</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Define tax obligations, dates, and amounts</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="/accounting/tax/filing/new" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Filing Details</h2>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label for="period_name" class="block text-sm font-medium text-gray-700 mb-1">
+                    Period Name <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    id="period_name"
+                    name="period_name"
+                    required
+                    placeholder="VAT Q1 2024"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                >
+            </div>
+
+            <div>
+                <label for="tax_type" class="block text-sm font-medium text-gray-700 mb-1">
+                    Tax Type <span class="text-red-500">*</span>
+                </label>
+                <select
+                    id="tax_type"
+                    name="tax_type"
+                    required
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                >
+                    <option value="">Select tax type</option>
+                    {% for t in tax_type_options %}
+                    <option value="{{ t }}">{{ t.upper() }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label for="period_start" class="block text-sm font-medium text-gray-700 mb-1">
+                        Period Start <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        id="period_start"
+                        name="period_start"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="period_end" class="block text-sm font-medium text-gray-700 mb-1">
+                        Period End <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        id="period_end"
+                        name="period_end"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="due_date" class="block text-sm font-medium text-gray-700 mb-1">
+                        Due Date <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        id="due_date"
+                        name="due_date"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Amounts</h2>
+        </div>
+        <div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="tax_base" class="block text-sm font-medium text-gray-700 mb-1">Tax Base</label>
+                <input
+                    type="number"
+                    id="tax_base"
+                    name="tax_base"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                >
+            </div>
+            <div>
+                <label for="tax_amount" class="block text-sm font-medium text-gray-700 mb-1">Tax Amount</label>
+                <input
+                    type="number"
+                    id="tax_amount"
+                    name="tax_amount"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                >
+            </div>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3">
+        <a href="/accounting/tax/filing" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-surface-50">Cancel</a>
+        <button type="submit" class="px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500">Create Filing Period</button>
+    </div>
+</form>
+{% endblock %}

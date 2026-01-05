@@ -1,0 +1,232 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Network Health</h1>
+            <p class="mt-1 text-sm text-gray-500">Infrastructure health insights and recommendations</p>
+        </div>
+        <a href="/network" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+            Dashboard
+        </a>
+    </div>
+
+    <!-- Health Score Card -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex items-center gap-6">
+            <div class="w-24 h-24 rounded-full flex items-center justify-center {% if health_score >= 80 %}bg-emerald-100{% elif health_score >= 60 %}bg-amber-100{% else %}bg-red-100{% endif %}">
+                <span class="text-3xl font-bold {% if health_score >= 80 %}text-emerald-600{% elif health_score >= 60 %}text-amber-600{% else %}text-red-600{% endif %}">{{ health_score }}</span>
+            </div>
+            <div class="flex-1">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Overall Health Score</h2>
+                <p class="text-sm text-gray-500 mt-1">
+                    {% if health_score >= 80 %}
+                    Network infrastructure is in good health
+                    {% elif health_score >= 60 %}
+                    Some issues require attention
+                    {% else %}
+                    Critical issues detected - immediate attention required
+                    {% endif %}
+                </p>
+                {% if issues %}
+                <div class="flex gap-4 mt-3">
+                    {% set critical_count = issues | selectattr('type', 'equalto', 'critical') | list | length %}
+                    {% set warning_count = issues | selectattr('type', 'equalto', 'warning') | list | length %}
+                    {% set info_count = issues | selectattr('type', 'equalto', 'info') | list | length %}
+                    {% if critical_count > 0 %}
+                    <span class="text-xs font-medium text-red-600">{{ critical_count }} critical</span>
+                    {% endif %}
+                    {% if warning_count > 0 %}
+                    <span class="text-xs font-medium text-amber-600">{{ warning_count }} warning</span>
+                    {% endif %}
+                    {% if info_count > 0 %}
+                    <span class="text-xs font-medium text-blue-600">{{ info_count }} info</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Issues List -->
+    {% if issues %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">Active Issues</h3>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for issue in issues %}
+            <div class="px-6 py-4 flex items-center gap-4">
+                {% if issue.type == 'critical' %}
+                <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                {% elif issue.type == 'warning' %}
+                <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                {% else %}
+                <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                {% endif %}
+                <div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium mb-1 {% if issue.type == 'critical' %}bg-red-100 text-red-800{% elif issue.type == 'warning' %}bg-amber-100 text-amber-800{% else %}bg-blue-100 text-blue-800{% endif %}">
+                        {{ issue.type | title }}
+                    </span>
+                    <p class="text-sm text-gray-700">{{ issue.message }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- POPs Without Routers -->
+        {% if pops_without_routers %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">POPs Without Routers</h3>
+                <p class="text-sm text-gray-500">These POPs have no routers configured</p>
+            </div>
+            <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {% for pop in pops_without_routers %}
+                <a href="/network/pops/{{ pop.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-surface-50 block">
+                    <div>
+                        <p class="font-medium text-gray-900">{{ pop.name }}</p>
+                        <p class="text-sm text-gray-500">{{ pop.city or 'No city' }}</p>
+                    </div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">No Router</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- High Ticket POPs -->
+        {% if high_ticket_pops %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">High Ticket POPs</h3>
+                <p class="text-sm text-gray-500">POPs with high support ticket volume (30 days)</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">POP</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tickets</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Customers</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ratio</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for pop in high_ticket_pops %}
+                        <tr class="hover:bg-surface-50">
+                            <td class="px-6 py-3">
+                                <a href="/network/pops/{{ pop.id }}" class="font-medium text-primary-600 hover:text-primary-700">{{ pop.name }}</a>
+                                <p class="text-sm text-gray-500">{{ pop.city or '' }}</p>
+                            </td>
+                            <td class="px-6 py-3 text-sm text-right font-medium text-red-600">{{ pop.ticket_count }}</td>
+                            <td class="px-6 py-3 text-sm text-right text-gray-500">{{ pop.customer_count }}</td>
+                            <td class="px-6 py-3 text-sm text-right text-gray-900">{{ pop.ticket_ratio }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- High Utilization Networks -->
+        {% if high_util_networks %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">High Utilization Networks</h3>
+                <p class="text-sm text-gray-500">Networks with &gt;80% IP address utilization</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Network</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Used</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Utilization</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {% for net in high_util_networks %}
+                        <tr class="hover:bg-surface-50">
+                            <td class="px-6 py-3">
+                                <a href="/network/ip/networks" class="font-medium text-primary-600 hover:text-primary-700">{{ net.network }}</a>
+                                <p class="text-sm text-gray-500">{{ net.description or '' }}</p>
+                            </td>
+                            <td class="px-6 py-3 text-sm text-right text-gray-900">{{ net.used }}</td>
+                            <td class="px-6 py-3 text-sm text-right text-gray-500">{{ net.total }}</td>
+                            <td class="px-6 py-3 text-right">
+                                {% set util = (net.used * 100 / net.total) | round(1) if net.total > 0 else 0 %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if util >= 90 %}bg-red-100 text-red-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                                    {{ util }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Routers Without Subscriptions -->
+        {% if routers_no_subs %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Underutilized Routers</h3>
+                <p class="text-sm text-gray-500">Routers with no active subscriptions</p>
+            </div>
+            <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {% for router in routers_no_subs %}
+                <a href="/network/routers/{{ router.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-surface-50 block">
+                    <div>
+                        <p class="font-medium text-gray-900">{{ router.name }}</p>
+                        <p class="text-sm text-gray-500">{{ router.ip_address or 'No IP' }}</p>
+                    </div>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Idle</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Customers Without POP -->
+    {% if customers_no_pop > 0 %}
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl shadow-warm-sm ring-1 ring-blue-200/50 p-5">
+        <div class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold text-blue-900">{{ customers_no_pop | format_number }} customers without POP assignment</h3>
+                <p class="text-sm text-blue-700 mt-0.5">These active customers are not assigned to any Point of Presence.</p>
+            </div>
+            <a href="/parties" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">View Parties</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- No Issues State -->
+    {% if not issues and not pops_without_routers and not high_ticket_pops and not high_util_networks and not routers_no_subs and customers_no_pop == 0 %}
+    <div class="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl shadow-warm-sm ring-1 ring-emerald-200/50 p-8 text-center">
+        <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold text-emerald-900">All Systems Healthy</h3>
+        <p class="text-sm text-emerald-700 mt-1">No infrastructure issues detected. Network is operating normally.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

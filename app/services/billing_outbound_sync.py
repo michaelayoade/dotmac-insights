@@ -209,7 +209,7 @@ class BillingOutboundSyncService:
         """Build ERPNext Sales Invoice payload from Invoice."""
         return {
             "doctype": "Sales Invoice",
-            "customer": invoice.customer_id,
+            "customer": invoice.customer_account_id,
             "posting_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
             "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
             "currency": invoice.currency,
@@ -228,7 +228,7 @@ class BillingOutboundSyncService:
             "doctype": "Payment Entry",
             "payment_type": "Receive",  # AR payment = receive from customer
             "party_type": "Customer",
-            "party": payment.customer_id,
+            "party": payment.customer_account_id,
             "posting_date": payment.payment_date.isoformat() if payment.payment_date else None,
             "paid_amount": float(payment.amount) if payment.amount else 0,
             "received_amount": float(payment.base_amount) if payment.base_amount else 0,

@@ -1,0 +1,70 @@
+{% if suppliers %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="suppliers-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="/suppliers?sort=supplier_name&dir={{ 'desc' if sort == 'supplier_name' and dir == 'asc' else 'asc' }}&q={{ q }}&group={{ group_filter }}&status={{ status_filter }}"
+                   class="flex items-center gap-1 hover:text-gray-700"
+                   hx-get="/suppliers/table?sort=supplier_name&dir={{ 'desc' if sort == 'supplier_name' and dir == 'asc' else 'asc' }}&q={{ q }}&group={{ group_filter }}&status={{ status_filter }}"
+                   hx-target="#table-container" hx-push-url="true">
+                    Supplier
+                    {% if sort == 'supplier_name' %}
+                    <svg class="w-4 h-4 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
+                    {% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Group</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Email</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Country</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden xl:table-cell">Currency</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for supplier in suppliers %}
+            {% include "modules/suppliers/templates/partials/supplier_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+{% set pagination = {
+    "page": page,
+    "per_page": per_page,
+    "total": total,
+    "total_pages": total_pages,
+    "has_prev": page > 1,
+    "has_next": page < total_pages,
+    "prev_page": (page - 1) if page > 1 else None,
+    "next_page": (page + 1) if page < total_pages else None,
+    "start_item": ((page - 1) * per_page) + 1,
+    "end_item": [page * per_page, total]|min
+} %}
+{% set query_params = [] %}
+{% if q %}
+{% set _ = query_params.append("q=" ~ q) %}
+{% endif %}
+{% if group_filter %}
+{% set _ = query_params.append("group=" ~ group_filter) %}
+{% endif %}
+{% if status_filter %}
+{% set _ = query_params.append("status=" ~ status_filter) %}
+{% endif %}
+{% if sort %}
+{% set _ = query_params.append("sort=" ~ sort) %}
+{% endif %}
+{% if dir %}
+{% set _ = query_params.append("dir=" ~ dir) %}
+{% endif %}
+{% set base_url = "/suppliers/table" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with pagination=pagination, base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="suppliers-empty-state">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No suppliers found</h3>
+    <p class="text-sm text-gray-500">{% if q or group_filter or status_filter %}Try adjusting your search or filters.{% else %}Suppliers will appear here when added.{% endif %}</p>
+</div>
+{% endif %}

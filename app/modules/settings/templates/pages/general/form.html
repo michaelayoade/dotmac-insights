@@ -1,0 +1,179 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            {% for crumb in breadcrumbs %}
+            {% if not crumb.is_current %}
+            <a href="{{ crumb.href }}" class="hover:text-gray-700 transition-colors">{{ crumb.label }}</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            {% else %}
+            <span class="text-gray-900 font-medium">{{ crumb.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ group_label }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ group_description }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Group Tabs -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">
+        {% for g in groups %}
+        <a
+            href="/settings/general/{{ g.group }}"
+            class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors {{ 'border-primary-500 text-primary-600' if current_group == g.group else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+        >
+            {{ g.label }}
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+
+<!-- Settings Form -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+    <form action="/settings/general/{{ current_group }}" method="POST" class="divide-y divide-gray-100">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="p-6 space-y-6">
+            {% for field in fields %}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
+                <div class="lg:col-span-1">
+                    <label for="{{ field.name }}" class="block text-sm font-medium text-gray-900">
+                        {{ field.label }}
+                        {% if field.required %}<span class="text-red-500">*</span>{% endif %}
+                    </label>
+                    {% if field.description and field.type != 'toggle' %}
+                    <p class="mt-1 text-xs text-gray-500">{{ field.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="lg:col-span-2">
+                    {% if field.type == 'select' %}
+                    <select
+                        name="{{ field.name }}"
+                        id="{{ field.name }}"
+                        class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                        {{ 'required' if field.required else '' }}
+                    >
+                        <option value="">Select...</option>
+                        {% for opt in field.options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if field.value == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% elif field.type == 'toggle' %}
+                    <div class="flex items-center gap-3" x-data="{ enabled: {{ 'true' if field.value else 'false' }} }">
+                        <button
+                            type="button"
+                            role="switch"
+                            :aria-checked="enabled"
+                            @click="enabled = !enabled"
+                            :class="enabled ? 'bg-primary-600' : 'bg-gray-200'"
+                            class="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                        >
+                            <span
+                                :class="enabled ? 'translate-x-5' : 'translate-x-0'"
+                                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                            ></span>
+                        </button>
+                        <input type="hidden" name="{{ field.name }}" :value="enabled ? 'true' : 'false'">
+                        <span class="text-sm text-gray-500">{{ field.description }}</span>
+                    </div>
+                    {% elif field.is_secret %}
+                    <div class="relative" x-data="{ revealed: false }">
+                        <input
+                            :type="revealed ? 'text' : 'password'"
+                            name="{{ field.name }}"
+                            id="{{ field.name }}"
+                            value="{{ field.value }}"
+                            placeholder="Enter value..."
+                            class="block w-full pr-10 rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                            autocomplete="off"
+                        >
+                        <button
+                            type="button"
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                            @click="revealed = !revealed"
+                        >
+                            <svg x-show="!revealed" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            <svg x-show="revealed" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.27 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                            </svg>
+                        </button>
+                    </div>
+                    {% else %}
+                    <input
+                        type="{{ field.input_type }}"
+                        name="{{ field.name }}"
+                        id="{{ field.name }}"
+                        value="{{ field.value or '' }}"
+                        placeholder="{{ field.description }}"
+                        class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                        {{ 'required' if field.required else '' }}
+                        {% if field.min is not none %}min="{{ field.min }}"{% endif %}
+                        {% if field.max is not none %}max="{{ field.max }}"{% endif %}
+                        {% if field.pattern %}pattern="{{ field.pattern }}"{% endif %}
+                    >
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Form Actions -->
+        <div class="px-6 py-4 bg-surface-50 rounded-b-2xl flex items-center justify-between">
+            <div>
+                {% if has_test_action %}
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-xl hover:bg-primary-100 focus:ring-2 focus:ring-primary-100 transition-all"
+                    hx-post="/settings/general/{{ current_group }}/test"
+                    hx-target="#test-result"
+                    hx-indicator="#test-spinner"
+                >
+                    <span id="test-spinner" class="htmx-indicator">
+                        <svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Test {{ current_group | title }}
+                </button>
+                <div id="test-result" class="mt-2"></div>
+                {% endif %}
+            </div>
+            <div class="flex items-center gap-3">
+                <a
+                    href="/settings"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+                >
+                    Cancel
+                </a>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{ product_name }} - Unified Business Management Platform">
+    <title>{% block title %}{{ page_title | default("Dashboard") }}{% endblock %} | {{ product_name }}</title>
+
+    <!-- Fonts: DM Sans (display) + Source Sans 3 (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS (compiled) -->
+    <link href="/static/css/styles.css" rel="stylesheet">
+
+    <style>
+        /* Alpine.js x-cloak: hide elements until Alpine initializes */
+        [x-cloak] { display: none !important; }
+
+        .htmx-indicator { opacity: 0; visibility: hidden; }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator { opacity: 1; visibility: visible; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.25rem;
+            padding: 0.625rem 1.25rem;
+        }
+
+        .btn-sm {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(90deg, #0d7377, #0a5f62);
+            box-shadow: 0 10px 15px -3px rgba(13, 115, 119, 0.25),
+                        0 4px 6px -4px rgba(13, 115, 119, 0.25);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.05);
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px 0 rgba(26, 29, 33, 0.08),
+                        0 1px 2px -1px rgba(26, 29, 33, 0.08);
+        }
+
+        .btn-secondary:hover {
+            background: #f5f3f0;
+        }
+
+        .btn-success {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .btn-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .btn-danger {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+<body
+    class="h-full bg-surface-100 font-body antialiased"
+    hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+    x-data="{ sidebarOpen: false }"
+    data-product-name="{{ product_name }}"
+>
+    {% block body %}{% endblock %}
+
+    <!-- Toast Container -->
+    <div
+        id="toast-container"
+        class="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none"
+        x-data="toastManager()"
+        @show-toast.window="show($event.detail)"
+        aria-live="polite"
+    >
+        <template x-for="toast in toasts" :key="toast.id">
+            <div
+                class="pointer-events-auto max-w-sm w-full overflow-hidden rounded-xl shadow-warm-lg"
+                :class="{
+                    'animate-slide-in-right': toast.entering,
+                    'animate-slide-out-right': toast.leaving,
+                    'bg-emerald-50 border border-emerald-200': toast.type === 'success',
+                    'bg-red-50 border border-red-200': toast.type === 'error',
+                    'bg-amber-50 border border-amber-200': toast.type === 'warning',
+                    'bg-primary-50 border border-primary-200': toast.type === 'info'
+                }"
+                x-show="!toast.hidden"
+                data-testid="toast"
+                :data-toast-type="toast.type"
+            >
+                <div class="p-4 flex items-start gap-3">
+                    <div class="flex-shrink-0 mt-0.5">
+                        <template x-if="toast.type === 'success'">
+                            <div class="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M2.5 6.5l2.5 2.5 4.5-5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                        </template>
+                        <template x-if="toast.type === 'error'">
+                            <div class="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 3l6 6M9 3l-6 6" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                        </template>
+                        <template x-if="toast.type === 'warning'">
+                            <div class="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="currentColor">
+                                    <path d="M6 3v4M6 9v.01"/>
+                                </svg>
+                            </div>
+                        </template>
+                        <template x-if="toast.type === 'info'">
+                            <div class="w-5 h-5 rounded-full bg-primary-600 flex items-center justify-center">
+                                <svg class="h-3 w-3 text-white" viewBox="0 0 12 12" fill="currentColor">
+                                    <circle cx="6" cy="3.5" r="0.75"/>
+                                    <path d="M5 6h2v3.5H5z"/>
+                                </svg>
+                            </div>
+                        </template>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium"
+                           :class="{
+                               'text-emerald-900': toast.type === 'success',
+                               'text-red-900': toast.type === 'error',
+                               'text-amber-900': toast.type === 'warning',
+                               'text-primary-900': toast.type === 'info'
+                           }"
+                           x-text="toast.message"></p>
+                    </div>
+                    <button
+                        type="button"
+                        class="flex-shrink-0 rounded-md p-1 transition-colors"
+                        :class="{
+                            'text-emerald-500 hover:bg-emerald-100': toast.type === 'success',
+                            'text-red-500 hover:bg-red-100': toast.type === 'error',
+                            'text-amber-600 hover:bg-amber-100': toast.type === 'warning',
+                            'text-primary-600 hover:bg-primary-100': toast.type === 'info'
+                        }"
+                        @click="dismiss(toast.id)"
+                    >
+                        <span class="sr-only">Close</span>
+                        <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="M4.28 3.22a.75.75 0 00-1.06 1.06L6.94 8l-3.72 3.72a.75.75 0 101.06 1.06L8 9.06l3.72 3.72a.75.75 0 101.06-1.06L9.06 8l3.72-3.72a.75.75 0 00-1.06-1.06L8 6.94 4.28 3.22z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Modal Container -->
+    <div
+        id="modal-container"
+        x-data="{ open: false }"
+        @open-modal.window="open = true"
+        @close-modal.window="open = false"
+        x-show="open"
+        x-cloak
+        class="fixed inset-0 z-40 overflow-y-auto"
+        aria-labelledby="modal-title"
+        role="dialog"
+        aria-modal="true"
+    >
+        <h2 id="modal-title" class="sr-only">Dialog</h2>
+        <!-- Backdrop -->
+        <div
+            class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
+            x-show="open"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0"
+            x-transition:enter-end="opacity-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100"
+            x-transition:leave-end="opacity-0"
+            @click="open = false"
+        ></div>
+
+        <!-- Modal Panel -->
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div
+                id="modal-content"
+                class="relative w-full max-w-lg transform overflow-hidden rounded-2xl bg-white shadow-warm-xl"
+                x-show="open"
+                x-transition:enter="ease-out duration-300"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="ease-in duration-200"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                @click.stop
+            >
+                <!-- Modal content injected by HTMX -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Flash Message (from server) -->
+{% if flash %}
+    <script>
+        const dispatchFlashToast = () => {
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    message: {{ flash.message | tojson }},
+                    type: {{ flash.category | tojson }}
+                }
+            }));
+        };
+        if (document.readyState === "loading") {
+            document.addEventListener('DOMContentLoaded', dispatchFlashToast);
+        } else {
+            dispatchFlashToast();
+        }
+    </script>
+{% endif %}
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+
+    <!-- UI components (must load before Alpine) -->
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/table-actions.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="/static/js/vendor/alpine.min.js"></script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

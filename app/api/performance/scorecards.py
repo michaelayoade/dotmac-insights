@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.models.performance import (
     EmployeeScorecardInstance,
     ScorecardInstanceStatus,
@@ -259,24 +259,68 @@ async def list_scorecards(
 @router.get("/my", dependencies=[Depends(Require("performance:self"))])
 async def get_my_scorecards(
     period_id: Optional[int] = None,
-    # current_user: User = Depends(get_current_user),  # TODO: Add auth
+    principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
     """Get current user's scorecards."""
-    # TODO: Get employee_id from current_user
-    # For now, return empty list
-    return {"items": [], "total": 0, "message": "Auth not implemented yet"}
+    # Find employee by email
+    employee = db.query(Employee).filter(
+        Employee.email == principal.email
+    ).first()
+
+    if not employee:
+        raise HTTPException(status_code=404, detail="Employee record not found for current user")
+
+    # Build query
+    query = db.query(EmployeeScorecardInstance).filter(
+        EmployeeScorecardInstance.employee_id == employee.id
+    )
+
+    if period_id:
+        query = query.filter(EmployeeScorecardInstance.evaluation_period_id == period_id)
+
+    scorecards = query.order_by(EmployeeScorecardInstance.created_at.desc()).all()
+    items = [build_scorecard_response(sc, db) for sc in scorecards]
+
+    return ScorecardListResponse(items=items, total=len(items))
 
 
 @router.get("/team", dependencies=[Depends(Require("performance:team"))])
 async def get_team_scorecards(
     period_id: Optional[int] = None,
-    # current_user: User = Depends(get_current_user),  # TODO: Add auth
+    principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
-    """Get scorecards for manager's team."""
-    # TODO: Get team members based on manager relationships
-    return {"items": [], "total": 0, "message": "Auth not implemented yet"}
+    """Get scorecards for manager's team (direct reports)."""
+    # Find manager's employee record by email
+    manager = db.query(Employee).filter(
+        Employee.email == principal.email
+    ).first()
+
+    if not manager:
+        raise HTTPException(status_code=404, detail="Employee record not found for current user")
+
+    # Find team members (employees who report to this manager)
+    team_member_ids = db.query(Employee.id).filter(
+        Employee.reports_to_id == manager.id
+    ).all()
+    team_member_ids = [m[0] for m in team_member_ids]
+
+    if not team_member_ids:
+        return ScorecardListResponse(items=[], total=0)
+
+    # Build query for team scorecards
+    query = db.query(EmployeeScorecardInstance).filter(
+        EmployeeScorecardInstance.employee_id.in_(team_member_ids)
+    )
+
+    if period_id:
+        query = query.filter(EmployeeScorecardInstance.evaluation_period_id == period_id)
+
+    scorecards = query.order_by(EmployeeScorecardInstance.created_at.desc()).all()
+    items = [build_scorecard_response(sc, db) for sc in scorecards]
+
+    return ScorecardListResponse(items=items, total=len(items))
 
 
 @router.get("/{scorecard_id}", response_model=ScorecardDetailResponse, dependencies=[Depends(Require("performance:read"))])

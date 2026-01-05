@@ -1,0 +1,20 @@
+{% set current_path = current_path | default('') %}
+{% set is_journey_templates = current_path.startswith('/marketing/journeys/templates') %}
+{% set tabs = [
+    {"label": "Dashboard", "href": "/marketing", "active": current_path in ["/marketing", "/marketing/"]},
+    {"label": "Campaigns", "href": "/marketing/campaigns", "active": current_path.startswith("/marketing/campaigns")},
+    {"label": "Journeys", "href": "/marketing/journeys", "active": current_path.startswith("/marketing/journeys") and not is_journey_templates},
+    {"label": "Journey Templates", "href": "/marketing/journeys/templates", "active": is_journey_templates},
+    {"label": "Social Calendar", "href": "/marketing/social/calendar", "active": current_path.startswith("/marketing/social/calendar")},
+    {"label": "Social Compose", "href": "/marketing/social/compose", "active": current_path.startswith("/marketing/social/compose")},
+    {"label": "Social Posts", "href": "/marketing/social/posts", "active": current_path.startswith("/marketing/social/posts")},
+    {"label": "Social Accounts", "href": "/marketing/social/accounts", "active": current_path.startswith("/marketing/social/accounts")},
+    {"label": "Email Campaigns", "href": "/marketing/email/campaigns", "active": current_path.startswith("/marketing/email/campaigns")},
+    {"label": "Email Templates", "href": "/marketing/email/templates", "active": current_path.startswith("/marketing/email/templates")},
+    {"label": "Email Analytics", "href": "/marketing/email/analytics", "active": current_path.startswith("/marketing/email/analytics")},
+    {"label": "Audiences", "href": "/marketing/audiences", "active": current_path.startswith("/marketing/audiences")},
+    {"label": "Integrations", "href": "/marketing/integrations", "active": current_path.startswith("/marketing/integrations")},
+    {"label": "Consent", "href": "/marketing/consent", "active": current_path.startswith("/marketing/consent")}
+] %}
+
+{% include "components/ui/tabs.html" %}

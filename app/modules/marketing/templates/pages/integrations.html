@@ -1,0 +1,96 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Integrations</h1>
+        <p class="mt-1 text-sm text-gray-500">Connect platforms and sync marketing data</p>
+    </div>
+    <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Add Integration</button>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set integrations = integrations | default([]) %}
+{% set callback_base_url = callback_base_url | default('') %}
+{% set oauth_providers = oauth_providers | default([]) %}
+{% set whatsapp_settings = whatsapp_settings | default({}) %}
+
+<div class="space-y-6">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">OAuth Callback</h2>
+            <p class="text-sm text-gray-500 mt-1">Set the base URL used for OAuth callbacks.</p>
+            <form method="post" action="/marketing/integrations/callback-settings" class="mt-4 space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="url" name="callback_base_url" value="{{ callback_base_url }}" placeholder="https://your-domain.com" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Save</button>
+            </form>
+            {% if oauth_providers %}
+            <div class="mt-6 space-y-3">
+                {% for provider in oauth_providers %}
+                <div class="rounded-xl border border-gray-100 bg-surface-50 p-3 flex flex-col gap-2">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ provider.label }}</p>
+                            <p class="text-xs text-gray-500">{{ provider.description }}</p>
+                        </div>
+                        <a href="/marketing/integrations/{{ provider.id }}/connect" class="text-sm text-primary-600 hover:text-primary-700 font-medium">Connect</a>
+                    </div>
+                    <code class="text-xs text-gray-500">{{ callback_base_url }}/marketing/integrations/{{ provider.id }}/callback</code>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Custom Integration</h2>
+            <p class="text-sm text-gray-500 mt-1">Create a custom integration and store its webhook details.</p>
+            <form method="post" action="/marketing/integrations/custom" class="mt-4 space-y-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="text" name="name" placeholder="Integration name" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <input type="text" name="integration_type" placeholder="Type slug (e.g. partner-api)" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <input type="text" name="webhook_url" placeholder="Webhook URL (optional)" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <textarea name="description" rows="3" placeholder="Description" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200"></textarea>
+                <textarea name="credentials" rows="2" placeholder="Credentials or notes (optional)" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200"></textarea>
+                <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Create</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900">WhatsApp Settings</h2>
+        <p class="text-sm text-gray-500 mt-1">Configure the phone number ID and default recipient used for WhatsApp sends.</p>
+        <form method="post" action="/marketing/integrations/whatsapp-settings" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label class="text-sm font-medium text-gray-700">Phone Number ID</label>
+                <input type="text" name="phone_number_id" value="{{ whatsapp_settings.phone_number_id | default('') }}" placeholder="WhatsApp phone number ID" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700">Default Recipient</label>
+                <input type="text" name="default_recipient" value="{{ whatsapp_settings.default_recipient | default('') }}" placeholder="+234..." class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <p class="mt-2 text-xs text-gray-500">Used when a post does not specify recipients.</p>
+            </div>
+            <div class="md:col-span-2">
+                <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Save WhatsApp Settings</button>
+            </div>
+        </form>
+    </div>
+
+    {% if integrations %}
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {% for integration in integrations %}
+            {% include "modules/marketing/templates/partials/integration_card.html" %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 text-sm text-gray-500">
+            No integrations connected.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

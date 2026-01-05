@@ -22,6 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 
 # ============================================================================
@@ -467,7 +468,7 @@ class DebitNoteStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class DebitNote(Base):
+class DebitNote(SoftValidationMixin, Base):
     """
     Debit Note model for adjustments to supplier accounts.
 

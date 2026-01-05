@@ -1,0 +1,71 @@
+<div class="grid grid-cols-{{ days }} divide-x divide-gray-100">
+    <!-- Day Headers -->
+    {% for day in date_range %}
+    <div class="py-3 px-3 text-center border-b border-gray-100 {% if day.is_today %}bg-primary-50{% else %}bg-surface-50{% endif %}">
+        <div class="text-xs font-medium text-gray-500 uppercase">{{ day.day_name }}</div>
+        <div class="mt-1 text-lg font-semibold {% if day.is_today %}text-primary-600{% else %}text-gray-900{% endif %}">{{ day.day_number }}</div>
+        <div class="text-xs text-gray-400 mt-0.5">{{ day.orders | length }} orders</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Schedule Grid -->
+<div class="grid grid-cols-{{ days }} divide-x divide-gray-100" style="min-height: 500px;">
+    {% for day in date_range %}
+    <div class="relative p-2 space-y-2 {% if day.is_today %}bg-primary-50/30{% endif %}">
+        {% for order in day.orders %}
+        <a
+            href="/field-service/{{ order.id }}"
+            class="block p-2 rounded-lg text-xs transition-all hover:shadow-md
+                {% if order.priority == 'emergency' %}
+                bg-red-100 border-l-4 border-red-500 hover:bg-red-200
+                {% elif order.priority == 'urgent' %}
+                bg-orange-100 border-l-4 border-orange-500 hover:bg-orange-200
+                {% elif order.status == 'completed' %}
+                bg-green-100 border-l-4 border-green-500 hover:bg-green-200
+                {% elif order.status == 'in_progress' %}
+                bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-200
+                {% else %}
+                bg-gray-100 border-l-4 border-gray-400 hover:bg-gray-200
+                {% endif %}
+            "
+        >
+            <div class="font-semibold text-gray-900">{{ order.order_number }}</div>
+            {% if order.scheduled_start_time %}
+            <div class="text-gray-600 mt-0.5">
+                {{ order.scheduled_start_time[:5] }}
+                {% if order.estimated_duration_hours %}
+                <span class="text-gray-400">({{ order.estimated_duration_hours }}h)</span>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if order.customer_name %}
+            <div class="text-gray-500 truncate mt-0.5" title="{{ order.customer_name }}">
+                {{ order.customer_name }}
+            </div>
+            {% endif %}
+            {% if order.service_address %}
+            <div class="text-gray-400 truncate mt-0.5" title="{{ order.service_address }}">
+                {{ order.service_address }}
+            </div>
+            {% endif %}
+            <div class="mt-1 pt-1 border-t border-gray-200/50">
+                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium
+                    {% if order.status == 'completed' %}bg-green-200 text-green-800
+                    {% elif order.status == 'in_progress' %}bg-blue-200 text-blue-800
+                    {% elif order.status == 'en_route' %}bg-cyan-200 text-cyan-800
+                    {% elif order.status == 'on_site' %}bg-purple-200 text-purple-800
+                    {% else %}bg-gray-200 text-gray-800{% endif %}
+                ">
+                    {{ order.status | replace('_', ' ') | title }}
+                </span>
+            </div>
+        </a>
+        {% else %}
+        <div class="flex items-center justify-center h-full">
+            <span class="text-xs text-gray-300">No orders</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+</div>

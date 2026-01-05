@@ -1,0 +1,146 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Suppliers</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage vendor and supplier relationships</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/accounting/suppliers/new"
+            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            New Supplier
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set supplier_columns = [
+    {'key': 'supplier', 'label': 'Supplier', 'required': True},
+    {'key': 'group', 'label': 'Group'},
+    {'key': 'contact', 'label': 'Contact'},
+    {'key': 'outstanding', 'label': 'Outstanding'},
+] %}
+<div x-data="columnPicker('suppliers-table', {{ supplier_columns  | tojson | e }})">
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+    <a href="/accounting/suppliers" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Suppliers</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_suppliers }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+    <a href="/accounting/suppliers?status=active" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-emerald-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Active</p>
+        <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.active_suppliers }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-emerald-600">View active →</p>
+    </a>
+    <a href="/accounting/aging/ap" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Payables</p>
+        <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(stats.total_payables or 0) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View aging →</p>
+    </a>
+    <a href="/accounting/aging/ap?aging=overdue" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Overdue</p>
+        <p class="mt-1 text-2xl font-bold text-amber-600 font-mono">{{ '{:,.2f}'.format(stats.total_overdue or 0) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View overdue →</p>
+    </a>
+</div>
+
+<!-- Search and Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4" x-data="{ open: false }">
+        <div class="flex-1 min-w-[200px]">
+            <div class="relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ current_search or '' }}"
+                    placeholder="Search suppliers..."
+                    class="block w-full rounded-xl border-0 py-2.5 pl-10 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    hx-get="/accounting/suppliers/table"
+                    hx-target="#suppliers-table"
+                    hx-include="[name='group']"
+                    hx-push-url="true"
+                    hx-trigger="input changed delay:300ms, search"
+                >
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="sm:w-48">
+            <select
+                name="group"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/suppliers/table"
+                hx-target="#suppliers-table"
+                hx-include="[name='q']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+                <option value="">All Groups</option>
+                {% for opt in group_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_group == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="relative" @click.away="open = false">
+            <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                @click="open = !open"
+            >
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                Columns
+            </button>
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="absolute right-0 z-10 mt-2 w-52 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+            >
+                <template x-for="col in columns" :key="col.key">
+                    <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                        <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            :checked="isVisible(col.key)"
+                            :disabled="col.required"
+                            @change="toggleColumn(col.key)"
+                        >
+                        <span x-text="col.label"></span>
+                    </label>
+                </template>
+                <button
+                    type="button"
+                    class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                    @click="resetColumns()"
+                >
+                    Reset columns
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Suppliers Table -->
+<div id="suppliers-table">
+    {% include "modules/accounting/templates/suppliers/partials/suppliers_table.html" %}
+</div>
+</div>
+{% endblock %}

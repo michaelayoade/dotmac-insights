@@ -1,0 +1,129 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Performance Appraisal</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ appraisal.start_date.year if appraisal.start_date else '' }} Review Period</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/hr/my/appraisals" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to List
+            </a>
+        </div>
+    </div>
+
+    <!-- Status -->
+    <div class="{% if appraisal.status == 'Completed' %}bg-emerald-50 border-emerald-200{% elif appraisal.status == 'Pending' %}bg-amber-50 border-amber-200{% else %}bg-gray-50 border-gray-200{% endif %} border rounded-2xl p-4">
+        <div class="flex items-center gap-3">
+            {% if appraisal.status == 'Completed' %}
+            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-medium text-emerald-800">Completed</span>
+            {% elif appraisal.status == 'Pending' %}
+            <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="font-medium text-amber-800">Pending</span>
+            {% else %}
+            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span class="font-medium text-gray-800">{{ appraisal.status or 'Draft' }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Details Card -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Appraisal Details</h2>
+        </div>
+        <div class="p-6">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Review Period</dt>
+                    <dd class="mt-1 text-gray-900">{{ appraisal.start_date.strftime('%B %d, %Y') if appraisal.start_date else '-' }} - {{ appraisal.end_date.strftime('%B %d, %Y') if appraisal.end_date else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Appraiser</dt>
+                    <dd class="mt-1 text-gray-900">{{ appraisal.appraiser_name or '-' }}</dd>
+                </div>
+                {% if appraisal.appraisal_template %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Template</dt>
+                    <dd class="mt-1 text-gray-900">{{ appraisal.appraisal_template.template_title }}</dd>
+                </div>
+                {% endif %}
+                {% if appraisal.kra_template %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">KRA Template</dt>
+                    <dd class="mt-1 text-gray-900">{{ appraisal.kra_template }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+
+    <!-- Score -->
+    {% if appraisal.total_score is not none %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-lg font-display font-semibold text-gray-900">Overall Score</h2>
+                <p class="text-sm text-gray-500 mt-1">Based on all evaluation criteria</p>
+            </div>
+            <div class="text-center">
+                <p class="text-4xl font-bold text-purple-600">{{ '{:.1f}'.format(appraisal.total_score) }}</p>
+                {% if appraisal.total_score >= 4 %}
+                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 mt-2">Excellent</span>
+                {% elif appraisal.total_score >= 3 %}
+                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 mt-2">Good</span>
+                {% elif appraisal.total_score >= 2 %}
+                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700 mt-2">Satisfactory</span>
+                {% else %}
+                    <span class="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700 mt-2">Needs Improvement</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Goals/KRAs -->
+    {% if appraisal.goals %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Goals & KRAs</h2>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for goal in appraisal.goals %}
+            <div class="p-6">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <h3 class="font-medium text-gray-900">{{ goal.kra or goal.goal }}</h3>
+                        {% if goal.per_weightage %}
+                        <p class="text-sm text-gray-500 mt-1">Weightage: {{ goal.per_weightage }}%</p>
+                        {% endif %}
+                    </div>
+                    {% if goal.score %}
+                    <div class="text-right ml-4">
+                        <p class="text-xl font-bold text-purple-600">{{ '{:.1f}'.format(goal.score) }}</p>
+                        <p class="text-xs text-gray-500">Score</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Feedback -->
+    {% if appraisal.feedback or appraisal.remarks %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Feedback</h2>
+        <div class="bg-surface-50 rounded-xl p-4 text-gray-700">
+            {{ appraisal.feedback or appraisal.remarks }}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

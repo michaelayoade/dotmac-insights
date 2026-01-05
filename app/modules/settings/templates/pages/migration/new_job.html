@@ -1,0 +1,86 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-3">
+        <a href="/settings/migration" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">New Migration Job</h1>
+            <p class="mt-1.5 text-gray-500 font-body">Create a new data migration job</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<div class="max-w-2xl">
+    <form action="/settings/migration/new" method="POST" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Job Name -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <label for="name" class="block text-sm font-semibold text-gray-900 mb-2">Job Name</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                placeholder="e.g., Q4 Customer Import"
+                class="block w-full rounded-xl border-gray-200 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-sm"
+            >
+            <p class="mt-2 text-xs text-gray-500">Give this migration a descriptive name</p>
+        </div>
+
+        <!-- Entity Type -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <label for="entity_type" class="block text-sm font-semibold text-gray-900 mb-4">Entity Type</label>
+            <p class="text-sm text-gray-500 mb-4">Select the type of data you want to import</p>
+
+            <div class="space-y-4">
+                {% for category in categories %}
+                <div>
+                    <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">{{ category }}</h4>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {% for entity in entity_types if entity.category == category %}
+                        <label class="relative flex cursor-pointer rounded-lg border border-gray-200 bg-white p-3 hover:border-primary-300 hover:bg-primary-50/50 transition-colors">
+                            <input
+                                type="radio"
+                                name="entity_type"
+                                value="{{ entity.value }}"
+                                class="sr-only peer"
+                                required
+                            >
+                            <div class="flex items-center">
+                                <span class="text-sm font-medium text-gray-900 peer-checked:text-primary-600">{{ entity.label }}</span>
+                            </div>
+                            <span class="pointer-events-none absolute -inset-px rounded-lg border-2 border-transparent peer-checked:border-primary-500" aria-hidden="true"></span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-end gap-3">
+            <a href="/settings/migration" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors">
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all"
+            >
+                Create Job
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

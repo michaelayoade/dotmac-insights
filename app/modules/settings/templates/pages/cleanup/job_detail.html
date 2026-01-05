@@ -1,0 +1,122 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ job.name }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Cleanup job details and results</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="/settings/data-cleanup/jobs"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to Jobs
+        </a>
+        {% if job.status.value == 'completed' and job.is_rollbackable %}
+        <button type="button"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-orange-700 bg-orange-50 rounded-xl ring-1 ring-orange-200 hover:bg-orange-100 transition-colors"
+                disabled title="Coming in Phase 4">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+            </svg>
+            Rollback
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Job Info Card -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Job Details</h2>
+    </div>
+    <div class="p-6">
+        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
+                <dd class="mt-1">
+                    <span class="inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium ring-1 ring-inset {{ job_status_colors[job.status.value] }}">
+                        {{ job.status.value.replace('_', ' ')|title }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Entity Type</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ get_entity_display(job.entity_type.value) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Action</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ job.action_type.value|title }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Rollbackable</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ 'Yes' if job.is_rollbackable else 'No' }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Records</dt>
+                <dd class="mt-1 text-sm font-semibold text-gray-900 tabular-nums">{{ "{:,}".format(job.record_ids|length if job.record_ids else 0) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Records Changed</dt>
+                <dd class="mt-1 text-sm font-semibold text-emerald-600 tabular-nums">{{ "{:,}".format(job.records_changed) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Records Failed</dt>
+                <dd class="mt-1 text-sm font-semibold {{ 'text-red-600' if job.records_failed > 0 else 'text-gray-900' }} tabular-nums">{{ "{:,}".format(job.records_failed) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Created</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ job.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
+            </div>
+            {% if job.completed_at %}
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ job.completed_at.strftime('%b %d, %Y %H:%M') }}</dd>
+            </div>
+            {% endif %}
+            {% if job.rolled_back_at %}
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Rolled Back</dt>
+                <dd class="mt-1 text-sm text-orange-600">{{ job.rolled_back_at.strftime('%b %d, %Y %H:%M') }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+
+        {% if job.error_message %}
+        <div class="mt-6 pt-6 border-t border-gray-100">
+            <dt class="text-xs font-medium text-red-500 uppercase tracking-wide mb-2">Error</dt>
+            <dd class="text-sm text-red-700 bg-red-50 rounded-lg p-3">{{ job.error_message }}</dd>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Changes Log -->
+{% if job.changes_log %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Changes Log</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Before and after values for each changed record</p>
+    </div>
+    <div class="p-6">
+        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto max-h-96">
+            <pre>{{ job.changes_log|tojson(indent=2) }}</pre>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <div class="px-6 py-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <h3 class="mt-4 text-sm font-semibold text-gray-900">No changes recorded</h3>
+        <p class="mt-1 text-sm text-gray-500">This job hasn't made any changes yet.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

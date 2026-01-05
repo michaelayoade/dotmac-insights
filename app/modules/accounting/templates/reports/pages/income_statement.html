@@ -1,0 +1,173 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Income Statement</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ start_date.strftime('%B %d, %Y') }} - {{ end_date.strftime('%B %d, %Y') }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <button
+            onclick="window.print()"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+            </svg>
+            Print
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Report Navigation -->
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="/accounting/reports/trial-balance" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Trial Balance</a>
+    <a href="/accounting/reports/balance-sheet" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Balance Sheet</a>
+    <a href="/accounting/reports/income-statement" class="px-4 py-2 rounded-lg text-sm font-medium bg-primary-100 text-primary-700">Income Statement</a>
+    <a href="/accounting/reports/cash-flow" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Cash Flow</a>
+    <a href="/accounting/reports/financial-ratios" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Financial Ratios</a>
+</div>
+
+<!-- Date Filter -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <label class="text-sm font-medium text-gray-700">Period:</label>
+        <input
+            type="date"
+            name="start"
+            value="{{ start_param or start_date.strftime('%Y-%m-%d') }}"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+        >
+        <span class="text-gray-500">to</span>
+        <input
+            type="date"
+            name="end"
+            value="{{ end_param or end_date.strftime('%Y-%m-%d') }}"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+        >
+        <button
+            type="submit"
+            class="px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500 transition-colors"
+        >
+            Update
+        </button>
+    </form>
+</div>
+
+<!-- Summary Card -->
+<div class="bg-gradient-to-br {{ 'from-emerald-50 to-emerald-100' if net_income >= 0 else 'from-red-50 to-red-100' }} rounded-xl p-6 mb-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <p class="text-sm font-medium {{ 'text-emerald-700' if net_income >= 0 else 'text-red-700' }}">
+                {{ 'Net Profit' if net_income >= 0 else 'Net Loss' }}
+            </p>
+            <p class="text-3xl font-bold {{ 'text-emerald-800' if net_income >= 0 else 'text-red-800' }} font-mono mt-1">
+                {{ '{:,.2f}'.format(net_income|abs) }}
+            </p>
+        </div>
+        <div class="w-16 h-16 rounded-2xl {{ 'bg-emerald-200' if net_income >= 0 else 'bg-red-200' }} flex items-center justify-center">
+            {% if net_income >= 0 %}
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+            </svg>
+            {% else %}
+            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"/>
+            </svg>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="space-y-6">
+    <!-- Income -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 bg-emerald-50">
+            <h2 class="text-lg font-display font-semibold text-emerald-900">Income</h2>
+        </div>
+        <table class="min-w-full divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100">
+                {% for row in income %}
+                <tr class="hover:bg-surface-50">
+                    <td class="py-3 pl-6 pr-3">
+                        <a href="/accounting/accounts/{{ row.account.id }}" class="text-sm text-gray-900 hover:text-primary-600">
+                            {{ row.account.account_name }}
+                        </a>
+                    </td>
+                    <td class="py-3 px-3 pr-6 text-sm text-right font-mono font-medium text-emerald-600">
+                        {{ '{:,.2f}'.format(row.balance) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2" class="px-6 py-4 text-sm text-gray-500 text-center">No income</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-emerald-100">
+                <tr>
+                    <td class="py-3.5 pl-6 pr-3 text-sm font-semibold text-emerald-900">Total Income</td>
+                    <td class="py-3.5 px-3 pr-6 text-sm text-right font-mono font-bold text-emerald-900">{{ '{:,.2f}'.format(total_income) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Expenses -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 bg-amber-50">
+            <h2 class="text-lg font-display font-semibold text-amber-900">Expenses</h2>
+        </div>
+        <table class="min-w-full divide-y divide-gray-100">
+            <tbody class="divide-y divide-gray-100">
+                {% for row in expenses %}
+                <tr class="hover:bg-surface-50">
+                    <td class="py-3 pl-6 pr-3">
+                        <a href="/accounting/accounts/{{ row.account.id }}" class="text-sm text-gray-900 hover:text-primary-600">
+                            {{ row.account.account_name }}
+                        </a>
+                    </td>
+                    <td class="py-3 px-3 pr-6 text-sm text-right font-mono font-medium text-amber-600">
+                        {{ '{:,.2f}'.format(row.balance) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="2" class="px-6 py-4 text-sm text-gray-500 text-center">No expenses</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-amber-100">
+                <tr>
+                    <td class="py-3.5 pl-6 pr-3 text-sm font-semibold text-amber-900">Total Expenses</td>
+                    <td class="py-3.5 px-3 pr-6 text-sm text-right font-mono font-bold text-amber-900">{{ '{:,.2f}'.format(total_expenses) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Net Income Summary -->
+    <div class="bg-gray-100 rounded-xl p-6">
+        <table class="min-w-full">
+            <tbody>
+                <tr>
+                    <td class="py-2 text-sm text-gray-600">Total Income</td>
+                    <td class="py-2 text-sm text-right font-mono text-emerald-600">{{ '{:,.2f}'.format(total_income) }}</td>
+                </tr>
+                <tr>
+                    <td class="py-2 text-sm text-gray-600">Less: Total Expenses</td>
+                    <td class="py-2 text-sm text-right font-mono text-amber-600">({{ '{:,.2f}'.format(total_expenses) }})</td>
+                </tr>
+                <tr class="border-t-2 border-gray-300">
+                    <td class="py-3 text-base font-semibold text-gray-900">{{ 'Net Profit' if net_income >= 0 else 'Net Loss' }}</td>
+                    <td class="py-3 text-lg text-right font-mono font-bold {{ 'text-emerald-600' if net_income >= 0 else 'text-red-600' }}">
+                        {{ '{:,.2f}'.format(net_income) }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

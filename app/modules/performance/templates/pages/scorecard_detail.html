@@ -1,0 +1,147 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/performance" class="hover:text-primary-600">Performance</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <a href="/performance/scorecards" class="hover:text-primary-600">Scorecards</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">#{{ scorecard.id }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Employee Scorecard</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Employee #{{ scorecard.employee_id }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Scorecard Summary</h3>
+                {% set status_colors = {
+                    'pending': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'computing': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                    'computed': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'in_review': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                    'approved': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'disputed': 'bg-red-50 text-red-700 ring-red-600/20',
+                    'finalized': 'bg-green-50 text-green-700 ring-green-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(scorecard.status.value if scorecard.status else 'pending', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ (scorecard.status.value if scorecard.status else 'pending')|replace('_', ' ')|title }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Employee</dt>
+                        <dd class="mt-1.5 text-gray-900">Employee #{{ scorecard.employee_id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Evaluation Period</dt>
+                        <dd class="mt-1.5 text-gray-900">Period #{{ scorecard.evaluation_period_id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Template</dt>
+                        <dd class="mt-1.5 text-gray-900">Template #{{ scorecard.template_id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Final Rating</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ scorecard.final_rating or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if scorecard.kra_results %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">KRA Results</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">KRA</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Weight</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Score</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Weighted</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for result in scorecard.kra_results %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm text-gray-900">KRA #{{ result.kra_id }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600 text-right">{{ result.weightage_in_scorecard|round(1) if result.weightage_in_scorecard else '-' }}%</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ result.final_score|round(1) if result.final_score else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ result.weighted_score|round(2) if result.weighted_score else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if scorecard.kpi_results %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">KPI Results</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">KPI</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Target</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actual</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Score</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for result in scorecard.kpi_results %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm text-gray-900">KPI #{{ result.kpi_id }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600 text-right">{{ result.target_value|round(2) if result.target_value else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ result.raw_value|round(2) if result.raw_value else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ result.final_score|round(1) if result.final_score else '-' }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg shadow-primary-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Total Score</h3>
+                <p class="mt-4 text-4xl font-bold">{{ scorecard.total_weighted_score|round(1) if scorecard.total_weighted_score else '-' }}%</p>
+                <p class="text-sm opacity-75">{{ scorecard.final_rating or 'Not rated' }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Review Info</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                {% if scorecard.reviewed_at %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Reviewed At</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ scorecard.reviewed_at.strftime('%b %d, %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+                {% if scorecard.finalized_at %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Finalized At</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ scorecard.finalized_at.strftime('%b %d, %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ scorecard.created_at.strftime('%b %d, %Y %H:%M') if scorecard.created_at else '-' }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1016,7 +1016,7 @@ class NigerianTaxService:
             raise ValueError("E-invoice not found")
 
         # Generate simple UBL structure (placeholder - full implementation would use proper XML library)
-        ubl_structure = {
+        ubl_structure: dict[str, Any] = {
             "UBLVersionID": einvoice.ubl_version_id,
             "CustomizationID": einvoice.customization_id,
             "ProfileID": einvoice.profile_id,
@@ -1090,6 +1090,13 @@ class NigerianTaxService:
         from app.templates.environment import get_template_env
         env = get_template_env()
         xml_template = env.get_template("tax/einvoice_ubl.xml.j2")
+        supplier_party = ubl_structure.get("AccountingSupplierParty", {})
+        if not isinstance(supplier_party, dict):
+            supplier_party = {}
+        customer_party = ubl_structure.get("AccountingCustomerParty", {})
+        if not isinstance(customer_party, dict):
+            customer_party = {}
+
         xml_content = xml_template.render(
             ubl_version=einvoice.ubl_version_id,
             customization_id=einvoice.customization_id,
@@ -1100,11 +1107,11 @@ class NigerianTaxService:
             invoice_type_code=einvoice.invoice_type_code,
             note=einvoice.note,
             currency_code=einvoice.document_currency_code,
-            supplier=ubl_structure.get("AccountingSupplierParty", {}).get("Party", {}),
-            customer=ubl_structure.get("AccountingCustomerParty", {}).get("Party", {}),
+            supplier=supplier_party,
+            customer=customer_party,
             tax_amount=einvoice.tax_amount,
             tax_subtotals=[{
-                "taxable_amount": einvoice.taxable_amount,
+                "taxable_amount": einvoice.tax_exclusive_amount,
                 "tax_amount": einvoice.tax_amount,
                 "category_id": "S",
                 "percent": "7.5",

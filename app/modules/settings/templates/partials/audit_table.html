@@ -1,0 +1,97 @@
+{% if entries %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="audit-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('timestamp')" x-cloak>Timestamp</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('user')" x-cloak>User</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('group')" x-cloak>Group</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('action')" x-cloak>Action</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('details')" x-cloak>Details</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for entry in entries %}
+            <tr class="hover:bg-surface-50 transition-colors" x-data="{ expanded: false }">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-600" x-show="isVisible('timestamp')" x-cloak>
+                    {{ entry.created_at | format_datetime }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('user')" x-cloak>
+                    <span class="text-sm font-medium text-gray-900">{{ entry.user_email }}</span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('group')" x-cloak>
+                    <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium bg-surface-100 text-gray-700">
+                        {{ entry.group_name | title }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('action')" x-cloak>
+                    {% set action_styles = {
+                        'create': 'bg-emerald-50 text-emerald-700',
+                        'update': 'bg-blue-50 text-blue-700',
+                        'delete': 'bg-red-50 text-red-700',
+                        'test': 'bg-amber-50 text-amber-700'
+                    } %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium {{ action_styles.get(entry.action, 'bg-gray-50 text-gray-700') }}">
+                        {{ entry.action | title }}
+                    </span>
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-500 hidden lg:table-cell" x-show="isVisible('details')" x-cloak>
+                    <button
+                        type="button"
+                        class="text-primary-600 hover:text-primary-500 text-xs font-medium"
+                        @click="expanded = !expanded"
+                    >
+                        <span x-show="!expanded">View changes</span>
+                        <span x-show="expanded" x-cloak>Hide changes</span>
+                    </button>
+                </td>
+            </tr>
+            <tr x-show="expanded" x-cloak class="bg-surface-50">
+                <td colspan="5" class="px-6 py-4">
+                    <div class="grid grid-cols-2 gap-4 text-xs">
+                        {% if entry.old_value_redacted %}
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">Before</h5>
+                            <pre class="p-3 bg-white rounded-lg overflow-auto text-gray-600 max-h-48">{{ entry.old_value_redacted }}</pre>
+                        </div>
+                        {% endif %}
+                        {% if entry.new_value_redacted %}
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">After</h5>
+                            <pre class="p-3 bg-white rounded-lg overflow-auto text-gray-600 max-h-48">{{ entry.new_value_redacted }}</pre>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3 text-xs text-gray-400">
+                        IP: {{ entry.ip_address or 'Unknown' }}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="audit-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No audit entries</h3>
+    <p class="text-sm text-gray-500 font-body">
+        {% if search_query or current_group or current_action %}
+        No entries match your filters.
+        {% else %}
+        Settings changes will be recorded here.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

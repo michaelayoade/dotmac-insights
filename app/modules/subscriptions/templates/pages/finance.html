@@ -1,0 +1,179 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col gap-2 mb-6">
+    <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900">Finance Overview</h1>
+    <p class="text-sm text-gray-500 font-body">Revenue, churn impact, and recent invoices.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/subscriptions/templates/partials/service_nav.html" %}
+
+<form class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6" method="GET" action="/subscriptions/finance">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <input type="number" name="party_id" value="{{ ar_balance.party_id if ar_balance else '' }}" class="rounded-xl border-gray-200 text-sm" placeholder="Party ID for AR balance">
+        <input type="number" name="subscription_id" value="{{ subscription_summary.subscription_id if subscription_summary else '' }}" class="rounded-xl border-gray-200 text-sm" placeholder="Subscription ID for summary">
+        <div class="flex items-center justify-end gap-2">
+            <a href="/subscriptions/finance" class="text-sm text-gray-500 hover:text-gray-700">Reset</a>
+            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-primary-600 hover:bg-primary-500">Load</button>
+        </div>
+    </div>
+</form>
+
+{% if ar_balance %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <h3 class="text-base font-display font-semibold text-gray-900">AR Balance</h3>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-700">
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Total Outstanding</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ "{:,.2f}".format(ar_balance.total_outstanding) }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Current</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ "{:,.2f}".format(ar_balance.current) }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Overdue</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ "{:,.2f}".format(ar_balance.overdue) }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Invoices</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ ar_balance.invoice_count }}</p>
+        </div>
+    </div>
+    {% if payment_history %}
+    <div class="mt-6">
+        <p class="text-xs uppercase tracking-wide text-gray-500">Recent Payments</p>
+        <div class="mt-2 space-y-2 text-sm text-gray-700">
+            {% for payment in payment_history %}
+            <div class="flex items-center justify-between">
+                <span>{{ payment.reference or payment.payment_id }}</span>
+                <span>{{ payment.currency }} {{ "{:,.2f}".format(payment.amount) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if subscription_summary %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <h3 class="text-base font-display font-semibold text-gray-900">Subscription Summary</h3>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700">
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Plan</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ subscription_summary.plan_name }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Status</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ subscription_summary.status | title }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Outstanding</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ subscription_summary.currency }} {{ "{:,.2f}".format(subscription_summary.financials.outstanding_balance) }}</p>
+        </div>
+    </div>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700">
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Total Paid</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ subscription_summary.currency }} {{ "{:,.2f}".format(subscription_summary.financials.total_paid) }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Lifetime Value</p>
+            <p class="mt-2 font-semibold text-gray-900">{{ subscription_summary.currency }} {{ "{:,.2f}".format(subscription_summary.lifetime.lifetime_value) }}</p>
+        </div>
+        <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500">Payment Link</p>
+            <p class="mt-2 font-semibold text-gray-900">
+                {{ "Linked" if subscription_summary.payment_subscription else "Not linked" }}
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900">Revenue</h3>
+        <p class="text-xs text-gray-500 mt-1">{{ revenue_summary.period_start }} to {{ revenue_summary.period_end }}</p>
+        <div class="mt-4 space-y-2 text-sm text-gray-700">
+            <div class="flex items-center justify-between">
+                <span>Total Revenue</span>
+                <span class="font-semibold">{{ revenue_summary.currency }} {{ "{:,.0f}".format(revenue_summary.total_revenue) }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span>Subscription Revenue</span>
+                <span class="font-semibold">{{ revenue_summary.currency }} {{ "{:,.0f}".format(revenue_summary.subscription_revenue) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900">Churn Impact</h3>
+        <p class="text-xs text-gray-500 mt-1">{{ churn_summary.period_start }} to {{ churn_summary.period_end }}</p>
+        <div class="mt-4 space-y-2 text-sm text-gray-700">
+            <div class="flex items-center justify-between">
+                <span>Churned</span>
+                <span class="font-semibold">{{ "{:,}".format(churn_summary.churned_count) }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span>MRR Lost</span>
+                <span class="font-semibold">{{ revenue_summary.currency }} {{ "{:,.0f}".format(churn_summary.mrr_lost) }}</span>
+            </div>
+            <div class="flex items-center justify-between">
+                <span>Churn Rate</span>
+                <span class="font-semibold">{{ "{:.2f}".format(churn_summary.churn_rate) }}%</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h3 class="text-base font-display font-semibold text-gray-900">Revenue Mix</h3>
+        <p class="text-xs text-gray-500 mt-1">By service type</p>
+        <div class="mt-4 space-y-2 text-sm text-gray-700">
+            {% for item in revenue_summary.by_service_type %}
+            <div class="flex items-center justify-between">
+                <span>{{ item.value | title }}</span>
+                <span class="font-semibold">{{ "{:.1f}".format(item.percentage) }}%</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-base font-display font-semibold text-gray-900">Recent Invoices</h3>
+    </div>
+    <table class="min-w-full text-sm">
+        <thead class="bg-surface-50 text-gray-500 uppercase text-xs tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Invoice</th>
+                <th class="px-4 py-3 text-left">Date</th>
+                <th class="px-4 py-3 text-left">Status</th>
+                <th class="px-4 py-3 text-right">Total</th>
+                <th class="px-4 py-3 text-right">Balance</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% if recent_invoices %}
+            {% for invoice in recent_invoices %}
+            <tr class="hover:bg-surface-50">
+                <td class="px-4 py-3 text-gray-900">{{ invoice.invoice_number or ("INV-" ~ invoice.id) }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ invoice.invoice_date.date() if invoice.invoice_date else '-' }}</td>
+                <td class="px-4 py-3 text-gray-700">{{ invoice.status.value }}</td>
+                <td class="px-4 py-3 text-right text-gray-900">{{ invoice.currency }} {{ "{:,.2f}".format(invoice.total_amount) }}</td>
+                <td class="px-4 py-3 text-right text-gray-900">{{ invoice.currency }} {{ "{:,.2f}".format(invoice.balance or (invoice.total_amount - (invoice.amount_paid or 0))) }}</td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="5" class="px-4 py-10 text-center text-gray-500">No invoices available.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

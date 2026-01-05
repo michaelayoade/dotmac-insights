@@ -56,13 +56,21 @@ help:
 install:
 	@echo "Installing Python dependencies..."
 	poetry install
-	@echo "Installing frontend dependencies..."
-	cd frontend && npm ci
+	@echo "Installing Node dependencies..."
+	npm ci
+	@echo "Building CSS..."
+	npm run css:build
 	@echo "Installing Playwright browsers..."
-	cd frontend && npx playwright install --with-deps chromium
+	npx playwright install --with-deps chromium
 	@echo "Installing pre-commit hooks..."
 	poetry run pre-commit install || true
 	@echo "Done! Run 'make test' to verify installation."
+
+css-build:
+	npm run css:build
+
+css-watch:
+	npm run css:watch
 
 clean:
 	@echo "Cleaning Python caches..."

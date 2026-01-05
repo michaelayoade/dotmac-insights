@@ -1,153 +1,207 @@
-"""AR Payments: Customer payment CRUD and workflow."""
+"""AR Payments: Customer payment CRUD and workflow.
+
+Uses ARPaymentService for business logic.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.auth import Require, get_current_principal, Principal
+from app.auth import Principal, Require, get_current_principal
 from app.database import get_db
-from app.models.payment import Payment, PaymentStatus, PaymentMethod, PaymentSource
-from app.models.payment_allocation import PaymentAllocation
+from app.models.payment import Payment, PaymentMethod, PaymentStatus
+from app.services.accounting.ar_payment_types import (
+    AllocationData,
+    PaymentCreateData,
+    PaymentFilters,
+    PaymentUpdateData,
+)
+from app.services.accounting.ar_payments import ARPaymentService
+from app.services.errors import NotFoundError, ServiceError, ValidationError
 from app.services.payment_allocation_service import (
-    PaymentAllocationService,
     AllocationRequest,
     PaymentAllocationError,
+    PaymentAllocationService,
 )
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, paginate
+from .helpers import parse_date
+from .schemas.allocation import AllocationCreate
 
 router = APIRouter()
 
 
-# =============================================================================
-# PYDANTIC SCHEMAS
-# =============================================================================
+# ---------------------------------------------------------------------------
+# Dependency Injection
+# ---------------------------------------------------------------------------
 
-class AllocationCreate(BaseModel):
-    """Schema for creating a payment allocation."""
-    document_type: str  # invoice, credit_note
-    document_id: int
-    allocated_amount: float
-    discount_amount: float = 0
-    write_off_amount: float = 0
-    discount_type: Optional[str] = None
-    discount_account: Optional[str] = None
-    write_off_account: Optional[str] = None
-    write_off_reason: Optional[str] = None
+
+def get_ar_payment_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> ARPaymentService:
+    """Dependency to get an ARPaymentService instance."""
+    return ARPaymentService(db, principal)
+
+
+# ---------------------------------------------------------------------------
+# Pydantic Schemas
+# ---------------------------------------------------------------------------
 
 
 class CustomerPaymentCreate(BaseModel):
     """Schema for creating a customer payment."""
-    contact_id: Optional[int] = None  # CRM contact (preferred)
-    customer_id: Optional[int] = None  # legacy customer
+
+    customer_account_id: Optional[int] = None
     payment_date: str
-    amount: float
+    amount: float = Field(..., gt=0, description="Payment amount must be positive")
     currency: str = "NGN"
     payment_method: str = "bank_transfer"
     receipt_number: Optional[str] = None
     transaction_reference: Optional[str] = None
     notes: Optional[str] = None
-    conversion_rate: float = 1
+    conversion_rate: float = Field(
+        default=1, gt=0, description="Conversion rate must be positive"
+    )
     bank_account_id: Optional[int] = None
     allocations: List[AllocationCreate] = []
 
 
 class CustomerPaymentUpdate(BaseModel):
     """Schema for updating a customer payment."""
+
     payment_date: Optional[str] = None
-    amount: Optional[float] = None
+    amount: Optional[float] = Field(
+        default=None, gt=0, description="Payment amount must be positive"
+    )
     payment_method: Optional[str] = None
     transaction_reference: Optional[str] = None
     notes: Optional[str] = None
-    conversion_rate: Optional[float] = None
+    conversion_rate: Optional[float] = Field(
+        default=None, gt=0, description="Conversion rate must be positive"
+    )
 
 
-# =============================================================================
-# AR PAYMENTS LIST & DETAIL
-# =============================================================================
+# ---------------------------------------------------------------------------
+# Helper: Convert Pydantic schema to service dataclass
+# ---------------------------------------------------------------------------
 
-@router.get("/ar-payments", dependencies=[Depends(Require("accounting:read"))])
-def list_ar_payments(
-    contact_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
-    status: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    limit: int = Query(default=50, le=500),
-    offset: int = 0,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """List customer payments with filters."""
-    query = db.query(Payment)
 
-    if contact_id:
-        query = query.filter(Payment.contact_id == contact_id)
-    elif customer_id:
-        query = query.filter(Payment.customer_id == customer_id)
+def _to_create_data(schema: CustomerPaymentCreate) -> PaymentCreateData:
+    """Convert Pydantic schema to service PaymentCreateData."""
+    # Parse payment method
+    try:
+        method_enum = PaymentMethod(schema.payment_method.lower())
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid payment method: {schema.payment_method}"
+        ) from e
 
-    if status:
+    # Parse date
+    try:
+        payment_date = datetime.fromisoformat(schema.payment_date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid date format") from e
+
+    allocations = [
+        AllocationData(
+            document_type=a.document_type,
+            document_id=a.document_id,
+            allocated_amount=Decimal(str(a.allocated_amount)),
+            discount_amount=Decimal(str(a.discount_amount)),
+            write_off_amount=Decimal(str(a.write_off_amount)),
+            discount_type=a.discount_type,
+            discount_account=a.discount_account,
+            write_off_account=a.write_off_account,
+            write_off_reason=a.write_off_reason,
+        )
+        for a in schema.allocations
+    ]
+
+    return PaymentCreateData(
+        customer_account_id=schema.customer_account_id,
+        payment_date=payment_date,
+        amount=Decimal(str(schema.amount)),
+        currency=schema.currency,
+        payment_method=method_enum,
+        receipt_number=schema.receipt_number,
+        transaction_reference=schema.transaction_reference,
+        notes=schema.notes,
+        conversion_rate=Decimal(str(schema.conversion_rate)),
+        bank_account_id=schema.bank_account_id,
+        allocations=allocations,
+    )
+
+
+def _to_update_data(schema: CustomerPaymentUpdate) -> PaymentUpdateData:
+    """Convert Pydantic schema to service PaymentUpdateData."""
+    payment_date = None
+    if schema.payment_date is not None:
         try:
-            status_enum = PaymentStatus(status.lower())
-            query = query.filter(Payment.status == status_enum)
-        except ValueError:
-            pass
+            payment_date = datetime.fromisoformat(schema.payment_date)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail="Invalid date format") from e
 
-    if start_date:
-        query = query.filter(Payment.payment_date >= parse_date(start_date, "start_date"))
+    payment_method = None
+    if schema.payment_method is not None:
+        try:
+            payment_method = PaymentMethod(schema.payment_method.lower())
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid payment method: {schema.payment_method}"
+            ) from e
 
-    if end_date:
-        query = query.filter(Payment.payment_date <= parse_date(end_date, "end_date"))
+    amount = Decimal(str(schema.amount)) if schema.amount is not None else None
+    conversion_rate = (
+        Decimal(str(schema.conversion_rate))
+        if schema.conversion_rate is not None
+        else None
+    )
 
-    query = query.order_by(Payment.payment_date.desc(), Payment.id.desc())
-    total, payments = paginate(query, offset, limit)
+    return PaymentUpdateData(
+        payment_date=payment_date,
+        amount=amount,
+        payment_method=payment_method,
+        transaction_reference=schema.transaction_reference,
+        notes=schema.notes,
+        conversion_rate=conversion_rate,
+    )
 
+
+# ---------------------------------------------------------------------------
+# Helper: Serialize payment to response dict
+# ---------------------------------------------------------------------------
+
+
+def _serialize_payment_list_item(p: Payment) -> Dict[str, Any]:
+    """Serialize payment for list response."""
     return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "payments": [
-            {
-                "id": p.id,
-                "receipt_number": p.receipt_number,
-                "contact_id": p.contact_id,
-                "customer_id": p.customer_id,  # legacy
-                "payment_date": p.payment_date.isoformat() if p.payment_date else None,
-                "amount": float(p.amount),
-                "currency": p.currency,
-                "payment_method": p.payment_method.value if p.payment_method else None,
-                "status": p.status.value if p.status else None,
-                "total_allocated": float(p.total_allocated) if p.total_allocated else 0,
-                "unallocated_amount": float(p.unallocated_amount) if p.unallocated_amount else 0,
-            }
-            for p in payments
-        ],
+        "id": p.id,
+        "receipt_number": p.receipt_number,
+        "customer_account_id": p.customer_account_id,
+        "payment_date": p.payment_date.isoformat() if p.payment_date else None,
+        "amount": float(p.amount),
+        "currency": p.currency,
+        "payment_method": p.payment_method.value if p.payment_method else None,
+        "status": p.status.value if p.status else None,
+        "total_allocated": float(p.total_allocated) if p.total_allocated else 0,
+        "unallocated_amount": float(p.unallocated_amount) if p.unallocated_amount else 0,
     }
 
 
-@router.get("/ar-payments/{payment_id}", dependencies=[Depends(Require("accounting:read"))])
-def get_ar_payment(
-    payment_id: int,
-    db: Session = Depends(get_db),
+def _serialize_payment_detail(
+    payment: Payment, allocations: list
 ) -> Dict[str, Any]:
-    """Get customer payment detail with allocations."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    allocations = db.query(PaymentAllocation).filter(
-        PaymentAllocation.payment_id == payment_id
-    ).all()
-
+    """Serialize payment for detail response."""
     return {
         "id": payment.id,
         "receipt_number": payment.receipt_number,
-        "contact_id": payment.contact_id,
-        "customer_id": payment.customer_id,  # legacy
+        "customer_account_id": payment.customer_account_id,
         "invoice_id": payment.invoice_id,
         "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
         "amount": float(payment.amount),
@@ -180,67 +234,149 @@ def get_ar_payment(
     }
 
 
-# =============================================================================
-# AR PAYMENTS CRUD
-# =============================================================================
+# ---------------------------------------------------------------------------
+# AR Payments List & Detail
+# ---------------------------------------------------------------------------
+
+
+@router.get("/ar-payments", dependencies=[Depends(Require("accounting:read"))])
+def list_ar_payments(
+    customer_account_id: Optional[int] = None,
+    status: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    limit: int = Query(default=50, le=500),
+    offset: int = Query(default=0, ge=0),
+    service: ARPaymentService = Depends(get_ar_payment_service),
+) -> Dict[str, Any]:
+    """List customer payments with filters."""
+    # Parse status enum
+    status_enum = None
+    if status:
+        try:
+            status_enum = PaymentStatus(status.lower())
+        except ValueError:
+            valid_statuses = [s.value for s in PaymentStatus]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid status '{status}'. Valid values: {valid_statuses}",
+            )
+
+    filters = PaymentFilters(
+        customer_account_id=customer_account_id,
+        status=status_enum,
+        start_date=parse_date(start_date, "start_date") if start_date else None,
+        end_date=parse_date(end_date, "end_date") if end_date else None,
+    )
+
+    pagination = PaginationParams(offset=offset, limit=limit)
+    result = service.list_payments(filters, pagination)
+
+    return {
+        "total": result.total,
+        "limit": result.limit,
+        "offset": result.offset,
+        "payments": [_serialize_payment_list_item(p) for p in result.items],
+    }
+
+
+@router.get("/ar-payments/{payment_id}", dependencies=[Depends(Require("accounting:read"))])
+def get_ar_payment(
+    payment_id: int,
+    service: ARPaymentService = Depends(get_ar_payment_service),
+) -> Dict[str, Any]:
+    """Get customer payment detail with allocations."""
+    try:
+        payment = service.get_payment(payment_id)
+        allocations = service.get_payment_allocations(payment_id)
+        return _serialize_payment_detail(payment, allocations)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+
+
+# ---------------------------------------------------------------------------
+# AR Payments CRUD
+# ---------------------------------------------------------------------------
+
 
 @router.post("/ar-payments", dependencies=[Depends(Require("books:write"))])
 def create_ar_payment(
     data: CustomerPaymentCreate,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: ARPaymentService = Depends(get_ar_payment_service),
 ) -> Dict[str, Any]:
     """Create a new customer payment."""
-    # Require at least one of contact_id or customer_id
-    if not data.contact_id and not data.customer_id:
-        raise HTTPException(status_code=400, detail="Either contact_id or customer_id is required")
-
-    # Parse payment method
     try:
-        method_enum = PaymentMethod(data.payment_method.lower())
-    except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid payment method: {data.payment_method}")
+        create_data = _to_create_data(data)
+        payment = service.create_payment(create_data)
+        db.commit()
+        db.refresh(payment)
+        return {
+            "message": "Customer payment created",
+            "id": payment.id,
+            "receipt_number": payment.receipt_number,
+        }
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ServiceError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    # Parse date
+
+@router.patch("/ar-payments/{payment_id}", dependencies=[Depends(Require("books:write"))])
+def update_ar_payment(
+    payment_id: int,
+    data: CustomerPaymentUpdate,
+    db: Session = Depends(get_db),
+    service: ARPaymentService = Depends(get_ar_payment_service),
+) -> Dict[str, Any]:
+    """Update a customer payment."""
     try:
-        payment_date = datetime.fromisoformat(data.payment_date)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format")
+        update_data = _to_update_data(data)
+        payment = service.update_payment(payment_id, update_data)
+        db.commit()
+        return {
+            "message": "Payment updated",
+            "id": payment.id,
+        }
+    except (NotFoundError, ValidationError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    payment = Payment(
-        contact_id=data.contact_id,
-        customer_id=data.customer_id,
-        payment_date=payment_date,
-        amount=Decimal(str(data.amount)),
-        currency=data.currency,
-        payment_method=method_enum,
-        receipt_number=data.receipt_number,
-        transaction_reference=data.transaction_reference,
-        notes=data.notes,
-        conversion_rate=Decimal(str(data.conversion_rate)),
-        bank_account_id=data.bank_account_id,
-        source=PaymentSource.INTERNAL,
-        status=PaymentStatus.PENDING,
-        workflow_status="pending",
-        write_back_status="pending",
-        created_by_id=principal.id,
-        origin_system="local",
-    )
 
-    # Calculate base amount
-    payment.base_currency = "NGN"  # TODO: Get from company settings
-    payment.base_amount = payment.amount * payment.conversion_rate
-    payment.unallocated_amount = payment.amount
-    payment.total_allocated = Decimal("0")
+@router.delete("/ar-payments/{payment_id}", dependencies=[Depends(Require("books:write"))])
+def delete_ar_payment(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    service: ARPaymentService = Depends(get_ar_payment_service),
+) -> Dict[str, Any]:
+    """Delete a draft customer payment."""
+    try:
+        service.delete_payment(payment_id)
+        db.commit()
+        return {"message": "Payment deleted"}
+    except (NotFoundError, ValidationError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
-    db.add(payment)
-    db.flush()
 
-    # Process allocations if provided
-    if data.allocations:
-        alloc_service = PaymentAllocationService(db)
-        alloc_requests = [
-            AllocationRequest(
+# ---------------------------------------------------------------------------
+# Allocations
+# ---------------------------------------------------------------------------
+
+
+@router.post("/ar-payments/{payment_id}/allocations", dependencies=[Depends(Require("books:write"))])
+def add_payment_allocations(
+    payment_id: int,
+    allocations: List[AllocationCreate],
+    db: Session = Depends(get_db),
+    service: ARPaymentService = Depends(get_ar_payment_service),
+) -> Dict[str, Any]:
+    """Add allocations to a customer payment."""
+    try:
+        alloc_data = [
+            AllocationData(
                 document_type=a.document_type,
                 document_id=a.document_id,
                 allocated_amount=Decimal(str(a.allocated_amount)),
@@ -251,151 +387,16 @@ def create_ar_payment(
                 write_off_account=a.write_off_account,
                 write_off_reason=a.write_off_reason,
             )
-            for a in data.allocations
+            for a in allocations
         ]
-        try:
-            alloc_service.allocate_payment(
-                payment_id=payment.id,
-                allocations=alloc_requests,
-                user_id=principal.id,
-                is_supplier_payment=False,
-            )
-        except PaymentAllocationError as e:
-            db.rollback()
-            raise HTTPException(status_code=400, detail=str(e))
-
-    db.commit()
-    db.refresh(payment)
-
-    return {
-        "message": "Customer payment created",
-        "id": payment.id,
-        "receipt_number": payment.receipt_number,
-    }
-
-
-@router.patch("/ar-payments/{payment_id}", dependencies=[Depends(Require("books:write"))])
-def update_ar_payment(
-    payment_id: int,
-    data: CustomerPaymentUpdate,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Update a customer payment."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.docstatus != 0:
-        raise HTTPException(status_code=400, detail="Can only update draft payments")
-
-    if data.payment_date:
-        try:
-            payment.payment_date = datetime.fromisoformat(data.payment_date)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format")
-
-    if data.amount is not None:
-        payment.amount = Decimal(str(data.amount))
-        payment.base_amount = payment.amount * payment.conversion_rate
-        payment.unallocated_amount = payment.amount - payment.total_allocated
-
-    if data.payment_method:
-        try:
-            payment.payment_method = PaymentMethod(data.payment_method.lower())
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid payment method: {data.payment_method}")
-
-    if data.transaction_reference is not None:
-        payment.transaction_reference = data.transaction_reference
-
-    if data.notes is not None:
-        payment.notes = data.notes
-
-    if data.conversion_rate is not None:
-        payment.conversion_rate = Decimal(str(data.conversion_rate))
-        payment.base_amount = payment.amount * payment.conversion_rate
-
-    db.commit()
-
-    return {
-        "message": "Payment updated",
-        "id": payment.id,
-    }
-
-
-@router.delete("/ar-payments/{payment_id}", dependencies=[Depends(Require("books:write"))])
-def delete_ar_payment(
-    payment_id: int,
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Delete a draft customer payment."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.docstatus != 0:
-        raise HTTPException(status_code=400, detail="Can only delete draft payments")
-
-    # Remove allocations first
-    db.query(PaymentAllocation).filter(
-        PaymentAllocation.payment_id == payment_id
-    ).delete()
-
-    payment.is_deleted = True
-    payment.deleted_at = datetime.now(timezone.utc)
-    payment.deleted_by_id = principal.id
-    db.commit()
-
-    return {"message": "Payment deleted"}
-
-
-# =============================================================================
-# ALLOCATIONS
-# =============================================================================
-
-@router.post("/ar-payments/{payment_id}/allocations", dependencies=[Depends(Require("books:write"))])
-def add_payment_allocations(
-    payment_id: int,
-    allocations: List[AllocationCreate],
-    db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
-) -> Dict[str, Any]:
-    """Add allocations to a customer payment."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    alloc_service = PaymentAllocationService(db)
-    alloc_requests = [
-        AllocationRequest(
-            document_type=a.document_type,
-            document_id=a.document_id,
-            allocated_amount=Decimal(str(a.allocated_amount)),
-            discount_amount=Decimal(str(a.discount_amount)),
-            write_off_amount=Decimal(str(a.write_off_amount)),
-            discount_type=a.discount_type,
-            discount_account=a.discount_account,
-            write_off_account=a.write_off_account,
-            write_off_reason=a.write_off_reason,
-        )
-        for a in allocations
-    ]
-
-    try:
-        created = alloc_service.allocate_payment(
-            payment_id=payment_id,
-            allocations=alloc_requests,
-            user_id=principal.id,
-            is_supplier_payment=False,
-        )
+        service.add_allocations(payment_id, alloc_data)
         db.commit()
         return {
-            "message": f"Added {len(created)} allocations",
-            "allocation_ids": [a.id for a in created],
+            "message": f"Added {len(allocations)} allocations",
         }
-    except PaymentAllocationError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except (NotFoundError, ValidationError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
 @router.delete("/ar-payments/{payment_id}/allocations/{allocation_id}", dependencies=[Depends(Require("books:write"))])
@@ -411,7 +412,9 @@ def remove_payment_allocation(
         raise HTTPException(status_code=404, detail="Payment not found")
 
     if payment.docstatus != 0:
-        raise HTTPException(status_code=400, detail="Cannot modify allocations on posted payment")
+        raise HTTPException(
+            status_code=400, detail="Cannot modify allocations on posted payment"
+        )
 
     alloc_service = PaymentAllocationService(db)
     try:
@@ -422,9 +425,10 @@ def remove_payment_allocation(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# =============================================================================
-# POSTING
-# =============================================================================
+# ---------------------------------------------------------------------------
+# Posting (keeps existing logic - workflow dependent)
+# ---------------------------------------------------------------------------
+
 
 @router.post("/ar-payments/{payment_id}/post", dependencies=[Depends(Require("books:approve"))])
 async def post_ar_payment(
@@ -433,106 +437,39 @@ async def post_ar_payment(
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Post AR payment to GL - creates bank debit, AR credit."""
-    from app.services.document_posting import DocumentPostingService, PostingError
     from app.services.billing_outbound_sync import BillingOutboundSyncService
+    from app.services.document_posting import DocumentPostingService, PostingError
+
     from .helpers import invalidate_report_cache
 
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
 
-    # Check workflow status (mirror AP pattern)
     if payment.status != PaymentStatus.APPROVED:
         raise HTTPException(status_code=400, detail="Can only post approved payments")
 
     posting_service = DocumentPostingService(db)
     try:
-        # post_payment requires (payment_id, user_id, posting_date=None)
         je = posting_service.post_payment(payment_id, principal.id)
         payment.status = PaymentStatus.POSTED
         payment.workflow_status = "posted"
         db.commit()
-        db.refresh(payment)  # ensure returned data reflects DB state
+        db.refresh(payment)
     except PostingError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception:
-        db.rollback()
-        raise  # let FastAPI handle unexpected errors
 
     await invalidate_report_cache()
 
-    # Trigger outbound sync to ERPNext (if enabled via feature flag)
+    # Trigger outbound sync to ERPNext (if enabled)
     sync_service = BillingOutboundSyncService(db)
     sync_service.sync_payment_to_erpnext(payment)
-    db.commit()  # persist sync log
-
-    return {
-        "message": "Payment posted",
-        "journal_entry_id": je.id,
-        "status": payment.status.value,
-    }
-
-
-@router.post("/ar-payments/{payment_id}/approve", dependencies=[Depends(Require("books:approve"))])
-def approve_ar_payment(
-    payment_id: int,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Approve a pending AR payment for posting."""
-    payment = db.query(Payment).filter(Payment.id == payment_id).first()
-    if not payment:
-        raise HTTPException(status_code=404, detail="Payment not found")
-
-    if payment.status != PaymentStatus.PENDING:
-        raise HTTPException(status_code=400, detail="Can only approve pending payments")
-
-    payment.status = PaymentStatus.APPROVED
-    payment.workflow_status = "approved"
     db.commit()
 
     return {
-        "message": "Payment approved",
+        "message": "Payment posted",
         "id": payment.id,
+        "journal_entry_id": je.id,
         "status": payment.status.value,
-    }
-
-
-# =============================================================================
-# OUTSTANDING INVOICES
-# =============================================================================
-
-@router.get("/ar-payments/outstanding-invoices", dependencies=[Depends(Require("accounting:read"))])
-def get_outstanding_invoices(
-    contact_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
-    currency: Optional[str] = None,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Get outstanding invoices available for payment."""
-    if not contact_id and not customer_id:
-        raise HTTPException(status_code=400, detail="Either contact_id or customer_id is required")
-
-    alloc_service = PaymentAllocationService(db)
-    # Use contact_id if provided, else fall back to customer_id
-    if contact_id:
-        docs = alloc_service.get_outstanding_documents("contact", contact_id, currency)
-    else:
-        docs = alloc_service.get_outstanding_documents("customer", customer_id, currency)
-
-    return {
-        "total": len(docs),
-        "documents": [
-            {
-                "document_type": d.document_type,
-                "document_id": d.document_id,
-                "document_number": d.document_number,
-                "document_date": d.document_date,
-                "due_date": d.due_date,
-                "currency": d.currency,
-                "total_amount": float(d.total_amount),
-                "outstanding_amount": float(d.outstanding_amount),
-            }
-            for d in docs
-        ],
     }

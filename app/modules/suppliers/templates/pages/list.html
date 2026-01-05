@@ -1,0 +1,75 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Suppliers</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage your vendors and suppliers</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/suppliers/bills" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-surface-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                View Bills
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form hx-get="/suppliers/table" hx-target="#table-container" hx-push-url="true" class="flex flex-col lg:flex-row gap-4">
+            <div class="flex-1">
+                <input type="text" name="q" value="{{ q }}" placeholder="Search suppliers..."
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <select name="group" class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                    <option value="">All Groups</option>
+                    {% for g in supplier_groups %}
+                    <option value="{{ g }}" {{ 'selected' if g == group_filter else '' }}>{{ g }}</option>
+                    {% endfor %}
+                </select>
+                <select name="status" class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-white">
+                    <option value="">All Status</option>
+                    <option value="active" {{ 'selected' if status_filter == 'active' else '' }}>Active</option>
+                    <option value="inactive" {{ 'selected' if status_filter == 'inactive' else '' }}>Inactive</option>
+                </select>
+                <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                    Search
+                </button>
+                {% if q or group_filter or status_filter %}
+                <a href="/suppliers" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                    Clear
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Total Suppliers</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ total }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Active</p>
+            <p class="text-2xl font-bold text-green-600 mt-1">{{ suppliers|selectattr('disabled', 'false')|list|length if suppliers else 0 }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">On Hold</p>
+            <p class="text-2xl font-bold text-yellow-600 mt-1">{{ suppliers|selectattr('on_hold')|list|length if suppliers else 0 }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-sm text-gray-500">Inactive</p>
+            <p class="text-2xl font-bold text-gray-600 mt-1">{{ suppliers|selectattr('disabled')|list|length if suppliers else 0 }}</p>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div id="table-container">
+        {% include "modules/suppliers/templates/partials/suppliers_table.html" %}
+    </div>
+</div>
+{% endblock %}

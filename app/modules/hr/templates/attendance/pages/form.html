@@ -1,0 +1,77 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="{{ '/hr/attendance/' ~ record.id if record else '/hr/attendance' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        {% if record %}<input type="hidden" name="_method" value="PUT">{% endif %}
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ 'Edit Attendance' if record else 'Record Attendance' }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ 'Update attendance record details' if record else 'Create a new attendance record' }}</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1.5">Employee <span class="text-red-500">*</span></label>
+                <select name="employee_id" id="employee_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">Select employee</option>
+                    {% for opt in employee_options %}<option value="{{ opt.value }}" {{ 'selected' if (record and record.employee_id == opt.value) or (form_data and form_data.employee_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+                {% if errors.employee_id %}<p class="mt-1.5 text-sm text-red-600">{{ errors.employee_id }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="attendance_date" class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-500">*</span></label>
+                <input type="date" name="attendance_date" id="attendance_date" required value="{{ record.attendance_date if record else (form_data.attendance_date if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                {% if errors.attendance_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.attendance_date }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="status" class="block text-sm font-medium text-gray-700 mb-1.5">Status <span class="text-red-500">*</span></label>
+                <select name="status" id="status" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">Select status</option>
+                    {% for s in ['Present', 'Absent', 'Half Day', 'On Leave'] %}
+                    <option value="{{ s }}" {{ 'selected' if (record and record.status == s) or (form_data and form_data.status == s) else '' }}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.status %}<p class="mt-1.5 text-sm text-red-600">{{ errors.status }}</p>{% endif %}
+            </div>
+            <div>
+                <label for="shift_id" class="block text-sm font-medium text-gray-700 mb-1.5">Shift</label>
+                <select name="shift_id" id="shift_id" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">No shift</option>
+                    {% for opt in shift_options %}<option value="{{ opt.value }}" {{ 'selected' if (record and record.shift_id == opt.value) or (form_data and form_data.shift_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="in_time" class="block text-sm font-medium text-gray-700 mb-1.5">In Time</label>
+                    <input type="time" name="in_time" id="in_time" value="{{ record.in_time if record else (form_data.in_time if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+                <div>
+                    <label for="out_time" class="block text-sm font-medium text-gray-700 mb-1.5">Out Time</label>
+                    <input type="time" name="out_time" id="out_time" value="{{ record.out_time if record else (form_data.out_time if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+            </div>
+            <div class="flex items-start gap-6">
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="late_entry" id="late_entry" {{ 'checked' if (record and record.late_entry) or (form_data and form_data.late_entry) else '' }} class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                    <label for="late_entry" class="text-sm text-gray-700">Late Entry</label>
+                </div>
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" name="early_exit" id="early_exit" {{ 'checked' if (record and record.early_exit) or (form_data and form_data.early_exit) else '' }} class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                    <label for="early_exit" class="text-sm text-gray-700">Early Exit</label>
+                </div>
+            </div>
+            <div>
+                <label for="remarks" class="block text-sm font-medium text-gray-700 mb-1.5">Remarks</label>
+                <textarea name="remarks" id="remarks" rows="3" placeholder="Additional notes..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm resize-none">{{ record.remarks if record else (form_data.remarks if form_data else '') }}</textarea>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="/hr/attendance" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">{{ 'Update Record' if record else 'Save Record' }}</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% if milestones %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="milestones-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Milestone</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Project</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Due Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for milestone in milestones %}
+            {% include "modules/projects/templates/partials/milestone_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total_pages > 1 %}
+{% set query_params = [] %}
+{% if search_query %}
+{% set _ = query_params.append("q=" ~ search_query) %}
+{% endif %}
+{% if current_status %}
+{% set _ = query_params.append("status=" ~ current_status) %}
+{% endif %}
+{% if current_project_id %}
+{% set _ = query_params.append("project_id=" ~ current_project_id) %}
+{% endif %}
+{% set base_url = "/projects/milestones" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="milestones-empty-state">
+    <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No milestones found</h3>
+    <p class="text-sm text-gray-500 mb-4">{% if search_query %}Try adjusting your search.{% else %}Milestones will appear here when added to projects.{% endif %}</p>
+</div>
+{% endif %}

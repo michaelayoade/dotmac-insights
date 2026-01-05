@@ -1,7 +1,11 @@
-"""Journal Entries: JE list, detail, CRUD, submit/approve/reject/post workflows."""
+"""Journal Entries: API endpoints for journal entry management.
+
+This module provides the REST API for journal entry management.
+Business logic is delegated to JournalEntryService.
+"""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -11,24 +15,37 @@ from sqlalchemy.orm import Session
 
 from app.auth import Require, get_current_principal, Principal
 from app.database import get_db
-from app.models.accounting import (
-    Account,
-    JournalEntry,
-    JournalEntryType,
-    GLEntry,
+from app.models.accounting import JournalEntryType
+from app.services.accounting import JournalEntryService
+from app.services.accounting.journal_entry_types import (
+    JECreateData,
+    JEFilters,
+    JELineData,
+    JEUpdateData,
 )
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
-from .helpers import parse_date, paginate, invalidate_report_cache
+from .helpers import parse_date, invalidate_report_cache
 
 router = APIRouter()
 
 
-# =============================================================================
-# PYDANTIC SCHEMAS
-# =============================================================================
+# ============= SERVICE DEPENDENCY =============
+
+def get_journal_entry_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> JournalEntryService:
+    """Create a JournalEntryService instance for dependency injection."""
+    return JournalEntryService(db, principal)
+
+
+# ============= PYDANTIC SCHEMAS =============
 
 class JournalEntryAccountCreate(BaseModel):
     """Schema for creating a journal entry account line."""
+
     account: Optional[str] = None
     account_id: Optional[int] = None
     debit: float = 0
@@ -42,6 +59,7 @@ class JournalEntryAccountCreate(BaseModel):
 
 class JournalEntryCreate(BaseModel):
     """Schema for creating a journal entry."""
+
     voucher_type: str = "journal_entry"
     posting_date: str
     user_remark: Optional[str] = None
@@ -51,98 +69,30 @@ class JournalEntryCreate(BaseModel):
     lines: Optional[List[JournalEntryAccountCreate]] = None
 
 
-# =============================================================================
-# JOURNAL ENTRIES LIST & DETAIL
-# =============================================================================
+# ============= HELPER FUNCTIONS =============
 
-@router.get("/journal-entries", dependencies=[Depends(Require("accounting:read"))])
-def get_journal_entries(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
-    voucher_type: Optional[str] = None,
-    limit: int = Query(default=50, le=500),
-    offset: int = 0,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Get journal entries list.
-
-    Args:
-        start_date: Filter from date
-        end_date: Filter to date
-        voucher_type: Filter by voucher type
-        limit: Max results
-        offset: Pagination offset
-
-    Returns:
-        Paginated list of journal entries
-    """
-    query = db.query(JournalEntry)
-
-    if start_date:
-        query = query.filter(JournalEntry.posting_date >= parse_date(start_date, "start_date"))
-
-    if end_date:
-        query = query.filter(JournalEntry.posting_date <= parse_date(end_date, "end_date"))
-
-    if voucher_type:
-        try:
-            vtype = JournalEntryType(voucher_type.lower())
-            query = query.filter(JournalEntry.voucher_type == vtype)
-        except ValueError:
-            pass
-
-    query = query.order_by(JournalEntry.posting_date.desc(), JournalEntry.id.desc())
-    total, entries = paginate(query, offset, limit)
-
+def _entry_to_dict(e) -> Dict[str, Any]:
+    """Convert JournalEntry to list response dict."""
     return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "entries": [
-            {
-                "id": e.id,
-                "erpnext_id": e.erpnext_id,
-                "voucher_type": e.voucher_type.value if e.voucher_type else None,
-                "posting_date": e.posting_date.isoformat() if e.posting_date else None,
-                "company": e.company,
-                "total_debit": float(e.total_debit),
-                "total_credit": float(e.total_credit),
-                "user_remark": e.user_remark,
-                "is_opening": e.is_opening,
-            }
-            for e in entries
-        ],
+        "id": e.id,
+        "erpnext_id": e.erpnext_id,
+        "voucher_type": e.voucher_type.value if e.voucher_type else None,
+        "posting_date": e.posting_date.isoformat() if e.posting_date else None,
+        "company": e.company,
+        "total_debit": float(e.total_debit),
+        "total_credit": float(e.total_credit),
+        "user_remark": e.user_remark,
+        "is_opening": e.is_opening,
     }
 
 
-@router.get("/journal-entries/{entry_id}", dependencies=[Depends(Require("accounting:read"))])
-def get_journal_entry_detail(
-    entry_id: int,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Get journal entry detail with all line items (GL entries).
-
-    Args:
-        entry_id: Journal entry ID
-
-    Returns:
-        Full journal entry details with line items
-    """
-    entry = db.query(JournalEntry).filter(JournalEntry.id == entry_id).first()
-    if not entry:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
-
-    # Get related GL entries (line items)
-    gl_entries = db.query(GLEntry).filter(
-        GLEntry.voucher_no == entry.erpnext_id,
-        GLEntry.voucher_type == "Journal Entry",
-    ).order_by(GLEntry.id).all()
-
+def _entry_detail_to_dict(entry, gl_entries) -> Dict[str, Any]:
+    """Convert JournalEntry with GL entries to detailed response dict."""
     accounts = [
         {
             "id": acc.id,
             "account": acc.account,
-            "account_type": acc.account_type,
+            "account_type": getattr(acc, "account_type", None),
             "party_type": acc.party_type,
             "party": acc.party,
             "debit": float(acc.debit or 0),
@@ -150,18 +100,26 @@ def get_journal_entry_detail(
             "debit_in_account_currency": float(acc.debit_in_account_currency or 0),
             "credit_in_account_currency": float(acc.credit_in_account_currency or 0),
             "exchange_rate": float(acc.exchange_rate or 1),
-            "reference_type": acc.reference_type,
-            "reference_name": acc.reference_name,
-            "reference_due_date": acc.reference_due_date.isoformat() if acc.reference_due_date else None,
+            "reference_type": getattr(acc, "reference_type", None),
+            "reference_name": getattr(acc, "reference_name", None),
+            "reference_due_date": (
+                acc.reference_due_date.isoformat()
+                if hasattr(acc, "reference_due_date") and acc.reference_due_date
+                else None
+            ),
             "cost_center": acc.cost_center,
-            "project": acc.project,
-            "bank_account": acc.bank_account,
-            "cheque_no": acc.cheque_no,
-            "cheque_date": acc.cheque_date.isoformat() if acc.cheque_date else None,
-            "user_remark": acc.user_remark,
-            "idx": acc.idx,
+            "project": getattr(acc, "project", None),
+            "bank_account": getattr(acc, "bank_account", None),
+            "cheque_no": getattr(acc, "cheque_no", None),
+            "cheque_date": (
+                acc.cheque_date.isoformat()
+                if hasattr(acc, "cheque_date") and acc.cheque_date
+                else None
+            ),
+            "user_remark": getattr(acc, "user_remark", None),
+            "idx": getattr(acc, "idx", 0),
         }
-        for acc in getattr(entry, "accounts", [])
+        for acc in getattr(entry, "items", [])
     ]
 
     return {
@@ -192,372 +150,251 @@ def get_journal_entry_detail(
     }
 
 
-# =============================================================================
-# JOURNAL ENTRY CRUD
-# =============================================================================
+# ============= LIST & DETAIL ENDPOINTS =============
+
+@router.get("/journal-entries", dependencies=[Depends(Require("accounting:read"))])
+def get_journal_entries(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    voucher_type: Optional[str] = None,
+    limit: int = Query(default=50, le=500),
+    offset: int = Query(default=0, ge=0),
+    service: JournalEntryService = Depends(get_journal_entry_service),
+) -> Dict[str, Any]:
+    """Get journal entries list."""
+    # Build filters
+    vtype_enum = None
+    if voucher_type:
+        try:
+            vtype_enum = JournalEntryType(voucher_type.lower())
+        except ValueError:
+            pass  # Ignore invalid voucher type
+
+    filters = JEFilters(
+        start_date=parse_date(start_date, "start_date") if start_date else None,
+        end_date=parse_date(end_date, "end_date") if end_date else None,
+        voucher_type=vtype_enum,
+    )
+    pagination = PaginationParams(offset=offset, limit=limit)
+
+    result = service.list_entries(filters, pagination)
+
+    return {
+        "total": result.total,
+        "limit": limit,
+        "offset": offset,
+        "entries": [_entry_to_dict(e) for e in result.items],
+    }
+
+
+@router.get(
+    "/journal-entries/{entry_id}", dependencies=[Depends(Require("accounting:read"))]
+)
+def get_journal_entry_detail(
+    entry_id: int,
+    service: JournalEntryService = Depends(get_journal_entry_service),
+) -> Dict[str, Any]:
+    """Get journal entry detail with all line items (GL entries)."""
+    try:
+        entry = service.get_entry(entry_id)
+        gl_entries = service.get_entry_lines(entry_id)
+        return _entry_detail_to_dict(entry, gl_entries)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+
+
+# ============= CRUD ENDPOINTS =============
 
 @router.post("/journal-entries", dependencies=[Depends(Require("books:write"))])
 async def create_journal_entry(
     je_data: JournalEntryCreate,
     db: Session = Depends(get_db),
-    principal: Principal = Depends(get_current_principal),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Create a new journal entry.
-
-    Args:
-        je_data: Journal entry data
-
-    Returns:
-        Created journal entry details
-    """
-    from app.models.accounting import JournalEntryItem
-    from app.services.je_validator import JEValidator, ValidationError
-    from app.services.audit_logger import AuditLogger, serialize_for_audit
-
+    """Create a new journal entry."""
     try:
         voucher_type_enum = JournalEntryType(je_data.voucher_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid voucher type: {je_data.voucher_type}")
+        raise HTTPException(
+            status_code=400, detail=f"Invalid voucher type: {je_data.voucher_type}"
+        )
 
     posting_dt = parse_date(je_data.posting_date, "posting_date")
+    if posting_dt is None:
+        raise HTTPException(status_code=400, detail="Invalid posting_date")
 
-    user_remark = je_data.user_remark
-    if user_remark is None and je_data.description:
-        user_remark = je_data.description
-
-    # Create JE
-    company = je_data.company or "Test Company"
-    je = JournalEntry(
-        voucher_type=voucher_type_enum,
-        posting_date=datetime.combine(posting_dt, datetime.min.time()) if posting_dt else None,
-        user_remark=user_remark,
-        company=company,
-        total_debit=Decimal("0"),
-        total_credit=Decimal("0"),
-        docstatus=0,  # Draft
-    )
-
-    # Parse account lines
-    je_accounts: List[JournalEntryItem] = []
     account_lines = je_data.accounts or (je_data.lines or [])
-    for acc_data in account_lines:
-        account_name = acc_data.account
-        account_id = acc_data.account_id
 
-        if not account_name and account_id:
-            account = db.query(Account).filter(Account.id == account_id).first()
-            if not account:
-                raise HTTPException(status_code=400, detail=f"Account {account_id} not found")
-            account_name = account.account_name
-        elif account_name and not account_id:
-            account = db.query(Account).filter(Account.account_name == account_name).first()
-            if account:
-                account_id = account.id
-
-        if not account_name:
-            raise HTTPException(status_code=400, detail="Account is required for journal entry lines")
-        if account_id is None:
-            raise HTTPException(status_code=400, detail=f"Account '{account_name}' not found in chart of accounts")
-
-        je_acc = JournalEntryItem(
-            account=account_name,
-            account_id=account_id,
-            debit=Decimal(str(acc_data.debit)),
-            credit=Decimal(str(acc_data.credit)),
-            debit_in_account_currency=Decimal(str(acc_data.debit)),
-            credit_in_account_currency=Decimal(str(acc_data.credit)),
-            exchange_rate=Decimal("1"),
-            party_type=acc_data.party_type,
-            party=acc_data.party,
-            cost_center=acc_data.cost_center,
-        )
-        je_accounts.append(je_acc)
-
-    # Validate
-    validator = JEValidator(db)
     try:
-        validator.validate_or_raise(je, je_accounts)
-    except ValidationError as e:
-        raise HTTPException(status_code=400, detail={"errors": e.errors})
+        create_data = JECreateData(
+            posting_date=posting_dt,
+            voucher_type=voucher_type_enum,
+            user_remark=je_data.user_remark,
+            description=je_data.description,
+            company=je_data.company,
+            lines=[
+                JELineData(
+                    account=line.account,
+                    account_id=line.account_id,
+                    debit=Decimal(str(line.debit)),
+                    credit=Decimal(str(line.credit)),
+                    party_type=line.party_type,
+                    party=line.party,
+                    cost_center=line.cost_center,
+                    description=line.description,
+                    user_remark=line.user_remark,
+                )
+                for line in account_lines
+            ],
+        )
 
-    # Calculate totals
-    je.total_debit = sum(((a.debit or Decimal("0")) for a in je_accounts), Decimal("0"))
-    je.total_credit = sum(((a.credit or Decimal("0")) for a in je_accounts), Decimal("0"))
+        je = service.create_entry(create_data)
+        db.commit()
 
-    db.add(je)
-    db.flush()
-
-    # Add account lines
-    for idx, acc in enumerate(je_accounts, 1):
-        acc.journal_entry_id = je.id
-        acc.idx = idx
-        db.add(acc)
-
-    # Audit log
-    audit = AuditLogger(db)
-    audit.log_create(
-        doctype="journal_entry",
-        document_id=je.id,
-        user_id=getattr(principal, "id", None),
-        new_values=serialize_for_audit(je),
-    )
-
-    db.commit()
-
-    return {
-        "message": "Journal entry created",
-        "id": je.id,
-        "total_debit": str(je.total_debit),
-        "total_credit": str(je.total_credit),
-        "docstatus": je.docstatus,
-    }
+        return {
+            "message": "Journal entry created",
+            "id": je.id,
+            "total_debit": str(je.total_debit),
+            "total_credit": str(je.total_credit),
+            "docstatus": je.docstatus,
+        }
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.patch("/journal-entries/{je_id}", dependencies=[Depends(Require("books:write"))])
+@router.patch(
+    "/journal-entries/{je_id}", dependencies=[Depends(Require("books:write"))]
+)
 def update_journal_entry(
     je_id: int,
     posting_date: Optional[str] = None,
     user_remark: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Update a draft journal entry.
+    """Update a draft journal entry."""
+    try:
+        update_data = JEUpdateData(
+            posting_date=(
+                parse_date(posting_date, "posting_date") if posting_date else None
+            ),
+            user_remark=user_remark,
+        )
 
-    Args:
-        je_id: Journal entry ID
-        posting_date: New posting date
-        user_remark: New remark
+        service.update_entry(je_id, update_data)
+        db.commit()
 
-    Returns:
-        Updated journal entry info
-    """
-    from app.services.audit_logger import AuditLogger, serialize_for_audit
-
-    je = db.query(JournalEntry).filter(JournalEntry.id == je_id).first()
-    if not je:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
-
-    if je.docstatus != 0:
-        raise HTTPException(status_code=400, detail="Can only update draft entries")
-
-    old_values = serialize_for_audit(je)
-
-    if posting_date:
-        parsed_posting_date = parse_date(posting_date, "posting_date")
-        je.posting_date = datetime.combine(parsed_posting_date, datetime.min.time()) if parsed_posting_date else None
-    if user_remark is not None:
-        je.user_remark = user_remark
-
-    je.updated_at = datetime.now(timezone.utc)
-
-    # Audit log
-    audit = AuditLogger(db)
-    audit.log_update(
-        doctype="journal_entry",
-        document_id=je.id,
-        user_id=user.id,
-        old_values=old_values,
-        new_values=serialize_for_audit(je),
-    )
-
-    db.commit()
-
-    return {
-        "message": "Journal entry updated",
-        "id": je.id,
-    }
+        return {
+            "message": "Journal entry updated",
+            "id": je_id,
+        }
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.delete("/journal-entries/{je_id}", dependencies=[Depends(Require("books:write"))])
+@router.delete(
+    "/journal-entries/{je_id}", dependencies=[Depends(Require("books:write"))]
+)
 def delete_journal_entry(
     je_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Delete a draft journal entry.
-
-    Args:
-        je_id: Journal entry ID
-
-    Returns:
-        Deletion confirmation
-    """
-    from app.services.audit_logger import AuditLogger, serialize_for_audit
-
-    je = db.query(JournalEntry).filter(JournalEntry.id == je_id).first()
-    if not je:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
-
-    if je.docstatus != 0:
-        raise HTTPException(status_code=400, detail="Can only delete draft entries")
-
-    old_values = serialize_for_audit(je)
-
-    # Audit log before delete
-    audit = AuditLogger(db)
-    audit.log_delete(
-        doctype="journal_entry",
-        document_id=je.id,
-        user_id=user.id,
-        old_values=old_values,
-    )
-
-    db.delete(je)
-    db.commit()
-
-    return {"message": "Journal entry deleted"}
+    """Delete a draft journal entry."""
+    try:
+        service.delete_entry(je_id)
+        db.commit()
+        return {"message": "Journal entry deleted"}
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-# =============================================================================
-# JOURNAL ENTRY WORKFLOW ACTIONS
-# =============================================================================
+# ============= WORKFLOW ENDPOINTS =============
 
-@router.post("/journal-entries/{je_id}/submit", dependencies=[Depends(Require("books:write"))])
+@router.post(
+    "/journal-entries/{je_id}/submit", dependencies=[Depends(Require("books:write"))]
+)
 async def submit_journal_entry(
     je_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:write")),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Submit a journal entry for approval.
-
-    Args:
-        je_id: Journal entry ID
-
-    Returns:
-        Submission status with approval info
-    """
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    je = db.query(JournalEntry).filter(JournalEntry.id == je_id).first()
-    if not je:
-        raise HTTPException(status_code=404, detail="Journal entry not found")
-
-    engine = ApprovalEngine(db)
+    """Submit a journal entry for approval."""
     try:
-        approval = engine.submit_document(
-            doctype="journal_entry",
-            document_id=je_id,
-            user_id=user.id,
-            amount=je.total_debit,
-            document_name=je.erpnext_id,
-        )
+        service.submit_entry(je_id)
         db.commit()
         return {
             "message": "Journal entry submitted for approval",
-            "approval_id": approval.id,
-            "status": approval.status.value,
-            "current_step": approval.current_step,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.post("/journal-entries/{je_id}/approve", dependencies=[Depends(Require("books:approve"))])
+@router.post(
+    "/journal-entries/{je_id}/approve",
+    dependencies=[Depends(Require("books:approve"))],
+)
 async def approve_journal_entry(
     je_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Approve a journal entry at the current step.
-
-    Args:
-        je_id: Journal entry ID
-        remarks: Approval remarks
-
-    Returns:
-        Approval status
-    """
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    engine = ApprovalEngine(db)
+    """Approve a journal entry at the current step."""
     try:
-        approval = engine.approve_document(
-            doctype="journal_entry",
-            document_id=je_id,
-            user_id=user.id,
-            remarks=remarks,
-        )
+        service.approve_entry(je_id, remarks)
         db.commit()
         return {
             "message": "Journal entry approved",
-            "approval_id": approval.id,
-            "status": approval.status.value,
-            "current_step": approval.current_step,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.post("/journal-entries/{je_id}/reject", dependencies=[Depends(Require("books:approve"))])
+@router.post(
+    "/journal-entries/{je_id}/reject",
+    dependencies=[Depends(Require("books:approve"))],
+)
 async def reject_journal_entry(
     je_id: int,
     reason: str = Query(..., description="Reason for rejection"),
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Reject a journal entry.
-
-    Args:
-        je_id: Journal entry ID
-        reason: Rejection reason
-
-    Returns:
-        Rejection status
-    """
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    engine = ApprovalEngine(db)
+    """Reject a journal entry."""
     try:
-        approval = engine.reject_document(
-            doctype="journal_entry",
-            document_id=je_id,
-            user_id=user.id,
-            reason=reason,
-        )
+        service.reject_entry(je_id, reason)
         db.commit()
         return {
             "message": "Journal entry rejected",
-            "approval_id": approval.id,
-            "status": approval.status.value,
-            "rejection_reason": approval.rejection_reason,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 
-@router.post("/journal-entries/{je_id}/post", dependencies=[Depends(Require("books:approve"))])
+@router.post(
+    "/journal-entries/{je_id}/post", dependencies=[Depends(Require("books:approve"))]
+)
 async def post_journal_entry(
     je_id: int,
     remarks: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    service: JournalEntryService = Depends(get_journal_entry_service),
 ) -> Dict[str, Any]:
-    """Post an approved journal entry to the GL.
-
-    Args:
-        je_id: Journal entry ID
-        remarks: Posting remarks
-
-    Returns:
-        Posting status
-    """
-    from app.services.approval_engine import ApprovalEngine, ApprovalError
-
-    engine = ApprovalEngine(db)
+    """Post an approved journal entry to the GL."""
     try:
-        approval = engine.post_document(
-            doctype="journal_entry",
-            document_id=je_id,
-            user_id=user.id,
-            remarks=remarks,
-        )
-
-        # Update JE docstatus to posted
-        je = db.query(JournalEntry).filter(JournalEntry.id == je_id).first()
-        if je:
-            je.docstatus = 1  # Posted
-
+        service.post_entry(je_id, remarks)
         db.commit()
 
         # Invalidate report caches after posting
@@ -565,8 +402,8 @@ async def post_journal_entry(
 
         return {
             "message": "Journal entry posted",
-            "approval_id": approval.id,
-            "status": approval.status.value,
         }
-    except ApprovalError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)

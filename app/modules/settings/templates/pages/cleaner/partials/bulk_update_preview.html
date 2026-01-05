@@ -1,0 +1,160 @@
+<!-- Bulk Update Preview Partial - loaded via HTMX -->
+
+<!-- Stats Summary -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Preview Results</h3>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="text-center p-4 bg-rose-50 rounded-xl ring-1 ring-rose-100">
+            <p class="text-3xl font-bold text-rose-600 tabular-nums">{{ preview.records_affected }}</p>
+            <p class="text-sm text-rose-700 mt-1">Records Affected</p>
+        </div>
+        <div class="text-center p-4 bg-gray-50 rounded-xl ring-1 ring-gray-200">
+            <p class="text-lg font-bold text-gray-700">{{ preview.table }}</p>
+            <p class="text-sm text-gray-600 mt-1">Table</p>
+        </div>
+        <div class="text-center p-4 bg-blue-50 rounded-xl ring-1 ring-blue-100">
+            <p class="text-lg font-bold text-blue-600">{{ filters | length }}</p>
+            <p class="text-sm text-blue-700 mt-1">Filters Applied</p>
+        </div>
+        <div class="text-center p-4 bg-purple-50 rounded-xl ring-1 ring-purple-100">
+            <p class="text-lg font-bold text-purple-600">{{ updates | length }}</p>
+            <p class="text-sm text-purple-700 mt-1">Fields to Update</p>
+        </div>
+    </div>
+</div>
+
+{% if preview.records_affected > 0 %}
+<!-- Applied Filters & Updates Summary -->
+<div class="grid lg:grid-cols-2 gap-6 mb-6">
+    <!-- Filters Applied -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h4 class="font-semibold text-gray-900 mb-3">Filters Applied</h4>
+        {% if filters %}
+        <div class="space-y-2">
+            {% for field, value in filters.items() %}
+            <div class="flex items-center gap-2 text-sm">
+                <code class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{{ field }}</code>
+                <span class="text-gray-400">=</span>
+                <code class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">{{ value }}</code>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-500">No filters - all records in table will be updated</p>
+        {% endif %}
+    </div>
+
+    <!-- Updates to Apply -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h4 class="font-semibold text-gray-900 mb-3">Updates to Apply</h4>
+        <div class="space-y-2">
+            {% for field, value in updates.items() %}
+            <div class="flex items-center gap-2 text-sm">
+                <code class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{{ field }}</code>
+                <span class="text-gray-400">&rarr;</span>
+                <code class="bg-rose-50 text-rose-700 px-2 py-0.5 rounded">{{ value }}</code>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Sample Changes Table -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-900">Sample Changes</h3>
+        <p class="text-sm text-gray-500 mt-1">Showing {{ preview.sample_changes | length }} of {{ preview.records_affected }} records</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Record</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Field</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Before</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">After</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for change in preview.sample_changes %}
+                {% for field_name in change.changed_fields %}
+                <tr class="hover:bg-surface-50 transition-colors">
+                    {% if loop.first %}
+                    <td class="px-6 py-4 whitespace-nowrap text-sm" rowspan="{{ change.changed_fields | length }}">
+                        <span class="font-mono text-gray-400">#{{ change.record_id }}</span>
+                    </td>
+                    {% endif %}
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <code class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{{ field_name }}</code>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <code class="text-sm bg-red-50 text-red-700 px-2 py-0.5 rounded font-mono">{{ change.before.get(field_name, '-') }}</code>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <code class="text-sm bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-mono">{{ change.after.get(field_name, '-') }}</code>
+                    </td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Execute Button -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h3 class="font-semibold text-gray-900">Ready to Execute</h3>
+            <p class="text-sm text-gray-500 mt-1">
+                This will update <strong class="text-rose-600">{{ preview.records_affected }}</strong> records.
+                The operation can be rolled back if needed.
+            </p>
+        </div>
+        <form
+            hx-post="/settings/data-cleaner/bulk-update/execute"
+            hx-confirm="Are you sure you want to update {{ preview.records_affected }} records? This action can be rolled back."
+        >
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="table" value="{{ table }}">
+            {% for field, value in filters.items() %}
+            <input type="hidden" name="filter_{{ field }}" value="{{ value }}">
+            {% endfor %}
+            {% for field, value in updates.items() %}
+            <input type="hidden" name="update_{{ field }}" value="{{ value }}">
+            {% endfor %}
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 transition-colors shadow-lg shadow-rose-600/20"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Execute Bulk Update
+            </button>
+        </form>
+    </div>
+</div>
+{% else %}
+<!-- No Records Match -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <div class="text-center py-8">
+        <div class="mx-auto w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900">No Records Match</h3>
+        <p class="text-sm text-gray-500 mt-2">
+            No records in <strong>{{ preview.table }}</strong> match your filters.
+            Try adjusting the filter criteria.
+        </p>
+    </div>
+</div>
+{% endif %}

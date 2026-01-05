@@ -1,0 +1,439 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ 'Edit Journal Entry' if entry else 'New Journal Entry' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ 'Update journal entry details' if entry else 'Create a new accounting journal entry' }}
+            </p>
+        </div>
+        <a
+            href="{{ '/accounting/journal-entries/' ~ entry.id if entry else '/accounting/journal-entries' }}"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form -->
+    <form
+        action="{{ '/accounting/journal-entries/' ~ entry.id if entry else '/accounting/journal-entries' }}"
+        method="POST"
+        id="je-form"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Header Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Voucher Type -->
+                <div>
+                    <label for="voucher_type" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Voucher Type <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="voucher_type"
+                        name="voucher_type"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('voucher_type') else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        {% for opt in voucher_type_options %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if (form_data.voucher_type if form_data else (entry.voucher_type.value if entry and entry.voucher_type else '')) == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.get('voucher_type') %}
+                    <p class="mt-1.5 text-sm text-red-600">{{ errors.voucher_type }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Posting Date -->
+                <div>
+                    <label for="posting_date" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Posting Date <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        id="posting_date"
+                        name="posting_date"
+                        value="{{ form_data.posting_date if form_data else (entry.posting_date.strftime('%Y-%m-%d') if entry and entry.posting_date else '') }}"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('posting_date') else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                    {% if errors.get('posting_date') %}
+                    <p class="mt-1.5 text-sm text-red-600">{{ errors.posting_date }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Cheque/Reference Number -->
+                <div>
+                    <label for="cheque_no" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Reference / Cheque No.
+                    </label>
+                    <input
+                        type="text"
+                        id="cheque_no"
+                        name="cheque_no"
+                        value="{{ form_data.cheque_no if form_data else (entry.cheque_no if entry else '') }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors font-mono"
+                        placeholder="e.g., CHQ-001"
+                    >
+                </div>
+            </div>
+
+            <!-- User Remark -->
+            <div class="mt-6">
+                <label for="user_remark" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Remarks / Narration
+                </label>
+                <textarea
+                    id="user_remark"
+                    name="user_remark"
+                    rows="2"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors resize-none"
+                    placeholder="Enter a description for this journal entry..."
+                >{{ form_data.user_remark if form_data else (entry.user_remark if entry else '') }}</textarea>
+            </div>
+        </div>
+
+        <!-- Line Items Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Line Items</h2>
+                <button
+                    type="button"
+                    onclick="addLineItem()"
+                    class="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Line
+                </button>
+            </div>
+
+            {% if errors.get('items') %}
+            <div class="px-6 py-3 bg-red-50 border-b border-red-100">
+                <p class="text-sm text-red-600">{{ errors.items }}</p>
+            </div>
+            {% endif %}
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <thead>
+                        <tr class="bg-surface-50">
+                            <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 w-12">#</th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Account <span class="text-red-500">*</span></th>
+                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 w-40">Debit</th>
+                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 w-40">Credit</th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Description</th>
+                            <th class="py-3 pl-3 pr-6 w-12"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="line-items-body" class="divide-y divide-gray-100">
+                        {% set initial_items = line_items if line_items else (entry.items if entry else []) %}
+                        {% for item in initial_items %}
+                        <tr class="line-item-row" data-row-idx="{{ loop.index0 }}">
+                            <td class="py-3 pl-6 pr-3 text-sm text-gray-500 row-number">{{ loop.index }}</td>
+                            <td class="px-3 py-3">
+                                <select
+                                    name="items[{{ loop.index0 }}][account_id]"
+                                    required
+                                    class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm"
+                                >
+                                    <option value="">Select account...</option>
+                                    {% for acct in accounts %}
+                                    <option
+                                        value="{{ acct.id }}"
+                                        {{ 'selected' if (item.account_id|string if item.account_id else '') == acct.id|string else '' }}
+                                    >{{ acct.account_number ~ ' - ' if acct.account_number else '' }}{{ acct.account_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="px-3 py-3">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="items[{{ loop.index0 }}][debit]"
+                                    value="{{ item.debit if item.debit else '' }}"
+                                    class="debit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono"
+                                    placeholder="0.00"
+                                    onchange="updateTotals(); clearOpposite(this, 'credit')"
+                                    onfocus="this.select()"
+                                >
+                            </td>
+                            <td class="px-3 py-3">
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    name="items[{{ loop.index0 }}][credit]"
+                                    value="{{ item.credit if item.credit else '' }}"
+                                    class="credit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono"
+                                    placeholder="0.00"
+                                    onchange="updateTotals(); clearOpposite(this, 'debit')"
+                                    onfocus="this.select()"
+                                >
+                            </td>
+                            <td class="px-3 py-3 hidden lg:table-cell">
+                                <input
+                                    type="text"
+                                    name="items[{{ loop.index0 }}][description]"
+                                    value="{{ item.description if item.description else '' }}"
+                                    class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm"
+                                    placeholder="Line description..."
+                                >
+                            </td>
+                            <td class="py-3 pl-3 pr-6">
+                                <button
+                                    type="button"
+                                    onclick="removeLineItem(this)"
+                                    class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                                    title="Remove line"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <!-- Default two empty rows for new entries -->
+                        <tr class="line-item-row" data-row-idx="0">
+                            <td class="py-3 pl-6 pr-3 text-sm text-gray-500 row-number">1</td>
+                            <td class="px-3 py-3">
+                                <select
+                                    name="items[0][account_id]"
+                                    required
+                                    class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm"
+                                >
+                                    <option value="">Select account...</option>
+                                    {% for acct in accounts %}
+                                    <option value="{{ acct.id }}" {{ 'selected' if prefill_account and prefill_account|string == acct.id|string else '' }}>{{ acct.account_number ~ ' - ' if acct.account_number else '' }}{{ acct.account_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="px-3 py-3">
+                                <input type="number" step="0.01" min="0" name="items[0][debit]" class="debit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono" placeholder="0.00" onchange="updateTotals(); clearOpposite(this, 'credit')" onfocus="this.select()">
+                            </td>
+                            <td class="px-3 py-3">
+                                <input type="number" step="0.01" min="0" name="items[0][credit]" class="credit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono" placeholder="0.00" onchange="updateTotals(); clearOpposite(this, 'debit')" onfocus="this.select()">
+                            </td>
+                            <td class="px-3 py-3 hidden lg:table-cell">
+                                <input type="text" name="items[0][description]" class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm" placeholder="Line description...">
+                            </td>
+                            <td class="py-3 pl-3 pr-6">
+                                <button type="button" onclick="removeLineItem(this)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Remove line">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="line-item-row" data-row-idx="1">
+                            <td class="py-3 pl-6 pr-3 text-sm text-gray-500 row-number">2</td>
+                            <td class="px-3 py-3">
+                                <select name="items[1][account_id]" required class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm">
+                                    <option value="">Select account...</option>
+                                    {% for acct in accounts %}
+                                    <option value="{{ acct.id }}">{{ acct.account_number ~ ' - ' if acct.account_number else '' }}{{ acct.account_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="px-3 py-3">
+                                <input type="number" step="0.01" min="0" name="items[1][debit]" class="debit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono" placeholder="0.00" onchange="updateTotals(); clearOpposite(this, 'credit')" onfocus="this.select()">
+                            </td>
+                            <td class="px-3 py-3">
+                                <input type="number" step="0.01" min="0" name="items[1][credit]" class="credit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono" placeholder="0.00" onchange="updateTotals(); clearOpposite(this, 'debit')" onfocus="this.select()">
+                            </td>
+                            <td class="px-3 py-3 hidden lg:table-cell">
+                                <input type="text" name="items[1][description]" class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm" placeholder="Line description...">
+                            </td>
+                            <td class="py-3 pl-3 pr-6">
+                                <button type="button" onclick="removeLineItem(this)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Remove line">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="bg-surface-50">
+                        <tr>
+                            <td colspan="2" class="py-3.5 pl-6 pr-3 text-sm font-semibold text-gray-900">Total</td>
+                            <td class="px-3 py-3.5 text-sm text-right font-mono font-semibold text-blue-600" id="total-debit">0.00</td>
+                            <td class="px-3 py-3.5 text-sm text-right font-mono font-semibold text-red-600" id="total-credit">0.00</td>
+                            <td colspan="2" class="px-3 py-3.5"></td>
+                        </tr>
+                        <tr id="difference-row" class="hidden">
+                            <td colspan="2" class="py-2 pl-6 pr-3 text-xs font-medium text-red-600">Difference (Out of Balance)</td>
+                            <td colspan="2" class="px-3 py-2 text-right text-xs font-mono font-medium text-red-600" id="difference-amount">0.00</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-between">
+            <button
+                type="button"
+                onclick="addLineItem()"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Add Line Item
+            </button>
+            <div class="flex items-center gap-3">
+                <a
+                    href="{{ '/accounting/journal-entries/' ~ entry.id if entry else '/accounting/journal-entries' }}"
+                    class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+                >
+                    Cancel
+                </a>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    {{ 'Update Entry' if entry else 'Save as Draft' }}
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Account options template for JS -->
+<template id="account-options-template">
+    <option value="">Select account...</option>
+    {% for acct in accounts %}
+    <option value="{{ acct.id }}">{{ acct.account_number ~ ' - ' if acct.account_number else '' }}{{ acct.account_name }}</option>
+    {% endfor %}
+</template>
+
+<script>
+let rowCounter = document.querySelectorAll('.line-item-row').length;
+
+function addLineItem() {
+    const tbody = document.getElementById('line-items-body');
+    const template = document.getElementById('account-options-template');
+    const newIdx = rowCounter++;
+
+    const row = document.createElement('tr');
+    row.className = 'line-item-row';
+    row.setAttribute('data-row-idx', newIdx);
+    row.innerHTML = `
+        <td class="py-3 pl-6 pr-3 text-sm text-gray-500 row-number">${tbody.querySelectorAll('.line-item-row').length + 1}</td>
+        <td class="px-3 py-3">
+            <select name="items[${newIdx}][account_id]" required class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm">
+                ${template.innerHTML}
+            </select>
+        </td>
+        <td class="px-3 py-3">
+            <input type="number" step="0.01" min="0" name="items[${newIdx}][debit]" class="debit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono" placeholder="0.00" onchange="updateTotals(); clearOpposite(this, 'credit')" onfocus="this.select()">
+        </td>
+        <td class="px-3 py-3">
+            <input type="number" step="0.01" min="0" name="items[${newIdx}][credit]" class="credit-input block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm text-right font-mono" placeholder="0.00" onchange="updateTotals(); clearOpposite(this, 'debit')" onfocus="this.select()">
+        </td>
+        <td class="px-3 py-3 hidden lg:table-cell">
+            <input type="text" name="items[${newIdx}][description]" class="block w-full rounded-lg border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset text-sm" placeholder="Line description...">
+        </td>
+        <td class="py-3 pl-3 pr-6">
+            <button type="button" onclick="removeLineItem(this)" class="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors" title="Remove line">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(row);
+    // Focus the new account select
+    row.querySelector('select').focus();
+}
+
+function removeLineItem(button) {
+    const tbody = document.getElementById('line-items-body');
+    const rows = tbody.querySelectorAll('.line-item-row');
+
+    // Don't allow removing if only 2 rows left
+    if (rows.length <= 2) {
+        alert('A journal entry must have at least 2 line items.');
+        return;
+    }
+
+    const row = button.closest('tr');
+    row.remove();
+
+    // Renumber remaining rows
+    tbody.querySelectorAll('.line-item-row').forEach((row, idx) => {
+        row.querySelector('.row-number').textContent = idx + 1;
+    });
+
+    updateTotals();
+}
+
+function clearOpposite(input, oppositeClass) {
+    const row = input.closest('tr');
+    const oppositeInput = row.querySelector(`.${oppositeClass}-input`);
+    if (input.value && parseFloat(input.value) > 0 && oppositeInput.value) {
+        oppositeInput.value = '';
+    }
+}
+
+function updateTotals() {
+    let totalDebit = 0;
+    let totalCredit = 0;
+
+    document.querySelectorAll('.debit-input').forEach(input => {
+        totalDebit += parseFloat(input.value) || 0;
+    });
+
+    document.querySelectorAll('.credit-input').forEach(input => {
+        totalCredit += parseFloat(input.value) || 0;
+    });
+
+    document.getElementById('total-debit').textContent = totalDebit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    document.getElementById('total-credit').textContent = totalCredit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    const diff = Math.abs(totalDebit - totalCredit);
+    const diffRow = document.getElementById('difference-row');
+    const diffAmount = document.getElementById('difference-amount');
+
+    if (diff > 0.001) {
+        diffRow.classList.remove('hidden');
+        diffAmount.textContent = diff.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    } else {
+        diffRow.classList.add('hidden');
+    }
+}
+
+// Initialize totals on page load
+document.addEventListener('DOMContentLoaded', updateTotals);
+
+// Set today's date if not editing and date is empty
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.getElementById('posting_date');
+    if (!dateInput.value) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+});
+</script>
+{% endblock %}

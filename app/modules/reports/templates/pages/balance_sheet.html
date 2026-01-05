@@ -1,0 +1,98 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/reports" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-display font-bold text-gray-900">Balance Sheet</h1>
+                <p class="mt-1 text-sm text-gray-500">Statement of Financial Position as of {{ as_of }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    {% include "modules/reports/templates/partials/report_filters.html" %}
+
+    <!-- Report Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Assets -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Assets</h2>
+            </div>
+            <div id="assets-section" class="p-6"
+                 hx-get="/api/v1/accounting/balance-sheet?as_of={{ as_of }}&section=assets"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="text-center text-gray-500">
+                    <svg class="w-5 h-5 animate-spin inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Loading...
+                </div>
+            </div>
+        </div>
+
+        <!-- Liabilities & Equity -->
+        <div class="space-y-6">
+            <!-- Liabilities -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Liabilities</h2>
+                </div>
+                <div id="liabilities-section" class="p-6"
+                     hx-get="/api/v1/accounting/balance-sheet?as_of={{ as_of }}&section=liabilities"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <div class="text-center text-gray-500">
+                        <svg class="w-5 h-5 animate-spin inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Equity -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Equity</h2>
+                </div>
+                <div id="equity-section" class="p-6"
+                     hx-get="/api/v1/accounting/balance-sheet?as_of={{ as_of }}&section=equity"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <div class="text-center text-gray-500">
+                        <svg class="w-5 h-5 animate-spin inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Balance Check -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500">Balance Check</p>
+                <p class="text-lg font-semibold text-gray-900">Assets = Liabilities + Equity</p>
+            </div>
+            <div id="balance-check" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-green-50 text-green-700">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Balanced
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print { display: none !important; }
+    body { background: white; }
+    .shadow-warm-sm, .shadow-warm-md { box-shadow: none !important; }
+    .ring-1 { ring-width: 0 !important; }
+}
+</style>
+{% endblock %}

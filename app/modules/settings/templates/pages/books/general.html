@@ -1,0 +1,208 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            {% for crumb in breadcrumbs %}
+            {% if not crumb.is_current %}
+            <a href="{{ crumb.href }}" class="hover:text-gray-700 transition-colors">{{ crumb.label }}</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            {% else %}
+            <span class="text-gray-900 font-medium">{{ crumb.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Accounting Settings</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Configure currency, fiscal year, and document formatting</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Books Tabs -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">
+        {% for tab in books_tabs %}
+        <a
+            href="{{ tab.href }}"
+            class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors {{ 'border-primary-500 text-primary-600' if current_tab == tab.id else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+        >
+            {{ tab.label }}
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+
+<form action="/settings/books" method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="space-y-6">
+        <!-- Currency Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: true }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Currency & Precision</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Base Currency</label>
+                        <input type="text" name="base_currency" value="{{ settings.base_currency or 'NGN' }}" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Rounding Method</label>
+                        <select name="rounding_method" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                            {% for opt in rounding_methods %}
+                            <option value="{{ opt.value }}" {{ 'selected' if settings.rounding_method == opt.value or (settings.rounding_method and settings.rounding_method.value == opt.value) else '' }}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Currency Precision</label>
+                        <input type="number" name="currency_precision" value="{{ settings.currency_precision or 2 }}" min="0" max="4" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Quantity Precision</label>
+                        <input type="number" name="quantity_precision" value="{{ settings.quantity_precision or 2 }}" min="0" max="6" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Rate Precision</label>
+                        <input type="number" name="rate_precision" value="{{ settings.rate_precision or 4 }}" min="0" max="6" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Exchange Rate Precision</label>
+                        <input type="number" name="exchange_rate_precision" value="{{ settings.exchange_rate_precision or 6 }}" min="2" max="8" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fiscal Year Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: true }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Fiscal Year</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Start Month</label>
+                        <select name="fiscal_year_start_month" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                            {% for m in range(1, 13) %}
+                            <option value="{{ m }}" {{ 'selected' if settings.fiscal_year_start_month == m else '' }}>{{ ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][m-1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Start Day</label>
+                        <input type="number" name="fiscal_year_start_day" value="{{ settings.fiscal_year_start_day or 1 }}" min="1" max="31" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="auto_create_fiscal_years" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.auto_create_fiscal_years else '' }} {{ 'disabled' if not can_edit else '' }}>
+                        <span class="text-sm text-gray-700">Auto-create fiscal years</span>
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input type="checkbox" name="auto_create_fiscal_periods" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.auto_create_fiscal_periods else '' }} {{ 'disabled' if not can_edit else '' }}>
+                        <span class="text-sm text-gray-700">Auto-create fiscal periods</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Display Formats Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: true }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Display Formats</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Date Format</label>
+                        <select name="date_format" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                            {% for opt in date_formats %}
+                            <option value="{{ opt.value }}" {{ 'selected' if settings.date_format == opt.value else '' }}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Number Format</label>
+                        <select name="number_format" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                            {% for opt in number_formats %}
+                            <option value="{{ opt.value }}" {{ 'selected' if settings.number_format == opt.value else '' }}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Negative Format</label>
+                        <select name="negative_format" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                            {% for opt in negative_formats %}
+                            <option value="{{ opt.value }}" {{ 'selected' if settings.negative_format == opt.value else '' }}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Currency Symbol Position</label>
+                        <select name="currency_symbol_position" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                            {% for opt in symbol_positions %}
+                            <option value="{{ opt.value }}" {{ 'selected' if settings.currency_symbol_position == opt.value else '' }}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Posting Controls Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100" x-data="{ open: false }">
+            <button type="button" class="w-full flex items-center justify-between px-6 py-4 text-left" @click="open = !open">
+                <h3 class="text-lg font-semibold text-gray-900">Posting Controls</h3>
+                <svg class="w-5 h-5 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div class="px-6 pb-6 space-y-4" x-show="open" x-collapse>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Backdating Allowed (days)</label>
+                        <input type="number" name="backdating_days_allowed" value="{{ settings.backdating_days_allowed or 0 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Future Posting Allowed (days)</label>
+                        <input type="number" name="future_posting_days_allowed" value="{{ settings.future_posting_days_allowed or 0 }}" min="0" class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm" {{ 'disabled' if not can_edit else '' }}>
+                    </div>
+                </div>
+                <label class="flex items-center gap-2">
+                    <input type="checkbox" name="require_posting_in_open_period" value="true" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" {{ 'checked' if settings.require_posting_in_open_period else '' }} {{ 'disabled' if not can_edit else '' }}>
+                    <span class="text-sm text-gray-700">Require posting in open fiscal period</span>
+                </label>
+            </div>
+        </div>
+
+        {% if can_edit %}
+        <div class="flex justify-end">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Save Changes
+            </button>
+        </div>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}

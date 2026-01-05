@@ -275,7 +275,7 @@ def build_inbox_stats_snapshot(db: Session) -> Dict[str, Any]:
         db.query(func.count(OmniConversation.id))
         .filter(
             OmniConversation.status.in_(["open", "pending"]),
-            OmniConversation.assigned_agent_id.is_(None),
+            OmniConversation.assigned_party_id.is_(None),
             OmniConversation.assigned_team_id.is_(None),
         )
         .scalar()

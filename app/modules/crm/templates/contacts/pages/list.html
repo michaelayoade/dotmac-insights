@@ -1,0 +1,86 @@
+{% extends "layouts/module.html" %}
+
+{% block page_actions %}
+<a
+    href="/crm/contacts/new"
+    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+    data-testid="new-contact-button"
+>
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    New Contact
+</a>
+{% endblock %}
+
+{% block module_content %}
+<div class="space-y-6" x-data="{ ...bulkSelect() }">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex flex-col lg:flex-row gap-4 items-start lg:items-center">
+            <div class="flex-1">
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <input
+                        type="text"
+                        name="q"
+                        value="{{ search_query }}"
+                        placeholder="Search contacts..."
+                        class="block w-full pl-10 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                        hx-get="/crm/contacts/table"
+                        hx-trigger="input changed delay:300ms, search"
+                        hx-target="#contacts-table-container"
+                        hx-include="[name='contact_type'], [name='status']"
+                        data-testid="contacts-search"
+                    >
+                </div>
+            </div>
+
+            <div class="w-full sm:w-48">
+                <select
+                    name="contact_type"
+                    class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                    hx-get="/crm/contacts/table"
+                    hx-trigger="change"
+                    hx-target="#contacts-table-container"
+                    hx-include="[name='q'], [name='status']"
+                    data-testid="type-filter-button"
+                >
+                    <option value="">All Types</option>
+                    {% for opt in type_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if current_type == opt.value else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="w-full sm:w-48">
+                <select
+                    name="status"
+                    class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                    hx-get="/crm/contacts/table"
+                    hx-trigger="change"
+                    hx-target="#contacts-table-container"
+                    hx-include="[name='q'], [name='contact_type']"
+                    data-testid="status-filter-button"
+                >
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div id="contacts-table-container">
+        {% include "modules/crm/templates/contacts/partials/contacts_table.html" %}
+    </div>
+
+    {% with bulk_delete_url="/crm/contacts/bulk-delete", item_name="contacts" %}
+    {% include "components/ui/bulk_actions.html" %}
+    {% endwith %}
+</div>
+{% endblock %}

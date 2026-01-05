@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import (
-    String, ForeignKey, Numeric, Index,
+    BigInteger, String, ForeignKey, Numeric, Index,
     Enum as SAEnum
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -23,7 +23,7 @@ from app.database import Base
 from app.models.gateway_transaction import GatewayProvider
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import CustomerAccount
     from app.models.invoice import Invoice
 
 
@@ -67,8 +67,11 @@ class VirtualAccount(Base):
     bank_slug: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # Ownership
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id"), nullable=True, index=True
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=True,
+        index=True,
     )
     customer_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -116,9 +119,12 @@ class VirtualAccount(Base):
         ForeignKey("users.id"), nullable=True
     )
 
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship()
+    invoice: Mapped[Optional["Invoice"]] = relationship()
+
     __table_args__ = (
         Index("ix_va_provider_status", "provider", "status"),
-        Index("ix_va_customer", "customer_id", "status"),
+        Index("ix_va_customer_account", "customer_account_id", "status"),
     )
 
     def __repr__(self) -> str:

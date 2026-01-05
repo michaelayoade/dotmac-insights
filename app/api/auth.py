@@ -24,6 +24,8 @@ from app.middleware.rate_limit import (
     clear_auth_rate_limit,
     record_auth_failure,
 )
+from app.models.auth import User
+from app.services.activity_logger import ActivityLogger
 
 logger = structlog.get_logger("auth.session")
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -131,16 +133,53 @@ async def create_session(
         expires_at=expires_at.isoformat() if expires_at else None,
     )
 
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="login",
+        user=user,
+        entity_type="auth",
+        summary="User logged in",
+        metadata={"origin": origin, "expires_at": expires_at.isoformat() if expires_at else None},
+        request=request,
+    )
+    db.commit()
+
     return SessionResponse(authenticated=True)
 
 
 @router.delete("/session")
-async def clear_session(request: Request, response: Response) -> dict:
+async def clear_session(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> dict:
     """Clear the authentication cookie (logout)."""
     from app.middleware.rate_limit import get_client_ip
 
     client_ip = get_client_ip(request)
     logger.info("session_cleared", client_ip=client_ip)
+
+    user = None
+    token = request.cookies.get(AUTH_COOKIE_NAME)
+    if token:
+        try:
+            claims = await verify_jwt(token)
+        except HTTPException:
+            claims = None
+        if claims:
+            user = db.query(User).filter(User.external_id == claims.sub).first()
+            if not user and claims.email:
+                user = db.query(User).filter(User.email == claims.email).first()
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="logout",
+        user=user,
+        entity_type="auth",
+        summary="User logged out",
+        request=request,
+    )
+    db.commit()
 
     response.delete_cookie(AUTH_COOKIE_NAME, path="/")
     return {"status": "logged_out"}

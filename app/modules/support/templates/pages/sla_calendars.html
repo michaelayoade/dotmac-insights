@@ -1,0 +1,88 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="/support/sla" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Business Calendars</h1>
+            <p class="mt-1 text-sm text-gray-500">Define business hours for SLA calculations</p>
+        </div>
+    </div>
+
+    <!-- Calendar List -->
+    {% if calendars %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for calendar in calendars %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                {% if calendar.is_default %}
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700">Default</span>
+                {% endif %}
+            </div>
+
+            <h3 class="font-semibold text-gray-900 mb-1">{{ calendar.name }}</h3>
+            <p class="text-sm text-gray-500 mb-4">{{ calendar.description or 'No description' }}</p>
+
+            <div class="space-y-2 text-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Timezone</span>
+                    <span class="text-gray-900 font-medium">{{ calendar.timezone or 'UTC' }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-500">Used by</span>
+                    <span class="text-gray-900 font-medium">{{ calendar_usage.get(calendar.id, 0) }} policies</span>
+                </div>
+            </div>
+
+            {% if calendar.working_hours %}
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Working Hours</p>
+                <div class="space-y-1">
+                    {% for day, hours in calendar.working_hours.items() %}
+                    {% if hours %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-600 capitalize">{{ day[:3] }}</span>
+                        <span class="text-gray-900">{{ hours.start }} - {{ hours.end }}</span>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+        <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </div>
+        <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No business calendars</h3>
+        <p class="text-sm text-gray-500 mb-4">Business calendars define working hours for SLA calculations.</p>
+    </div>
+    {% endif %}
+
+    <!-- Info Card -->
+    <div class="bg-blue-50 rounded-2xl p-6">
+        <div class="flex gap-4">
+            <div class="flex-shrink-0">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+                <h4 class="text-sm font-medium text-blue-900">About Business Calendars</h4>
+                <p class="mt-1 text-sm text-blue-700">
+                    Business calendars define your working hours and holidays. SLA timers only count time during business hours,
+                    ensuring fair response time calculations even for tickets submitted outside working hours.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

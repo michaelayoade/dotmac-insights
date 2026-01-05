@@ -1,0 +1,70 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Payment Terms</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage payment term templates and schedules</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/accounting/payment-terms/new"
+            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+            </svg>
+            New Payment Terms
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Search and Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <div class="relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ current_search or '' }}"
+                    placeholder="Search payment terms..."
+                    class="block w-full rounded-xl border-0 py-2.5 pl-10 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    hx-get="/accounting/payment-terms/table"
+                    hx-target="#terms-table"
+                    hx-include="[name='is_active']"
+                    hx-push-url="true"
+                    hx-trigger="input changed delay:300ms, search"
+                >
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="sm:w-48">
+            <select
+                name="is_active"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/payment-terms/table"
+                hx-target="#terms-table"
+                hx-include="[name='q']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+                <option value="">All Status</option>
+                <option value="true" {{ 'selected' if current_active == true else '' }}>Active Only</option>
+                <option value="false" {{ 'selected' if current_active == false else '' }}>Inactive Only</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Terms Table -->
+<div id="terms-table">
+    {% include "modules/accounting/templates/payment_terms/partials/terms_table.html" %}
+</div>
+{% endblock %}

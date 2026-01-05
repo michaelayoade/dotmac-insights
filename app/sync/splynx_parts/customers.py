@@ -4,7 +4,13 @@ from typing import Optional, Tuple, Any, Dict
 import structlog
 import bcrypt
 
-from app.models.customer import Customer, CustomerStatus, CustomerType, BillingType
+from app.models.party import (
+    CustomerAccount,
+    Party,
+    PartyExternalId,
+    PartyRole,
+    PartyType,
+)
 from app.models.pop import Pop
 from app.config import settings
 from app.models.sync_cursor import parse_datetime
@@ -255,6 +261,16 @@ async def sync_customers(sync_client, client, full_sync: bool):
             pop.splynx_id: pop.id
             for pop in sync_client.db.query(Pop).all()
         }
+        party_ext_ids = (
+            sync_client.db.query(PartyExternalId)
+            .filter(PartyExternalId.system == "splynx")
+            .all()
+        )
+        party_by_ext = {p.external_id: p.party_id for p in party_ext_ids}
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
 
         # Pre-fetch customer details concurrently in batches (bulk API doesn't return password, billing info, activation)
         # Each customer requires 3 API calls: /customer/{id}, /billing-info/{id}, /customer/{id}/logs-changes--first-activation
@@ -287,19 +303,17 @@ async def sync_customers(sync_client, client, full_sync: bool):
                 continue
 
             splynx_id = cust_data.get("id")
-            existing = sync_client.db.query(Customer).filter(Customer.splynx_id == splynx_id).first()
             processed_count += 1
 
             # Map Splynx status to our status
             splynx_status = str(cust_data.get("status", "active")).lower()
-            # Map Splynx statuses to internal enum
             status_map = {
-                "active": CustomerStatus.ACTIVE,
-                "disabled": CustomerStatus.INACTIVE,  # Splynx "disabled" → INACTIVE
-                "blocked": CustomerStatus.SUSPENDED,
-                "new": CustomerStatus.PROSPECT,
+                "active": "active",
+                "disabled": "suspended",
+                "blocked": "suspended",
+                "new": "pending",
             }
-            status = status_map.get(splynx_status, CustomerStatus.INACTIVE)
+            account_status = status_map.get(splynx_status, "active")
 
             # Find POP if location_id exists (using pre-fetched map)
             pop_id = None
@@ -307,20 +321,12 @@ async def sync_customers(sync_client, client, full_sync: bool):
             if location_id:
                 pop_id = pops_by_splynx_id.get(int(location_id))
 
-            # Map category to customer type
+            # Map category to party type
             category = str(cust_data.get("category", "")).lower()
-            customer_type = CustomerType.RESIDENTIAL
-            if category in ["company", "business", "corporate", "enterprise"]:
-                customer_type = CustomerType.BUSINESS
+            is_business = category in ["company", "business", "corporate", "enterprise"]
 
             # Map billing type
-            billing_type_str = str(cust_data.get("billing_type", "")).lower()
-            billing_type_map = {
-                "prepaid": BillingType.PREPAID,
-                "prepaid_monthly": BillingType.PREPAID_MONTHLY,
-                "recurring": BillingType.RECURRING,
-            }
-            billing_type = billing_type_map.get(billing_type_str)
+            billing_type = str(cust_data.get("billing_type", "") or "").lower() or None
 
             # Extract additional_attributes (custom fields)
             attrs = cust_data.get("additional_attributes", {}) or {}
@@ -356,181 +362,210 @@ async def sync_customers(sync_client, client, full_sync: bool):
             gps_raw = cust_data.get("gps") or None
             latitude, longitude = _parse_gps(gps_raw)
 
-            if existing:
-                # Basic info
-                existing.name = cust_data.get("name", "")
-                existing.email = cust_data.get("email") or None
-                existing.billing_email = cust_data.get("billing_email") or None
-                existing.phone = cust_data.get("phone") or None
+            # Ensure party-based identity records exist
+            party = None
+            created = False
+            if splynx_id is not None:
+                party_id = party_by_ext.get(str(splynx_id))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
 
-                # Normalize address (city, state) - handles FCT/Abuja variations, etc.
-                addr = _normalize_customer_address(cust_data, latitude, longitude)
+            email = (cust_data.get("email") or "").strip().lower()
+            if not party and email:
+                party = party_email_index.get(email)
 
-                # Address
-                existing.address = cust_data.get("street_1") or None
-                existing.address_2 = cust_data.get("street_2") or None
-                existing.city = addr["city"]
-                existing.state = addr["state"]
-                existing.zip_code = cust_data.get("zip_code") or None
-                existing.country = cust_data.get("country") or "Nigeria"
-
-                # Geolocation - use GPS from source, or extracted from city field if available
-                existing.gps = gps_raw
-                existing.latitude = latitude or addr["latitude"]
-                existing.longitude = longitude or addr["longitude"]
-
-                # Classification
-                existing.status = status
-                existing.customer_type = customer_type
-                existing.billing_type = billing_type
-                existing.pop_id = pop_id
-
-                # Network/Infrastructure
-                existing.base_station = base_station
-                existing.building_type = building_type
-
-                # Account info
-                existing.account_number = cust_data.get("login")
-                existing.vat_id = vat_id
-                existing.zoho_id = zoho_id
-
-                # Financial
-                existing.mrr = mrr
-                existing.daily_prepaid_cost = daily_cost
-
-                # Partner
-                existing.partner_id = cust_data.get("partner_id")
-
-                # Dates
-                existing.signup_date = _parse_date(cust_data.get("date_add"))
-                existing.conversion_date = _parse_date(cust_data.get("conversion_date"))
-                existing.last_online = _parse_datetime_str(cust_data.get("last_online"))
-
-                # Attribution
-                existing.added_by = cust_data.get("added_by")
-                existing.added_by_id = cust_data.get("added_by_id")
-                existing.referrer = referrer
-
-                # Labels
-                existing.labels = labels
-
-                # Details from pre-fetched map (bulk API doesn't return password, billing info, activation)
-                details = customer_details_map.get(splynx_id, {})
-
-                # Password
-                password_raw = details.get("password")
-                if password_raw:
-                    existing.password_hash = _hash_password(password_raw)
-
-                # Billing info (blocking date, deposit, etc.)
-                billing_info = details.get("billing_info")
-                if billing_info:
-                    blocking_date_str = billing_info.get("blocking_date")
-                    if blocking_date_str and blocking_date_str != "0000-00-00":
-                        existing.blocking_date = _parse_date(blocking_date_str)
-                    existing.days_until_blocking = billing_info.get("days_until_blocking")
-                    if billing_info.get("deposit_balance"):
-                        try:
-                            existing.deposit_balance = Decimal(str(billing_info["deposit_balance"]))
-                        except (ValueError, TypeError):
-                            pass
-                    if billing_info.get("payment_per_month"):
-                        try:
-                            existing.payment_per_month = Decimal(str(billing_info["payment_per_month"]))
-                        except (ValueError, TypeError):
-                            pass
-
-                # First activation date
-                activation_date = details.get("activation_date")
-                if activation_date:
-                    existing.activation_date = activation_date
-
-                existing.last_synced_at = datetime.now(timezone.utc)
-                sync_client.increment_updated()
-            else:
-                # Normalize address for new customers
-                addr = _normalize_customer_address(cust_data, latitude, longitude)
-
-                customer = Customer(
-                    splynx_id=splynx_id,
-                    # Basic info
-                    name=cust_data.get("name", ""),
-                    email=cust_data.get("email") or None,
-                    billing_email=cust_data.get("billing_email") or None,
-                    phone=cust_data.get("phone") or None,
-                    # Address (normalized)
-                    address=cust_data.get("street_1") or None,
-                    address_2=cust_data.get("street_2") or None,
-                    city=addr["city"],
-                    state=addr["state"],
-                    zip_code=cust_data.get("zip_code") or None,
-                    country=cust_data.get("country") or "Nigeria",
-                    # Geolocation - use GPS from source, or extracted from city field
-                    gps=gps_raw,
-                    latitude=latitude or addr["latitude"],
-                    longitude=longitude or addr["longitude"],
-                    # Classification
-                    status=status,
-                    customer_type=customer_type,
-                    billing_type=billing_type,
-                    pop_id=pop_id,
-                    # Network/Infrastructure
-                    base_station=base_station,
-                    building_type=building_type,
-                    # Account info
-                    account_number=cust_data.get("login"),
-                    vat_id=vat_id,
-                    zoho_id=zoho_id,
-                    # Financial
-                    mrr=mrr,
-                    daily_prepaid_cost=daily_cost,
-                    # Partner
-                    partner_id=cust_data.get("partner_id"),
-                    # Dates
-                    signup_date=_parse_date(cust_data.get("date_add")),
-                    conversion_date=_parse_date(cust_data.get("conversion_date")),
-                    last_online=_parse_datetime_str(cust_data.get("last_online")),
-                    # Attribution
-                    added_by=cust_data.get("added_by"),
-                    added_by_id=cust_data.get("added_by_id"),
-                    referrer=referrer,
-                    # Labels
-                    labels=labels,
+            if not party:
+                party_type = PartyType.ORGANIZATION.value if is_business else PartyType.PERSON.value
+                party = Party(
+                    type=party_type,
+                    name=cust_data.get("name", "") or None,
+                    emails=[],
+                    phones=[],
                 )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+                created = True
 
-                # Details from pre-fetched map (bulk API doesn't return password, billing info, activation)
-                details = customer_details_map.get(splynx_id, {})
+            if email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email for e in emails):
+                    emails.append(
+                        {
+                            "address": email,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+                    party_email_index[email] = party
 
-                # Password
-                password_raw = details.get("password")
-                if password_raw:
-                    customer.password_hash = _hash_password(password_raw)
+            billing_email = (cust_data.get("billing_email") or "").strip().lower()
+            if billing_email and billing_email != email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == billing_email for e in emails):
+                    emails.append(
+                        {
+                            "address": billing_email,
+                            "label": "billing",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
 
-                # Billing info
-                billing_info = details.get("billing_info")
-                if billing_info:
-                    blocking_date_str = billing_info.get("blocking_date")
-                    if blocking_date_str and blocking_date_str != "0000-00-00":
-                        customer.blocking_date = _parse_date(blocking_date_str)
-                    customer.days_until_blocking = billing_info.get("days_until_blocking")
-                    if billing_info.get("deposit_balance"):
-                        try:
-                            customer.deposit_balance = Decimal(str(billing_info["deposit_balance"]))
-                        except (ValueError, TypeError):
-                            pass
-                    if billing_info.get("payment_per_month"):
-                        try:
-                            customer.payment_per_month = Decimal(str(billing_info["payment_per_month"]))
-                        except (ValueError, TypeError):
-                            pass
+            phone = cust_data.get("phone") or None
+            if phone:
+                phones = list(party.phones or [])
+                if not any((p.get("number") or "") == phone for p in phones):
+                    phones.append(
+                        {
+                            "number": phone,
+                            "label": "primary",
+                            "is_primary": len(phones) == 0,
+                            "can_sms": False,
+                            "can_whatsapp": False,
+                        }
+                    )
+                    party.phones = phones
 
-                # First activation date
-                activation_date = details.get("activation_date")
-                if activation_date:
-                    customer.activation_date = activation_date
+            if not party.name:
+                party.name = cust_data.get("name") or party.name
 
-                sync_client.db.add(customer)
+            if splynx_id is not None and str(splynx_id) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="splynx",
+                        external_id=str(splynx_id),
+                        external_key_type="customer_id",
+                    )
+                )
+                party_by_ext[str(splynx_id)] = party.id
+
+            has_customer_role = (
+                sync_client.db.query(PartyRole)
+                .filter(PartyRole.party_id == party.id, PartyRole.role == "customer", PartyRole.until.is_(None))
+                .first()
+            )
+            if not has_customer_role:
+                sync_client.db.add(PartyRole(party_id=party.id, role="customer"))
+
+            account = (
+                sync_client.db.query(CustomerAccount)
+                .filter(CustomerAccount.party_id == party.id)
+                .first()
+            )
+            account_status = "active"
+            if splynx_status in ["blocked", "disabled"]:
+                account_status = "suspended"
+            elif splynx_status in ["new"]:
+                account_status = "pending"
+
+            if not account:
+                account_number = cust_data.get("login") or str(splynx_id)
+                account = CustomerAccount(
+                    party_id=party.id,
+                    account_number=str(account_number),
+                    status=account_status,
+                    billing_email=cust_data.get("billing_email") or cust_data.get("email"),
+                    external_ids={
+                        "splynx_id": splynx_id,
+                    },
+                )
+                sync_client.db.add(account)
+                created = True
+            else:
+                account.status = account_status
+                if not account.billing_email:
+                    account.billing_email = cust_data.get("billing_email") or cust_data.get("email")
+
+            # Normalize address for party payloads
+            addr = _normalize_customer_address(cust_data, latitude, longitude)
+            if cust_data.get("name"):
+                party.name = cust_data.get("name") or party.name
+
+            # Addresses (replace primary address with latest sync)
+            address_line1 = cust_data.get("street_1") or None
+            address_line2 = cust_data.get("street_2") or None
+            postal_code = cust_data.get("zip_code") or None
+            country = cust_data.get("country") or "Nigeria"
+            if address_line1 or address_line2 or addr["city"] or addr["state"] or postal_code:
+                party.addresses = [
+                    {
+                        "type": "primary",
+                        "line1": address_line1,
+                        "line2": address_line2,
+                        "city": addr["city"],
+                        "state": addr["state"],
+                        "postal_code": postal_code,
+                        "country": country,
+                        "lat": latitude or addr["latitude"],
+                        "lng": longitude or addr["longitude"],
+                        "is_primary": True,
+                    }
+                ]
+
+            # Tags from labels
+            if labels_list:
+                existing_tags = set(party.tags or [])
+                party.tags = sorted(existing_tags.union(set(labels_list)))
+
+            # Details from pre-fetched map (bulk API doesn't return password, billing info, activation)
+            details = customer_details_map.get(splynx_id, {})
+            password_raw = details.get("password")
+            billing_info = details.get("billing_info") or {}
+            activation_date = details.get("activation_date")
+
+            custom_fields = dict(party.custom_fields or {})
+            custom_fields.update(
+                {
+                    "base_station": base_station,
+                    "building_type": building_type,
+                    "referrer": referrer,
+                    "zoho_id": zoho_id,
+                    "vat_id": vat_id,
+                    "partner_id": cust_data.get("partner_id"),
+                    "pop_id": pop_id,
+                    "gps": gps_raw,
+                    "signup_date": _parse_date(cust_data.get("date_add")),
+                    "conversion_date": _parse_date(cust_data.get("conversion_date")),
+                    "last_online": _parse_datetime_str(cust_data.get("last_online")),
+                    "added_by": cust_data.get("added_by"),
+                    "added_by_id": cust_data.get("added_by_id"),
+                    "daily_prepaid_cost": daily_cost,
+                }
+            )
+
+            if password_raw:
+                custom_fields["splynx_password_hash"] = _hash_password(password_raw)
+
+            if billing_info:
+                custom_fields["blocking_date"] = _parse_date(billing_info.get("blocking_date"))
+                custom_fields["days_until_blocking"] = billing_info.get("days_until_blocking")
+                custom_fields["deposit_balance"] = billing_info.get("deposit_balance")
+                custom_fields["payment_per_month"] = billing_info.get("payment_per_month")
+
+            party.custom_fields = custom_fields
+
+            # Update account fields from Splynx
+            account.account_number = account.account_number or str(cust_data.get("login") or splynx_id)
+            account.status = account_status
+            account.billing_type = billing_type
+            if mrr is not None:
+                account.mrr = Decimal(str(mrr))
+            if activation_date:
+                account.activated_at = activation_date
+
+            account.external_ids = {
+                **(account.external_ids or {}),
+                "splynx_id": splynx_id,
+            }
+
+            if created:
                 sync_client.increment_created()
+            else:
+                sync_client.increment_updated()
 
             # Commit in batches to reduce transaction size
             if i % batch_size == 0:

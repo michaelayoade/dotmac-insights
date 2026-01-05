@@ -1,0 +1,86 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Compose Social Post</h1>
+        <p class="mt-1 text-sm text-gray-500">Create and schedule multi-platform content</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set accounts = accounts | default([]) %}
+
+<form method="post" action="/marketing/social/compose" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Post Content</h2>
+            <div class="mt-4 space-y-4">
+                <div>
+                    <label class="text-sm font-medium text-gray-700">Message</label>
+                    <textarea name="content" rows="6" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-3 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200" placeholder="Write your WhatsApp message..."></textarea>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700">Media URLs</label>
+                    <textarea name="media_urls" rows="3" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-3 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200" placeholder="https://... (one per line)"></textarea>
+                    <p class="mt-2 text-xs text-gray-500">Media will be sent first (one message per URL), followed by the text message.</p>
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700">Recipients (WhatsApp)</label>
+                    <textarea name="recipients" rows="2" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-3 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200" placeholder="+234... one per line or comma-separated"></textarea>
+                    <p class="mt-2 text-xs text-gray-500">Leave blank to use the default WhatsApp recipient.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Preview</h2>
+            <div class="mt-4 rounded-2xl border border-gray-100 bg-surface-50 p-5">
+                <p class="text-sm text-gray-600">Preview will appear here once content is added.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Account</h2>
+            <div class="mt-4 space-y-3 text-sm">
+                {% if accounts %}
+                <select name="account_id" class="w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                    <option value="">Select account</option>
+                    {% for account in accounts %}
+                    <option value="{{ account.id }}">
+                        {{ account.platform.value | title }} · {{ account.display_name or account.account_id }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <div class="text-sm text-gray-500">No social accounts connected yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Schedule</h2>
+            <div class="mt-4 space-y-4">
+                <div>
+                    <label class="text-sm font-medium text-gray-700">Date</label>
+                    <input type="date" name="schedule_date" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700">Time</label>
+                    <input type="time" name="schedule_time" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button name="action" value="draft" class="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Save Draft</button>
+                    <button name="action" value="schedule" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

@@ -219,9 +219,9 @@ class WorkflowTask(Base):
     def assignee_display_name(self) -> str:
         """Get display name for assignee."""
         if self.assignee_user:
-            return self.assignee_user.display_name or self.assignee_user.email
+            return self.assignee_user.name or self.assignee_user.email
         if self.assignee_employee:
-            return self.assignee_employee.employee_name or str(self.assignee_employee.id)
+            return self.assignee_employee.name or str(self.assignee_employee.id)
         return "Unassigned"
 
     def __repr__(self) -> str:

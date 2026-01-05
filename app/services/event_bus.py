@@ -288,7 +288,7 @@ class EventBus:
         try:
             key = f"events:{event_id}"
             data = self.redis.get(key)
-            if data:
+            if isinstance(data, (str, bytes, bytearray)):
                 return Event.from_dict(json.loads(data))
         except Exception:
             pass

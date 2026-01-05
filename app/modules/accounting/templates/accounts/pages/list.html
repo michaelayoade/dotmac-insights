@@ -1,0 +1,157 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Chart of Accounts</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage your company's account structure</p>
+    </div>
+    <a
+        href="/accounting/accounts/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Account
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <a href="/accounting/accounts" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_count }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+    <a href="/accounting/accounts?is_group=true" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-gray-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Groups</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.group_count }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-gray-600">View groups →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=asset" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-blue-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Assets</p>
+        <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.by_root_type.get('asset', 0) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-blue-600">View assets →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=liability" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Liabilities</p>
+        <p class="mt-1 text-2xl font-bold text-red-600">{{ stats.by_root_type.get('liability', 0) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View liabilities →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=income" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-emerald-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Income</p>
+        <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.by_root_type.get('income', 0) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-emerald-600">View income →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=expense" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Expenses</p>
+        <p class="mt-1 text-2xl font-bold text-amber-600">{{ stats.by_root_type.get('expense', 0) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View expenses →</p>
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <div class="flex flex-col sm:flex-row gap-4">
+        <!-- Search -->
+        <div class="flex-1">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ search_query }}"
+                    placeholder="Search accounts..."
+                    class="block w-full pl-11 pr-4 py-2.5 rounded-xl border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm transition-colors"
+                    hx-get="/accounting/accounts/table"
+                    hx-target="#accounts-container"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-include="[name='root_type'], [name='show_disabled'], [name='view']"
+                    hx-push-url="true"
+                >
+            </div>
+        </div>
+
+        <!-- Root Type Filter -->
+        <div class="sm:w-48">
+            <select
+                name="root_type"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/accounts/table"
+                hx-target="#accounts-container"
+                hx-trigger="change"
+                hx-include="[name='q'], [name='show_disabled'], [name='view']"
+                hx-push-url="true"
+            >
+                <option value="">All Types</option>
+                {% for opt in root_type_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_root_type == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- View Toggle -->
+        <div class="flex items-center gap-2">
+            <input
+                type="hidden"
+                name="view"
+                value="{{ view_mode }}"
+            >
+            <button
+                type="button"
+                class="p-2.5 rounded-xl {{ 'bg-primary-100 text-primary-700' if view_mode == 'tree' else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }} transition-colors"
+                hx-get="/accounting/accounts/table?view=tree"
+                hx-target="#accounts-container"
+                hx-include="[name='q'], [name='root_type'], [name='show_disabled']"
+                hx-push-url="true"
+                title="Tree View"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+            </button>
+            <button
+                type="button"
+                class="p-2.5 rounded-xl {{ 'bg-primary-100 text-primary-700' if view_mode == 'flat' else 'bg-gray-100 text-gray-600 hover:bg-gray-200' }} transition-colors"
+                hx-get="/accounting/accounts/table?view=flat"
+                hx-target="#accounts-container"
+                hx-include="[name='q'], [name='root_type'], [name='show_disabled']"
+                hx-push-url="true"
+                title="Flat View"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Show Disabled Toggle -->
+        <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+            <input
+                type="checkbox"
+                name="show_disabled"
+                {{ 'checked' if show_disabled else '' }}
+                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                hx-get="/accounting/accounts/table"
+                hx-target="#accounts-container"
+                hx-trigger="change"
+                hx-include="[name='q'], [name='root_type'], [name='view']"
+                hx-push-url="true"
+            >
+            Show Disabled
+        </label>
+    </div>
+</div>
+
+<!-- Accounts Container -->
+<div id="accounts-container">
+    {% include "modules/accounting/templates/accounts/partials/accounts_tree.html" %}
+</div>
+{% endblock %}

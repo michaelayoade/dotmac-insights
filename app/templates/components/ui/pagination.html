@@ -1,0 +1,159 @@
+{#
+Pagination Component
+
+Usage (pagination from build_pagination_context includes base_url and htmx_target):
+{% include "components/ui/pagination.html" %}
+
+Or with overrides:
+{% with base_url="/custom", htmx_target="#custom-table" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+#}
+
+{% set p = pagination %}
+{% set _base_url = base_url if base_url is defined else (p.base_url if p.base_url is defined else "") %}
+{% set _htmx_target = htmx_target if htmx_target is defined else (p.htmx_target if p.htmx_target is defined else "") %}
+{% set joiner = '&' if '?' in _base_url else '?' %}
+
+<nav class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6" aria-label="Pagination" data-testid="pagination">
+    <!-- Mobile view -->
+    <div class="flex flex-1 justify-between sm:hidden">
+        {% if p.has_prev %}
+        <a
+            href="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
+            class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            {% if _htmx_target %}
+            hx-get="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
+            hx-target="{{ _htmx_target }}"
+            hx-push-url="true"
+            {% endif %}
+            data-testid="pagination-prev-mobile"
+        >
+            Previous
+        </a>
+        {% else %}
+        <span class="relative inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
+            Previous
+        </span>
+        {% endif %}
+
+        {% if p.has_next %}
+        <a
+            href="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
+            class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            {% if _htmx_target %}
+            hx-get="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
+            hx-target="{{ _htmx_target }}"
+            hx-push-url="true"
+            {% endif %}
+            data-testid="pagination-next-mobile"
+        >
+            Next
+        </a>
+        {% else %}
+        <span class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-gray-100 px-4 py-2 text-sm font-medium text-gray-400 cursor-not-allowed">
+            Next
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- Desktop view -->
+    <div class="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+        <div>
+            <p class="text-sm text-gray-700">
+                Showing
+                <span class="font-medium">{{ p.start_item }}</span>
+                to
+                <span class="font-medium">{{ p.end_item }}</span>
+                of
+                <span class="font-medium">{{ p.total }}</span>
+                results
+            </p>
+        </div>
+        <div>
+            <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
+                <!-- Previous -->
+                {% if p.has_prev %}
+                <a
+                    href="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
+                    class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                    {% if _htmx_target %}
+                    hx-get="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
+                    hx-target="{{ _htmx_target }}"
+                    hx-push-url="true"
+                    {% endif %}
+                    data-testid="pagination-prev"
+                >
+                    <span class="sr-only">Previous</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
+                    </svg>
+                </a>
+                {% else %}
+                <span class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
+                    <span class="sr-only">Previous</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd"/>
+                    </svg>
+                </span>
+                {% endif %}
+
+                <!-- Page numbers -->
+                {% for page_num in range(1, p.total_pages + 1) %}
+                    {% if page_num == p.page %}
+                    <span
+                        class="relative z-10 inline-flex items-center bg-primary-600 px-4 py-2 text-sm font-semibold text-white focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+                        aria-current="page"
+                        data-testid="pagination-page-{{ page_num }}"
+                    >
+                        {{ page_num }}
+                    </span>
+                    {% elif page_num == 1 or page_num == p.total_pages or (page_num >= p.page - 1 and page_num <= p.page + 1) %}
+                    <a
+                        href="{{ _base_url }}{{ joiner }}page={{ page_num }}"
+                        class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                        {% if _htmx_target %}
+                        hx-get="{{ _base_url }}{{ joiner }}page={{ page_num }}"
+                        hx-target="{{ _htmx_target }}"
+                        hx-push-url="true"
+                        {% endif %}
+                        data-testid="pagination-page-{{ page_num }}"
+                    >
+                        {{ page_num }}
+                    </a>
+                    {% elif page_num == 2 or page_num == p.total_pages - 1 %}
+                    <span class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-700 ring-1 ring-inset ring-gray-300">
+                        ...
+                    </span>
+                    {% endif %}
+                {% endfor %}
+
+                <!-- Next -->
+                {% if p.has_next %}
+                <a
+                    href="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
+                    class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
+                    {% if _htmx_target %}
+                    hx-get="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
+                    hx-target="{{ _htmx_target }}"
+                    hx-push-url="true"
+                    {% endif %}
+                    data-testid="pagination-next"
+                >
+                    <span class="sr-only">Next</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+                    </svg>
+                </a>
+                {% else %}
+                <span class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-300 ring-1 ring-inset ring-gray-300 cursor-not-allowed">
+                    <span class="sr-only">Next</span>
+                    <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"/>
+                    </svg>
+                </span>
+                {% endif %}
+            </nav>
+        </div>
+    </div>
+</nav>

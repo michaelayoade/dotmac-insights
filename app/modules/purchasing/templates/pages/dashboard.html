@@ -1,0 +1,265 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Purchasing Dashboard</h1>
+            <p class="mt-1 text-sm text-gray-500">Accounts payable overview and vendor management</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/purchasing" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Purchase Orders
+            </a>
+        </div>
+    </div>
+
+    <!-- Primary Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="stats-grid">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total Payables</p>
+                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.total_outstanding | format_currency }}</p>
+                </div>
+                <div class="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Overdue</p>
+                    <p class="text-3xl font-bold text-red-600 mt-1">{{ stats.total_overdue | format_currency }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ stats.overdue_count }} bills</p>
+                </div>
+                <div class="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Due This Week</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ stats.due_this_week_total | format_currency }}</p>
+                    <p class="text-xs text-gray-500 mt-1">{{ stats.due_this_week_count }} bills</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Active Suppliers</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ stats.supplier_count | format_number }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PO Stats Row -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Total POs</p>
+                    <p class="text-xl font-bold text-gray-900">{{ po_stats.total | format_number }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Draft</p>
+                    <p class="text-xl font-bold text-slate-700">{{ po_stats.draft | format_number }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">To Receive</p>
+                    <p class="text-xl font-bold text-orange-600">{{ po_stats.to_receive | format_number }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-500">Completed</p>
+                    <p class="text-xl font-bold text-emerald-600">{{ po_stats.completed | format_number }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left Column -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Overdue Alert -->
+            {% if overdue_bills %}
+            <div class="bg-gradient-to-r from-red-50 to-orange-50 rounded-2xl shadow-warm-sm ring-1 ring-red-200/50 p-6">
+                <div class="flex items-start gap-4">
+                    <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-lg font-semibold text-red-900">Overdue Bills</h3>
+                        <p class="text-sm text-red-700 mt-1">{{ stats.overdue_count }} bills totaling {{ stats.total_overdue | format_currency }} are past due</p>
+                        <div class="mt-4 space-y-2">
+                            {% for bill in overdue_bills[:5] %}
+                            <div class="flex items-center justify-between py-2 px-3 bg-white/60 rounded-lg">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-medium text-gray-900">{{ bill.supplier_name or bill.supplier }}</span>
+                                    <span class="text-sm text-gray-500">{{ bill.erpnext_id or bill.id }}</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="font-medium text-red-700">{{ bill.outstanding_amount | format_currency }}</span>
+                                    <span class="text-xs text-red-600 ml-2">
+                                        {% set days = (today - bill.due_date.date()).days if bill.due_date else 0 %}
+                                        {{ days }}d overdue
+                                    </span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Recent Unpaid Bills -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Recent Unpaid Bills</h2>
+                    <a href="/accounting/invoices?type=purchase&status=unpaid" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+                </div>
+                {% if recent_unpaid_bills %}
+                <div class="divide-y divide-gray-100">
+                    {% for bill in recent_unpaid_bills %}
+                    <div class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <p class="font-medium text-gray-900">{{ bill.supplier_name or bill.supplier }}</p>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if bill.status.value == 'overdue' %}bg-red-50 text-red-700
+                                    {% elif bill.status.value == 'unpaid' %}bg-amber-50 text-amber-700
+                                    {% else %}bg-gray-50 text-gray-700{% endif %}">
+                                    {{ bill.status.value.replace('_', ' ').title() if bill.status else 'Unknown' }}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-500">{{ bill.erpnext_id or bill.id }}</p>
+                        </div>
+                        <div class="text-right ml-4">
+                            <p class="font-medium text-gray-900">{{ bill.outstanding_amount | format_currency }}</p>
+                            <p class="text-xs text-gray-500">Due: {{ bill.due_date.strftime('%b %d, %Y') if bill.due_date else '-' }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="px-6 py-12 text-center text-gray-500">
+                    <p>No unpaid bills</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="space-y-6">
+            <!-- Top Suppliers by Outstanding -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Top Suppliers by Payables</h3>
+                {% if top_suppliers %}
+                <div class="space-y-3">
+                    {% for supplier in top_suppliers %}
+                    <div class="flex items-center justify-between">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ supplier.name }}</p>
+                            <p class="text-xs text-gray-500">{{ supplier.bill_count }} bills</p>
+                        </div>
+                        <span class="text-sm font-medium text-gray-900">{{ supplier.outstanding | format_currency }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 text-center py-4">No outstanding payables</p>
+                {% endif %}
+            </div>
+
+            <!-- Bill Status Breakdown -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Bills by Status</h3>
+                <div class="space-y-3">
+                    {% for status, data in status_breakdown.items() %}
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full
+                                {% if status == 'paid' %}bg-emerald-500
+                                {% elif status == 'overdue' %}bg-red-500
+                                {% elif status == 'unpaid' %}bg-amber-500
+                                {% elif status == 'draft' %}bg-gray-400
+                                {% elif status == 'submitted' %}bg-blue-500
+                                {% else %}bg-gray-300{% endif %}"></span>
+                            <span class="text-sm text-gray-600 capitalize">{{ status.replace('_', ' ') }}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-sm font-medium text-gray-900">{{ data.count }}</span>
+                            <span class="text-xs text-gray-500 ml-1">({{ data.total | format_currency }})</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick Links -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Quick Links</h3>
+                <div class="space-y-2">
+                    <a href="/purchasing" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <span class="text-sm font-medium">Purchase Orders</span>
+                    </a>
+                    <a href="/accounting/invoices?type=purchase" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span class="text-sm font-medium">Vendor Bills</span>
+                    </a>
+                    <a href="/accounting/suppliers" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                        <span class="text-sm font-medium">Suppliers</span>
+                    </a>
+                    <a href="/accounting/aging?type=payables" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span class="text-sm font-medium">AP Aging Report</span>
+                    </a>
+                    <a href="/expenses" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-50 text-gray-700 hover:text-primary-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span class="text-sm font-medium">Expenses</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

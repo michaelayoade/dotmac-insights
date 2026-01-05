@@ -19,11 +19,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 from app.models.gateway_transaction import GatewayProvider
 from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import Party
     from app.models.gateway_transaction import GatewayTransaction
 
 
@@ -46,7 +47,7 @@ class PaymentSubscriptionInterval(str, enum.Enum):
     ANNUALLY = "annually"
 
 
-class PaymentSubscription(Base):
+class PaymentSubscription(SoftValidationMixin, Base):
     """
     Recurring payment subscriptions via payment gateways.
 
@@ -67,9 +68,9 @@ class PaymentSubscription(Base):
         String(255), nullable=True, index=True
     )
 
-    # Customer
-    customer_id: Mapped[int] = mapped_column(
-        ForeignKey("customers.id"), nullable=False, index=True
+    # Party link (unified identity - replaces customer_id)
+    party_id: Mapped[int] = mapped_column(
+        ForeignKey("parties.id"), nullable=False, index=True
     )
     customer_email: Mapped[str] = mapped_column(String(255), nullable=False)
     authorization_code: Mapped[str] = mapped_column(
@@ -157,8 +158,11 @@ class PaymentSubscription(Base):
         ForeignKey("users.id"), nullable=True
     )
 
+    # Relationships
+    party: Mapped[Optional["Party"]] = relationship(backref="payment_subscriptions")
+
     __table_args__ = (
-        Index("ix_payment_sub_customer_status", "customer_id", "status"),
+        Index("ix_payment_sub_party_status", "party_id", "status"),
         Index("ix_payment_sub_next_billing", "next_billing_date", "status"),
         Index("ix_payment_sub_provider", "provider", "status"),
     )

@@ -1,0 +1,148 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">General Ledger</h1>
+        <p class="mt-1.5 text-gray-500 font-body">View all posted transactions across accounts</p>
+    </div>
+    <a
+        href="/accounting/journal-entries/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Journal Entry
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <a href="/accounting/general-ledger" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Entries</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ '{:,}'.format(stats.total_count) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+    <a href="/accounting/general-ledger?period=this_month" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">This Month</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ '{:,}'.format(stats.this_month_count) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View this month →</p>
+    </a>
+    <a href="/accounting/reports/trial-balance" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-blue-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Total Debits</p>
+        <p class="mt-1 text-2xl font-bold text-blue-600">{{ '{:,.2f}'.format(stats.total_debit) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-blue-600">View trial balance →</p>
+    </a>
+    <a href="/accounting/reports/trial-balance" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Credits</p>
+        <p class="mt-1 text-2xl font-bold text-red-600">{{ '{:,.2f}'.format(stats.total_credit) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View trial balance →</p>
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Search -->
+        <div class="sm:col-span-2 lg:col-span-1">
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ search_query }}"
+                    placeholder="Search voucher/account..."
+                    class="block w-full pl-11 pr-4 py-2.5 rounded-xl border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm transition-colors"
+                    hx-get="/accounting/general-ledger/table"
+                    hx-target="#gl-container"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-include="[name='account_id'], [name='voucher_type'], [name='date_from'], [name='date_to']"
+                    hx-push-url="true"
+                >
+            </div>
+        </div>
+
+        <!-- Account Filter -->
+        <div>
+            <select
+                name="account_id"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/general-ledger/table"
+                hx-target="#gl-container"
+                hx-trigger="change"
+                hx-include="[name='q'], [name='voucher_type'], [name='date_from'], [name='date_to']"
+                hx-push-url="true"
+            >
+                <option value="">All Accounts</option>
+                {% for acct in accounts %}
+                <option value="{{ acct.id }}" {{ 'selected' if current_account_id and current_account_id|string == acct.id|string else '' }}>
+                    {{ acct.account_number ~ ' - ' if acct.account_number else '' }}{{ acct.account_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Voucher Type Filter -->
+        <div>
+            <select
+                name="voucher_type"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/general-ledger/table"
+                hx-target="#gl-container"
+                hx-trigger="change"
+                hx-include="[name='q'], [name='account_id'], [name='date_from'], [name='date_to']"
+                hx-push-url="true"
+            >
+                <option value="">All Voucher Types</option>
+                {% for opt in voucher_type_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_voucher_type == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Date From -->
+        <div>
+            <input
+                type="date"
+                name="date_from"
+                value="{{ date_from }}"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/general-ledger/table"
+                hx-target="#gl-container"
+                hx-trigger="change"
+                hx-include="[name='q'], [name='account_id'], [name='voucher_type'], [name='date_to']"
+                hx-push-url="true"
+                placeholder="From date"
+            >
+        </div>
+
+        <!-- Date To -->
+        <div>
+            <input
+                type="date"
+                name="date_to"
+                value="{{ date_to }}"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/general-ledger/table"
+                hx-target="#gl-container"
+                hx-trigger="change"
+                hx-include="[name='q'], [name='account_id'], [name='voucher_type'], [name='date_from']"
+                hx-push-url="true"
+                placeholder="To date"
+            >
+        </div>
+    </div>
+</div>
+
+<!-- GL Entries Container -->
+<div id="gl-container">
+    {% include "modules/accounting/templates/general_ledger/partials/gl_entries_table.html" %}
+</div>
+{% endblock %}

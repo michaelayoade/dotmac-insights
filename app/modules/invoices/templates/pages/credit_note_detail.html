@@ -1,0 +1,148 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/invoices" class="hover:text-primary-600">Invoices</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <a href="/invoices/credit-notes" class="hover:text-primary-600">Credit Notes</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ credit_note.credit_number or 'CN-' ~ credit_note.id }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ credit_note.credit_number or 'Credit Note #' ~ credit_note.id }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ credit_note.customer_account.party.name if credit_note.customer_account and credit_note.customer_account.party else 'Credit Note' }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Credit Note Details</h3>
+                {% set status_colors = {
+                    'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'issued': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'applied': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(credit_note.status.value.lower() if credit_note.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ credit_note.status.value.title() if credit_note.status else 'Draft' }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Credit Note Number</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ credit_note.credit_number or 'Not assigned' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Customer</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ credit_note.customer_account.party.name if credit_note.customer_account and credit_note.customer_account.party else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Issue Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ credit_note.issue_date.strftime('%b %d, %Y') if credit_note.issue_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Posting Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ credit_note.posting_date.strftime('%b %d, %Y') if credit_note.posting_date else '-' }}</dd>
+                    </div>
+                    {% if credit_note.invoice %}
+                    <div class="sm:col-span-2">
+                        <dt class="text-sm font-medium text-gray-500">Related Invoice</dt>
+                        <dd class="mt-1.5">
+                            <a href="/invoices/{{ credit_note.invoice.id }}" class="text-primary-600 hover:text-primary-700">{{ credit_note.invoice.invoice_number or 'Invoice #' ~ credit_note.invoice.id }}</a>
+                        </dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        {% if credit_note.lines %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Line Items</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Description</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Qty</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Rate</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for line in credit_note.lines %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="py-3 pl-6 pr-3 text-sm text-gray-900">{{ line.description or line.item_name or '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ line.qty|round(2) if line.qty else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ line.rate|round(2) if line.rate else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ line.amount|round(2) if line.amount else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-surface-50 border-t border-gray-200">
+                        <td colspan="3" class="py-3 pl-6 pr-3 text-sm font-semibold text-gray-900 text-right">Total</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-bold text-gray-900 text-right">{{ credit_note.total_amount|round(2) }} {{ credit_note.currency }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 rounded-2xl shadow-lg shadow-purple-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Credit Amount</h3>
+                <p class="mt-4 text-4xl font-bold">{{ credit_note.total_amount|round(2) }}</p>
+                <p class="text-sm opacity-75">{{ credit_note.currency }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Amounts</h3>
+            </div>
+            <div class="px-6 py-6 space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-sm text-gray-500">Amount</span>
+                    <span class="text-sm text-gray-900">{{ credit_note.amount|round(2) }} {{ credit_note.currency }}</span>
+                </div>
+                {% if credit_note.tax_amount %}
+                <div class="flex justify-between">
+                    <span class="text-sm text-gray-500">Tax</span>
+                    <span class="text-sm text-gray-900">{{ credit_note.tax_amount|round(2) }} {{ credit_note.currency }}</span>
+                </div>
+                {% endif %}
+                <div class="flex justify-between pt-3 border-t border-gray-100">
+                    <span class="text-sm font-semibold text-gray-900">Total</span>
+                    <span class="text-sm font-bold text-gray-900">{{ credit_note.total_amount|round(2) }} {{ credit_note.currency }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Timeline</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ credit_note.created_at.strftime('%b %d, %Y %H:%M') if credit_note.created_at else '-' }}</dd>
+                </div>
+                {% if credit_note.applied_date %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Applied</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ credit_note.applied_date.strftime('%b %d, %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

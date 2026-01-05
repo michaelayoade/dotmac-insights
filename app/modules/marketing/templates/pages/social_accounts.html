@@ -1,0 +1,94 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Social Accounts</h1>
+        <p class="mt-1 text-sm text-gray-500">Manage connected social profiles and tokens</p>
+    </div>
+    <a href="/marketing/integrations" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Connect Account</a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set accounts = accounts | default([]) %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Connected Accounts</h2>
+            <button class="text-sm text-primary-600 hover:text-primary-700 font-medium">Refresh</button>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% if accounts %}
+                {% for account in accounts %}
+                <div class="px-6 py-4 flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ account.platform }}</p>
+                        <p class="text-xs text-gray-500">{{ account.handle }} · {{ account.followers }} followers</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                            {% if account.status == 'connected' %}bg-emerald-50 text-emerald-700
+                            {% elif account.status == 'pending' %}bg-amber-50 text-amber-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {{ account.status | title }}
+                        </span>
+                        <span class="text-xs text-gray-500">{{ account.last_synced }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="px-6 py-6 text-sm text-gray-500">No social accounts connected.</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900">Add Social Account</h2>
+        <p class="text-sm text-gray-500 mt-1">Connect a platform account for publishing.</p>
+        <form method="post" action="/marketing/social/accounts" class="mt-4 space-y-3">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <div>
+                <label class="text-sm font-medium text-gray-700">Platform</label>
+                <select name="platform" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="twitter">X (Twitter)</option>
+                </select>
+                <p class="mt-2 text-xs text-gray-500">
+                    WhatsApp uses the phone_number_id. Facebook uses the Page ID. Instagram uses the Business Account ID.
+                    LinkedIn expects an organization URN or ID. X expects the numeric user ID.
+                </p>
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700">Account ID / Page ID</label>
+                <input type="text" name="account_id" placeholder="Platform account ID" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700">Display Name</label>
+                <input type="text" name="display_name" placeholder="WhatsApp Business" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700">Profile URL</label>
+                <input type="text" name="profile_url" placeholder="https://" class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700">Access Token</label>
+                <input type="text" name="access_token" placeholder="EAAG..." class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <p class="mt-2 text-xs text-gray-500">Use a long-lived token where possible (Meta). LinkedIn needs w_member_social.</p>
+            </div>
+            <div>
+                <label class="text-sm font-medium text-gray-700">Default Recipient (WhatsApp)</label>
+                <input type="text" name="default_recipient" placeholder="+234..." class="mt-2 w-full rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <p class="mt-2 text-xs text-gray-500">Used when a post does not specify recipients.</p>
+            </div>
+            <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Add Account</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -8,10 +8,11 @@ from sqlalchemy import String, Integer, Boolean, ForeignKey, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
-    from app.models.agent import Agent, Team
-    from app.models.unified_contact import UnifiedContact
+    from app.models.agent import Team
+    from app.models.party import Party
 
 
 class OmniChannelType(str, Enum):
@@ -23,10 +24,11 @@ class OmniChannelType(str, Enum):
     CUSTOM = "custom"
 
 
-class OmniChannel(Base):
+class OmniChannel(SoftValidationMixin, Base):
     """External channel/account configuration."""
 
     __tablename__ = "omni_channels"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
@@ -34,6 +36,10 @@ class OmniChannel(Base):
     config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     webhook_secret: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Chatwoot sync
+    chatwoot_inbox_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -56,10 +62,11 @@ class ConversationStatus(str, Enum):
     CLOSED = "closed"
 
 
-class OmniConversation(Base):
+class OmniConversation(SoftValidationMixin, Base):
     """Omnichannel conversation/thread."""
 
     __tablename__ = "omni_conversations"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("omni_channels.id"), nullable=False, index=True)
@@ -68,23 +75,26 @@ class OmniConversation(Base):
     external_thread_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
 
-    # Link to unified contact (replaces customer_id/lead_id after migration)
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Link to party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
 
     # Status & Priority
     status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True, default="open")
     priority: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="medium")
 
-    # Assignment
-    assigned_agent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
+    # Assignment (Party-based after Agent → Party unification)
+    assigned_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     assigned_team_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teams.id"), nullable=True, index=True)
     assigned_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
@@ -110,29 +120,28 @@ class OmniConversation(Base):
 
     # Relationships
     messages: Mapped[List["OmniMessage"]] = relationship(back_populates="conversation", cascade="all, delete-orphan")
-    assigned_agent: Mapped[Optional["Agent"]] = relationship(foreign_keys=[assigned_agent_id])
+    assigned_party: Mapped[Optional["Party"]] = relationship(foreign_keys=[assigned_party_id])
     assigned_team: Mapped[Optional["Team"]] = relationship(foreign_keys=[assigned_team_id])
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<OmniConversation {self.id} channel={self.channel_id} status={self.status}>"
 
 
-class OmniParticipant(Base):
+class OmniParticipant(SoftValidationMixin, Base):
     """Contact identity across channels."""
 
     __tablename__ = "omni_participants"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     handle: Mapped[str] = mapped_column(String(255), index=True)  # email/phone/social handle
     channel_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
-
-    # Link to unified contact (replaces customer_id after migration)
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Link to party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
 
     display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -142,26 +151,30 @@ class OmniParticipant(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<OmniParticipant {self.handle} ({self.channel_type})>"
 
 
-class OmniMessage(Base):
+class OmniMessage(SoftValidationMixin, Base):
     """Unified message record across channels."""
 
     __tablename__ = "omni_messages"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("omni_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     conversation: Mapped[OmniConversation] = relationship(back_populates="messages")
 
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
     participant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_participants.id"), nullable=True, index=True)
 
-    agent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     channel_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_channels.id"), nullable=True, index=True)
 
     direction: Mapped[str] = mapped_column(String(10), nullable=False)  # inbound|outbound
@@ -186,10 +199,11 @@ class OmniMessage(Base):
         return f"<OmniMessage {self.id} dir={self.direction} conv={self.conversation_id}>"
 
 
-class OmniAttachment(Base):
+class OmniAttachment(SoftValidationMixin, Base):
     """Attachment metadata linked to messages."""
 
     __tablename__ = "omni_attachments"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     message_id: Mapped[int] = mapped_column(ForeignKey("omni_messages.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -207,10 +221,11 @@ class OmniAttachment(Base):
         return f"<OmniAttachment {self.filename or self.id}>"
 
 
-class OmniWebhookEvent(Base):
+class OmniWebhookEvent(SoftValidationMixin, Base):
     """Raw webhook events for audit/idempotency."""
 
     __tablename__ = "omni_webhook_events"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     channel_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_channels.id"), nullable=True, index=True)
@@ -219,16 +234,19 @@ class OmniWebhookEvent(Base):
     headers: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     processed: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_retry_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     received_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
 
     def __repr__(self) -> str:
         return f"<OmniWebhookEvent {self.id} provider={self.provider_event_id}>"
 
 
-class InboxRoutingRule(Base):
+class InboxRoutingRule(SoftValidationMixin, Base):
     """Auto-routing rules for inbox conversations."""
 
     __tablename__ = "inbox_routing_rules"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -255,15 +273,13 @@ class InboxRoutingRule(Base):
         return f"<InboxRoutingRule {self.id} {self.name} active={self.is_active}>"
 
 
-class InboxContact(Base):
+class InboxContact(SoftValidationMixin, Base):
     """
     Unified contact directory for inbox - links participants across channels.
-
-    DEPRECATED: This model will be replaced by UnifiedContact.
-    Use unified_contact_id to link to the new UnifiedContact model.
     """
 
     __tablename__ = "inbox_contacts"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -277,14 +293,13 @@ class InboxContact(Base):
     job_title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Links to other systems (legacy)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
     lead_id: Mapped[Optional[int]] = mapped_column(ForeignKey("erpnext_leads.id"), nullable=True, index=True)
 
-    # Link to unified contact (migration target)
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Link to party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
 
     # Contact metadata
@@ -299,7 +314,7 @@ class InboxContact(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(foreign_keys=[unified_contact_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<InboxContact {self.id} {self.name}>"

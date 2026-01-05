@@ -1,0 +1,238 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/invoices" class="hover:text-primary-600">Invoices</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ invoice.invoice_number or 'INV-' ~ invoice.id }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ invoice.invoice_number or 'Invoice #' ~ invoice.id }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ invoice.customer_account.party.name if invoice.customer_account and invoice.customer_account.party else 'Customer Invoice' }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if invoice.status.value in ['pending', 'partially_paid', 'overdue'] %}
+        <form method="POST" action="/invoices/{{ invoice.id }}/mark-paid" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-green-600 to-green-700 rounded-xl shadow-lg shadow-green-600/25 hover:from-green-500 hover:to-green-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                Mark as Paid
+            </button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Invoice Details</h3>
+                {% set status_colors = {
+                    'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'pending': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                    'paid': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'partially_paid': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'overdue': 'bg-red-50 text-red-700 ring-red-600/20',
+                    'cancelled': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'refunded': 'bg-purple-50 text-purple-700 ring-purple-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(invoice.status.value.lower() if invoice.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ invoice.status.value.replace('_', ' ').title() if invoice.status else 'Draft' }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Invoice Number</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ invoice.invoice_number or 'Not assigned' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Customer</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ invoice.customer_account.party.name if invoice.customer_account and invoice.customer_account.party else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Invoice Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ invoice.invoice_date.strftime('%b %d, %Y') if invoice.invoice_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Due Date</dt>
+                        <dd class="mt-1.5 text-gray-900 {{ 'text-red-600 font-medium' if invoice.is_overdue else '' }}">
+                            {{ invoice.due_date.strftime('%b %d, %Y') if invoice.due_date else '-' }}
+                            {% if invoice.is_overdue %}
+                            <span class="text-xs text-red-500 ml-1">({{ invoice.days_overdue }} days overdue)</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Currency</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ invoice.currency }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Source</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ invoice.source.value.title() if invoice.source else 'Internal' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if invoice.lines %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Line Items</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Description</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Qty</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Rate</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for line in invoice.lines %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="py-3 pl-6 pr-3 text-sm text-gray-900">
+                            <div class="font-medium">{{ line.item_name or line.description or '-' }}</div>
+                            {% if line.item_code %}<div class="text-xs text-gray-500">{{ line.item_code }}</div>{% endif %}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ line.qty|round(2) if line.qty else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ line.rate|round(2) if line.rate else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ line.amount|round(2) if line.amount else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-surface-50">
+                        <td colspan="3" class="py-3 pl-6 pr-3 text-sm font-medium text-gray-500 text-right">Subtotal</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ invoice.amount|round(2) }} {{ invoice.currency }}</td>
+                    </tr>
+                    {% if invoice.tax_amount %}
+                    <tr class="bg-surface-50">
+                        <td colspan="3" class="py-3 pl-6 pr-3 text-sm font-medium text-gray-500 text-right">Tax</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ invoice.tax_amount|round(2) }} {{ invoice.currency }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr class="bg-surface-50 border-t border-gray-200">
+                        <td colspan="3" class="py-3 pl-6 pr-3 text-sm font-semibold text-gray-900 text-right">Total</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-bold text-gray-900 text-right">{{ invoice.total_amount|round(2) }} {{ invoice.currency }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-12 px-6 text-center">
+            <p class="text-gray-500">No line items on this invoice.</p>
+        </div>
+        {% endif %}
+
+        {% if invoice.payments %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Payments Received</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Receipt #</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Method</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for payment in invoice.payments %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm text-gray-900">{{ payment.payment_date.strftime('%b %d, %Y') if payment.payment_date else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ payment.receipt_number or '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ payment.payment_method.value.replace('_', ' ').title() if payment.payment_method else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ payment.amount|round(2) }} {{ payment.currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if invoice.credit_notes %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Credit Notes</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Credit Note</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for cn in invoice.credit_notes %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm">
+                            <a href="/invoices/credit-notes/{{ cn.id }}" class="text-primary-600 hover:text-primary-700">{{ cn.credit_number or 'CN-' ~ cn.id }}</a>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ cn.issue_date.strftime('%b %d, %Y') if cn.issue_date else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ cn.status.value.title() if cn.status else '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ cn.total_amount|round(2) }} {{ cn.currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg shadow-primary-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Total Amount</h3>
+                <p class="mt-4 text-4xl font-bold">{{ invoice.total_amount|round(2) }}</p>
+                <p class="text-sm opacity-75">{{ invoice.currency }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Payment Summary</h3>
+            </div>
+            <div class="px-6 py-6 space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-sm text-gray-500">Total Amount</span>
+                    <span class="text-sm text-gray-900">{{ invoice.total_amount|round(2) }} {{ invoice.currency }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm text-gray-500">Amount Paid</span>
+                    <span class="text-sm text-green-600">{{ invoice.amount_paid|default(0)|round(2) }} {{ invoice.currency }}</span>
+                </div>
+                <div class="flex justify-between pt-3 border-t border-gray-100">
+                    <span class="text-sm font-semibold text-gray-900">Balance Due</span>
+                    <span class="text-sm font-bold {{ 'text-red-600' if invoice.balance and invoice.balance > 0 else 'text-green-600' }}">{{ invoice.balance|default(invoice.total_amount)|round(2) }} {{ invoice.currency }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Timeline</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ invoice.created_at.strftime('%b %d, %Y %H:%M') if invoice.created_at else '-' }}</dd>
+                </div>
+                {% if invoice.paid_date %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Paid Date</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ invoice.paid_date.strftime('%b %d, %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ invoice.updated_at.strftime('%b %d, %Y %H:%M') if invoice.updated_at else '-' }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

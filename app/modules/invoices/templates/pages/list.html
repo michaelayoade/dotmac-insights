@@ -1,0 +1,65 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Invoices</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage customer invoices and billing</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/invoices/credit-notes" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            Credit Notes
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex flex-col lg:flex-row gap-4">
+            <div class="flex-1">
+                <input type="search" name="q" value="{{ q }}" placeholder="Search invoices..."
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm"
+                    hx-get="/invoices/table"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-target="#table-container"
+                    hx-include="[name='status'], [name='date_from'], [name='date_to']"
+                    hx-push-url="true">
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <select name="status"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/invoices/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='date_from'], [name='date_to']"
+                    hx-push-url="true">
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if status_filter == opt.value else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="date" name="date_from" value="{{ date_from }}" placeholder="From date"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/invoices/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='status'], [name='date_to']"
+                    hx-push-url="true">
+                <input type="date" name="date_to" value="{{ date_to }}" placeholder="To date"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/invoices/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='status'], [name='date_from']"
+                    hx-push-url="true">
+            </div>
+        </div>
+    </div>
+
+    <div id="table-container">
+        {% include "modules/invoices/templates/partials/invoices_table.html" %}
+    </div>
+</div>
+{% endblock %}

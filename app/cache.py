@@ -163,6 +163,7 @@ async def invalidate_analytics_cache() -> int:
 
 # Cache TTL presets (in seconds)
 CACHE_TTL = {
+    "very_short": 30,  # 30 seconds - for highly volatile data
     "short": 60,       # 1 minute - for real-time-ish data
     "medium": 300,     # 5 minutes - default
     "long": 900,       # 15 minutes - for expensive queries

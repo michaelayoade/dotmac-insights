@@ -1,440 +1,485 @@
 """
-Leads API - Lead management and conversion
+Leads API - Party-based lead management
+
+Leads are Party + PartyRole(role="lead") - NOT ERPNextLead.
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
 from typing import Optional, List
-from datetime import datetime, date, timezone
-from decimal import Decimal
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
-from app.auth import Require
-from app.models.sales import ERPNextLead, ERPNextLeadStatus
-from app.models.customer import Customer, CustomerStatus, CustomerType
-from app.models.crm import Opportunity, OpportunityStatus
-from app.models.contact import Contact, ContactType, ContactCategory
+from app.auth import Principal, get_current_principal
+from app.services.crm.leads import LeadService
+from app.services.crm.lead_types import (
+    LeadFilters,
+    LeadCreateData,
+    LeadUpdateData,
+    LeadScoreUpdate,
+    LeadConversionData,
+)
+from app.services.errors import NotFoundError, ValidationError
+from app.services.types import PaginationParams
 
 router = APIRouter(prefix="/leads", tags=["crm-leads"])
 
 
+def get_lead_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> LeadService:
+    """Create a LeadService instance for dependency injection."""
+    return LeadService(db, principal)
+
+
 # ============= SCHEMAS =============
-class LeadBase(BaseModel):
-    lead_name: str
-    company_name: Optional[str] = None
-    email_id: Optional[str] = None
-    phone: Optional[str] = None
-    mobile_no: Optional[str] = None
-    website: Optional[str] = None
-    source: Optional[str] = None
-    lead_owner: Optional[str] = None
-    territory: Optional[str] = None
-    industry: Optional[str] = None
-    market_segment: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
+class LeadCreate(BaseModel):
+    """Create a new lead (Party + PartyRole)."""
+
+    name: str
+    type: str = "person"  # person or organization
+    primary_email: Optional[str] = None
+    primary_phone: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    legal_name: Optional[str] = None
+    trading_name: Optional[str] = None
     notes: Optional[str] = None
-
-
-class LeadCreate(LeadBase):
-    pass
+    source: Optional[str] = None
+    source_campaign: Optional[str] = None
+    qualification: Optional[str] = None
+    lead_score: Optional[int] = None
+    owner_party_id: Optional[int] = None
 
 
 class LeadUpdate(BaseModel):
-    lead_name: Optional[str] = None
-    company_name: Optional[str] = None
-    email_id: Optional[str] = None
-    phone: Optional[str] = None
-    mobile_no: Optional[str] = None
-    website: Optional[str] = None
-    source: Optional[str] = None
-    lead_owner: Optional[str] = None
-    territory: Optional[str] = None
-    industry: Optional[str] = None
-    market_segment: Optional[str] = None
-    status: Optional[str] = None
-    qualification_status: Optional[str] = None
-    city: Optional[str] = None
-    state: Optional[str] = None
-    country: Optional[str] = None
+    """Update a lead."""
+
+    name: Optional[str] = None
+    primary_email: Optional[str] = None
+    primary_phone: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     notes: Optional[str] = None
+    status: Optional[str] = None
+    source: Optional[str] = None
+    source_campaign: Optional[str] = None
+    qualification: Optional[str] = None
+    lead_score: Optional[int] = None
+    owner_party_id: Optional[int] = None
 
 
-class LeadResponse(LeadBase):
-    id: int
-    status: str
-    qualification_status: Optional[str]
-    converted: bool
+class LeadScoreUpdateRequest(BaseModel):
+    """Update lead score."""
+
+    score: int
+    reason: Optional[str] = None
+
+
+class LeadQualifyRequest(BaseModel):
+    """Qualify a lead."""
+
+    qualification: str  # Hot, Warm, Cold, etc.
+
+
+class LeadDisqualifyRequest(BaseModel):
+    """Disqualify a lead."""
+
+    reason: str
+
+
+class LeadConvertToOpportunityRequest(BaseModel):
+    """Convert lead to opportunity."""
+
+    opportunity_name: Optional[str] = None
+    deal_value: Optional[float] = None
+    stage_id: Optional[int] = None
+    expected_close_date: Optional[datetime] = None
+
+
+class LeadConvertToCustomerRequest(BaseModel):
+    """Convert lead to customer."""
+
+    customer_tier: Optional[str] = None
+    payment_terms: Optional[str] = None
+
+
+class LeadResponse(BaseModel):
+    """Lead response with Party + PartyRole info."""
+
+    party_id: int
+    name: str
+    type: str
+    primary_email: Optional[str]
+    primary_phone: Optional[str]
+    first_name: Optional[str]
+    last_name: Optional[str]
+    notes: Optional[str]
+    tags: List[dict]
+    custom_fields: dict
     created_at: datetime
-    updated_at: datetime
+    role_id: int
+    status: str
+    source: Optional[str]
+    source_campaign: Optional[str]
+    qualification: Optional[str]
+    lead_score: Optional[int]
+    owner_party_id: Optional[int]
+    role_since: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class LeadListResponse(BaseModel):
+    """Paginated lead list response."""
+
     items: List[LeadResponse]
     total: int
     page: int
     page_size: int
 
 
-class LeadConvertRequest(BaseModel):
-    customer_name: Optional[str] = None
-    customer_type: str = "business"
-    create_opportunity: bool = False
-    opportunity_name: Optional[str] = None
-    deal_value: Optional[float] = None
-
-
 class LeadSummaryResponse(BaseModel):
+    """Lead summary statistics."""
+
     total_leads: int
-    new_leads: int
+    active_leads: int
     qualified_leads: int
+    unqualified_leads: int
     converted_leads: int
-    lost_leads: int
-    by_status: dict
+    avg_score: float
     by_source: dict
+    by_qualification: dict
+
+
+class LeadFunnelResponse(BaseModel):
+    """Lead funnel breakdown."""
+
+    new: int
+    contacted: int
+    qualified: int
+    proposal: int
+    converted: int
+    lost: int
+
+
+class BulkAssignRequest(BaseModel):
+    """Bulk assign leads to owner."""
+
+    lead_ids: List[int]
+    owner_id: int
+
+
+class BulkStatusRequest(BaseModel):
+    """Bulk update lead status."""
+
+    lead_ids: List[int]
+    status: str
+
+
+def _lead_to_response(lead) -> LeadResponse:
+    """Convert Lead dataclass to response."""
+    return LeadResponse(
+        party_id=lead.party_id,
+        name=lead.name,
+        type=lead.type,
+        primary_email=lead.primary_email,
+        primary_phone=lead.primary_phone,
+        first_name=lead.first_name,
+        last_name=lead.last_name,
+        notes=lead.notes,
+        tags=lead.tags or [],
+        custom_fields=lead.custom_fields or {},
+        created_at=lead.created_at,
+        role_id=lead.role_id,
+        status=lead.status,
+        source=lead.source,
+        source_campaign=lead.source_campaign,
+        qualification=lead.qualification,
+        lead_score=lead.lead_score,
+        owner_party_id=lead.owner_party_id,
+        role_since=lead.role_since,
+    )
 
 
 # ============= ENDPOINTS =============
-@router.get("", response_model=LeadListResponse, dependencies=[Depends(Require("crm:read"))])
+@router.get("", response_model=LeadListResponse)
 async def list_leads(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
     search: Optional[str] = None,
     status: Optional[str] = None,
+    qualification: Optional[str] = None,
     source: Optional[str] = None,
-    territory: Optional[str] = None,
-    converted: Optional[bool] = None,
-    db: Session = Depends(get_db),
+    source_campaign: Optional[str] = None,
+    owner_id: Optional[int] = None,
+    min_score: Optional[int] = None,
+    max_score: Optional[int] = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    service: LeadService = Depends(get_lead_service),
 ):
-    """List all leads with filtering and pagination."""
-    query = db.query(ERPNextLead)
+    """List leads with optional filters and pagination."""
+    filters = LeadFilters(
+        search=search,
+        status=status,
+        qualification=qualification,
+        source=source,
+        source_campaign=source_campaign,
+        owner_id=owner_id,
+        min_score=min_score,
+        max_score=max_score,
+    )
+    pagination = PaginationParams(page=page, page_size=page_size)
 
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                ERPNextLead.lead_name.ilike(search_term),
-                ERPNextLead.company_name.ilike(search_term),
-                ERPNextLead.email_id.ilike(search_term),
-            )
-        )
-
-    if status:
-        try:
-            status_enum = ERPNextLeadStatus(status.lower())
-            query = query.filter(ERPNextLead.status == status_enum)
-        except ValueError:
-            pass
-
-    if source:
-        query = query.filter(ERPNextLead.source == source)
-
-    if territory:
-        query = query.filter(ERPNextLead.territory == territory)
-
-    if converted is not None:
-        query = query.filter(ERPNextLead.converted == converted)
-
-    total = query.count()
-    leads = query.order_by(ERPNextLead.created_at.desc()).offset((page - 1) * page_size).limit(page_size).all()
+    result = service.list_leads(filters, pagination)
 
     return LeadListResponse(
-        items=[LeadResponse(
-            id=l.id,
-            lead_name=l.lead_name,
-            company_name=l.company_name,
-            email_id=l.email_id,
-            phone=l.phone,
-            mobile_no=l.mobile_no,
-            website=l.website,
-            source=l.source,
-            lead_owner=l.lead_owner,
-            territory=l.territory,
-            industry=l.industry,
-            market_segment=l.market_segment,
-            city=l.city,
-            state=l.state,
-            country=l.country,
-            notes=l.notes,
-            status=l.status.value if l.status else "lead",
-            qualification_status=l.qualification_status,
-            converted=l.converted,
-            created_at=l.created_at,
-            updated_at=l.updated_at,
-        ) for l in leads],
-        total=total,
-        page=page,
-        page_size=page_size,
+        items=[_lead_to_response(lead) for lead in result.items],
+        total=result.total,
+        page=result.page,
+        page_size=result.page_size,
     )
 
 
-@router.get("/summary", response_model=LeadSummaryResponse, dependencies=[Depends(Require("crm:read"))])
-async def get_leads_summary(db: Session = Depends(get_db)):
-    """Get lead summary statistics."""
-    total = db.query(func.count(ERPNextLead.id)).scalar() or 0
-    new_leads = db.query(func.count(ERPNextLead.id)).filter(ERPNextLead.status == ERPNextLeadStatus.LEAD).scalar() or 0
-    qualified = db.query(func.count(ERPNextLead.id)).filter(ERPNextLead.status == ERPNextLeadStatus.OPPORTUNITY).scalar() or 0
-    converted = db.query(func.count(ERPNextLead.id)).filter(ERPNextLead.converted == True).scalar() or 0
-    lost = db.query(func.count(ERPNextLead.id)).filter(ERPNextLead.status == ERPNextLeadStatus.DO_NOT_CONTACT).scalar() or 0
-
-    # By status
-    status_counts = db.query(
-        ERPNextLead.status,
-        func.count(ERPNextLead.id)
-    ).group_by(ERPNextLead.status).all()
-    by_status = {s.value if s else "unknown": c for s, c in status_counts}
-
-    # By source
-    source_counts = db.query(
-        ERPNextLead.source,
-        func.count(ERPNextLead.id)
-    ).filter(ERPNextLead.source.isnot(None)).group_by(ERPNextLead.source).all()
-    by_source = {s or "Unknown": c for s, c in source_counts}
-
-    return LeadSummaryResponse(
-        total_leads=total,
-        new_leads=new_leads,
-        qualified_leads=qualified,
-        converted_leads=converted,
-        lost_leads=lost,
-        by_status=by_status,
-        by_source=by_source,
-    )
-
-
-@router.get("/{lead_id}", response_model=LeadResponse, dependencies=[Depends(Require("crm:read"))])
-async def get_lead(lead_id: int, db: Session = Depends(get_db)):
-    """Get a single lead by ID."""
-    lead = db.query(ERPNextLead).filter(ERPNextLead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
-    return LeadResponse(
-        id=lead.id,
-        lead_name=lead.lead_name,
-        company_name=lead.company_name,
-        email_id=lead.email_id,
-        phone=lead.phone,
-        mobile_no=lead.mobile_no,
-        website=lead.website,
-        source=lead.source,
-        lead_owner=lead.lead_owner,
-        territory=lead.territory,
-        industry=lead.industry,
-        market_segment=lead.market_segment,
-        city=lead.city,
-        state=lead.state,
-        country=lead.country,
-        notes=lead.notes,
-        status=lead.status.value if lead.status else "lead",
-        qualification_status=lead.qualification_status,
-        converted=lead.converted,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-    )
-
-
-@router.post("", response_model=LeadResponse, dependencies=[Depends(Require("crm:write"))])
-async def create_lead(payload: LeadCreate, db: Session = Depends(get_db)):
-    """Create a new lead."""
-    lead = ERPNextLead(
-        lead_name=payload.lead_name,
-        company_name=payload.company_name,
-        email_id=payload.email_id,
-        phone=payload.phone,
-        mobile_no=payload.mobile_no,
-        website=payload.website,
-        source=payload.source,
-        lead_owner=payload.lead_owner,
-        territory=payload.territory,
-        industry=payload.industry,
-        market_segment=payload.market_segment,
-        city=payload.city,
-        state=payload.state,
-        country=payload.country,
-        notes=payload.notes,
-        status=ERPNextLeadStatus.LEAD,
-    )
-    db.add(lead)
-    db.commit()
-    db.refresh(lead)
-
-    return LeadResponse(
-        id=lead.id,
-        lead_name=lead.lead_name,
-        company_name=lead.company_name,
-        email_id=lead.email_id,
-        phone=lead.phone,
-        mobile_no=lead.mobile_no,
-        website=lead.website,
-        source=lead.source,
-        lead_owner=lead.lead_owner,
-        territory=lead.territory,
-        industry=lead.industry,
-        market_segment=lead.market_segment,
-        city=lead.city,
-        state=lead.state,
-        country=lead.country,
-        notes=lead.notes,
-        status=lead.status.value,
-        qualification_status=lead.qualification_status,
-        converted=lead.converted,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-    )
-
-
-@router.patch("/{lead_id}", response_model=LeadResponse, dependencies=[Depends(Require("crm:write"))])
-async def update_lead(lead_id: int, payload: LeadUpdate, db: Session = Depends(get_db)):
-    """Update a lead."""
-    lead = db.query(ERPNextLead).filter(ERPNextLead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-
-    if "status" in update_data:
-        try:
-            update_data["status"] = ERPNextLeadStatus(update_data["status"].lower())
-        except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {update_data['status']}")
-
-    for key, value in update_data.items():
-        setattr(lead, key, value)
-
-    db.commit()
-    db.refresh(lead)
-
-    return LeadResponse(
-        id=lead.id,
-        lead_name=lead.lead_name,
-        company_name=lead.company_name,
-        email_id=lead.email_id,
-        phone=lead.phone,
-        mobile_no=lead.mobile_no,
-        website=lead.website,
-        source=lead.source,
-        lead_owner=lead.lead_owner,
-        territory=lead.territory,
-        industry=lead.industry,
-        market_segment=lead.market_segment,
-        city=lead.city,
-        state=lead.state,
-        country=lead.country,
-        notes=lead.notes,
-        status=lead.status.value if lead.status else "lead",
-        qualification_status=lead.qualification_status,
-        converted=lead.converted,
-        created_at=lead.created_at,
-        updated_at=lead.updated_at,
-    )
-
-
-@router.post("/{lead_id}/convert", dependencies=[Depends(Require("crm:write"))])
-async def convert_lead(lead_id: int, payload: LeadConvertRequest, db: Session = Depends(get_db)):
-    """Convert a lead to a customer (and optionally create an opportunity)."""
-    lead = db.query(ERPNextLead).filter(ERPNextLead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
-    if lead.converted:
-        raise HTTPException(status_code=400, detail="Lead already converted")
-
-    # Create customer
-    customer_type = CustomerType.BUSINESS
-    if payload.customer_type == "residential":
-        customer_type = CustomerType.RESIDENTIAL
-    elif payload.customer_type == "enterprise":
-        customer_type = CustomerType.ENTERPRISE
-
-    customer = Customer(
-        name=payload.customer_name or lead.company_name or lead.lead_name,
-        email=lead.email_id,
-        phone=lead.phone or lead.mobile_no,
-        city=lead.city,
-        state=lead.state,
-        country=lead.country or "Nigeria",
-        customer_type=customer_type,
-        status=CustomerStatus.ACTIVE,
-        notes=lead.notes,
-        conversion_date=datetime.now(timezone.utc),
-    )
-    db.add(customer)
-    db.flush()
-
-    # Create primary contact person linked to customer
-    contact = Contact(
-        name=lead.lead_name or "Primary Contact",
-        contact_type=ContactType.PERSON,
-        category=ContactCategory.BUSINESS if customer_type in (CustomerType.BUSINESS, CustomerType.ENTERPRISE) else ContactCategory.RESIDENTIAL,
-        email=lead.email_id,
-        phone=lead.phone or lead.mobile_no,
-        is_primary_contact=True,
-        legacy_customer_id=customer.id,
-    )
-    db.add(contact)
-
-    # Optionally create opportunity
-    opportunity_id = None
-    if payload.create_opportunity:
-        opportunity = Opportunity(
-            name=payload.opportunity_name or f"Opportunity from {lead.lead_name}",
-            customer_id=customer.id,
-            lead_id=lead.id,
-            deal_value=Decimal(str(payload.deal_value or 0)),
-            probability=20,
-            source=lead.source,
-            status=OpportunityStatus.OPEN,
+@router.post("", response_model=LeadResponse, status_code=201)
+async def create_lead(
+    data: LeadCreate,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Create a new lead (Party + PartyRole)."""
+    try:
+        create_data = LeadCreateData(
+            name=data.name,
+            type=data.type,
+            primary_email=data.primary_email,
+            primary_phone=data.primary_phone,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            legal_name=data.legal_name,
+            trading_name=data.trading_name,
+            notes=data.notes,
+            source=data.source,
+            source_campaign=data.source_campaign,
+            qualification=data.qualification,
+            lead_score=data.lead_score,
+            owner_party_id=data.owner_party_id,
         )
-        opportunity.update_weighted_value()
-        db.add(opportunity)
-        db.flush()
-        opportunity_id = opportunity.id
-
-    # Mark lead as converted
-    lead.converted = True
-    lead.status = ERPNextLeadStatus.CONVERTED
-
-    db.commit()
-
-    return {
-        "success": True,
-        "customer_id": customer.id,
-        "contact_id": contact.id,
-        "opportunity_id": opportunity_id,
-        "message": f"Lead converted to customer: {customer.name}",
-    }
+        lead = service.create_lead(create_data)
+        db.commit()
+        return _lead_to_response(lead)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{lead_id}/qualify", dependencies=[Depends(Require("crm:write"))])
-async def qualify_lead(lead_id: int, db: Session = Depends(get_db)):
-    """Mark a lead as qualified (opportunity stage)."""
-    lead = db.query(ERPNextLead).filter(ERPNextLead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
+@router.get("/summary", response_model=LeadSummaryResponse)
+async def get_lead_summary(
+    service: LeadService = Depends(get_lead_service),
+):
+    """Get lead summary statistics."""
+    summary = service.get_lead_summary()
+    return LeadSummaryResponse(
+        total_leads=summary.total_leads,
+        active_leads=summary.active_leads,
+        qualified_leads=summary.qualified_leads,
+        unqualified_leads=summary.unqualified_leads,
+        converted_leads=summary.converted_leads,
+        avg_score=summary.avg_score,
+        by_source=summary.by_source,
+        by_qualification=summary.by_qualification,
+    )
 
-    lead.status = ERPNextLeadStatus.OPPORTUNITY
-    lead.qualification_status = "qualified"
-    db.commit()
 
-    return {"success": True, "message": "Lead qualified"}
+@router.get("/funnel", response_model=LeadFunnelResponse)
+async def get_lead_funnel(
+    service: LeadService = Depends(get_lead_service),
+):
+    """Get lead funnel breakdown."""
+    funnel = service.get_lead_funnel()
+    return LeadFunnelResponse(
+        new=funnel.new,
+        contacted=funnel.contacted,
+        qualified=funnel.qualified,
+        proposal=funnel.proposal,
+        converted=funnel.converted,
+        lost=funnel.lost,
+    )
 
 
-@router.post("/{lead_id}/disqualify", dependencies=[Depends(Require("crm:write"))])
-async def disqualify_lead(lead_id: int, reason: Optional[str] = None, db: Session = Depends(get_db)):
-    """Mark a lead as disqualified."""
-    lead = db.query(ERPNextLead).filter(ERPNextLead.id == lead_id).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
+@router.get("/{lead_id}", response_model=LeadResponse)
+async def get_lead(
+    lead_id: int,
+    service: LeadService = Depends(get_lead_service),
+):
+    """Get a lead by party ID."""
+    try:
+        lead = service.get_lead(lead_id)
+        return _lead_to_response(lead)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
-    lead.status = ERPNextLeadStatus.DO_NOT_CONTACT
-    lead.qualification_status = "disqualified"
-    if reason:
-        lead.notes = f"{lead.notes or ''}\n\nDisqualification reason: {reason}".strip()
-    db.commit()
 
-    return {"success": True, "message": "Lead disqualified"}
+@router.patch("/{lead_id}", response_model=LeadResponse)
+async def update_lead(
+    lead_id: int,
+    data: LeadUpdate,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Update a lead."""
+    try:
+        update_data = LeadUpdateData(
+            name=data.name,
+            primary_email=data.primary_email,
+            primary_phone=data.primary_phone,
+            first_name=data.first_name,
+            last_name=data.last_name,
+            notes=data.notes,
+            status=data.status,
+            source=data.source,
+            source_campaign=data.source_campaign,
+            qualification=data.qualification,
+            lead_score=data.lead_score,
+            owner_party_id=data.owner_party_id,
+        )
+        lead = service.update_lead(lead_id, update_data)
+        db.commit()
+        return _lead_to_response(lead)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{lead_id}", status_code=204)
+async def delete_lead(
+    lead_id: int,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Delete a lead (deactivates the lead role)."""
+    try:
+        service.delete_lead(lead_id)
+        db.commit()
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{lead_id}/score", response_model=LeadResponse)
+async def update_lead_score(
+    lead_id: int,
+    data: LeadScoreUpdateRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Update lead score."""
+    try:
+        lead = service.update_score(lead_id, data.score, data.reason)
+        db.commit()
+        return _lead_to_response(lead)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{lead_id}/qualify", response_model=LeadResponse)
+async def qualify_lead(
+    lead_id: int,
+    data: LeadQualifyRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Qualify a lead."""
+    try:
+        lead = service.qualify_lead(lead_id, data.qualification)
+        db.commit()
+        return _lead_to_response(lead)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{lead_id}/disqualify", response_model=LeadResponse)
+async def disqualify_lead(
+    lead_id: int,
+    data: LeadDisqualifyRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Disqualify a lead."""
+    try:
+        lead = service.disqualify_lead(lead_id, data.reason)
+        db.commit()
+        return _lead_to_response(lead)
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{lead_id}/convert/opportunity")
+async def convert_to_opportunity(
+    lead_id: int,
+    data: LeadConvertToOpportunityRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Convert lead to opportunity."""
+    try:
+        conversion_data = LeadConversionData(
+            opportunity_name=data.opportunity_name,
+            deal_value=data.deal_value,
+            stage_id=data.stage_id,
+            expected_close_date=data.expected_close_date,
+        )
+        opportunity = service.convert_to_opportunity(lead_id, conversion_data)
+        db.commit()
+        return {"id": opportunity.id, "name": opportunity.name}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{lead_id}/convert/customer")
+async def convert_to_customer(
+    lead_id: int,
+    data: LeadConvertToCustomerRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Convert lead to customer."""
+    try:
+        party = service.convert_to_customer(lead_id)
+        db.commit()
+        return {"id": party.id, "name": party.name}
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/bulk/assign")
+async def bulk_assign_leads(
+    data: BulkAssignRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Bulk assign leads to an owner."""
+    try:
+        count = service.bulk_assign(data.lead_ids, data.owner_id)
+        db.commit()
+        return {"assigned": count}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/bulk/status")
+async def bulk_update_status(
+    data: BulkStatusRequest,
+    service: LeadService = Depends(get_lead_service),
+    db: Session = Depends(get_db),
+):
+    """Bulk update lead status."""
+    try:
+        count = service.bulk_update_status(data.lead_ids, data.status)
+        db.commit()
+        return {"updated": count}
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))

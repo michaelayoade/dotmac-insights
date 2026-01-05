@@ -1,0 +1,166 @@
+{% extends "layouts/module.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Breadcrumb -->
+    <nav class="flex" aria-label="Breadcrumb">
+        <ol class="flex items-center space-x-4">
+            <li><a href="/crm" class="text-gray-400 hover:text-gray-500">CRM</a></li>
+            <li class="flex items-center">
+                <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                <a href="/crm/campaigns" class="ml-4 text-gray-400 hover:text-gray-500">Campaigns</a>
+            </li>
+            <li class="flex items-center">
+                <svg class="flex-shrink-0 h-5 w-5 text-gray-300" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                <span class="ml-4 text-gray-500">{{ campaign.name }}</span>
+            </li>
+        </ol>
+    </nav>
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 rounded-md p-4">
+        <p class="text-red-700">{{ error }}</p>
+    </div>
+    {% else %}
+    <!-- Header -->
+    <div class="bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:px-6 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ campaign.name }}</h1>
+                <div class="mt-2 flex items-center space-x-4">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                        {% if campaign.status == 'active' %}bg-green-100 text-green-800
+                        {% elif campaign.status == 'draft' %}bg-gray-100 text-gray-800
+                        {% elif campaign.status == 'paused' %}bg-yellow-100 text-yellow-800
+                        {% elif campaign.status == 'completed' %}bg-blue-100 text-blue-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ campaign.status|capitalize }}
+                    </span>
+                    <span class="text-sm text-gray-500">{{ campaign.campaign_type|default('Marketing')|capitalize }}</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                {% if campaign.status == 'draft' %}
+                <button type="button" class="btn btn-success">Activate</button>
+                {% elif campaign.status == 'active' %}
+                <button type="button" class="btn btn-warning">Pause</button>
+                <button type="button" class="btn btn-primary">Complete</button>
+                {% elif campaign.status == 'paused' %}
+                <button type="button" class="btn btn-success">Resume</button>
+                {% endif %}
+                <button type="button" class="btn btn-secondary">Edit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Content Grid -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Details -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Campaign Details</h3>
+                </div>
+                <div class="px-4 py-5 sm:p-6">
+                    {% if campaign.description %}
+                    <p class="text-sm text-gray-600 mb-6">{{ campaign.description }}</p>
+                    {% endif %}
+
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Start Date</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ campaign.start_date.strftime('%B %d, %Y') if campaign.start_date else 'Not set' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">End Date</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ campaign.end_date.strftime('%B %d, %Y') if campaign.end_date else 'Not set' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Budget</dt>
+                            <dd class="mt-1 text-sm text-gray-900">${{ '{:,.0f}'.format(campaign.budget or 0) }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Expected Revenue</dt>
+                            <dd class="mt-1 text-sm text-gray-900">${{ '{:,.0f}'.format(campaign.expected_revenue or 0) }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Performance -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Performance</h3>
+                </div>
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-gray-900">0</div>
+                            <div class="text-sm text-gray-500">Leads Generated</div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-gray-900">0</div>
+                            <div class="text-sm text-gray-500">Opportunities</div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-gray-900">$0</div>
+                            <div class="text-sm text-gray-500">Revenue</div>
+                        </div>
+                        <div class="text-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl font-bold text-gray-900">0%</div>
+                            <div class="text-sm text-gray-500">ROI</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Quick Stats -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Quick Stats</h3>
+                </div>
+                <div class="p-4">
+                    <dl class="space-y-4">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Created</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ campaign.created_at.strftime('%b %d, %Y') if campaign.created_at else '-' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
+                            <dd class="mt-1 text-sm text-gray-900">{{ campaign.updated_at.strftime('%b %d, %Y') if campaign.updated_at else '-' }}</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="bg-white shadow rounded-lg">
+                <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900">Actions</h3>
+                </div>
+                <div class="p-4 space-y-2">
+                    <button type="button" class="w-full btn btn-secondary justify-start">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                        </svg>
+                        Add Leads
+                    </button>
+                    <button type="button" class="w-full btn btn-secondary justify-start">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                        </svg>
+                        View Analytics
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

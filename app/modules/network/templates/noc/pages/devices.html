@@ -1,0 +1,131 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto"
+     hx-get="/network/noc/partials/device-grid"
+     hx-trigger="every {{ refresh_interval }}s"
+     hx-target="#device-grid"
+     hx-swap="innerHTML">
+
+    {# Page Header #}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
+        <div class="relative">
+            <div class="absolute -left-4 top-1 bottom-1 w-1 bg-gradient-to-b from-cyan-500 to-blue-500 rounded-full"></div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-display">Device Status</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Real-time device monitoring</p>
+        </div>
+        <div class="flex items-center gap-4">
+            {# Filter Controls #}
+            <div class="flex items-center gap-2">
+                <select id="status-filter"
+                        class="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                        hx-get="/network/noc/partials/device-grid"
+                        hx-target="#device-grid"
+                        hx-trigger="change"
+                        hx-include="[name='pop_filter']">
+                    <option value="">All Status</option>
+                    <option value="online">Online</option>
+                    <option value="offline">Offline</option>
+                    <option value="warning">Warning</option>
+                </select>
+                <select id="pop-filter" name="pop_filter"
+                        class="text-sm border-gray-200 rounded-lg focus:ring-primary-500 focus:border-primary-500"
+                        hx-get="/network/noc/partials/device-grid"
+                        hx-target="#device-grid"
+                        hx-trigger="change"
+                        hx-include="[name='status_filter']">
+                    <option value="">All POPs</option>
+                    {% for pop in pops %}
+                    <option value="{{ pop.id }}">{{ pop.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            {# View Toggle #}
+            <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button class="px-3 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-gray-700">
+                    Grid
+                </button>
+                <button class="px-3 py-1.5 text-sm font-medium rounded-md text-gray-500 hover:text-gray-700">
+                    Table
+                </button>
+            </div>
+
+            {# Live Indicator #}
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500">Live</span>
+                <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            </div>
+        </div>
+    </div>
+
+    {# Stats Summary #}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-warm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-green-600 tabular-nums">{{ stats.online }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Online</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-warm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-red-600 tabular-nums">{{ stats.offline }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Offline</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-warm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-amber-600 tabular-nums">{{ stats.warning }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Warning</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-warm">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-600 tabular-nums">{{ stats.total }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Total</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Device Grid #}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-warm overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">All Devices</h2>
+            <a href="/network/noc" class="text-sm text-primary-600 hover:text-primary-700">
+                ← Back to NOC
+            </a>
+        </div>
+        <div id="device-grid" class="p-4">
+            {% include "network/noc/partials/device_grid.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

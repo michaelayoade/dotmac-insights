@@ -1,23 +1,35 @@
 """Exports: Report exports (CSV/PDF), cache metadata, export status."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.auth import Require
-from app.cache import get_redis_client, CACHE_TTL
+from app.auth import Require, Principal, get_current_principal
+from app.cache import CACHE_TTL
 from app.database import get_db
+from app.services.accounting import ReportExportService
+from app.services.accounting.exports_types import ExportFormat
+from app.services.errors import ValidationError as ServiceValidationError
 
 router = APIRouter()
 
 
-# =============================================================================
+# SERVICE DEPENDENCIES
+
+
+def get_export_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> ReportExportService:
+    """Dependency to get a ReportExportService instance."""
+    return ReportExportService(db, principal)
+
+
 # HELPER FUNCTIONS
-# =============================================================================
+
 
 def _export_headers(base_filename: str, extension: str) -> Dict[str, str]:
     """Build Content-Disposition headers for streamed exports."""
@@ -34,64 +46,61 @@ def _stream_export(content: Any, media_type: str, base_filename: str, extension:
     )
 
 
-# =============================================================================
+def _validate_format(format_str: str, service: ReportExportService) -> ExportFormat:
+    """Validate export format."""
+    try:
+        return service.validate_format(format_str)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+
+
 # CACHE & EXPORT METADATA
-# =============================================================================
+
 
 @router.get("/cache-metadata", dependencies=[Depends(Require("accounting:read"))])
-async def get_accounting_cache_metadata() -> Dict[str, Any]:
+async def get_accounting_cache_metadata(
+    service: ReportExportService = Depends(get_export_service),
+) -> Dict[str, Any]:
     """Expose TTL metadata for cached accounting endpoints.
 
     Returns:
         Cache configuration and availability status
     """
-    cache_keys = [
-        {"key": "accounting-dashboard", "ttl_seconds": 60},
-        {"key": "accounting-dashboard-bundle", "ttl_seconds": 60},
-        {"key": "trial-balance", "ttl_seconds": 60},
-        {"key": "balance-sheet", "ttl_seconds": 60},
-        {"key": "income-statement", "ttl_seconds": 60},
-        {"key": "accounts-payable", "ttl_seconds": 60},
-        {"key": "accounts-receivable", "ttl_seconds": 60},
-        {"key": "cash-flow", "ttl_seconds": 60},
-        {"key": "income-statement-comparative", "ttl_seconds": 300},
-        {"key": "tax-dashboard", "ttl_seconds": 60},
-        {"key": "receivables-aging-enhanced", "ttl_seconds": 60},
-    ]
-    client = await get_redis_client()
+    cache_metadata = await service.get_cache_metadata()
 
     return {
-        "as_of": datetime.now(timezone.utc).isoformat() + "Z",
+        "as_of": cache_metadata.as_of,
         "presets": CACHE_TTL,
-        "cache_available": client is not None,
-        "keys": cache_keys,
+        "cache_available": cache_metadata.cache_available,
+        "keys": [{"key": k.key, "ttl_seconds": k.ttl_seconds} for k in cache_metadata.keys],
     }
 
 
 @router.get("/exports/status", dependencies=[Depends(Require("books:read"))])
-def get_export_status() -> Dict[str, Any]:
+def get_export_status(
+    service: ReportExportService = Depends(get_export_service),
+) -> Dict[str, Any]:
     """Lightweight health signal for export services.
 
     Returns:
         Export service availability status
     """
-    from app.services.export_service import WEASYPRINT_AVAILABLE
+    status = service.get_export_status()
 
     return {
-        "as_of": datetime.now(timezone.utc).isoformat() + "Z",
+        "as_of": status.as_of,
         "services": {
-            "csv": {"available": True},
+            "csv": {"available": status.csv_available},
             "pdf": {
-                "available": bool(WEASYPRINT_AVAILABLE),
-                "requires": "weasyprint",
+                "available": status.pdf_available,
+                "requires": status.pdf_requires,
             },
         },
     }
 
 
-# =============================================================================
 # TRIAL BALANCE EXPORT
-# =============================================================================
+
 
 @router.get("/trial-balance/export", dependencies=[Depends(Require("books:read"))])
 def export_trial_balance(
@@ -101,7 +110,7 @@ def export_trial_balance(
     cost_center: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    service: ReportExportService = Depends(get_export_service),
 ):
     """Export trial balance report to CSV or PDF.
 
@@ -115,12 +124,9 @@ def export_trial_balance(
     Returns:
         Streaming file response
     """
-    from app.services.export_service import ExportService, ExportError
-    from app.services.audit_logger import AuditLogger
     from .reports import get_trial_balance
 
-    if format not in ("csv", "pdf"):
-        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'pdf'")
+    export_format = _validate_format(format, service)
 
     # Get report data
     data = get_trial_balance(
@@ -131,35 +137,27 @@ def export_trial_balance(
         db=db,
     )
 
-    export_service = ExportService()
-
-    # Audit log the export
-    audit = AuditLogger(db)
-    audit.log_export(
-        doctype="trial_balance",
-        document_id=0,
-        user_id=user.id,
-        document_name=f"Trial Balance {as_of_date or 'today'}",
-        remarks=f"Exported as {format.upper()}",
+    # Log the export
+    service.log_export(
+        report_type="trial_balance",
+        format=export_format,
+        description=f"Trial Balance {as_of_date or 'today'}",
     )
     db.commit()
 
+    # Export using service
     try:
         base_filename = filename or "trial_balance"
-        content: Any
-        if format == "csv":
-            content = export_service.export_csv(data, "trial_balance")
-            return _stream_export(content, "text/csv", base_filename, "csv")
-        else:
-            content = export_service.export_pdf(data, "trial_balance")
-            return _stream_export(content, "application/pdf", base_filename, "pdf")
-    except ExportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        content = service.export(data, "trial_balance", export_format)
+        content_type = service.get_content_type(export_format)
+        extension = service.get_file_extension(export_format)
+        return _stream_export(content, content_type, base_filename, extension)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
-# =============================================================================
 # BALANCE SHEET EXPORT
-# =============================================================================
+
 
 @router.get("/balance-sheet/export", dependencies=[Depends(Require("books:read"))])
 def export_balance_sheet(
@@ -168,7 +166,7 @@ def export_balance_sheet(
     comparative_date: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    service: ReportExportService = Depends(get_export_service),
 ):
     """Export balance sheet report to CSV or PDF.
 
@@ -181,12 +179,9 @@ def export_balance_sheet(
     Returns:
         Streaming file response
     """
-    from app.services.export_service import ExportService, ExportError
-    from app.services.audit_logger import AuditLogger
     from .reports import get_balance_sheet
 
-    if format not in ("csv", "pdf"):
-        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'pdf'")
+    export_format = _validate_format(format, service)
 
     # Get report data
     data = get_balance_sheet(
@@ -196,35 +191,27 @@ def export_balance_sheet(
         db=db,
     )
 
-    export_service = ExportService()
-
-    # Audit log the export
-    audit = AuditLogger(db)
-    audit.log_export(
-        doctype="balance_sheet",
-        document_id=0,
-        user_id=user.id,
-        document_name=f"Balance Sheet {as_of_date or 'today'}",
-        remarks=f"Exported as {format.upper()}",
+    # Log the export
+    service.log_export(
+        report_type="balance_sheet",
+        format=export_format,
+        description=f"Balance Sheet {as_of_date or 'today'}",
     )
     db.commit()
 
+    # Export using service
     try:
         base_filename = filename or "balance_sheet"
-        content: Any
-        if format == "csv":
-            content = export_service.export_csv(data, "balance_sheet")
-            return _stream_export(content, "text/csv", base_filename, "csv")
-        else:
-            content = export_service.export_pdf(data, "balance_sheet")
-            return _stream_export(content, "application/pdf", base_filename, "pdf")
-    except ExportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        content = service.export(data, "balance_sheet", export_format)
+        content_type = service.get_content_type(export_format)
+        extension = service.get_file_extension(export_format)
+        return _stream_export(content, content_type, base_filename, extension)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
-# =============================================================================
 # INCOME STATEMENT EXPORT
-# =============================================================================
+
 
 @router.get("/income-statement/export", dependencies=[Depends(Require("books:read"))])
 def export_income_statement(
@@ -236,7 +223,7 @@ def export_income_statement(
     basis: str = Query("accrual", description="Accounting basis: accrual or cash"),
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    service: ReportExportService = Depends(get_export_service),
 ):
     """Export income statement report to CSV or PDF.
 
@@ -252,12 +239,9 @@ def export_income_statement(
     Returns:
         Streaming file response
     """
-    from app.services.export_service import ExportService, ExportError
-    from app.services.audit_logger import AuditLogger
     from .reports import get_income_statement
 
-    if format not in ("csv", "pdf"):
-        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'pdf'")
+    export_format = _validate_format(format, service)
 
     # Get report data
     data = get_income_statement(
@@ -273,35 +257,27 @@ def export_income_statement(
         db=db,
     )
 
-    export_service = ExportService()
-
-    # Audit log the export
-    audit = AuditLogger(db)
-    audit.log_export(
-        doctype="income_statement",
-        document_id=0,
-        user_id=user.id,
-        document_name=f"Income Statement {start_date or ''} to {end_date or 'today'}",
-        remarks=f"Exported as {format.upper()}, basis: {basis}",
+    # Log the export
+    service.log_export(
+        report_type="income_statement",
+        format=export_format,
+        description=f"Income Statement {start_date or ''} to {end_date or 'today'}",
     )
     db.commit()
 
+    # Export using service
     try:
         base_filename = filename or "income_statement"
-        content: Any
-        if format == "csv":
-            content = export_service.export_csv(data, "income_statement")
-            return _stream_export(content, "text/csv", base_filename, "csv")
-        else:
-            content = export_service.export_pdf(data, "income_statement")
-            return _stream_export(content, "application/pdf", base_filename, "pdf")
-    except ExportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        content = service.export(data, "income_statement", export_format)
+        content_type = service.get_content_type(export_format)
+        extension = service.get_file_extension(export_format)
+        return _stream_export(content, content_type, base_filename, extension)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
-# =============================================================================
 # GENERAL LEDGER EXPORT
-# =============================================================================
+
 
 @router.get("/general-ledger/export", dependencies=[Depends(Require("books:read"))])
 def export_general_ledger(
@@ -315,7 +291,7 @@ def export_general_ledger(
     limit: int = Query(default=1000, le=10000),
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    service: ReportExportService = Depends(get_export_service),
 ):
     """Export general ledger to CSV or PDF.
 
@@ -333,12 +309,9 @@ def export_general_ledger(
     Returns:
         Streaming file response
     """
-    from app.services.export_service import ExportService, ExportError
-    from app.services.audit_logger import AuditLogger
     from .ledger import get_general_ledger
 
-    if format not in ("csv", "pdf"):
-        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'pdf'")
+    export_format = _validate_format(format, service)
 
     # Get report data
     data = get_general_ledger(
@@ -353,35 +326,28 @@ def export_general_ledger(
         db=db,
     )
 
-    export_service = ExportService()
-
-    # Audit log the export
-    audit = AuditLogger(db)
-    audit.log_export(
-        doctype="general_ledger",
-        document_id=0,
-        user_id=user.id,
-        document_name=f"General Ledger {start_date or ''} to {end_date or ''}",
-        remarks=f"Exported as {format.upper()}, {data.get('total', 0)} records",
+    # Log the export
+    service.log_export(
+        report_type="general_ledger",
+        format=export_format,
+        description=f"General Ledger {start_date or ''} to {end_date or ''}",
+        record_count=data.get("total", 0),
     )
     db.commit()
 
+    # Export using service
     try:
         base_filename = filename or "general_ledger"
-        content: Any
-        if format == "csv":
-            content = export_service.export_csv(data, "general_ledger")
-            return _stream_export(content, "text/csv", base_filename, "csv")
-        else:
-            content = export_service.export_pdf(data, "general_ledger")
-            return _stream_export(content, "application/pdf", base_filename, "pdf")
-    except ExportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        content = service.export(data, "general_ledger", export_format)
+        content_type = service.get_content_type(export_format)
+        extension = service.get_file_extension(export_format)
+        return _stream_export(content, content_type, base_filename, extension)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
-# =============================================================================
 # RECEIVABLES AGING EXPORT
-# =============================================================================
+
 
 @router.get("/receivables-aging/export", dependencies=[Depends(Require("books:read"))])
 def export_receivables_aging(
@@ -389,7 +355,7 @@ def export_receivables_aging(
     as_of_date: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    service: ReportExportService = Depends(get_export_service),
 ):
     """Export receivables aging report to CSV or PDF.
 
@@ -401,45 +367,34 @@ def export_receivables_aging(
     Returns:
         Streaming file response
     """
-    from app.services.export_service import ExportService, ExportError
-    from app.services.audit_logger import AuditLogger
     from .receivables import get_receivables_aging
 
-    if format not in ("csv", "pdf"):
-        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'pdf'")
+    export_format = _validate_format(format, service)
 
     # Get report data
     data = get_receivables_aging(as_of_date=as_of_date, db=db)
 
-    export_service = ExportService()
-
-    # Audit log the export
-    audit = AuditLogger(db)
-    audit.log_export(
-        doctype="receivables_aging",
-        document_id=0,
-        user_id=user.id,
-        document_name=f"Receivables Aging {as_of_date or 'today'}",
-        remarks=f"Exported as {format.upper()}",
+    # Log the export
+    service.log_export(
+        report_type="receivables_aging",
+        format=export_format,
+        description=f"Receivables Aging {as_of_date or 'today'}",
     )
     db.commit()
 
+    # Export using service
     try:
         base_filename = filename or "receivables_aging"
-        content: Any
-        if format == "csv":
-            content = export_service.export_csv(data, "receivables_aging")
-            return _stream_export(content, "text/csv", base_filename, "csv")
-        else:
-            content = export_service.export_pdf(data, "receivables_aging")
-            return _stream_export(content, "application/pdf", base_filename, "pdf")
-    except ExportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        content = service.export(data, "receivables_aging", export_format)
+        content_type = service.get_content_type(export_format)
+        extension = service.get_file_extension(export_format)
+        return _stream_export(content, content_type, base_filename, extension)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
-# =============================================================================
 # PAYABLES AGING EXPORT
-# =============================================================================
+
 
 @router.get("/payables-aging/export", dependencies=[Depends(Require("books:read"))])
 def export_payables_aging(
@@ -447,7 +402,7 @@ def export_payables_aging(
     as_of_date: Optional[str] = None,
     filename: Optional[str] = Query(None, description="Override download filename (without extension)"),
     db: Session = Depends(get_db),
-    user=Depends(Require("accounting:read")),
+    service: ReportExportService = Depends(get_export_service),
 ):
     """Export payables aging report to CSV or PDF.
 
@@ -459,37 +414,27 @@ def export_payables_aging(
     Returns:
         Streaming file response
     """
-    from app.services.export_service import ExportService, ExportError
-    from app.services.audit_logger import AuditLogger
     from .payables import get_payables_aging
 
-    if format not in ("csv", "pdf"):
-        raise HTTPException(status_code=400, detail="Format must be 'csv' or 'pdf'")
+    export_format = _validate_format(format, service)
 
     # Get report data
     data = get_payables_aging(as_of_date=as_of_date, db=db)
 
-    export_service = ExportService()
-
-    # Audit log the export
-    audit = AuditLogger(db)
-    audit.log_export(
-        doctype="payables_aging",
-        document_id=0,
-        user_id=user.id,
-        document_name=f"Payables Aging {as_of_date or 'today'}",
-        remarks=f"Exported as {format.upper()}",
+    # Log the export
+    service.log_export(
+        report_type="payables_aging",
+        format=export_format,
+        description=f"Payables Aging {as_of_date or 'today'}",
     )
     db.commit()
 
+    # Export using service
     try:
         base_filename = filename or "payables_aging"
-        content: Any
-        if format == "csv":
-            content = export_service.export_csv(data, "payables_aging")
-            return _stream_export(content, "text/csv", base_filename, "csv")
-        else:
-            content = export_service.export_pdf(data, "payables_aging")
-            return _stream_export(content, "application/pdf", base_filename, "pdf")
-    except ExportError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        content = service.export(data, "payables_aging", export_format)
+        content_type = service.get_content_type(export_format)
+        extension = service.get_file_extension(export_format)
+        return _stream_export(content, content_type, base_filename, extension)
+    except ServiceValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)

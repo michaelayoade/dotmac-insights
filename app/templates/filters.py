@@ -16,14 +16,21 @@ from typing import Any, Optional, Union
 
 from markupsafe import Markup
 
+from app.config import settings
+from app.currency import get_currency_symbol
+
 
 def register_filters(env: Any) -> None:
     """Register all custom filters with the Jinja2 environment."""
     env.filters["currency"] = currency_filter
+    env.filters["format_currency"] = currency_filter  # Alias
     env.filters["format_number"] = format_number_filter
     env.filters["format_date"] = format_date_filter
+    env.filters["date_format"] = date_format_filter  # Alias with strftime format
+    env.filters["dateformat"] = date_format_filter  # Alias without underscore
     env.filters["format_time"] = format_time_filter
     env.filters["format_datetime"] = format_datetime_filter
+    env.filters["timeago"] = timeago_filter
     env.filters["title_case"] = title_case_filter
     env.filters["truncate_words"] = truncate_words_filter
     env.filters["nl2br"] = nl2br_filter
@@ -36,7 +43,7 @@ def register_filters(env: Any) -> None:
 
 def currency_filter(
     value: Optional[Union[int, float, Decimal, str]],
-    symbol: str = "₦",
+    symbol: Optional[str] = None,
     decimal_places: int = 2,
 ) -> str:
     """
@@ -44,20 +51,22 @@ def currency_filter(
 
     Examples:
         {{ 1234.56 | currency }} -> "₦1,234.56"
-        {{ 1234 | currency("$") }} -> "$1,234.00"
-        {{ amount | currency(symbol="€", decimal_places=0) }} -> "€1,235"
+        {{ 1234 | currency }} -> "₦1,234.00"
+        {{ amount | currency(decimal_places=0) }} -> "₦1,235"
     """
+    base_symbol = get_currency_symbol(settings.base_currency)
+    currency_symbol = base_symbol if symbol is None else base_symbol
     if value is None:
-        return f"{symbol}0.00"
+        return f"{currency_symbol}0.00"
 
     try:
         num = float(value)
     except (ValueError, TypeError):
-        return f"{symbol}0.00"
+        return f"{currency_symbol}0.00"
 
     # Format with thousands separator and decimal places
     formatted = f"{num:,.{decimal_places}f}"
-    return f"{symbol}{formatted}"
+    return f"{currency_symbol}{formatted}"
 
 
 def format_number_filter(
@@ -98,18 +107,19 @@ def format_date_filter(
         return ""
 
     if isinstance(value, str):
+        value_str = value
         try:
             # Try common date formats
             for fmt in ["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"]:
                 try:
-                    value = datetime.strptime(value, fmt)
+                    value = datetime.strptime(value_str, fmt)
                     break
                 except ValueError:
                     continue
             else:
-                return value  # Return original string if parsing fails
+                return value_str  # Return original string if parsing fails
         except Exception:
-            return value
+            return value_str
 
     if isinstance(value, (date, datetime)):
         return value.strftime(format_str)
@@ -132,17 +142,18 @@ def format_time_filter(
         return ""
 
     if isinstance(value, str):
+        value_str = value
         try:
             for fmt in ["%H:%M:%S", "%H:%M", "%Y-%m-%dT%H:%M:%S"]:
                 try:
-                    value = datetime.strptime(value, fmt)
+                    value = datetime.strptime(value_str, fmt)
                     break
                 except ValueError:
                     continue
             else:
-                return value
+                return value_str
         except Exception:
-            return value
+            return value_str
 
     if isinstance(value, datetime):
         return value.strftime(format_str)
@@ -164,15 +175,86 @@ def format_datetime_filter(
         return ""
 
     if isinstance(value, str):
+        value_str = value
         try:
-            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            value = datetime.fromisoformat(value_str.replace("Z", "+00:00"))
         except Exception:
-            return value
+            return value_str
 
     if isinstance(value, datetime):
         return value.strftime(format_str)
 
     return str(value)
+
+
+def date_format_filter(
+    value: Optional[Union[date, datetime, str]],
+    format_str: str = "%B %d, %Y",
+) -> str:
+    """
+    Format a date using strftime format string.
+
+    Examples:
+        {{ order.date | date_format('%b %d') }} -> "Dec 23"
+        {{ order.date | date_format('%Y-%m-%d') }} -> "2025-12-23"
+    """
+    return format_date_filter(value, format_str)
+
+
+def timeago_filter(value: Optional[Union[datetime, date, str]]) -> str:
+    """
+    Convert a datetime to a human-readable "time ago" string.
+
+    Examples:
+        {{ created_at | timeago }} -> "2 hours ago"
+        {{ updated_at | timeago }} -> "3 days ago"
+    """
+    if value is None:
+        return ""
+
+    now = datetime.utcnow()
+
+    if isinstance(value, str):
+        value_str = value
+        try:
+            value = datetime.fromisoformat(value_str.replace("Z", "+00:00"))
+            # Remove timezone info for comparison
+            if value.tzinfo is not None:
+                value = value.replace(tzinfo=None)
+        except Exception:
+            return value_str
+
+    if isinstance(value, date) and not isinstance(value, datetime):
+        value = datetime.combine(value, datetime.min.time())
+
+    if not isinstance(value, datetime):
+        return str(value)
+
+    diff = now - value
+    seconds = diff.total_seconds()
+
+    if seconds < 0:
+        return "just now"
+    elif seconds < 60:
+        return "just now"
+    elif seconds < 3600:
+        minutes = int(seconds / 60)
+        return f"{minutes}m ago"
+    elif seconds < 86400:
+        hours = int(seconds / 3600)
+        return f"{hours}h ago"
+    elif seconds < 604800:
+        days = int(seconds / 86400)
+        return f"{days}d ago"
+    elif seconds < 2592000:
+        weeks = int(seconds / 604800)
+        return f"{weeks}w ago"
+    elif seconds < 31536000:
+        months = int(seconds / 2592000)
+        return f"{months}mo ago"
+    else:
+        years = int(seconds / 31536000)
+        return f"{years}y ago"
 
 
 def title_case_filter(value: Optional[str]) -> str:

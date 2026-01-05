@@ -1,0 +1,96 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Support Queues</h1>
+            <p class="mt-1 text-sm text-gray-500">Saved views powered by queue filters</p>
+        </div>
+        <a href="/settings/support/queues" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+            Manage Queues
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 lg:col-span-1">
+            <h2 class="text-sm font-semibold text-gray-900 mb-3">Queues</h2>
+            <div class="space-y-2">
+                {% for queue in queues %}
+                <a
+                    href="/support/queues?queue_id={{ queue.id }}"
+                    class="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium {{ 'bg-primary-50 text-primary-700' if selected_queue and selected_queue.id == queue.id else 'text-gray-700 hover:bg-surface-50' }}"
+                >
+                    <span class="truncate">{{ queue.name }}</span>
+                    <span class="text-xs text-gray-500">{{ queue_counts.get(queue.id, 0) }}</span>
+                </a>
+                {% else %}
+                <p class="text-sm text-gray-500">No queues configured.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="lg:col-span-3 space-y-4">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                {% if selected_queue %}
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold text-gray-900">{{ selected_queue.name }}</h2>
+                        {% if selected_queue.description %}
+                        <p class="text-sm text-gray-500 mt-1">{{ selected_queue.description }}</p>
+                        {% endif %}
+                    </div>
+                    <span class="text-sm text-gray-500">{{ queue_counts.get(selected_queue.id, 0) }} tickets</span>
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500">Select a queue to view tickets.</p>
+                {% endif %}
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ticket</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned</th>
+                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Created</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for ticket in tickets %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="px-6 py-4 text-sm">
+                                    <a href="/support/tickets/{{ ticket.id }}" class="text-primary-600 hover:text-primary-700 font-medium">#{{ ticket.ticket_number or ticket.id }}</a>
+                                    <p class="text-gray-700 truncate max-w-sm">{{ ticket.subject }}</p>
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ ticket.status.value if ticket.status else ticket.status }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ ticket.priority.value if ticket.priority else ticket.priority }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-600">{{ ticket.assigned_team or '-' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ ticket.created_at | datetime }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="px-6 py-12 text-center text-gray-500">No tickets found.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if pagination.total_pages > 1 %}
+                {% set query_params = [] %}
+                {% if selected_queue %}
+                {% set _ = query_params.append("queue_id=" ~ selected_queue.id) %}
+                {% endif %}
+                {% set base_url = "/support/queues" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+                {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": pagination.total_pages, "has_prev": pagination.has_prev, "has_next": pagination.has_next, "prev_page": pagination.prev_page, "next_page": pagination.next_page, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url=base_url %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

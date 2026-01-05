@@ -1,0 +1,247 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            {% for crumb in breadcrumbs %}
+            {% if not crumb.is_current %}
+            <a href="{{ crumb.href }}" class="hover:text-gray-700 transition-colors">{{ crumb.label }}</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            {% else %}
+            <span class="text-gray-900 font-medium">{{ crumb.label }}</span>
+            {% endif %}
+            {% endfor %}
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ page_title }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">View and manage permissions for this user</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Admin Tabs -->
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">
+        {% for tab in admin_tabs %}
+        <a
+            href="{{ tab.href }}"
+            class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 transition-colors {{ 'border-primary-500 text-primary-600' if current_tab == tab.id else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}"
+        >
+            {{ tab.label }}
+        </a>
+        {% endfor %}
+    </nav>
+</div>
+
+<!-- User Info Card -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <div class="flex items-center gap-4">
+        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center text-white text-2xl font-bold">
+            {{ (target_user.name or target_user.email)[0:1] | upper }}
+        </div>
+        <div>
+            <h2 class="text-xl font-semibold text-gray-900">{{ target_user.name or 'No name' }}</h2>
+            <p class="text-gray-500">{{ target_user.email }}</p>
+            {% if target_user.is_superuser %}
+            <span class="inline-flex items-center mt-2 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">Superuser</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Effective Permissions -->
+    <div class="lg:col-span-2">
+        {% if rbac_enabled and effective_permissions %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Effective Permissions</h2>
+            <p class="text-sm text-gray-500 mb-4">These are the resolved permissions after applying role hierarchy, groups, and direct grants.</p>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-green-50 rounded-xl p-4">
+                    <div class="text-2xl font-bold text-green-700">{{ effective_permissions.allowed_scopes | length }}</div>
+                    <div class="text-sm text-green-600">Allowed</div>
+                </div>
+                <div class="bg-red-50 rounded-xl p-4">
+                    <div class="text-2xl font-bold text-red-700">{{ effective_permissions.denied_scopes | length }}</div>
+                    <div class="text-sm text-red-600">Denied</div>
+                </div>
+            </div>
+
+            {% if effective_permissions.allowed_scopes %}
+            <div class="mb-4">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Allowed Scopes</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for scope in effective_permissions.allowed_scopes | sort %}
+                    <code class="text-xs font-mono text-green-700 bg-green-50 px-2 py-1 rounded">{{ scope }}</code>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if effective_permissions.denied_scopes %}
+            <div class="mb-4">
+                <h3 class="text-sm font-medium text-gray-700 mb-2">Denied Scopes</h3>
+                <div class="flex flex-wrap gap-2">
+                    {% for scope in effective_permissions.denied_scopes | sort %}
+                    <code class="text-xs font-mono text-red-700 bg-red-50 px-2 py-1 rounded line-through">{{ scope }}</code>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Role-Based Permissions</h2>
+            <p class="text-sm text-gray-500 mb-4">Permissions inherited from assigned roles.</p>
+
+            {% if target_user.roles %}
+            <div class="space-y-4">
+                {% for role in target_user.roles %}
+                <div class="border border-gray-100 rounded-xl p-4">
+                    <div class="font-medium text-gray-900 mb-2">{{ role.name }}</div>
+                    <div class="flex flex-wrap gap-1">
+                        {% for perm in role.permissions %}
+                        <code class="text-xs font-mono text-gray-600 bg-gray-50 px-2 py-0.5 rounded">{{ perm.name }}</code>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">No roles assigned.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Direct Permissions -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-semibold text-gray-900">Direct Permissions</h2>
+                <span class="text-sm text-gray-500">{{ direct_permissions | length }} grant(s)</span>
+            </div>
+            <p class="text-sm text-gray-500 mb-4">Direct permission grants that override role-based permissions.</p>
+
+            {% if direct_permissions %}
+            <div class="space-y-2" id="direct-permissions-list">
+                {% for dp in direct_permissions %}
+                <div class="flex items-center justify-between p-3 rounded-xl {{ 'bg-green-50' if dp.grant_type == 'allow' else 'bg-red-50' }} group">
+                    <div class="flex items-center gap-3">
+                        {% if dp.grant_type == 'allow' %}
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {% else %}
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        {% endif %}
+                        <div>
+                            <code class="text-sm font-mono {{ 'text-green-700' if dp.grant_type == 'allow' else 'text-red-700' }}">{{ dp.permission.name }}</code>
+                            {% if dp.reason %}
+                            <div class="text-xs text-gray-500 mt-0.5">{{ dp.reason }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if can_edit %}
+                    <button
+                        type="button"
+                        class="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg transition-all"
+                        hx-delete="/settings/admin/users/{{ target_user.id }}/permissions/{{ dp.permission_id }}"
+                        hx-confirm="Remove this permission grant?"
+                        hx-target="closest .flex"
+                        hx-swap="outerHTML"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-400">
+                <p class="text-sm">No direct permissions granted</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Add Permission Panel -->
+    {% if can_edit %}
+    <div class="lg:col-span-1">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 sticky top-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Add Direct Permission</h2>
+
+            <form method="post" action="/settings/admin/users/{{ target_user.id }}/permissions" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <div>
+                    <label for="permission_id" class="block text-sm font-medium text-gray-700 mb-1">Permission</label>
+                    <select
+                        id="permission_id"
+                        name="permission_id"
+                        required
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                        <option value="">Select permission...</option>
+                        {% for category, perms in permission_groups.items() %}
+                        <optgroup label="{{ category }}">
+                            {% for perm in perms %}
+                            <option value="{{ perm.id }}">{{ perm.name }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Grant Type</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2">
+                            <input type="radio" name="grant_type" value="allow" checked class="w-4 h-4 text-green-600 focus:ring-green-500">
+                            <span class="text-sm text-gray-700">Allow</span>
+                        </label>
+                        <label class="flex items-center gap-2">
+                            <input type="radio" name="grant_type" value="deny" class="w-4 h-4 text-red-600 focus:ring-red-500">
+                            <span class="text-sm text-gray-700">Deny</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="reason" class="block text-sm font-medium text-gray-700 mb-1">Reason (optional)</label>
+                    <input
+                        type="text"
+                        id="reason"
+                        name="reason"
+                        placeholder="e.g., Temporary access for project X"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                </div>
+
+                <button
+                    type="submit"
+                    class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Permission
+                </button>
+            </form>
+
+            <div class="mt-6 pt-6 border-t border-gray-100">
+                <p class="text-xs text-gray-500">
+                    <strong>Note:</strong> Direct "deny" grants always take precedence over "allow" grants and role-based permissions.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

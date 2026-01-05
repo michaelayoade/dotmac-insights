@@ -1,0 +1,154 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+{% set pop_columns = [
+    {'key': 'pop', 'label': 'POP', 'required': True},
+    {'key': 'location', 'label': 'Location'},
+    {'key': 'customers', 'label': 'Customers'},
+    {'key': 'routers', 'label': 'Routers'},
+    {'key': 'status', 'label': 'Status'},
+] %}
+<div class="max-w-7xl mx-auto" x-data="columnPicker('pops-table', {{ pop_columns  | tojson | e }})">
+    {# Page Header #}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
+        <div class="relative">
+            <div class="absolute -left-4 top-1 bottom-1 w-1 bg-gradient-to-b from-primary-500 to-primary-600 rounded-full"></div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-display">Points of Presence</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Network locations and infrastructure sites</p>
+        </div>
+    </div>
+
+    {# Filters and Table #}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-warm animate-fade-up" style="animation-delay: 100ms">
+        <div class="p-4 border-b border-gray-100 bg-gradient-to-r from-surface-50 to-white rounded-t-2xl">
+            <div class="flex flex-col sm:flex-row gap-4">
+                {# Search #}
+                <div class="flex-1">
+                    <div class="relative group">
+                        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ search_query }}"
+                            placeholder="Search POPs by name, code, or city..."
+                            class="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 font-body placeholder:text-gray-400"
+                            hx-get="/network/pops/table"
+                            hx-trigger="input changed delay:300ms, search"
+                            hx-target="#pops-table-container"
+                            hx-include="[name='city'], [name='status']"
+                            hx-push-url="true"
+                            data-testid="pops-search"
+                        />
+                    </div>
+                </div>
+
+                {# Filters #}
+                <div class="flex gap-2 flex-wrap items-center" x-data="{ open: false }">
+                    <span class="text-xs text-gray-400 font-medium uppercase tracking-wider hidden sm:inline">Filters:</span>
+
+                    {# City Filter #}
+                    <div class="relative">
+                        <select
+                            name="city"
+                            class="appearance-none pl-3 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white cursor-pointer hover:border-gray-300 transition-colors"
+                            hx-get="/network/pops/table"
+                            hx-trigger="change"
+                            hx-target="#pops-table-container"
+                            hx-include="[name='q'], [name='status']"
+                            hx-push-url="true"
+                        >
+                            <option value="">All Cities</option>
+                            {% for c in cities %}
+                            <option value="{{ c }}" {% if current_city == c %}selected{% endif %}>{{ c }}</option>
+                            {% endfor %}
+                        </select>
+                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+
+                    {# Status Filter #}
+                    <div class="relative">
+                        <select
+                            name="status"
+                            class="appearance-none pl-3 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white cursor-pointer hover:border-gray-300 transition-colors"
+                            hx-get="/network/pops/table"
+                            hx-trigger="change"
+                            hx-target="#pops-table-container"
+                            hx-include="[name='q'], [name='city']"
+                            hx-push-url="true"
+                        >
+                            <option value="">All Status</option>
+                            <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                            <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                        </select>
+                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+
+                    {% if current_city or current_status or search_query %}
+                    <a href="/network/pops" class="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Clear
+                    </a>
+                    {% endif %}
+
+                    <div class="relative" @click.away="open = false">
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                            @click="open = !open"
+                        >
+                            <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                            Columns
+                        </button>
+                        <div
+                            x-show="open"
+                            x-cloak
+                            x-transition:enter="transition ease-out duration-100"
+                            x-transition:enter-start="opacity-0 scale-95"
+                            x-transition:enter-end="opacity-100 scale-100"
+                            x-transition:leave="transition ease-in duration-75"
+                            x-transition:leave-start="opacity-100 scale-100"
+                            x-transition:leave-end="opacity-0 scale-95"
+                            class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+                        >
+                            <template x-for="col in columns" :key="col.key">
+                                <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                                    <input
+                                        type="checkbox"
+                                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                        :checked="isVisible(col.key)"
+                                        :disabled="col.required"
+                                        @change="toggleColumn(col.key)"
+                                    >
+                                    <span x-text="col.label"></span>
+                                </label>
+                            </template>
+                            <button
+                                type="button"
+                                class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                                @click="resetColumns()"
+                            >
+                                Reset columns
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Table Container #}
+        <div id="pops-table-container">
+            {% include "modules/network/templates/partials/pops_table.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

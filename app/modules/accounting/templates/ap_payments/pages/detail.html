@@ -1,0 +1,310 @@
+{% extends "layouts/app.html" %}
+
+{% set status_colors = {
+    'DRAFT': 'text-gray-700 bg-gray-50 ring-gray-600/20',
+    'SUBMITTED': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    'APPROVED': 'text-blue-700 bg-blue-50 ring-blue-600/20',
+    'POSTED': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'CANCELLED': 'text-red-700 bg-red-50 ring-red-600/20'
+} %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/accounting/ap-payments" class="hover:text-primary-600">Supplier Payments</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span class="text-gray-900">{{ payment.payment_number }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ payment.payment_number }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">
+            {{ '{:,.2f}'.format(payment.paid_amount) }} {{ payment.currency }} to {{ payment.supplier.name if payment.supplier else payment.supplier_name or 'supplier' }}
+        </p>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if payment.status.value == 'draft' %}
+        <form method="POST" action="/accounting/ap-payments/{{ payment.id }}/submit" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-amber-700 transition-colors"
+            >
+                Submit for Approval
+            </button>
+        </form>
+        <a
+            href="/accounting/ap-payments/{{ payment.id }}/edit"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-surface-50 transition-colors"
+        >
+            Edit
+        </a>
+        {% endif %}
+        {% if payment.status.value == 'submitted' %}
+        <form method="POST" action="/accounting/ap-payments/{{ payment.id }}/approve" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-emerald-700 transition-colors"
+            >
+                Approve
+            </button>
+        </form>
+        <form method="POST" action="/accounting/ap-payments/{{ payment.id }}/reject" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-red-700 shadow-warm-sm ring-1 ring-inset ring-red-200 hover:bg-red-50 transition-colors"
+            >
+                Reject
+            </button>
+        </form>
+        {% endif %}
+        {% if payment.status.value == 'approved' %}
+        <form method="POST" action="/accounting/ap-payments/{{ payment.id }}/post" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-primary-700 transition-colors"
+            >
+                Post to GL
+            </button>
+        </form>
+        {% endif %}
+        {% if payment.unallocated_amount and payment.unallocated_amount > 0 and payment.status.value != 'cancelled' %}
+        <a
+            href="/accounting/ap-payments/{{ payment.id }}/allocate"
+            class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-blue-700 transition-colors"
+        >
+            Allocate
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Payment Details -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Payment Details</h2>
+            </div>
+            <div class="p-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Number</dt>
+                        <dd class="mt-1 text-sm font-mono text-gray-900">{{ payment.payment_number }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Date</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ payment.payment_date.strftime('%B %d, %Y') if payment.payment_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Posting Date</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ payment.posting_date.strftime('%B %d, %Y') if payment.posting_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Mode of Payment</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ payment.mode_of_payment or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Amount Paid</dt>
+                        <dd class="mt-1 text-sm font-mono font-semibold text-gray-900">{{ '{:,.2f}'.format(payment.paid_amount) }} {{ payment.currency }}</dd>
+                    </div>
+                    {% if payment.reference_number %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Reference Number</dt>
+                        <dd class="mt-1 text-sm font-mono text-gray-900">{{ payment.reference_number }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+
+                {% if payment.remarks %}
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Remarks</dt>
+                    <dd class="text-sm text-gray-600">{{ payment.remarks }}</dd>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Deductions -->
+        {% if payment.total_discount or payment.total_write_off or payment.total_withholding_tax %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Deductions</h2>
+            </div>
+            <div class="p-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+                    {% if payment.total_discount %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Discount</dt>
+                        <dd class="mt-1 text-sm font-mono text-emerald-600">{{ '{:,.2f}'.format(payment.total_discount) }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if payment.total_write_off %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Write-off</dt>
+                        <dd class="mt-1 text-sm font-mono text-gray-600">{{ '{:,.2f}'.format(payment.total_write_off) }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if payment.total_withholding_tax %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Withholding Tax</dt>
+                        <dd class="mt-1 text-sm font-mono text-amber-600">{{ '{:,.2f}'.format(payment.total_withholding_tax) }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Allocations -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Bill Allocations</h2>
+                {% if payment.unallocated_amount and payment.unallocated_amount > 0 and payment.status.value != 'cancelled' %}
+                <a
+                    href="/accounting/ap-payments/{{ payment.id }}/allocate"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Allocate
+                </a>
+                {% endif %}
+            </div>
+            <div class="p-6">
+                {% if payment.allocations %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                        <thead>
+                            <tr class="bg-surface-50">
+                                <th class="py-2 px-3 text-left text-xs font-medium text-gray-500 uppercase">Bill</th>
+                                <th class="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Allocated</th>
+                                <th class="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Discount</th>
+                                <th class="py-2 px-3 text-right text-xs font-medium text-gray-500 uppercase">Write-off</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            {% for alloc in payment.allocations %}
+                            <tr>
+                                <td class="py-2 px-3 text-gray-900 font-mono">
+                                    {{ alloc.allocation_type.value if alloc.allocation_type else 'bill' }}-{{ alloc.document_id }}
+                                </td>
+                                <td class="py-2 px-3 text-right font-mono text-gray-900">{{ '{:,.2f}'.format(alloc.allocated_amount) }}</td>
+                                <td class="py-2 px-3 text-right font-mono text-gray-600">{{ '{:,.2f}'.format(alloc.discount_amount) if alloc.discount_amount else '-' }}</td>
+                                <td class="py-2 px-3 text-right font-mono text-gray-600">{{ '{:,.2f}'.format(alloc.write_off_amount) if alloc.write_off_amount else '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="bg-gray-50 font-semibold">
+                                <td class="py-2 px-3 text-gray-900">Total Allocated</td>
+                                <td class="py-2 px-3 text-right font-mono text-gray-900">{{ '{:,.2f}'.format(payment.total_allocated) }}</td>
+                                <td class="py-2 px-3"></td>
+                                <td class="py-2 px-3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-8">
+                    <div class="mx-auto w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4">No allocations yet</p>
+                    {% if payment.unallocated_amount and payment.unallocated_amount > 0 and payment.status.value != 'cancelled' %}
+                    <a
+                        href="/accounting/ap-payments/{{ payment.id }}/allocate"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                    >
+                        Allocate to Bills
+                    </a>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Status Card -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Status</h2>
+            </div>
+            <div class="p-6">
+                <div class="text-center mb-4">
+                    <span class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset {{ status_colors.get(payment.status.value.upper() if payment.status else 'DRAFT', status_colors['DRAFT']) }}">
+                        {{ payment.status.value.title() if payment.status else 'Draft' }}
+                    </span>
+                </div>
+
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Amount Paid</dt>
+                        <dd class="font-mono font-medium text-gray-900">{{ '{:,.2f}'.format(payment.paid_amount) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Allocated</dt>
+                        <dd class="font-mono text-gray-900">{{ '{:,.2f}'.format(payment.total_allocated or 0) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Unallocated</dt>
+                        <dd class="font-mono font-medium {{ 'text-blue-600' if payment.unallocated_amount and payment.unallocated_amount > 0 else 'text-gray-900' }}">
+                            {{ '{:,.2f}'.format(payment.unallocated_amount or 0) }}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Supplier Info -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Supplier</h2>
+            </div>
+            <div class="p-6">
+                {% if payment.supplier %}
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-medium">
+                        {{ payment.supplier.name[:2].upper() }}
+                    </span>
+                    <div>
+                        <p class="font-medium text-gray-900">{{ payment.supplier.name }}</p>
+                        {% if payment.supplier.email %}
+                        <p class="text-xs text-gray-500">{{ payment.supplier.email }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% elif payment.supplier_name %}
+                <p class="font-medium text-gray-900">{{ payment.supplier_name }}</p>
+                {% else %}
+                <p class="text-sm text-gray-500">No supplier linked</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Bank Account -->
+        {% if payment.bank_account_id %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Bank Account</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-gray-900">Account ID: {{ payment.bank_account_id }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

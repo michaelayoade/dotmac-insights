@@ -1,0 +1,138 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/hr/leave/types" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-display font-bold text-gray-900">{{ leave_type.leave_type_name }}</h1>
+                <p class="mt-1 text-sm text-gray-500">Leave type configuration</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="/hr/leave/types/{{ leave_type.id }}/edit" class="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                Edit
+            </a>
+            <button
+                hx-delete="/hr/leave/types/{{ leave_type.id }}"
+                hx-confirm="Are you sure you want to disable this leave type?"
+                class="inline-flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-medium">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                Disable
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Info -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Basic Information</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Leave Type Name</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ leave_type.leave_type_name }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Max Leaves Allowed</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ leave_type.max_leaves_allowed or 0 }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Max Continuous Days</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ leave_type.max_continuous_days_allowed or 'No limit' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Rounding</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ leave_type.rounding or '0.5' }}</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Status</dt>
+                <dd class="mt-1">
+                    {% if leave_type.disabled %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Disabled</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Active</span>
+                    {% endif %}
+                </dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Options -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Leave Options</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="flex items-center gap-3 p-3 rounded-lg {% if leave_type.is_carry_forward %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                {% if leave_type.is_carry_forward %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium {% if leave_type.is_carry_forward %}text-green-700{% else %}text-gray-500{% endif %}">Carry Forward</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg {% if leave_type.is_lwp %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                {% if leave_type.is_lwp %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium {% if leave_type.is_lwp %}text-green-700{% else %}text-gray-500{% endif %}">Leave Without Pay</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg {% if leave_type.is_optional_leave %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                {% if leave_type.is_optional_leave %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium {% if leave_type.is_optional_leave %}text-green-700{% else %}text-gray-500{% endif %}">Optional Leave</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg {% if leave_type.is_compensatory %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                {% if leave_type.is_compensatory %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium {% if leave_type.is_compensatory %}text-green-700{% else %}text-gray-500{% endif %}">Compensatory Leave</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg {% if leave_type.allow_encashment %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                {% if leave_type.allow_encashment %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium {% if leave_type.allow_encashment %}text-green-700{% else %}text-gray-500{% endif %}">Allow Encashment</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg {% if leave_type.include_holiday %}bg-green-50{% else %}bg-gray-50{% endif %}">
+                {% if leave_type.include_holiday %}
+                <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium {% if leave_type.include_holiday %}text-green-700{% else %}text-gray-500{% endif %}">Include Holidays</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Earned Leave Settings -->
+    {% if leave_type.is_earned_leave %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Earned Leave Settings</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Is Earned Leave</dt>
+                <dd class="mt-1">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Yes</span>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Earned Leave Frequency</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ leave_type.earned_leave_frequency or 'Not set' }}</dd>
+            </div>
+        </dl>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -216,7 +216,7 @@ async def get_kanban_view(
             opp_list.append({
                 "id": opp.id,
                 "name": opp.name,
-                "customer_name": opp.customer.name if opp.customer else None,
+                "party_name": opp.party.name if opp.party else None,
                 "deal_value": float(opp.deal_value),
                 "probability": opp.probability,
                 "expected_close_date": opp.expected_close_date.isoformat() if opp.expected_close_date else None,

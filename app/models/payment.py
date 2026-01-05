@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index, text, Numeric
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Index, text, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base, SoftDeleteMixin
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
-    from app.models.contact import Contact
+    from app.models.party import CustomerAccount
     from app.models.invoice import Invoice
     from app.models.payment_allocation import PaymentAllocation
 
@@ -40,7 +40,7 @@ class PaymentSource(enum.Enum):
     INTERNAL = "internal"
 
 
-class Payment(SoftDeleteMixin, Base):
+class Payment(SoftValidationMixin, SoftDeleteMixin, Base):
     """Payment records from all sources (AR - customer payments)."""
 
     __tablename__ = "payments"
@@ -54,10 +54,13 @@ class Payment(SoftDeleteMixin, Base):
     # Source system
     source: Mapped[PaymentSource] = mapped_column(Enum(PaymentSource), nullable=False, index=True)
 
-    # Links (legacy customer_id - use contact_id)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True)
-    contact_id: Mapped[Optional[int]] = mapped_column(ForeignKey("contacts.id", ondelete="SET NULL"), nullable=True, index=True)
     invoice_id: Mapped[Optional[int]] = mapped_column(ForeignKey("invoices.id", ondelete="SET NULL"), nullable=True, index=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Payment details
     receipt_number: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
@@ -110,9 +113,8 @@ class Payment(SoftDeleteMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="payments")
-    contact: Mapped[Optional["Contact"]] = relationship(foreign_keys=[contact_id])
     invoice: Mapped[Optional[Invoice]] = relationship(back_populates="payments")
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
     allocations: Mapped[List["PaymentAllocation"]] = relationship(
         back_populates="payment",
         foreign_keys="PaymentAllocation.payment_id",
@@ -120,6 +122,20 @@ class Payment(SoftDeleteMixin, Base):
     )
 
     __table_args__ = (
+        Index(
+            "ix_payments_status_date_currency",
+            "status",
+            "payment_date",
+            "currency",
+        ),
+        Index(
+            "ix_payments_status_date",
+            "status",
+            "payment_date",
+        ),
+        Index("ix_payments_bank_account_id", "bank_account_id"),
+        Index("ix_payments_fiscal_period_id", "fiscal_period_id"),
+        Index("ix_payments_journal_entry_id", "journal_entry_id"),
         Index(
             "uq_payments_splynx_id_not_null",
             "splynx_id",
@@ -132,6 +148,10 @@ class Payment(SoftDeleteMixin, Base):
             unique=True,
             postgresql_where=text("erpnext_id IS NOT NULL"),
         ),
+        # Audit column indexes
+        Index("ix_payments_created_by_id", "created_by_id"),
+        Index("ix_payments_updated_by_id", "updated_by_id"),
+        Index("ix_payments_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:

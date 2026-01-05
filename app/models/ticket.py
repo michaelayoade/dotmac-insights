@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, JSON
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Numeric, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from app.utils.datetime_utils import utc_now, ensure_utc
@@ -10,20 +10,23 @@ import enum
 from app.database import Base, SoftDeleteMixin
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
     from app.models.employee import Employee
     from app.models.project import Project
     from app.models.expense import Expense
     from app.models.unified_ticket import UnifiedTicket
     from app.models.agent import Team
+    from app.models.party import Party, CustomerAccount
 
 
 class TicketStatus(enum.Enum):
     OPEN = "open"
+    IN_PROGRESS = "in_progress"
+    WAITING = "waiting"
     REPLIED = "replied"
     RESOLVED = "resolved"
     CLOSED = "closed"
     ON_HOLD = "on_hold"
+    REOPENED = "reopened"
 
 
 class TicketPriority(enum.Enum):
@@ -54,7 +57,18 @@ class Ticket(SoftDeleteMixin, Base):
     source: Mapped[TicketSource] = mapped_column(Enum(TicketSource), default=TicketSource.ERPNEXT, index=True)
 
     # FK Relationships
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
 
@@ -127,13 +141,14 @@ class Ticket(SoftDeleteMixin, Base):
     write_back_status: Mapped[str] = mapped_column(String(50), default="synced")
     write_back_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     write_back_attempted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
-    updated_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
+    created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     # is_deleted, deleted_at, deleted_by_id inherited from SoftDeleteMixin
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="tickets")
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     employee: Mapped[Optional[Employee]] = relationship(
         back_populates="tickets", foreign_keys=[employee_id]
     )
@@ -191,6 +206,15 @@ class Ticket(SoftDeleteMixin, Base):
     )
     parent_ticket: Mapped[Optional["Ticket"]] = relationship(
         "Ticket", remote_side=[id], foreign_keys=[parent_ticket_id]
+    )
+
+    __table_args__ = (
+        Index("ix_tickets_merged_into_id", "merged_into_id"),
+        Index("ix_tickets_parent_ticket_id", "parent_ticket_id"),
+        # Audit column indexes
+        Index("ix_tickets_created_by_id", "created_by_id"),
+        Index("ix_tickets_updated_by_id", "updated_by_id"),
+        Index("ix_tickets_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:

@@ -1,0 +1,45 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Unsubscribe</h1>
+        <p class="mt-1 text-sm text-gray-500">Update marketing consent preferences</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-xl">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        {% if status == "success" %}
+            <div class="rounded-xl bg-emerald-50 text-emerald-700 px-4 py-3 text-sm">
+                Unsubscribe request processed.
+            </div>
+        {% elif status == "error" %}
+            <div class="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm">
+                {{ error_message | default("Unable to process unsubscribe request.") }}
+            </div>
+        {% else %}
+            <p class="text-sm text-gray-600">Paste your unsubscribe token to confirm.</p>
+        {% endif %}
+
+        <form method="post" class="mt-6 space-y-4">
+            <div>
+                <label for="token" class="block text-sm font-medium text-gray-700">Token</label>
+                <input
+                    id="token"
+                    name="token"
+                    type="text"
+                    value="{{ token | default('') }}"
+                    class="mt-2 w-full rounded-xl border border-gray-200 px-4 py-2 text-sm focus:ring-2 focus:ring-primary-200"
+                    placeholder="token"
+                />
+            </div>
+            <button class="inline-flex items-center px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                Confirm Unsubscribe
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}

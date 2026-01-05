@@ -3,7 +3,7 @@ import structlog
 
 from app.models.ticket_message import TicketMessage
 from app.models.ticket import Ticket
-from app.models.customer import Customer
+from app.models.party import Party, PartyExternalId
 from app.models.administrator import Administrator
 from app.config import settings
 
@@ -45,11 +45,15 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
                 except (ValueError, TypeError):
                     pass
 
-        customer_map = {}
-        customers = sync_client.db.query(Customer.id, Customer.splynx_id).all()
-        for c in customers:
-            if c.splynx_id:
-                customer_map[c.splynx_id] = c.id
+        customer_map = {
+            mapping.external_id: mapping.party_id
+            for mapping in sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "splynx",
+                PartyExternalId.external_key_type == "customer_id",
+            )
+            .all()
+        }
 
         admin_map = {}
         admin_name_map = {}  # splynx_id -> name for author_name population
@@ -59,14 +63,25 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
                 admin_map[a.splynx_id] = a.id
                 admin_name_map[a.splynx_id] = a.name
 
-        # Also build customer name map
+        # Also build party name map for customer authors
         customer_name_map = {}
-        customers_with_names = sync_client.db.query(Customer.splynx_id, Customer.name).filter(
-            Customer.splynx_id.isnot(None)
-        ).all()
-        for c in customers_with_names:
-            if c.splynx_id:
-                customer_name_map[c.splynx_id] = c.name
+        party_rows = (
+            sync_client.db.query(PartyExternalId.external_id, Party)
+            .join(Party, Party.id == PartyExternalId.party_id)
+            .filter(
+                PartyExternalId.system == "splynx",
+                PartyExternalId.external_key_type == "customer_id",
+            )
+            .all()
+        )
+        for ext_id, party in party_rows:
+            name = party.name
+            if not name:
+                name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+            if not name:
+                name = party.legal_name or party.trading_name
+            if ext_id and name:
+                customer_name_map[ext_id] = name
 
         for i, msg_data in enumerate(messages, 1):
             splynx_id = msg_data.get("id")
@@ -79,7 +94,7 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
             ticket_id = ticket_map.get(splynx_ticket_id) if splynx_ticket_id else None
 
             splynx_customer_id = msg_data.get("customer_id")
-            customer_id = customer_map.get(splynx_customer_id) if splynx_customer_id else None
+            party_id = customer_map.get(str(splynx_customer_id)) if splynx_customer_id else None
 
             splynx_admin_id = msg_data.get("admin_id")
             admin_id = admin_map.get(splynx_admin_id) if splynx_admin_id else None
@@ -96,8 +111,8 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
             author_name = None
             if splynx_admin_id and splynx_admin_id in admin_name_map:
                 author_name = admin_name_map[splynx_admin_id]
-            elif splynx_customer_id and splynx_customer_id in customer_name_map:
-                author_name = customer_name_map[splynx_customer_id]
+            elif splynx_customer_id and str(splynx_customer_id) in customer_name_map:
+                author_name = customer_name_map[str(splynx_customer_id)]
 
             # Parse attachments
             attachments = msg_data.get("attachments", [])
@@ -107,7 +122,7 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
             if existing:
                 existing.ticket_id = ticket_id
                 existing.splynx_ticket_id = splynx_ticket_id
-                existing.customer_id = customer_id
+                existing.party_id = party_id
                 existing.splynx_customer_id = splynx_customer_id
                 existing.admin_id = admin_id
                 existing.splynx_admin_id = splynx_admin_id
@@ -134,7 +149,7 @@ async def sync_ticket_messages(sync_client, client, full_sync: bool):
                     splynx_id=splynx_id,
                     ticket_id=ticket_id,
                     splynx_ticket_id=splynx_ticket_id,
-                    customer_id=customer_id,
+                    party_id=party_id,
                     splynx_customer_id=splynx_customer_id,
                     admin_id=admin_id,
                     splynx_admin_id=splynx_admin_id,

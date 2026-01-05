@@ -1,0 +1,122 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/hr/recruitment" class="hover:text-primary-600">Recruitment</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <a href="/hr/recruitment/offers" class="hover:text-primary-600">Job Offers</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ offer.applicant_name or ('Offer #' ~ offer.id) }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ offer.applicant_name or ('Offer #' ~ offer.id) }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ offer.job_title or offer.designation or 'Job Offer' }} · {{ offer_date_display or offer.offer_date }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="/hr/recruitment/offers/{{ offer.id }}/edit" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Edit
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Offer Details</h3>
+                {% set status_colors = {
+                    'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'Awaiting Response': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                    'Accepted': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'Rejected': 'bg-red-50 text-red-700 ring-red-600/20',
+                    'Expired': 'bg-orange-50 text-orange-700 ring-orange-600/20',
+                    'Voided': 'bg-gray-100 text-gray-700 ring-gray-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(offer.status_label, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ offer.status_label or 'Draft' }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Applicant</dt>
+                        <dd class="mt-1.5 text-gray-900">
+                            {% if applicant %}
+                            <a href="/hr/recruitment/applicants/{{ applicant.id }}" class="hover:text-primary-600">{{ offer.applicant_name }}</a>
+                            {% else %}
+                            {{ offer.applicant_name or '-' }}
+                            {% endif %}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Job Title</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ offer.job_title or offer.designation or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Offer Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ offer_date_display or offer.offer_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Expiry Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ expiry_date_display or offer.expiry_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Base Salary</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ offer.offer_salary|default(0)|round(2) if offer.offer_salary else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Salary Structure</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ offer.salary_structure or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Applicant Email</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ offer.applicant_email or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Company</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ offer.company or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if offer.terms %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Offer Terms</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                {% for term in offer.terms %}
+                <div class="border border-gray-100 rounded-xl p-4">
+                    <p class="text-sm font-medium text-gray-700">{{ term.offer_term or 'Term' }}</p>
+                    <p class="mt-1 text-sm text-gray-600">{{ term.value or '-' }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Offer Info</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Created</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ offer.created_at.strftime('%b %d, %Y') if offer.created_at else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Updated</dt>
+                    <dd class="mt-1 text-sm text-gray-900">{{ offer.updated_at.strftime('%b %d, %Y') if offer.updated_at else '-' }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

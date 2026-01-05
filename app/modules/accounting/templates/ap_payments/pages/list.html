@@ -1,0 +1,129 @@
+{% extends "layouts/app.html" %}
+
+{% set status_colors = {
+    'DRAFT': 'text-gray-700 bg-gray-50 ring-gray-600/20',
+    'SUBMITTED': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    'APPROVED': 'text-blue-700 bg-blue-50 ring-blue-600/20',
+    'POSTED': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'CANCELLED': 'text-red-700 bg-red-50 ring-red-600/20'
+} %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Supplier Payments</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage payments to suppliers and vendors</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/accounting/ap-payments/new"
+            class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-primary-700 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Payment
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+    <a href="/accounting/ap-payments?status=posted" class="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 hover:from-blue-100 hover:to-blue-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-blue-700 uppercase tracking-wider">This Month</p>
+        <p class="mt-1 text-2xl font-bold text-blue-800">{{ '{:,.2f}'.format(stats.this_month) }}</p>
+        <p class="text-xs text-blue-600 mt-1 group-hover:underline">View posted →</p>
+    </a>
+    <a href="/accounting/ap-payments?status=submitted" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Pending Approval</p>
+        <p class="mt-1 text-2xl font-bold text-amber-600">{{ '{:,.2f}'.format(stats.pending_amount) }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View pending →</p>
+    </a>
+    <a href="/accounting/ap-payments?status=draft" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-gray-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Drafts</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.draft_count }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-gray-600">View drafts →</p>
+    </a>
+    <a href="/accounting/ap-payments" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Count</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_count }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <div class="relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ current_search or '' }}"
+                    placeholder="Search by payment #, supplier..."
+                    class="block w-full rounded-xl border-0 py-2.5 pl-10 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    hx-get="/accounting/ap-payments/table"
+                    hx-target="#payments-table"
+                    hx-include="[name='status'], [name='date_from'], [name='date_to']"
+                    hx-push-url="true"
+                    hx-trigger="input changed delay:300ms, search"
+                >
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="sm:w-40">
+            <select
+                name="status"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/ap-payments/table"
+                hx-target="#payments-table"
+                hx-include="[name='q'], [name='date_from'], [name='date_to']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+                <option value="">All Status</option>
+                {% for opt in status_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="sm:w-40">
+            <input
+                type="date"
+                name="date_from"
+                value="{{ current_date_from or '' }}"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/ap-payments/table"
+                hx-target="#payments-table"
+                hx-include="[name='q'], [name='status'], [name='date_to']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+        </div>
+        <div class="sm:w-40">
+            <input
+                type="date"
+                name="date_to"
+                value="{{ current_date_to or '' }}"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/ap-payments/table"
+                hx-target="#payments-table"
+                hx-include="[name='q'], [name='status'], [name='date_from']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+        </div>
+    </form>
+</div>
+
+<!-- Payments Table -->
+<div id="payments-table">
+    {% include "modules/accounting/templates/ap_payments/partials/payments_table.html" %}
+</div>
+{% endblock %}

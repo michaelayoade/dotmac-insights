@@ -1,0 +1,105 @@
+{# Ticket SLA section partial for HTMX #}
+<div id="ticket-sla" class="bg-white border border-gray-200 rounded-lg p-4">
+    <div class="flex items-center justify-between mb-3">
+        <h4 class="text-sm font-medium text-gray-900">SLA Status</h4>
+        <button type="button"
+                hx-get="/support/tickets/{{ ticket.id }}/sla-modal"
+                hx-target="#modal-content"
+                hx-trigger="click"
+                @click="$dispatch('open-modal')"
+                class="text-xs text-primary-600 hover:text-primary-800">
+            Override
+        </button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+        {# Response SLA #}
+        <div>
+            <p class="text-xs text-gray-500 mb-1">First Response</p>
+            {% if ticket.response_by %}
+                {% set now = ticket.response_by.__class__.utcnow() if ticket.response_by.__class__ else None %}
+                {% set is_breached = now and ticket.response_by < now and not ticket.first_responded_at %}
+                {% set is_met = ticket.first_responded_at and ticket.first_responded_at <= ticket.response_by %}
+
+                {% if is_met %}
+                <div class="flex items-center text-green-600">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span class="text-sm font-medium">Met</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Responded {{ ticket.first_responded_at.strftime('%b %d, %H:%M') }}
+                </p>
+                {% elif is_breached %}
+                <div class="flex items-center text-red-600">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span class="text-sm font-medium">Breached</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Due {{ ticket.response_by.strftime('%b %d, %H:%M') }}
+                </p>
+                {% else %}
+                <div class="flex items-center text-yellow-600">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-sm font-medium">Pending</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Due {{ ticket.response_by.strftime('%b %d, %H:%M') }}
+                </p>
+                {% endif %}
+            {% else %}
+            <span class="text-sm text-gray-400">Not set</span>
+            {% endif %}
+        </div>
+
+        {# Resolution SLA #}
+        <div>
+            <p class="text-xs text-gray-500 mb-1">Resolution</p>
+            {% if ticket.resolution_by %}
+                {% set now = ticket.resolution_by.__class__.utcnow() if ticket.resolution_by.__class__ else None %}
+                {% set is_resolved = ticket.status and ticket.status.value in ['resolved', 'closed'] %}
+                {% set is_breached = now and ticket.resolution_by < now and not is_resolved %}
+                {% set is_met = is_resolved and ticket.resolved_at and ticket.resolved_at <= ticket.resolution_by %}
+
+                {% if is_met %}
+                <div class="flex items-center text-green-600">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span class="text-sm font-medium">Met</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Resolved {{ ticket.resolved_at.strftime('%b %d, %H:%M') if ticket.resolved_at else '' }}
+                </p>
+                {% elif is_breached %}
+                <div class="flex items-center text-red-600">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span class="text-sm font-medium">Breached</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Due {{ ticket.resolution_by.strftime('%b %d, %H:%M') }}
+                </p>
+                {% else %}
+                <div class="flex items-center text-yellow-600">
+                    <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="text-sm font-medium">Pending</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                    Due {{ ticket.resolution_by.strftime('%b %d, %H:%M') }}
+                </p>
+                {% endif %}
+            {% else %}
+            <span class="text-sm text-gray-400">Not set</span>
+            {% endif %}
+        </div>
+    </div>
+</div>

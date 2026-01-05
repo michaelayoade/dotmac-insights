@@ -1,0 +1,253 @@
+{% extends "layouts/app.html" %}
+
+{% set docstatus_colors = {
+    0: 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    1: 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    2: 'text-red-700 bg-red-50 ring-red-600/20'
+} %}
+{% set docstatus_labels = {
+    0: 'Draft',
+    1: 'Posted',
+    2: 'Cancelled'
+} %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a
+                    href="/accounting/journal-entries"
+                    class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                        {{ entry.voucher_no or 'JE-' ~ entry.id }}
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-500 font-body">
+                        {{ entry.voucher_type.value.replace('_', ' ').title() if entry.voucher_type else 'Journal Entry' }}
+                        &middot; {{ entry.posting_date.strftime('%B %d, %Y') if entry.posting_date else 'No date' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset {{ docstatus_colors.get(entry.docstatus, docstatus_colors[0]) }}">
+                {{ docstatus_labels.get(entry.docstatus, 'Draft') }}
+            </span>
+            {% if entry.docstatus == 0 %}
+            <a
+                href="/accounting/journal-entries/{{ entry.id }}/edit"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            <form action="/accounting/journal-entries/{{ entry.id }}/post" method="POST" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-600 transition-all duration-200"
+                    onclick="return confirm('Post this journal entry? This action cannot be undone.')"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Post Entry
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Line Items -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Line Items</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead>
+                            <tr class="bg-surface-50">
+                                <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">#</th>
+                                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Account</th>
+                                <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Debit</th>
+                                <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Credit</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for item in entry.items %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="py-3.5 pl-6 pr-3 text-sm text-gray-500">{{ item.idx or loop.index }}</td>
+                                <td class="px-3 py-3.5">
+                                    <div>
+                                        {% if item.account_rel %}
+                                        <a href="/accounting/accounts/{{ item.account_rel.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                            {{ item.account_rel.account_name }}
+                                        </a>
+                                        <p class="text-xs text-gray-500">{{ item.account_rel.account_number or '' }}</p>
+                                        {% else %}
+                                        <span class="text-gray-900">{{ item.account or 'Unknown Account' }}</span>
+                                        {% endif %}
+                                        {% if item.description %}
+                                        <p class="text-xs text-gray-500 mt-1">{{ item.description }}</p>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3.5 text-sm text-right font-mono {{ 'text-blue-600 font-medium' if item.debit and item.debit > 0 else 'text-gray-400' }}">
+                                    {{ '{:,.2f}'.format(item.debit) if item.debit and item.debit > 0 else '-' }}
+                                </td>
+                                <td class="px-3 py-3.5 pr-6 text-sm text-right font-mono {{ 'text-red-600 font-medium' if item.credit and item.credit > 0 else 'text-gray-400' }}">
+                                    {{ '{:,.2f}'.format(item.credit) if item.credit and item.credit > 0 else '-' }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">
+                                    No line items found
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="bg-surface-50">
+                            <tr>
+                                <td colspan="2" class="py-3.5 pl-6 pr-3 text-sm font-semibold text-gray-900">Total</td>
+                                <td class="px-3 py-3.5 text-sm text-right font-mono font-semibold text-blue-600">
+                                    {{ '{:,.2f}'.format(entry.total_debit or 0) }}
+                                </td>
+                                <td class="px-3 py-3.5 pr-6 text-sm text-right font-mono font-semibold text-red-600">
+                                    {{ '{:,.2f}'.format(entry.total_credit or 0) }}
+                                </td>
+                            </tr>
+                            {% set diff = (entry.total_debit or 0) - (entry.total_credit or 0) %}
+                            {% if diff != 0 %}
+                            <tr>
+                                <td colspan="2" class="py-2 pl-6 pr-3 text-xs font-medium text-red-600">Difference (Out of Balance)</td>
+                                <td colspan="2" class="px-3 py-2 pr-6 text-right text-xs font-mono font-medium text-red-600">
+                                    {{ '{:,.2f}'.format(diff|abs) }}
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Remarks -->
+            {% if entry.user_remark %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-2">Remarks</h3>
+                <p class="text-sm text-gray-600">{{ entry.user_remark }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Entry Details -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Entry Details</h3>
+                <dl class="space-y-4">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Voucher Number</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{ entry.voucher_no or 'JE-' ~ entry.id }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Posting Date</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ entry.posting_date.strftime('%B %d, %Y') if entry.posting_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Voucher Type</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ entry.voucher_type.value.replace('_', ' ').title() if entry.voucher_type else 'Journal Entry' }}</dd>
+                    </div>
+                    {% if entry.cheque_no %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Cheque Number</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{ entry.cheque_no }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if entry.cheque_date %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Cheque Date</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ entry.cheque_date.strftime('%B %d, %Y') }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Totals Card -->
+            <div class="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-6">
+                <h3 class="text-sm font-semibold text-primary-900 mb-4">Entry Total</h3>
+                <p class="text-3xl font-bold text-primary-700 font-mono">
+                    {{ '{:,.2f}'.format(entry.total_debit or 0) }}
+                </p>
+                <p class="text-sm text-primary-600 mt-1">Total debit/credit amount</p>
+            </div>
+
+            <!-- Metadata -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Metadata</h3>
+                <dl class="space-y-4 text-sm">
+                    {% if entry.created_at %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Created</dt>
+                        <dd class="mt-1 text-gray-900">{{ entry.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if entry.updated_at %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Last Updated</dt>
+                        <dd class="mt-1 text-gray-900">{{ entry.updated_at.strftime('%b %d, %Y %H:%M') }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if entry.owner %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</dt>
+                        <dd class="mt-1 text-gray-900">{{ entry.owner }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div class="space-y-2">
+                    <a
+                        href="/accounting/journal-entries/new"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-primary-50 text-primary-600 flex items-center justify-center group-hover:bg-primary-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">New Journal Entry</span>
+                    </a>
+                    <a
+                        href="/accounting/general-ledger?voucher_no={{ entry.voucher_no or 'JE-' ~ entry.id }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">View in General Ledger</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

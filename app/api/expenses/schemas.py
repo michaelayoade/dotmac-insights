@@ -1,4 +1,11 @@
-"""Pydantic schemas for Expense Management APIs."""
+"""Pydantic schemas for Expense Management APIs.
+
+Provides request/response schemas for:
+- Expense categories and policies
+- Expense claims and claim lines
+- Cash advances
+- Corporate cards and transactions
+"""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -18,22 +25,38 @@ from app.models.expense_management import (
 
 
 class ExpenseCategoryCreate(BaseModel):
-    code: str
-    name: str
-    expense_account: str
-    description: Optional[str] = None
-    parent_id: Optional[int] = None
-    is_group: bool = False
-    payable_account: Optional[str] = None
-    category_type: Optional[str] = None
-    default_tax_code_id: Optional[int] = None
-    is_tax_deductible: bool = True
-    requires_receipt: bool = True
-    company: Optional[str] = None
+    """Create an expense category for organizing and tracking expenses."""
+
+    code: str = Field(..., description="Unique category code", max_length=50)
+    name: str = Field(..., description="Category display name", max_length=255)
+    expense_account: str = Field(..., description="GL account for posting expenses")
+    description: Optional[str] = Field(None, description="Category description")
+    parent_id: Optional[int] = Field(None, description="Parent category ID for hierarchy")
+    is_group: bool = Field(False, description="True if this is a parent category")
+    payable_account: Optional[str] = Field(None, description="GL account for payables")
+    category_type: Optional[str] = Field(None, description="Category type classification")
+    default_tax_code_id: Optional[int] = Field(None, description="Default tax code for this category")
+    is_tax_deductible: bool = Field(True, description="Whether expenses are tax deductible")
+    requires_receipt: bool = Field(True, description="Whether receipt is required for claims")
+    company: Optional[str] = Field(None, description="Company this category belongs to")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "code": "TRAVEL",
+                "name": "Travel Expenses",
+                "expense_account": "6100 - Travel Expenses",
+                "is_tax_deductible": True,
+                "requires_receipt": True,
+            }
+        }
+    )
 
 
 class ExpenseCategoryRead(ExpenseCategoryCreate):
-    id: int
+    """Expense category response."""
+
+    id: int = Field(..., description="Unique category ID")
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -118,18 +141,43 @@ class ExpenseClaimLineCreate(BaseModel):
 
 
 class ExpenseClaimCreate(BaseModel):
-    title: str
-    employee_id: int
-    claim_date: date
-    description: Optional[str] = None
-    currency: str = "NGN"
-    base_currency: str = "NGN"
-    conversion_rate: Decimal = Decimal("1")
-    project_id: Optional[int] = None
-    cost_center: Optional[str] = None
-    cash_advance_id: Optional[int] = None
-    company: Optional[str] = None
-    lines: List[ExpenseClaimLineCreate]
+    """Submit a new expense claim for reimbursement.
+
+    An expense claim contains one or more line items representing individual expenses.
+    """
+
+    title: str = Field(..., description="Claim title/description", max_length=255)
+    employee_id: int = Field(..., description="ID of the employee submitting the claim")
+    claim_date: date = Field(..., description="Date the claim is submitted")
+    description: Optional[str] = Field(None, description="Additional claim details")
+    currency: str = Field("NGN", description="Claim currency code", max_length=3)
+    base_currency: str = Field("NGN", description="Company base currency", max_length=3)
+    conversion_rate: Decimal = Field(Decimal("1"), description="Exchange rate to base currency", gt=0)
+    project_id: Optional[int] = Field(None, description="Associated project ID")
+    cost_center: Optional[str] = Field(None, description="Cost center for allocation")
+    cash_advance_id: Optional[int] = Field(None, description="Cash advance to settle against")
+    company: Optional[str] = Field(None, description="Company code")
+    lines: List[ExpenseClaimLineCreate] = Field(..., description="Expense line items", min_length=1)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "title": "Lagos Business Trip - Dec 2025",
+                "employee_id": 1,
+                "claim_date": "2025-12-15",
+                "currency": "NGN",
+                "lines": [
+                    {
+                        "category_id": 1,
+                        "expense_date": "2025-12-10",
+                        "description": "Uber to client meeting",
+                        "claimed_amount": 5000,
+                        "has_receipt": True,
+                    }
+                ],
+            }
+        }
+    )
 
     @field_validator("conversion_rate")
     @classmethod
@@ -196,19 +244,40 @@ class ExpenseClaimPayNow(BaseModel):
 
 
 class CashAdvanceCreate(BaseModel):
-    employee_id: int
-    purpose: str
-    request_date: date
-    required_by_date: Optional[date] = None
-    project_id: Optional[int] = None
-    trip_start_date: Optional[date] = None
-    trip_end_date: Optional[date] = None
-    destination: Optional[str] = None
-    requested_amount: Decimal = Field(gt=0)
-    currency: str = "NGN"
-    base_currency: str = "NGN"
-    conversion_rate: Decimal = Decimal("1")
-    company: Optional[str] = None
+    """Request a cash advance for upcoming expenses.
+
+    Cash advances are disbursed before expenses are incurred and must be settled later.
+    """
+
+    employee_id: int = Field(..., description="ID of the employee requesting the advance")
+    purpose: str = Field(..., description="Purpose/reason for the advance", max_length=500)
+    request_date: date = Field(..., description="Date of the advance request")
+    required_by_date: Optional[date] = Field(None, description="Date when funds are needed")
+    project_id: Optional[int] = Field(None, description="Associated project ID")
+    trip_start_date: Optional[date] = Field(None, description="Travel start date if applicable")
+    trip_end_date: Optional[date] = Field(None, description="Travel end date if applicable")
+    destination: Optional[str] = Field(None, description="Travel destination", max_length=255)
+    requested_amount: Decimal = Field(..., description="Amount requested", gt=0)
+    currency: str = Field("NGN", description="Currency code", max_length=3)
+    base_currency: str = Field("NGN", description="Company base currency", max_length=3)
+    conversion_rate: Decimal = Field(Decimal("1"), description="Exchange rate to base currency", gt=0)
+    company: Optional[str] = Field(None, description="Company code")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "employee_id": 1,
+                "purpose": "Client visit to Abuja",
+                "request_date": "2025-12-01",
+                "required_by_date": "2025-12-05",
+                "trip_start_date": "2025-12-06",
+                "trip_end_date": "2025-12-08",
+                "destination": "Abuja",
+                "requested_amount": 150000,
+                "currency": "NGN",
+            }
+        }
+    )
 
     @field_validator("conversion_rate")
     @classmethod

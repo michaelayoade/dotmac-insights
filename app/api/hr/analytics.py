@@ -2,6 +2,11 @@
 HR Analytics Router
 
 Cross-module analytics and dashboard endpoints.
+
+Note: Most analytics endpoints use direct DB queries for complex aggregations.
+Where service methods exist (get_metrics), they are used. This is consistent
+with the pattern: "Direct DB reads acceptable for read-only summaries where
+service doesn't have method."
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -19,6 +24,15 @@ from app.models.hr_recruitment import JobOpening, JobOpeningStatus, JobApplicant
 from app.models.hr_training import TrainingEvent, TrainingEventStatus
 from app.models.hr_appraisal import Appraisal, AppraisalStatus
 from app.models.hr_lifecycle import EmployeeOnboarding, EmployeeSeparation, BoardingStatus
+
+# Services used where metrics methods exist
+from app.services.hr.lifecycle import LifecycleService
+from app.services.hr.training import TrainingService
+from app.services.hr.appraisal import AppraisalService
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import EmployeeFilters
+from app.services.hr.analytics import HRAnalyticsService
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -333,7 +347,7 @@ async def leave_balance_report(
     year: Optional[int] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get leave balance report for employees."""
@@ -387,7 +401,7 @@ async def attendance_summary_report(
     to_date: Optional[date] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get attendance summary report grouped by employee."""
@@ -599,31 +613,30 @@ async def list_employees(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List employees for lookups and selection fields."""
-    from app.models.employee import Employee, EmploymentStatus
+    from app.models.employee import EmploymentStatus
 
-    query = db.query(Employee)
+    service = EmployeeService(db)
 
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            (Employee.name.ilike(search_term)) |
-            (Employee.email.ilike(search_term)) |
-            (Employee.employee_number.ilike(search_term)) |
-            (Employee.department.ilike(search_term))
-        )
-
-    if department:
-        query = query.filter(Employee.department.ilike(f"%{department}%"))
-
+    # Build filters
+    status_enum = None
     if status:
         try:
             status_enum = EmploymentStatus(status)
-            query = query.filter(Employee.status == status_enum)
         except ValueError:
             pass
 
-    total = query.count()
-    employees = query.order_by(Employee.name).offset(offset).limit(limit).all()
+    filters = EmployeeFilters(
+        search=search,
+        status=status_enum,
+    )
+    pagination = PaginationParams(offset=offset, limit=limit)
+
+    result = service.list_employees(filters, pagination)
+
+    # Filter by department text if provided (service doesn't support this)
+    items = result.items
+    if department:
+        items = [e for e in items if e.department and department.lower() in e.department.lower()]
 
     return {
         "items": [
@@ -636,9 +649,162 @@ async def list_employees(
                 "designation": e.designation,
                 "status": e.status.value if e.status else None,
             }
-            for e in employees
+            for e in items
         ],
-        "total": total,
+        "total": result.total,
         "limit": limit,
         "offset": offset,
+    }
+
+
+# =============================================================================
+# ORGANIZATION ANALYTICS
+# =============================================================================
+
+
+@router.get("/organization/headcount", dependencies=[Depends(Require("hr:read"))])
+async def organization_headcount(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get headcount breakdown by department."""
+    service = HRAnalyticsService(db)
+    result = service.get_headcount_by_department(company)
+    return {
+        "data": [
+            {
+                "department_id": h.department_id,
+                "department_name": h.department_name,
+                "total_employees": h.total_employees,
+                "active_employees": h.active_employees,
+                "on_leave": h.on_leave,
+                "terminated": h.terminated,
+                "percentage_of_total": h.percentage_of_total,
+            }
+            for h in result
+        ]
+    }
+
+
+@router.get("/organization/headcount-trend/{department_id}", dependencies=[Depends(Require("hr:read"))])
+async def department_headcount_trend(
+    department_id: int,
+    months: int = Query(default=12, ge=1, le=24),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get headcount trend for a department over time."""
+    service = HRAnalyticsService(db)
+    result = service.get_department_headcount_trend(department_id, months)
+    return {
+        "department_id": result.department_id,
+        "department_name": result.department_name,
+        "data_points": [
+            {"period": p.period, "value": p.value, "label": p.label}
+            for p in result.data_points
+        ],
+    }
+
+
+@router.get("/organization/designations", dependencies=[Depends(Require("hr:read"))])
+async def designation_distribution(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get employee distribution by designation."""
+    service = HRAnalyticsService(db)
+    result = service.get_designation_distribution(company)
+    return {
+        "data": [
+            {
+                "designation_id": d.designation_id,
+                "designation_name": d.designation_name,
+                "employee_count": d.employee_count,
+                "percentage": d.percentage,
+            }
+            for d in result
+        ]
+    }
+
+
+@router.get("/organization/teams", dependencies=[Depends(Require("hr:read"))])
+async def team_metrics(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get metrics for HD teams."""
+    service = HRAnalyticsService(db)
+    result = service.get_team_metrics(company)
+    return {
+        "data": [
+            {
+                "team_id": t.team_id,
+                "team_name": t.team_name,
+                "member_count": t.member_count,
+                "avg_workload": t.avg_workload,
+            }
+            for t in result
+        ]
+    }
+
+
+@router.get("/workforce", dependencies=[Depends(Require("hr:read"))])
+async def workforce_analytics(
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get comprehensive workforce analytics."""
+    service = HRAnalyticsService(db)
+    result = service.get_workforce_analytics(company)
+    return {
+        "total_headcount": result.total_headcount,
+        "active_employees": result.active_employees,
+        "on_leave": result.on_leave,
+        "terminated": result.terminated,
+        "avg_tenure_months": result.avg_tenure_months,
+        "new_hires_30d": result.new_hires_30d,
+        "separations_30d": result.separations_30d,
+        "headcount_by_department": [
+            {
+                "department_id": h.department_id,
+                "department_name": h.department_name,
+                "total_employees": h.total_employees,
+                "percentage_of_total": h.percentage_of_total,
+            }
+            for h in result.headcount_by_department
+        ],
+        "headcount_by_designation": [
+            {
+                "designation_id": d.designation_id,
+                "designation_name": d.designation_name,
+                "employee_count": d.employee_count,
+                "percentage": d.percentage,
+            }
+            for d in result.headcount_by_designation
+        ],
+        "headcount_trend": [
+            {"period": p.period, "value": p.value, "label": p.label}
+            for p in result.headcount_trend
+        ],
+    }
+
+
+@router.get("/turnover", dependencies=[Depends(Require("hr:read"))])
+async def turnover_analytics(
+    from_date: date = Query(..., description="Start date for analysis"),
+    to_date: date = Query(..., description="End date for analysis"),
+    company: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Get turnover analytics for a period."""
+    service = HRAnalyticsService(db)
+    result = service.get_turnover_analytics(from_date, to_date, company)
+    return {
+        "period_start": result.period_start.isoformat(),
+        "period_end": result.period_end.isoformat(),
+        "total_separations": result.total_separations,
+        "voluntary_separations": result.voluntary_separations,
+        "involuntary_separations": result.involuntary_separations,
+        "turnover_rate": result.turnover_rate,
+        "avg_tenure_at_exit_months": result.avg_tenure_at_exit_months,
+        "by_department": result.by_department,
     }

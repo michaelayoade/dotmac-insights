@@ -1,0 +1,573 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-3">
+        <a href="/settings/migration" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <div class="flex items-center gap-3">
+                <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ job.name }}</h1>
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(job.status.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ job.status.value | title }}
+                </span>
+            </div>
+            <p class="mt-1.5 text-gray-500 font-body">{{ job.entity_type.value | replace('_', ' ') | title }}</p>
+        </div>
+    </div>
+    <div class="flex items-center gap-3">
+        {% if job.status.value == 'running' %}
+        <!-- Cancel Button for Running Jobs -->
+        <form action="/settings/migration/jobs/{{ job.id }}/cancel" method="POST" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors"
+                onclick="return confirm('Are you sure you want to cancel this migration job?')"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+                Cancel
+            </button>
+        </form>
+        {% elif job.status.value == 'completed' %}
+        <!-- Rollback Button for Completed Jobs -->
+        <a
+            href="/settings/migration/jobs/{{ job.id }}/rollback-preview"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-orange-700 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+            </svg>
+            Rollback
+        </a>
+        {% endif %}
+        {% if job.status.value not in ['running'] %}
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors"
+            hx-delete="/settings/migration/jobs/{{ job.id }}"
+            hx-confirm="Are you sure you want to delete this migration job? This cannot be undone."
+            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+            Delete
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Step Indicator -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <nav aria-label="Progress">
+        <ol class="flex items-center justify-between">
+            {% set steps = [
+                {'num': 1, 'label': 'Create', 'status': 'pending'},
+                {'num': 2, 'label': 'Upload', 'status': 'uploaded'},
+                {'num': 3, 'label': 'Map', 'status': 'mapped'},
+                {'num': 4, 'label': 'Validate', 'status': 'validated'},
+                {'num': 5, 'label': 'Execute', 'status': 'running'},
+                {'num': 6, 'label': 'Done', 'status': 'completed'}
+            ] %}
+            {% for step in steps %}
+            <li class="relative flex-1 {% if not loop.last %}pr-8 sm:pr-20{% endif %}">
+                {% if step.num < current_step %}
+                <!-- Completed step -->
+                <div class="flex items-center">
+                    <div class="relative flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600">
+                        <svg class="h-5 w-5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    {% if not loop.last %}
+                    <div class="absolute top-4 left-8 -ml-px h-0.5 w-full bg-emerald-600 sm:left-10"></div>
+                    {% endif %}
+                </div>
+                <span class="mt-2 block text-xs font-medium text-emerald-600">{{ step.label }}</span>
+                {% elif step.num == current_step %}
+                <!-- Current step -->
+                <div class="flex items-center">
+                    <div class="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-primary-600 bg-white">
+                        <span class="h-2.5 w-2.5 rounded-full bg-primary-600"></span>
+                    </div>
+                    {% if not loop.last %}
+                    <div class="absolute top-4 left-8 -ml-px h-0.5 w-full bg-gray-200 sm:left-10"></div>
+                    {% endif %}
+                </div>
+                <span class="mt-2 block text-xs font-semibold text-primary-600">{{ step.label }}</span>
+                {% else %}
+                <!-- Upcoming step -->
+                <div class="flex items-center">
+                    <div class="relative flex h-8 w-8 items-center justify-center rounded-full border-2 border-gray-300 bg-white">
+                        <span class="h-2.5 w-2.5 rounded-full bg-transparent"></span>
+                    </div>
+                    {% if not loop.last %}
+                    <div class="absolute top-4 left-8 -ml-px h-0.5 w-full bg-gray-200 sm:left-10"></div>
+                    {% endif %}
+                </div>
+                <span class="mt-2 block text-xs font-medium text-gray-500">{{ step.label }}</span>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+    </nav>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Main Content -->
+    <div class="lg:col-span-2 space-y-6">
+        {% if job.status.value == 'pending' %}
+        <!-- Upload File -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Upload Source File</h3>
+            <form action="/settings/migration/jobs/{{ job.id }}/upload" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-primary-300 transition-colors">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                    </svg>
+                    <div class="mt-4">
+                        <label for="file" class="cursor-pointer">
+                            <span class="text-primary-600 hover:text-primary-500 font-medium">Upload a file</span>
+                            <span class="text-gray-500"> or drag and drop</span>
+                            <input id="file" name="file" type="file" class="sr-only" accept=".csv,.json,.xlsx,.xls" required>
+                        </label>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-500">CSV, JSON, or Excel up to 100MB</p>
+                </div>
+                <div class="mt-4 flex justify-end">
+                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                        </svg>
+                        Upload File
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% elif job.status.value == 'uploaded' %}
+        <!-- File Uploaded - Show Columns -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Source Columns</h3>
+            <p class="text-sm text-gray-500 mb-4">{{ job.total_rows }} rows detected with {{ job.source_columns | length }} columns</p>
+
+            <div class="flex flex-wrap gap-2 mb-6">
+                {% for col in job.source_columns %}
+                <span class="inline-flex items-center px-3 py-1 rounded-lg bg-surface-100 text-sm font-medium text-gray-700">
+                    {{ col }}
+                </span>
+                {% endfor %}
+            </div>
+
+            {% if job.sample_rows %}
+            <h4 class="text-sm font-semibold text-gray-900 mb-2">Sample Data</h4>
+            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            {% for col in job.source_columns[:5] %}
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase">{{ col }}</th>
+                            {% endfor %}
+                            {% if job.source_columns | length > 5 %}
+                            <th class="px-3 py-2 text-left text-xs font-semibold text-gray-500">...</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for row in job.sample_rows[:3] %}
+                        <tr>
+                            {% for col in job.source_columns[:5] %}
+                            <td class="px-3 py-2 text-gray-600 truncate max-w-xs">{{ row.get(col, '') }}</td>
+                            {% endfor %}
+                            {% if job.source_columns | length > 5 %}
+                            <td class="px-3 py-2 text-gray-400">...</td>
+                            {% endif %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <div class="mt-6 flex justify-end">
+                <a href="/settings/migration/jobs/{{ job.id }}/mapping" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all">
+                    Configure Field Mapping
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        {% elif job.status.value == 'mapped' %}
+        <!-- Mapped - Show Summary and Validate Button -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Field Mapping</h3>
+
+            {% if job.field_mapping %}
+            <div class="space-y-2 mb-6">
+                {% for source, target in job.field_mapping.items() %}
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="px-3 py-1 rounded-lg bg-surface-100 text-gray-700">{{ source }}</span>
+                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                    <span class="px-3 py-1 rounded-lg bg-primary-50 text-primary-700 font-medium">{{ target }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="flex items-center gap-3">
+                <a href="/settings/migration/jobs/{{ job.id }}/mapping" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors">
+                    Edit Mapping
+                </a>
+                <a href="/settings/migration/jobs/{{ job.id }}/preview" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    Preview Data
+                </a>
+                <form action="/settings/migration/jobs/{{ job.id }}/validate" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Validate Data
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {% elif job.status.value == 'validated' %}
+        <!-- Validated - Show Results and Execute Button -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Validation Results</h3>
+
+            {% if job.validation_result %}
+            {% if job.validation_result.is_valid %}
+            <div class="rounded-xl bg-emerald-50 border border-emerald-200 p-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-emerald-800">Validation Passed</p>
+                        <p class="text-sm text-emerald-700">{{ job.total_rows }} rows ready to import{% if job.validation_result.warning_count > 0 %} ({{ job.validation_result.warning_count }} warnings){% endif %}</p>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="rounded-xl bg-red-50 border border-red-200 p-4 mb-6">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-red-800">Validation Failed</p>
+                        <p class="text-sm text-red-700">{{ job.validation_result.error_count }} errors, {{ job.validation_result.warning_count }} warnings</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Display Errors -->
+            {% if job.validation_result.errors and job.validation_result.errors | length > 0 %}
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-red-800 mb-2">Errors ({{ job.validation_result.errors | length }})</h4>
+                <div class="max-h-48 overflow-y-auto space-y-2">
+                    {% for error in job.validation_result.errors[:10] %}
+                    <div class="flex items-start gap-2 text-sm bg-red-50 rounded-lg p-2">
+                        <span class="text-red-500 font-medium tabular-nums">Row {{ error.row }}:</span>
+                        <span class="text-red-700">{{ error.field }}: {{ error.message }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if job.validation_result.errors | length > 10 %}
+                    <p class="text-xs text-red-600">... and {{ job.validation_result.errors | length - 10 }} more errors</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Display Warnings -->
+            {% if job.validation_result.warnings and job.validation_result.warnings | length > 0 %}
+            <div class="mb-4">
+                <h4 class="text-sm font-semibold text-amber-800 mb-2">Warnings ({{ job.validation_result.warnings | length }})</h4>
+                <div class="max-h-32 overflow-y-auto space-y-2">
+                    {% for warning in job.validation_result.warnings[:5] %}
+                    <div class="flex items-start gap-2 text-sm bg-amber-50 rounded-lg p-2">
+                        <span class="text-amber-500 font-medium tabular-nums">Row {{ warning.row }}:</span>
+                        <span class="text-amber-700">{{ warning.field }}: {{ warning.message }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if job.validation_result.warnings | length > 5 %}
+                    <p class="text-xs text-amber-600">... and {{ job.validation_result.warnings | length - 5 }} more warnings</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+
+            <div class="flex items-center gap-3">
+                <a href="/settings/migration/jobs/{{ job.id }}/mapping" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors">
+                    Edit Mapping
+                </a>
+                <a href="/settings/migration/jobs/{{ job.id }}/preview" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    Preview
+                </a>
+                <form action="/settings/migration/jobs/{{ job.id }}/execute" method="POST" class="inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl shadow-lg shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-600 transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Execute Migration
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        {% elif job.status.value == 'running' %}
+        <!-- Running - Show Progress -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6"
+             hx-get="/settings/migration/jobs/{{ job.id }}/progress"
+             hx-trigger="every 2s"
+             hx-swap="innerHTML">
+            {% include "modules/settings/templates/partials/migration/progress.html" %}
+        </div>
+
+        {% elif job.status.value == 'completed' %}
+        <!-- Completed - Show Summary -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Migration Completed</h3>
+                    <p class="text-sm text-gray-500">All records have been processed</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.created_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Created</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.updated_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Updated</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.skipped_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Skipped</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold {{ 'text-red-600' if job.failed_records > 0 else 'text-gray-900' }} tabular-nums">{{ "{:,}".format(job.failed_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Failed</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <a href="/settings/migration/jobs/{{ job.id }}/records" class="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-500 font-medium">
+                    View all records
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+                {% if job.skipped_records > 0 %}
+                <a href="/settings/migration/jobs/{{ job.id }}/duplicates" class="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-500 font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    View duplicates ({{ "{:,}".format(job.skipped_records) }})
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% elif job.status.value == 'rolled_back' %}
+        <!-- Rolled Back - Show Status -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-orange-100 p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Migration Rolled Back</h3>
+                    <p class="text-sm text-gray-500">All changes from this migration have been reverted</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-400 tabular-nums line-through">{{ "{:,}".format(job.created_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Created</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-400 tabular-nums line-through">{{ "{:,}".format(job.updated_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Updated</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-400 tabular-nums">{{ "{:,}".format(job.skipped_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Skipped</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-400 tabular-nums">{{ "{:,}".format(job.failed_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Failed</p>
+                </div>
+            </div>
+
+            {% if job.rolled_back_at %}
+            <p class="text-sm text-gray-500">
+                Rolled back on {{ job.rolled_back_at.strftime('%d %b %Y at %H:%M') }}
+            </p>
+            {% endif %}
+        </div>
+
+        {% elif job.status.value == 'cancelled' %}
+        <!-- Cancelled - Show Status -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Migration Cancelled</h3>
+                    <p class="text-sm text-gray-500">This migration was cancelled before completion</p>
+                </div>
+            </div>
+
+            {% if job.processed_rows > 0 %}
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.created_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Created</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.updated_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Updated</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.skipped_records) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Skipped</p>
+                </div>
+                <div class="bg-surface-50 rounded-xl p-4 text-center">
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums">{{ "{:,}".format(job.processed_rows) }}/{{ "{:,}".format(job.total_rows) }}</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wide">Processed</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {% elif job.status.value == 'failed' %}
+        <!-- Failed - Show Error -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-red-100 p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-display font-semibold text-red-800">Migration Failed</h3>
+                    <p class="text-sm text-red-600">{{ job.error_message or 'An unexpected error occurred' }}</p>
+                </div>
+            </div>
+
+            {% if job.error_details %}
+            <details class="mt-4">
+                <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-700">View error details</summary>
+                <pre class="mt-2 p-4 bg-gray-50 rounded-lg text-xs text-gray-600 overflow-x-auto">{{ job.error_details }}</pre>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+        <!-- Job Info -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Job Information</h3>
+            <dl class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Entity Type</dt>
+                    <dd class="text-gray-900 font-medium">{{ job.entity_type.value | replace('_', ' ') | title }}</dd>
+                </div>
+                {% if job.source_type %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Source Type</dt>
+                    <dd class="text-gray-900 font-medium">{{ job.source_type.value | upper }}</dd>
+                </div>
+                {% endif %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Total Rows</dt>
+                    <dd class="text-gray-900 font-medium tabular-nums">{{ "{:,}".format(job.total_rows) }}</dd>
+                </div>
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Created</dt>
+                    <dd class="text-gray-900">{{ job.created_at.strftime('%d %b %Y %H:%M') }}</dd>
+                </div>
+                {% if job.started_at %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Started</dt>
+                    <dd class="text-gray-900">{{ job.started_at.strftime('%d %b %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+                {% if job.completed_at %}
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Completed</dt>
+                    <dd class="text-gray-900">{{ job.completed_at.strftime('%d %b %Y %H:%M') }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+
+        <!-- Dedup Settings -->
+        {% if job.dedup_strategy %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-sm font-semibold text-gray-900 mb-4">Duplicate Handling</h3>
+            <dl class="space-y-3 text-sm">
+                <div class="flex justify-between">
+                    <dt class="text-gray-500">Strategy</dt>
+                    <dd class="text-gray-900 font-medium">{{ job.dedup_strategy.value | title }}</dd>
+                </div>
+                {% if job.dedup_fields %}
+                <div>
+                    <dt class="text-gray-500 mb-2">Check Fields</dt>
+                    <dd class="flex flex-wrap gap-1">
+                        {% for field in job.dedup_fields %}
+                        <span class="px-2 py-0.5 bg-surface-100 text-gray-700 rounded text-xs">{{ field }}</span>
+                        {% endfor %}
+                    </dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

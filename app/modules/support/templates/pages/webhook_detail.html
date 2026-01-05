@@ -1,0 +1,79 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Webhook Event #{{ event.id }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ channel.name if channel else 'Unknown Channel' }} • {{ channel.type | title if channel else '' }}</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/support/webhooks" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+                Back to Webhooks
+            </a>
+            {% if event.error and not event.processed %}
+            <form action="/support/webhooks/{{ event.id }}/retry" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 font-medium ring-1 ring-amber-200">
+                    Retry
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 space-y-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-base font-semibold text-gray-900 mb-3">Payload</h2>
+                {% if event.payload %}
+                <pre class="text-xs text-gray-700 bg-surface-50 rounded-lg p-4 overflow-auto">{{ event.payload | tojson | e }}</pre>
+                {% else %}
+                <p class="text-sm text-gray-500">No payload recorded.</p>
+                {% endif %}
+            </div>
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-base font-semibold text-gray-900 mb-3">Headers</h2>
+                {% if event.headers %}
+                <pre class="text-xs text-gray-700 bg-surface-50 rounded-lg p-4 overflow-auto">{{ event.headers | tojson | e }}</pre>
+                {% else %}
+                <p class="text-sm text-gray-500">No headers recorded.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="space-y-4">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <h2 class="text-sm font-semibold text-gray-900 mb-3">Status</h2>
+                <p class="text-sm text-gray-600">Processed: {{ 'Yes' if event.processed else 'No' }}</p>
+                {% if event.error %}
+                <p class="text-sm text-red-600 mt-2">{{ event.error }}</p>
+                {% endif %}
+                <div class="mt-3 text-xs text-gray-500 space-y-1">
+                    <p>Received: {{ event.received_at | datetime }}</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <h2 class="text-sm font-semibold text-gray-900 mb-3">Metadata</h2>
+                <div class="text-sm text-gray-600 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span>Provider Event ID</span>
+                        <span class="font-medium text-gray-900">{{ event.provider_event_id or '-' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>Retries</span>
+                        <span class="font-medium text-gray-900">{{ event.retry_count }}</span>
+                    </div>
+                    {% if event.last_retry_at %}
+                    <div class="flex items-center justify-between">
+                        <span>Last Retry</span>
+                        <span class="font-medium text-gray-900">{{ event.last_retry_at | datetime }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

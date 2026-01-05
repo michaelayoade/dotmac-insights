@@ -1,4 +1,4 @@
-"""Workflows: Approval workflows, accounting controls, audit log, account CRUD."""
+"""Accounting workflows, controls, audit log, and account management endpoints."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.database import get_db
 from app.models.accounting import Account, AccountType
 
@@ -17,9 +17,7 @@ from .helpers import parse_date, paginate
 router = APIRouter()
 
 
-# =============================================================================
 # SUPPORTED DOCTYPES
-# =============================================================================
 
 SUPPORTED_WORKFLOW_DOCTYPES = [
     {"doctype": "journal_entry", "name": "Journal Entry", "description": "General ledger journal entries"},
@@ -47,9 +45,7 @@ def list_workflow_doctypes() -> Dict[str, Any]:
     }
 
 
-# =============================================================================
 # APPROVAL WORKFLOWS
-# =============================================================================
 
 @router.get("/workflows", dependencies=[Depends(Require("books:read"))])
 def list_approval_workflows(
@@ -153,7 +149,7 @@ def create_workflow(
     escalation_enabled: bool = False,
     escalation_hours: Optional[int] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new approval workflow.
 
@@ -174,7 +170,7 @@ def create_workflow(
     workflow = engine.create_workflow(
         workflow_name=workflow_name,
         doctype=doctype,
-        user_id=user.id,
+        user_id=principal.id,
         description=description,
         is_mandatory=is_mandatory,
         escalation_enabled=escalation_enabled,
@@ -294,7 +290,7 @@ def update_workflow(
     escalation_enabled: Optional[bool] = None,
     escalation_hours: Optional[int] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update a workflow.
 
@@ -328,7 +324,7 @@ def update_workflow(
 
     engine = ApprovalEngine(db)
     try:
-        workflow = engine.update_workflow(workflow_id, user.id, **updates)
+        workflow = engine.update_workflow(workflow_id, principal.id, **updates)
         db.commit()
         return {
             "message": "Workflow updated",
@@ -344,7 +340,7 @@ def update_workflow(
 def deactivate_workflow(
     workflow_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Deactivate a workflow (soft delete).
 
@@ -358,7 +354,7 @@ def deactivate_workflow(
 
     engine = ApprovalEngine(db)
     try:
-        workflow = engine.deactivate_workflow(workflow_id, user.id)
+        workflow = engine.deactivate_workflow(workflow_id, principal.id)
         db.commit()
         return {
             "message": "Workflow deactivated",
@@ -369,15 +365,13 @@ def deactivate_workflow(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-# =============================================================================
 # PENDING APPROVALS
-# =============================================================================
 
 @router.get("/approvals/pending", dependencies=[Depends(Require("books:approve"))])
 def get_pending_approvals(
     doctype: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:approve")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get documents pending approval for the current user.
 
@@ -390,7 +384,7 @@ def get_pending_approvals(
     from app.services.approval_engine import ApprovalEngine
 
     engine = ApprovalEngine(db)
-    pending = engine.get_pending_approvals(user.id, doctype)
+    pending = engine.get_pending_approvals(principal.id, doctype)
 
     return {
         "total": len(pending),
@@ -424,9 +418,7 @@ def get_approval_status(
     return status
 
 
-# =============================================================================
 # ACCOUNTING CONTROLS
-# =============================================================================
 
 @router.get("/controls", dependencies=[Depends(Require("books:read"))])
 def get_accounting_controls(
@@ -504,7 +496,7 @@ def update_accounting_controls(
     fx_gain_account: Optional[str] = None,
     fx_loss_account: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update accounting control settings.
 
@@ -588,14 +580,14 @@ def update_accounting_controls(
         controls.fx_loss_account = fx_loss_account
 
     controls.updated_at = datetime.now(timezone.utc)
-    controls.updated_by_id = user.id
+    controls.updated_by_id = principal.id
 
     # Audit log
     audit = AuditLogger(db)
     audit.log_update(
         doctype="accounting_control",
         document_id=controls.id,
-        user_id=user.id,
+        user_id=principal.id,
         old_values=old_values,
         new_values=serialize_for_audit(controls),
     )
@@ -605,9 +597,7 @@ def update_accounting_controls(
     return {"message": "Controls updated"}
 
 
-# =============================================================================
 # AUDIT LOG
-# =============================================================================
 
 @router.get("/audit-log", dependencies=[Depends(Require("books:read"))])
 def list_audit_logs(
@@ -618,7 +608,7 @@ def list_audit_logs(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Query audit logs.
@@ -725,9 +715,7 @@ def get_document_audit_history(
     }
 
 
-# =============================================================================
 # ACCOUNT CRUD
-# =============================================================================
 
 @router.post("/accounts", dependencies=[Depends(Require("books:admin"))])
 def create_account(
@@ -739,7 +727,7 @@ def create_account(
     is_group: bool = False,
     company: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new account in the chart of accounts.
 
@@ -799,7 +787,7 @@ def create_account(
     audit.log_create(
         doctype="account",
         document_id=account.id,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=account_name,
         new_values=serialize_for_audit(account),
     )
@@ -823,7 +811,7 @@ def update_account(
     account_type: Optional[str] = None,
     disabled: Optional[bool] = None,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an account.
 
@@ -871,7 +859,7 @@ def update_account(
     audit.log_update(
         doctype="account",
         document_id=account.id,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=account.account_name,
         old_values=old_values,
         new_values=serialize_for_audit(account),
@@ -890,7 +878,7 @@ def update_account(
 def disable_account(
     account_id: int,
     db: Session = Depends(get_db),
-    user=Depends(Require("books:admin")),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Disable an account (soft delete).
 
@@ -921,7 +909,7 @@ def disable_account(
     audit.log_update(
         doctype="account",
         document_id=account.id,
-        user_id=user.id,
+        user_id=principal.id,
         document_name=account.account_name,
         old_values=old_values,
         new_values=serialize_for_audit(account),

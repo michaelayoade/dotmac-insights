@@ -1,0 +1,75 @@
+<tr
+    id="subscriber-row-{{ subscriber.id }}"
+    class="hover:bg-surface-50/50 transition-colors group"
+>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                {% if subscriber.avatar_url %}
+                <img class="h-10 w-10 rounded-full object-cover ring-2 ring-gray-100" src="{{ subscriber.avatar_url }}" alt="">
+                {% else %}
+                <div class="h-10 w-10 rounded-full bg-gradient-to-br from-primary-100 to-primary-200 flex items-center justify-center ring-2 ring-primary-100">
+                    <span class="text-sm font-semibold text-primary-700">
+                        {{ (subscriber.name or 'U')[0].upper() }}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+            <div>
+                <a href="/subscribers/{{ subscriber.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors">
+                    {{ subscriber.name or 'Unnamed' }}
+                </a>
+                <p class="text-xs text-gray-500 capitalize">{{ subscriber.type }}</p>
+            </div>
+        </div>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">{{ subscriber.primary_email or '-' }}</div>
+        <div class="text-xs text-gray-500">{{ format_phone(subscriber.primary_phone) }}</div>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        {% if account %}
+        <div class="text-sm font-mono text-gray-900">{{ account.account_number }}</div>
+        <div class="text-xs text-gray-500 capitalize">{{ account.tier }}</div>
+        {% else %}
+        <span class="text-sm text-gray-400">No account</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        {% set style = get_status_style(subscriber.status) %}
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium {{ style.bg }} {{ style.text }}">
+            <span class="w-1.5 h-1.5 rounded-full {{ style.dot }}"></span>
+            {{ subscriber.status.title() }}
+        </span>
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap">
+        {% if account and account.mrr %}
+        <span class="text-sm font-semibold text-gray-900">{{ format_currency(account.mrr, account.currency or 'NGN') }}</span>
+        {% else %}
+        <span class="text-sm text-gray-400">-</span>
+        {% endif %}
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/subscribers/{{ subscriber.id }}"
+                class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                title="View Details"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            <a
+                href="/subscribers/{{ subscriber.id }}/edit"
+                class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-all"
+                title="Edit"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+        </div>
+    </td>
+</tr>

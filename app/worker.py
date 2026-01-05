@@ -24,11 +24,15 @@ celery_app = Celery(
     include=[
         "app.tasks.sync_tasks",
         "app.tasks.performance_tasks",
-        "app.tasks.contacts_tasks",
         "app.tasks.platform_tasks",
         "app.tasks.event_tasks",
         "app.tasks.workflow_tasks",
         "app.tasks.scheduled_actions",
+        "app.tasks.provisioning_tasks",
+        "app.tasks.bundle_tasks",
+        "app.tasks.monitoring_tasks",
+        "app.tasks.marketing_tasks",
+        "app.tasks.validation_tasks",
     ],
 )
 
@@ -183,17 +187,6 @@ celery_app.conf.beat_schedule = {
         "task": "performance.send_weekly_summaries",
         "schedule": crontab(hour=8, minute=30, day_of_week=1),  # Every Monday at 8:30 AM
     },
-    # Contacts reconciliation - hourly
-    "contacts-reconciliation": {
-        "task": "app.tasks.contacts_tasks.run_contacts_reconciliation",
-        "schedule": crontab(minute=45),  # Every hour at :45
-    },
-    # Retry failed outbound syncs - every 10 minutes
-    "contacts-outbound-sync-retry": {
-        "task": "app.tasks.contacts_tasks.retry_failed_outbound_syncs",
-        "schedule": crontab(minute="*/10"),  # Every 10 minutes
-        "kwargs": {"max_retries": 5, "batch_size": 100},
-    },
     # Platform integration tasks (only effective if platform configured)
     "platform-validate-license": {
         "task": "app.tasks.platform.validate_license",
@@ -210,5 +203,83 @@ celery_app.conf.beat_schedule = {
     "platform-send-heartbeat": {
         "task": "app.tasks.platform.send_heartbeat",
         "schedule": settings.heartbeat_interval_seconds,  # Default: 5 minutes
+    },
+    # Data Bundle tasks
+    "bundles-process-usage": {
+        "task": "bundles.process_usage",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "bundles-check-exhaustion": {
+        "task": "bundles.check_exhaustion",
+        "schedule": crontab(minute="*"),  # Every minute
+    },
+    "bundles-process-expiry": {
+        "task": "bundles.process_expiry",
+        "schedule": crontab(hour=0, minute=5),  # Daily at 00:05
+    },
+    "bundles-send-alerts": {
+        "task": "bundles.send_alerts",
+        "schedule": crontab(minute=15),  # Every hour at :15
+    },
+    "bundles-auto-activate": {
+        "task": "bundles.auto_activate_pending",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "bundles-cleanup-expired": {
+        "task": "bundles.cleanup_expired",
+        "schedule": crontab(hour=3, minute=0, day_of_week=0),  # Weekly on Sunday at 3 AM
+    },
+    # Network Monitoring (SNMP) tasks
+    "monitoring-poll-devices": {
+        "task": "monitoring.poll_devices",
+        "schedule": crontab(minute="*/5"),  # Every 5 minutes
+    },
+    "monitoring-aggregate-metrics": {
+        "task": "monitoring.aggregate_metrics",
+        "schedule": crontab(minute=5),  # Hourly at :05
+    },
+    "monitoring-cleanup-metrics": {
+        "task": "monitoring.cleanup_metrics",
+        "schedule": crontab(hour=3, minute=30),  # Daily at 3:30 AM
+    },
+    # Marketing module tasks
+    "marketing-process-journey-steps": {
+        "task": "app.tasks.marketing_tasks.process_journey_steps",
+        "schedule": crontab(minute="*"),
+        "kwargs": {"batch_size": 100},
+    },
+    "marketing-publish-scheduled-posts": {
+        "task": "app.tasks.marketing_tasks.publish_scheduled_posts",
+        "schedule": crontab(minute="*"),
+        "kwargs": {"batch_size": 50},
+    },
+    "marketing-sync-social-metrics": {
+        "task": "app.tasks.marketing_tasks.sync_social_metrics",
+        "schedule": crontab(minute="*/15"),
+        "kwargs": {"batch_size": 50},
+    },
+    "marketing-refresh-audiences": {
+        "task": "app.tasks.marketing_tasks.refresh_audience_segments",
+        "schedule": crontab(hour="*/4", minute=5),
+    },
+    "marketing-sync-social-tokens": {
+        "task": "app.tasks.marketing_tasks.sync_social_account_tokens",
+        "schedule": crontab(hour="*/6", minute=10),
+        "kwargs": {"batch_size": 25},
+    },
+    "marketing-sync-email-metrics": {
+        "task": "app.tasks.marketing_tasks.sync_email_metrics",
+        "schedule": crontab(minute="*/30"),
+        "kwargs": {"batch_size": 200},
+    },
+    "marketing-refresh-integration-tokens": {
+        "task": "app.tasks.marketing_tasks.refresh_marketing_integration_tokens",
+        "schedule": crontab(hour="*/6", minute=20),
+        "kwargs": {"refresh_window_hours": 24},
+    },
+    "finance-validation-backfill": {
+        "task": "app.tasks.validation_tasks.audit_finance_validation",
+        "schedule": crontab(hour=2, minute=35),
+        "kwargs": {"batch_size": 500},
     },
 }

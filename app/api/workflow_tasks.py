@@ -198,7 +198,8 @@ async def get_task(
     """Get a specific workflow task."""
     require_auth(principal)
 
-    task = db.query(WorkflowTask).filter(WorkflowTask.id == task_id).first()
+    service = WorkflowTaskService(db)
+    task = service.get_task_by_id(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 

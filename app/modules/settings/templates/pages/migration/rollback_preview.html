@@ -1,0 +1,114 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="flex items-center gap-3">
+        <a href="/settings/migration/jobs/{{ job.id }}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Rollback Preview</h1>
+            <p class="mt-1.5 text-gray-500 font-body">{{ job.name }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Warning Banner -->
+<div class="rounded-xl bg-orange-50 border border-orange-200 p-4 mb-6">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-orange-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        <div>
+            <p class="text-sm font-medium text-orange-800">This action cannot be undone</p>
+            <p class="text-sm text-orange-700 mt-0.5">Rolling back will permanently delete all created records and revert all updated records to their original state.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Rollback Summary -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-6">Rollback Summary</h3>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <!-- Records to Delete -->
+        <div class="bg-red-50 rounded-xl p-6">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-red-700 tabular-nums">{{ "{:,}".format(created_count) }}</p>
+                    <p class="text-sm text-red-600">Records to delete</p>
+                </div>
+            </div>
+            <p class="text-xs text-red-600 mt-2">These records were created during the migration and will be permanently deleted.</p>
+        </div>
+
+        <!-- Records to Restore -->
+        <div class="bg-blue-50 rounded-xl p-6">
+            <div class="flex items-center gap-3 mb-2">
+                <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-blue-700 tabular-nums">{{ "{:,}".format(updated_count) }}</p>
+                    <p class="text-sm text-blue-600">Records to restore</p>
+                </div>
+            </div>
+            <p class="text-xs text-blue-600 mt-2">These records were updated during the migration and will be reverted to their original state.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Migration Info -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <h3 class="text-sm font-semibold text-gray-900 mb-4">Migration Details</h3>
+    <dl class="grid grid-cols-2 gap-4 text-sm">
+        <div>
+            <dt class="text-gray-500">Entity Type</dt>
+            <dd class="text-gray-900 font-medium mt-1">{{ job.entity_type.value | replace('_', ' ') | title }}</dd>
+        </div>
+        <div>
+            <dt class="text-gray-500">Completed</dt>
+            <dd class="text-gray-900 font-medium mt-1">{{ job.completed_at.strftime('%d %b %Y at %H:%M') if job.completed_at else '-' }}</dd>
+        </div>
+        <div>
+            <dt class="text-gray-500">Total Records</dt>
+            <dd class="text-gray-900 font-medium mt-1 tabular-nums">{{ "{:,}".format(job.total_rows) }}</dd>
+        </div>
+        <div>
+            <dt class="text-gray-500">Created By</dt>
+            <dd class="text-gray-900 font-medium mt-1">Migration Job #{{ job.id }}</dd>
+        </div>
+    </dl>
+</div>
+
+<!-- Actions -->
+<div class="flex items-center justify-end gap-3">
+    <a href="/settings/migration/jobs/{{ job.id }}" class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors">
+        Cancel
+    </a>
+    <form action="/settings/migration/jobs/{{ job.id }}/rollback" method="POST" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button
+            type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-orange-600 to-orange-700 rounded-xl shadow-lg shadow-orange-600/25 hover:from-orange-500 hover:to-orange-600 transition-all"
+            onclick="return confirm('Are you absolutely sure you want to rollback this migration? This action cannot be undone.')"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
+            </svg>
+            Confirm Rollback
+        </button>
+    </form>
+</div>
+{% endblock %}

@@ -12,22 +12,22 @@ from __future__ import annotations
 
 from sqlalchemy import (
     String, Text, Enum, DateTime, ForeignKey, Boolean, Integer,
-    Float, Index, UniqueConstraint
+    Float, Index, UniqueConstraint, text
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 import enum
-from app.database import Base
+from app.database import Base, SoftDeleteMixin
 from app.utils.datetime_utils import utc_now, ensure_utc
 
 if TYPE_CHECKING:
-    from app.models.unified_contact import UnifiedContact
-    from app.models.employee import Employee
+    from app.models.party import Party
     from app.models.ticket import Ticket
     from app.models.conversation import Conversation
     from app.models.agent import Team
+    from app.models.auth import User
 
 
 # =============================================================================
@@ -94,7 +94,7 @@ class TicketChannel(enum.Enum):
 # UNIFIED TICKET MODEL
 # =============================================================================
 
-class UnifiedTicket(Base):
+class UnifiedTicket(SoftDeleteMixin, Base):
     """
     Unified ticket record - single source of truth for all support data.
 
@@ -163,11 +163,11 @@ class UnifiedTicket(Base):
     # CUSTOMER/CONTACT REFERENCE
     # ==========================================================================
 
-    # Primary link to unified contact
-    unified_contact_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("unified_contacts.id"),
+    # Primary link to party (person or organization)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id"),
         nullable=True,
-        index=True
+        index=True,
     )
 
     # Denormalized for quick access (updated via triggers/app logic)
@@ -176,13 +176,13 @@ class UnifiedTicket(Base):
     contact_phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # ==========================================================================
-    # ASSIGNMENT & OWNERSHIP
+    # ASSIGNMENT & OWNERSHIP (Party-based after Agent → Party unification)
     # ==========================================================================
 
-    assigned_to_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("employees.id"),
+    assigned_to_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
         nullable=True,
-        index=True
+        index=True,
     )
     assigned_team: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)  # TEXT for display
     assigned_team_id: Mapped[Optional[int]] = mapped_column(
@@ -192,8 +192,14 @@ class UnifiedTicket(Base):
 
     # Creator (if internal)
     created_by_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("employees.id"),
-        nullable=True
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    updated_by_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # ==========================================================================
@@ -241,7 +247,11 @@ class UnifiedTicket(Base):
     chatwoot_conversation_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
     # Legacy table links (for migration/backfill)
-    legacy_ticket_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
+    legacy_ticket_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("tickets.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True
+    )
     legacy_conversation_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
     legacy_omni_conversation_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
 
@@ -312,29 +322,27 @@ class UnifiedTicket(Base):
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
-    is_deleted: Mapped[bool] = mapped_column(default=False, index=True)
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    deleted_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     # ==========================================================================
     # RELATIONSHIPS
     # ==========================================================================
 
-    unified_contact: Mapped[Optional["UnifiedContact"]] = relationship(
-        foreign_keys=[unified_contact_id]
+    party: Mapped[Optional["Party"]] = relationship(
+        foreign_keys=[party_id]
     )
-    assigned_to: Mapped[Optional["Employee"]] = relationship(
-        back_populates="assigned_unified_tickets",
-        foreign_keys=[assigned_to_id]
+    assigned_to_party: Mapped[Optional["Party"]] = relationship(
+        foreign_keys=[assigned_to_party_id]
     )
     assigned_team_rel: Mapped[Optional["Team"]] = relationship(
         "Team",
         foreign_keys=[assigned_team_id],
         backref="unified_tickets"
     )
-    created_by: Mapped[Optional["Employee"]] = relationship(
-        back_populates="created_unified_tickets",
+    created_by: Mapped[Optional["User"]] = relationship(
         foreign_keys=[created_by_id]
+    )
+    updated_by: Mapped[Optional["User"]] = relationship(
+        foreign_keys=[updated_by_id]
     )
 
     # Self-referential relationships
@@ -362,12 +370,21 @@ class UnifiedTicket(Base):
     __table_args__ = (
         # Composite indexes for common queries
         Index("ix_unified_tickets_status_priority", "status", "priority"),
-        Index("ix_unified_tickets_assigned_status", "assigned_to_id", "status"),
-        Index("ix_unified_tickets_contact_status", "unified_contact_id", "status"),
+        Index("ix_unified_tickets_assigned_party_status", "assigned_to_party_id", "status"),
+        Index("ix_unified_tickets_party_status", "party_id", "status"),
         Index("ix_unified_tickets_source_status", "source", "status"),
         Index("ix_unified_tickets_created_status", "created_at", "status"),
         Index("ix_unified_tickets_sla_response", "response_by", "response_sla_breached"),
         Index("ix_unified_tickets_sla_resolution", "resolution_by", "resolution_sla_breached"),
+        Index("ix_unified_tickets_merged_into_id", "merged_into_id"),
+        Index(
+            "ix_unified_tickets_status_resolution_created",
+            "status",
+            "resolution_by",
+            "created_at",
+            postgresql_where=text("status IN ('open','in_progress','waiting')"),
+        ),
+        Index("ix_unified_tickets_category_created", "category", "created_at"),
     )
 
     # ==========================================================================
@@ -424,9 +441,9 @@ class UnifiedTicket(Base):
             return self.resolution_time_seconds / 3600
         return None
 
-    def assign(self, employee_id: int, team: Optional[str] = None) -> None:
-        """Assign ticket to an agent."""
-        self.assigned_to_id = employee_id
+    def assign(self, party_id: int, team: Optional[str] = None) -> None:
+        """Assign ticket to a party (support agent)."""
+        self.assigned_to_party_id = party_id
         if team:
             self.assigned_team = team
         self.assigned_at = datetime.utcnow()

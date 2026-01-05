@@ -1,7 +1,7 @@
 """Corporate card management endpoints."""
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
@@ -22,7 +22,34 @@ from app.api.expenses.access import apply_employee_scope, assert_employee_access
 router = APIRouter()
 
 
-@router.get("/", response_model=List[CorporateCardRead], dependencies=[Depends(Require("expenses:read"))])
+def _serialize_card(card: CorporateCard) -> Dict[str, Any]:
+    """Serialize a CorporateCard model to a dictionary."""
+    return {
+        "id": card.id,
+        "card_number_last4": card.card_number_last4,
+        "card_name": card.card_name,
+        "card_type": card.card_type,
+        "bank_name": card.bank_name,
+        "card_provider": card.card_provider,
+        "employee_id": card.employee_id,
+        "credit_limit": float(card.credit_limit) if card.credit_limit is not None else None,
+        "single_transaction_limit": float(card.single_transaction_limit) if card.single_transaction_limit is not None else None,
+        "daily_limit": float(card.daily_limit) if card.daily_limit is not None else None,
+        "monthly_limit": float(card.monthly_limit) if card.monthly_limit is not None else None,
+        "currency": card.currency,
+        "status": card.status.value if card.status else None,
+        "issue_date": card.issue_date.isoformat() if card.issue_date else None,
+        "expiry_date": card.expiry_date.isoformat() if card.expiry_date else None,
+        "liability_account": card.liability_account,
+        "bank_account_id": card.bank_account_id,
+        "company": card.company,
+        "created_at": card.created_at.isoformat() if card.created_at else None,
+        "updated_at": card.updated_at.isoformat() if card.updated_at else None,
+        "created_by_id": card.created_by_id,
+    }
+
+
+@router.get("/", dependencies=[Depends(Require("expenses:read"))])
 async def list_cards(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -31,7 +58,7 @@ async def list_cards(
     include_inactive: bool = Query(default=False, description="Include suspended/cancelled cards"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
-):
+) -> Dict[str, Any]:
     """List corporate cards with optional filters."""
     query = db.query(CorporateCard).order_by(CorporateCard.created_at.desc())
     query = apply_employee_scope(
@@ -53,8 +80,14 @@ async def list_cards(
     elif not include_inactive:
         query = query.filter(CorporateCard.status == CorporateCardStatus.ACTIVE)
 
+    total = query.count()
     cards = query.offset(offset).limit(limit).all()
-    return cards
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [_serialize_card(card) for card in cards],
+    }
 
 
 @router.get("/{card_id}", response_model=CorporateCardRead, dependencies=[Depends(Require("expenses:read"))])

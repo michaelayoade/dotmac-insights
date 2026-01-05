@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import structlog
 
 from app.models.lead import Lead
-from app.models.customer import Customer
+from app.models.party import Party, PartyExternalId, PartyRole, PartyType
 from app.config import settings
 
 logger = structlog.get_logger()
@@ -32,12 +32,19 @@ async def sync_leads(sync_client, client, full_sync: bool):
         )
         logger.info("splynx_leads_fetched", count=len(leads))
 
-        # Pre-fetch customer lookup by splynx_id for conversion linking
-        customer_map = {}
-        customers = sync_client.db.query(Customer.id, Customer.splynx_id).all()
-        for cust in customers:
-            if cust.splynx_id:
-                customer_map[cust.splynx_id] = cust.id
+        party_exts = (
+            sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "splynx",
+                PartyExternalId.external_key_type == "lead_id",
+            )
+            .all()
+        )
+        party_by_ext = {p.external_id: p.party_id for p in party_exts}
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
 
         for i, lead_data in enumerate(leads, 1):
             splynx_id = lead_data.get("id")
@@ -45,10 +52,76 @@ async def sync_leads(sync_client, client, full_sync: bool):
                 Lead.splynx_id == splynx_id
             ).first()
 
-            # Try to link to converted customer if status is active
-            # TODO: Will be linked via separate logic if needed
-            # if lead_data.get("condition") == "active":
-            #     customer_id = find_matching_customer()
+            # Link or create party for this lead
+            party = None
+            if splynx_id is not None:
+                party_id = party_by_ext.get(str(splynx_id))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
+
+            email = (lead_data.get("email") or "").strip().lower()
+            if not party and email:
+                party = party_email_index.get(email)
+
+            if not party:
+                category = str(lead_data.get("category", "")).lower()
+                party_type = PartyType.ORGANIZATION.value if category in ["company", "business", "corporate", "enterprise"] else PartyType.PERSON.value
+                party = Party(
+                    type=party_type,
+                    name=lead_data.get("name") or None,
+                    emails=[],
+                    phones=[],
+                )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+
+            if email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email for e in emails):
+                    emails.append(
+                        {
+                            "address": email,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+                    party_email_index[email] = party
+
+            phone = lead_data.get("phone") or None
+            if phone:
+                phones = list(party.phones or [])
+                if not any((p.get("number") or "") == phone for p in phones):
+                    phones.append(
+                        {
+                            "number": phone,
+                            "label": "primary",
+                            "is_primary": len(phones) == 0,
+                            "can_sms": False,
+                            "can_whatsapp": False,
+                        }
+                    )
+                    party.phones = phones
+
+            if splynx_id is not None and str(splynx_id) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="splynx",
+                        external_id=str(splynx_id),
+                        external_key_type="lead_id",
+                    )
+                )
+                party_by_ext[str(splynx_id)] = party.id
+
+            has_lead_role = (
+                sync_client.db.query(PartyRole)
+                .filter(PartyRole.party_id == party.id, PartyRole.role == "lead", PartyRole.until.is_(None))
+                .first()
+            )
+            if not has_lead_role:
+                sync_client.db.add(PartyRole(party_id=party.id, role="lead"))
 
             if existing:
                 existing.name = lead_data.get("name")
@@ -69,6 +142,7 @@ async def sync_leads(sync_client, client, full_sync: bool):
                 existing.status = lead_data.get("status")
                 existing.condition = lead_data.get("condition")
                 existing.billing_type = lead_data.get("billing_type")
+                existing.party_id = party.id
                 existing.date_add = parse_datetime(lead_data.get("date_add"))
                 existing.last_online = parse_datetime(lead_data.get("last_online"))
                 existing.last_update = parse_datetime(lead_data.get("last_update"))
@@ -96,6 +170,7 @@ async def sync_leads(sync_client, client, full_sync: bool):
                     status=lead_data.get("status"),
                     condition=lead_data.get("condition"),
                     billing_type=lead_data.get("billing_type"),
+                    party_id=party.id,
                     date_add=parse_datetime(lead_data.get("date_add")),
                     last_online=parse_datetime(lead_data.get("last_online")),
                     last_update=parse_datetime(lead_data.get("last_update")),

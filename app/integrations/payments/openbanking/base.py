@@ -92,7 +92,7 @@ class BaseOpenBankingProvider(abc.ABC):
     @abc.abstractmethod
     async def get_widget_token(
         self,
-        customer_id: str,
+        party_id: str,
         redirect_url: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -100,7 +100,7 @@ class BaseOpenBankingProvider(abc.ABC):
         Get token/config for launching account linking widget.
 
         Args:
-            customer_id: Internal customer identifier
+            party_id: Internal party identifier
             redirect_url: URL to redirect after linking
             metadata: Optional metadata
 

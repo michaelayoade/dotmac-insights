@@ -1,0 +1,99 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/reports" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <div>
+                <h1 class="text-2xl font-display font-bold text-gray-900">Revenue Analysis</h1>
+                <p class="mt-1 text-sm text-gray-500">Revenue trends for {{ start_date }} to {{ end_date }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    {% include "modules/reports/templates/partials/report_filters.html" %}
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Total Revenue</p>
+            <p class="text-2xl font-bold text-gray-900" id="total-revenue">Loading...</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Avg Monthly Revenue</p>
+            <p class="text-2xl font-bold text-gray-900" id="avg-monthly">Loading...</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Growth Rate</p>
+            <p class="text-2xl font-bold" id="growth-rate">Loading...</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Invoice Count</p>
+            <p class="text-2xl font-bold text-gray-900" id="invoice-count">Loading...</p>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Revenue Trend -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Revenue Trend</h2>
+            <div id="revenue-trend-chart" class="h-64 flex items-center justify-center text-gray-500">
+                <svg class="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Loading chart...
+            </div>
+        </div>
+
+        <!-- Revenue by Category -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Revenue by Category</h2>
+            <div id="revenue-category-chart" class="h-64 flex items-center justify-center text-gray-500">
+                <svg class="w-5 h-5 animate-spin mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Loading chart...
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Customers -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Top Customers by Revenue</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead>
+                    <tr class="bg-surface-50">
+                        <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">#</th>
+                        <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Customer</th>
+                        <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Invoices</th>
+                        <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Revenue</th>
+                        <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100" id="top-customers">
+                    <tr>
+                        <td colspan="5" class="py-16 text-center text-gray-500">
+                            <svg class="w-5 h-5 animate-spin inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Loading...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print { display: none !important; }
+    body { background: white; }
+    .shadow-warm-sm, .shadow-warm-md { box-shadow: none !important; }
+    .ring-1 { ring-width: 0 !important; }
+}
+</style>
+{% endblock %}

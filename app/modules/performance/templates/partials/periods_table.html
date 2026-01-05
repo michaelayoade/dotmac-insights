@@ -1,0 +1,49 @@
+{% if periods %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="periods-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('period')" x-cloak>Period</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('type')" x-cloak>Type</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('range')" x-cloak>Date Range</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('status')" x-cloak>Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for period in periods %}
+            {% include "modules/performance/templates/partials/period_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+{% set pagination = {
+    "page": page,
+    "per_page": per_page,
+    "total": total,
+    "total_pages": total_pages,
+    "has_prev": page > 1,
+    "has_next": page < total_pages,
+    "prev_page": (page - 1) if page > 1 else None,
+    "next_page": (page + 1) if page < total_pages else None,
+    "start_item": ((page - 1) * per_page) + 1,
+    "end_item": [page * per_page, total]|min
+} %}
+{% set query_params = [] %}
+{% if q %}
+{% set _ = query_params.append("q=" ~ q) %}
+{% endif %}
+{% if status_filter %}
+{% set _ = query_params.append("status=" ~ status_filter) %}
+{% endif %}
+{% set base_url = "/performance/table" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with pagination=pagination, base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="periods-empty-state">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No evaluation periods found</h3>
+    <p class="text-sm text-gray-500">{% if q or status_filter %}Try adjusting your search or filters.{% else %}Evaluation periods will appear here when created.{% endif %}</p>
+</div>
+{% endif %}

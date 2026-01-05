@@ -1,0 +1,35 @@
+{% if members %}
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">User</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Display Name</th>
+                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Added</th>
+                <th class="py-3 pl-3 pr-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for member in members %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-3 pl-4 pr-3 text-sm text-gray-900">{{ member.user }}</td>
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ member.user_name or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-500">{{ member.created_at.strftime('%Y-%m-%d') if member.created_at else '-' }}</td>
+                <td class="whitespace-nowrap py-3 pl-3 pr-4 text-right">
+                    <button
+                        hx-delete="/hr/teams/{{ team.id }}/members/{{ member.id }}"
+                        hx-target="#members-list"
+                        hx-swap="innerHTML"
+                        hx-confirm="Remove {{ member.user_name or member.user }} from this team?"
+                        class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-sm text-gray-500 text-center py-8">No members in this team. Add members to assign tickets to this team.</p>
+{% endif %}

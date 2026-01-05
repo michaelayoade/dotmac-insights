@@ -1,0 +1,114 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/hr/payroll" class="hover:text-primary-600">Payroll</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <a href="/hr/payroll/runs" class="hover:text-primary-600">Runs</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ run.name or run.id }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ run.name or 'Payroll Run' }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ run.start_date }} - {{ run.end_date }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Run Details</h3>
+                {% set status_colors = {
+                    'Draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'Submitted': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'Completed': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'Cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(run.status, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ run.status or 'Draft' }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Company</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ run.company or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Payroll Frequency</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ run.payroll_frequency or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Start Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ run.start_date }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">End Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ run.end_date }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Posting Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ run.posting_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Currency</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ run.currency or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if salary_slips %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Generated Salary Slips</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Employee</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Net Pay</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for slip in salary_slips %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3">
+                            <a href="/hr/payroll/{{ slip.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ slip.employee_name or slip.employee_id }}</a>
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ slip.net_pay|default(0)|round(2) }}</td>
+                        <td class="whitespace-nowrap px-3 py-3">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-50 text-green-700' if slip.status == 'Paid' else 'bg-gray-50 text-gray-700' }}">
+                                {{ slip.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Summary</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Number of Employees</dt>
+                    <dd class="mt-1 text-2xl font-bold text-gray-900">{{ run.number_of_employees or salary_slips|length if salary_slips else 0 }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Total Net Pay</dt>
+                    <dd class="mt-1 text-2xl font-bold text-primary-600">{{ run.total_net_pay|default(0)|round(2) }}</dd>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

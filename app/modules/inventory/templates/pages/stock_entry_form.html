@@ -1,0 +1,171 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ 'Edit Stock Entry' if entry else 'New Stock Entry' }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ 'Update stock entry details' if entry else 'Record a stock movement' }}
+            </p>
+        </div>
+        <a
+            href="{{ '/inventory/stock-entries/' ~ entry.id if entry else '/inventory/stock-entries' }}"
+            class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Cancel
+        </a>
+    </div>
+
+    <!-- Form -->
+    <form
+        action="{{ '/inventory/stock-entries/' ~ entry.id if entry else '/inventory/stock-entries' }}"
+        method="POST"
+        class="space-y-6"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Entry Type -->
+                <div>
+                    <label for="stock_entry_type" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Entry Type <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="stock_entry_type"
+                        name="stock_entry_type"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('stock_entry_type') else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        <option value="">Select type</option>
+                        {% for opt in type_options %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if (form_data.stock_entry_type if form_data else (entry.stock_entry_type if entry else '')) == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.get('stock_entry_type') %}
+                    <p class="mt-1.5 text-sm text-red-600">{{ errors.stock_entry_type }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Posting Date -->
+                <div>
+                    <label for="posting_date" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Posting Date <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        id="posting_date"
+                        name="posting_date"
+                        value="{{ form_data.posting_date if form_data else (entry.posting_date.strftime('%Y-%m-%d') if entry and entry.posting_date else '') }}"
+                        required
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.get('posting_date') else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                    {% if errors.get('posting_date') %}
+                    <p class="mt-1.5 text-sm text-red-600">{{ errors.posting_date }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- From Warehouse -->
+                <div>
+                    <label for="from_warehouse" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        From Warehouse
+                    </label>
+                    <select
+                        id="from_warehouse"
+                        name="from_warehouse"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        <option value="">Select warehouse</option>
+                        {% for opt in warehouse_options %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if (form_data.from_warehouse if form_data else (entry.from_warehouse if entry else '')) == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- To Warehouse -->
+                <div>
+                    <label for="to_warehouse" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        To Warehouse
+                    </label>
+                    <select
+                        id="to_warehouse"
+                        name="to_warehouse"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    >
+                        <option value="">Select warehouse</option>
+                        {% for opt in warehouse_options %}
+                        <option
+                            value="{{ opt.value }}"
+                            {{ 'selected' if (form_data.to_warehouse if form_data else (entry.to_warehouse if entry else '')) == opt.value else '' }}
+                        >{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Purpose -->
+            <div>
+                <label for="purpose" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Purpose
+                </label>
+                <input
+                    type="text"
+                    id="purpose"
+                    name="purpose"
+                    value="{{ form_data.purpose if form_data else (entry.purpose if entry else '') }}"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    placeholder="Reason for this stock movement"
+                >
+            </div>
+
+            <!-- Remarks -->
+            <div>
+                <label for="remarks" class="block text-sm font-medium text-gray-700 mb-1.5">
+                    Remarks
+                </label>
+                <textarea
+                    id="remarks"
+                    name="remarks"
+                    rows="3"
+                    class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-primary-500 placeholder:text-gray-400 focus:ring-2 focus:ring-inset sm:text-sm transition-colors"
+                    placeholder="Additional notes"
+                >{{ form_data.remarks if form_data else (entry.remarks if entry else '') }}</textarea>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center justify-end gap-3">
+            <a
+                href="{{ '/inventory/stock-entries/' ~ entry.id if entry else '/inventory/stock-entries' }}"
+                class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                {{ 'Update Entry' if entry else 'Create Entry' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

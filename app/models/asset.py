@@ -7,13 +7,15 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
+    from app.models.router import Router
 
 
 # ============= ASSET CATEGORY =============
-class AssetCategory(Base):
+class AssetCategory(SoftValidationMixin, Base):
     """Asset categories for grouping fixed assets from ERPNext.
 
     Asset Categories define depreciation settings and accounting defaults
@@ -21,6 +23,7 @@ class AssetCategory(Base):
     """
 
     __tablename__ = "asset_categories"
+    __soft_validation_scope__ = "assets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -46,7 +49,7 @@ class AssetCategory(Base):
 
 
 # ============= ASSET CATEGORY FINANCE BOOK (Child Table) =============
-class AssetCategoryFinanceBook(Base):
+class AssetCategoryFinanceBook(SoftValidationMixin, Base):
     """Finance book depreciation settings for Asset Categories.
 
     Defines default depreciation method, rates, and accounts for each
@@ -54,6 +57,7 @@ class AssetCategoryFinanceBook(Base):
     """
 
     __tablename__ = "asset_category_finance_books"
+    __soft_validation_scope__ = "assets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     asset_category_id: Mapped[int] = mapped_column(
@@ -97,7 +101,7 @@ class AssetStatus(enum.Enum):
 
 
 # ============= ASSET (Fixed Asset Register) =============
-class Asset(Base):
+class Asset(SoftValidationMixin, Base):
     """Fixed Assets from ERPNext Asset Management module.
 
     Represents physical or intangible assets owned by the company,
@@ -105,6 +109,7 @@ class Asset(Base):
     """
 
     __tablename__ = "assets"
+    __soft_validation_scope__ = "assets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -190,12 +195,19 @@ class Asset(Base):
         backref="custodian_assets"
     )
 
+    # Network Device Integration (for routers/CPE as fixed assets)
+    network_device: Mapped[Optional["Router"]] = relationship(
+        "Router",
+        back_populates="asset",
+        uselist=False,
+    )
+
     def __repr__(self) -> str:
         return f"<Asset {self.asset_name} ({self.erpnext_id})>"
 
 
 # ============= ASSET FINANCE BOOK (Child Table) =============
-class AssetFinanceBook(Base):
+class AssetFinanceBook(SoftValidationMixin, Base):
     """Finance book depreciation settings for individual Assets.
 
     Each asset can have multiple finance books with different depreciation
@@ -203,6 +215,7 @@ class AssetFinanceBook(Base):
     """
 
     __tablename__ = "asset_finance_books"
+    __soft_validation_scope__ = "assets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     asset_id: Mapped[int] = mapped_column(
@@ -240,7 +253,7 @@ class AssetFinanceBook(Base):
 
 
 # ============= ASSET DEPRECIATION SCHEDULE (Child Table) =============
-class AssetDepreciationSchedule(Base):
+class AssetDepreciationSchedule(SoftValidationMixin, Base):
     """Depreciation schedule rows for Assets.
 
     Contains the planned depreciation entries for an asset, showing
@@ -248,6 +261,7 @@ class AssetDepreciationSchedule(Base):
     """
 
     __tablename__ = "asset_depreciation_schedules"
+    __soft_validation_scope__ = "assets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     asset_id: Mapped[int] = mapped_column(

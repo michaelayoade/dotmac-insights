@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 from app.utils.datetime_utils import utc_now
 from app.models.supplier_payment import SupplierPayment
 
@@ -31,7 +32,7 @@ class DiscountType(enum.Enum):
     OTHER = "other"
 
 
-class PaymentAllocation(Base):
+class PaymentAllocation(SoftValidationMixin, Base):
     """
     Allocation of a payment to one or more documents.
 

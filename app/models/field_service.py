@@ -6,13 +6,14 @@ from datetime import datetime, date, time
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index, JSON, Date, Time
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Index, JSON, Date, Time
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import CustomerAccount
+    from app.models.party import Party
     from app.models.project import Project
     from app.models.task import Task
     from app.models.ticket import Ticket
@@ -158,12 +159,12 @@ class FieldTeam(Base):
 
 
 class FieldTeamMember(Base):
-    """Team member assignments."""
+    """Team member assignments (party-based)."""
     __tablename__ = "field_team_members"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("field_teams.id", ondelete="CASCADE"), nullable=False, index=True)
-    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), nullable=False, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(ForeignKey("parties.id"), nullable=True, index=True)
 
     # Role in team
     role: Mapped[str] = mapped_column(String(50), default="technician")  # lead, technician, helper
@@ -174,14 +175,21 @@ class FieldTeamMember(Base):
 
     # Relationships
     team: Mapped["FieldTeam"] = relationship(back_populates="members")
-    employee: Mapped["Employee"] = relationship(back_populates="field_team_memberships")
+    party: Mapped["Party"] = relationship(foreign_keys=[party_id])
+    employee: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        primaryjoin="FieldTeamMember.party_id == Employee.party_id",
+        foreign_keys="[FieldTeamMember.party_id]",
+        back_populates="field_team_memberships",
+        viewonly=True,
+    )
 
     __table_args__ = (
-        Index("ix_field_team_members_team_employee", "team_id", "employee_id", unique=True),
+        Index("ix_field_team_members_team_party", "team_id", "party_id", unique=True),
     )
 
     def __repr__(self) -> str:
-        return f"<FieldTeamMember team={self.team_id} employee={self.employee_id}>"
+        return f"<FieldTeamMember team={self.team_id} party={self.party_id}>"
 
 
 # =============================================================================
@@ -296,7 +304,12 @@ class ServiceOrder(Base):
     project_id: Mapped[Optional[int]] = mapped_column(ForeignKey("projects.id"), nullable=True, index=True)
     task_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tasks.id"), nullable=True, index=True)
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    customer_account_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=False,
+        index=True,
+    )
 
     # Asset/Vehicle links (for service history tracking)
     asset_id: Mapped[Optional[int]] = mapped_column(ForeignKey("assets.id"), nullable=True, index=True)
@@ -361,7 +374,7 @@ class ServiceOrder(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped["Customer"] = relationship()
+    customer_account: Mapped["CustomerAccount"] = relationship(foreign_keys=[customer_account_id])
     project: Mapped[Optional["Project"]] = relationship()
     task: Mapped[Optional["Task"]] = relationship()
     ticket: Mapped[Optional["Ticket"]] = relationship()
@@ -382,7 +395,7 @@ class ServiceOrder(Base):
 
     __table_args__ = (
         Index("ix_service_orders_scheduled", "scheduled_date", "status"),
-        Index("ix_service_orders_customer", "customer_id", "status"),
+        Index("ix_service_orders_customer", "customer_account_id", "status"),
         Index("ix_service_orders_technician", "assigned_technician_id", "scheduled_date"),
     )
 
@@ -588,6 +601,10 @@ class ServiceOrderItem(Base):
         return f"<ServiceOrderItem {self.item_name} x{self.quantity}>"
 
 
+# Alias for backwards compatibility (analytics uses TimeEntry)
+TimeEntry = ServiceTimeEntry
+
+
 # =============================================================================
 # CUSTOMER NOTIFICATIONS
 # =============================================================================
@@ -651,7 +668,12 @@ class CustomerNotification(Base):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # Target customer
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    customer_account_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=False,
+        index=True,
+    )
 
     # Notification details
     notification_type: Mapped[CustomerNotificationType] = mapped_column(Enum(CustomerNotificationType), nullable=False, index=True)
@@ -692,16 +714,16 @@ class CustomerNotification(Base):
     scheduled_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Relationships
-    customer: Mapped["Customer"] = relationship()
+    customer_account: Mapped["CustomerAccount"] = relationship(foreign_keys=[customer_account_id])
     service_order: Mapped[Optional["ServiceOrder"]] = relationship(back_populates="notifications")
 
     __table_args__ = (
-        Index("ix_customer_notifications_customer_type", "customer_id", "notification_type"),
+        Index("ix_customer_notifications_customer_type", "customer_account_id", "notification_type"),
         Index("ix_customer_notifications_status", "status", "scheduled_at"),
     )
 
     def __repr__(self) -> str:
-        return f"<CustomerNotification {self.notification_type.value} -> {self.customer_id}>"
+        return f"<CustomerNotification {self.notification_type.value} -> {self.customer_account_id}>"
 
 
 # =============================================================================
@@ -713,7 +735,12 @@ class CustomerNotificationPreference(Base):
     __tablename__ = "customer_notification_preferences"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False, index=True)
+    customer_account_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=False,
+        index=True,
+    )
 
     # Event type
     notification_type: Mapped[CustomerNotificationType] = mapped_column(Enum(CustomerNotificationType), nullable=False)
@@ -729,8 +756,8 @@ class CustomerNotificationPreference(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     __table_args__ = (
-        Index("ix_customer_notif_prefs_customer_type", "customer_id", "notification_type", unique=True),
+        Index("ix_customer_notif_prefs_customer_type", "customer_account_id", "notification_type", unique=True),
     )
 
     def __repr__(self) -> str:
-        return f"<CustomerNotificationPreference {self.notification_type.value} for customer={self.customer_id}>"
+        return f"<CustomerNotificationPreference {self.notification_type.value} for customer={self.customer_account_id}>"

@@ -193,7 +193,7 @@ class OkraClient(BaseOpenBankingProvider):
 
     async def get_widget_token(
         self,
-        customer_id: str,
+        party_id: str,
         redirect_url: str,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -204,7 +204,7 @@ class OkraClient(BaseOpenBankingProvider):
         """
         return {
             "public_key": self.public_key,
-            "customer_id": customer_id,
+            "customer_id": party_id,
             "callback_url": redirect_url,
             "metadata": metadata or {},
             "widget_url": "https://widget.okra.ng",

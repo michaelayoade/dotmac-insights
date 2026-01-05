@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Callable, Any
+from typing import Optional, Callable, Any, AsyncGenerator
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, create_engine, event, or_
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker, with_loader_criteria
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from app.config import settings
 
 connect_args = {}
@@ -89,3 +90,51 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# =============================================================================
+# ASYNC SESSION SUPPORT
+# =============================================================================
+
+def _make_async_url(url: str) -> str:
+    """Convert sync database URL to async driver URL."""
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif url.startswith("sqlite://"):
+        return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
+    return url
+
+
+async_engine = create_async_engine(
+    _make_async_url(settings.database_url),
+    pool_pre_ping=True,
+    pool_size=10,
+    max_overflow=20,
+)
+
+AsyncSessionLocal = async_sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False,
+)
+
+
+async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
+    """Async dependency for FastAPI routes requiring async database access."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+# Register soft validation after all models are available
+def _register_soft_validation():
+    """Deferred registration to avoid circular imports."""
+    from app.validation.soft_validation import register_soft_validation
+    register_soft_validation()
+
+
+_register_soft_validation()

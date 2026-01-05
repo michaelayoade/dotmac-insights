@@ -317,13 +317,14 @@ async def get_bills(
     supplier: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    currency: Optional[str] = None,
     min_amount: Optional[float] = None,
     max_amount: Optional[float] = None,
     overdue_only: bool = False,
     sort_by: str = Query(default="posting_date", regex="^(posting_date|due_date|grand_total|supplier_name)$"),
     sort_order: str = Query(default="desc", regex="^(asc|desc)$"),
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get vendor bills (purchase invoices) with filtering and pagination."""
@@ -343,6 +344,8 @@ async def get_bills(
                 PurchaseInvoice.supplier_name.ilike(f"%{supplier}%"),
             )
         )
+    if currency:
+        query = query.filter(PurchaseInvoice.currency == currency)
 
     if start_date:
         query = query.filter(PurchaseInvoice.posting_date >= _parse_date(start_date, "start_date"))
@@ -362,7 +365,35 @@ async def get_bills(
             PurchaseInvoice.outstanding_amount > 0,
         )
 
-    total = query.count()
+    # Use func.count for efficient counting (avoids 2 full table scans)
+    # Mirror the same filters as the main query
+    count_query = db.query(func.count(PurchaseInvoice.id))
+    if status:
+        try:
+            count_query = count_query.filter(PurchaseInvoice.status == PurchaseInvoiceStatus(status.lower()))
+        except ValueError:
+            pass
+    if supplier:
+        count_query = count_query.filter(or_(
+            PurchaseInvoice.supplier.ilike(f"%{supplier}%"),
+            PurchaseInvoice.supplier_name.ilike(f"%{supplier}%"),
+        ))
+    if currency:
+        count_query = count_query.filter(PurchaseInvoice.currency == currency)
+    if start_date:
+        count_query = count_query.filter(PurchaseInvoice.posting_date >= _parse_date(start_date, "start_date"))
+    if end_date:
+        count_query = count_query.filter(PurchaseInvoice.posting_date <= _parse_date(end_date, "end_date"))
+    if min_amount is not None:
+        count_query = count_query.filter(PurchaseInvoice.grand_total >= min_amount)
+    if max_amount is not None:
+        count_query = count_query.filter(PurchaseInvoice.grand_total <= max_amount)
+    if overdue_only:
+        count_query = count_query.filter(
+            PurchaseInvoice.due_date < date.today(),
+            PurchaseInvoice.outstanding_amount > 0,
+        )
+    total = count_query.scalar()
 
     # Sorting
     sort_column = getattr(PurchaseInvoice, sort_by)
@@ -569,7 +600,7 @@ async def get_vendor_payments(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get vendor payments from GL entries (Payment Entry voucher type)."""
@@ -588,7 +619,20 @@ async def get_vendor_payments(
     if end_date:
         query = query.filter(GLEntry.posting_date <= _parse_date(end_date, "end_date"))
 
-    total = query.count()
+    # Build count query with same filters
+    count_filters = [
+        GLEntry.voucher_type == "Payment Entry",
+        GLEntry.party_type == "Supplier",
+        GLEntry.is_cancelled == False,
+    ]
+    if supplier:
+        count_filters.append(GLEntry.party.ilike(f"%{supplier}%"))
+    if start_date:
+        count_filters.append(GLEntry.posting_date >= _parse_date(start_date, "start_date"))
+    if end_date:
+        count_filters.append(GLEntry.posting_date <= _parse_date(end_date, "end_date"))
+    total = db.query(func.count(GLEntry.id)).filter(*count_filters).scalar()
+
     payments = query.order_by(GLEntry.posting_date.desc()).offset(offset).limit(limit).all()
 
     return {
@@ -621,7 +665,7 @@ async def get_purchase_orders(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get purchase orders.
@@ -731,7 +775,7 @@ async def get_debit_notes(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get debit notes (returns/credits from suppliers)."""
@@ -753,7 +797,19 @@ async def get_debit_notes(
     if end_date:
         query = query.filter(PurchaseInvoice.posting_date <= _parse_date(end_date, "end_date"))
 
-    total = query.count()
+    # Build count query with same filters
+    count_filters = [PurchaseInvoice.status == PurchaseInvoiceStatus.RETURN]
+    if supplier:
+        count_filters.append(or_(
+            PurchaseInvoice.supplier.ilike(f"%{supplier}%"),
+            PurchaseInvoice.supplier_name.ilike(f"%{supplier}%"),
+        ))
+    if start_date:
+        count_filters.append(PurchaseInvoice.posting_date >= _parse_date(start_date, "start_date"))
+    if end_date:
+        count_filters.append(PurchaseInvoice.posting_date <= _parse_date(end_date, "end_date"))
+    total = db.query(func.count(PurchaseInvoice.id)).filter(*count_filters).scalar()
+
     notes = query.order_by(PurchaseInvoice.posting_date.desc()).offset(offset).limit(limit).all()
 
     return {
@@ -825,7 +881,7 @@ async def get_suppliers(
     country: Optional[str] = None,
     with_outstanding: bool = False,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get suppliers list with optional outstanding balance filter."""
@@ -845,7 +901,19 @@ async def get_suppliers(
     if country:
         query = query.filter(Supplier.country == country)
 
-    total = query.count()
+    # Build count query with same filters
+    count_filters = [Supplier.disabled == False]
+    if search:
+        count_filters.append(or_(
+            Supplier.supplier_name.ilike(f"%{search}%"),
+            Supplier.email_id.ilike(f"%{search}%"),
+        ))
+    if supplier_group:
+        count_filters.append(Supplier.supplier_group == supplier_group)
+    if country:
+        count_filters.append(Supplier.country == country)
+    total = db.query(func.count(Supplier.id)).filter(*count_filters).scalar()
+
     suppliers = query.order_by(Supplier.supplier_name).offset(offset).limit(limit).all()
 
     # Calculate outstanding amounts for each supplier
@@ -1127,7 +1195,7 @@ async def get_expenses(
     end_date: Optional[str] = None,
     min_amount: Optional[float] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get expense entries from GL (expense accounts)."""
@@ -1272,7 +1340,7 @@ async def list_erpnext_expenses(
     project_id: Optional[int] = None,
     status: Optional[str] = None,
     limit: int = Query(default=50, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List ERPNext expense claims stored locally."""

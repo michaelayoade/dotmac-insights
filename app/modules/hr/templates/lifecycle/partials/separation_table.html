@@ -1,0 +1,56 @@
+{% if separations %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="separation-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('employee')" x-cloak>Employee</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('date')" x-cloak>Separation Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('reason')" x-cloak>Reason</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('status')" x-cloak>Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for separation in separations %}
+            <tr class="group hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3" x-show="isVisible('employee')" x-cloak>
+                    <a href="/hr/lifecycle/separation/{{ separation.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ separation.employee_name or 'Unknown' }}</a>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('date')" x-cloak>{{ separation.separation_date.strftime('%b %d, %Y') if separation.separation_date else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('reason')" x-cloak>{{ separation.reason_for_leaving or '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('status')" x-cloak>
+                    {% set status = separation.boarding_status.value if separation.boarding_status else 'pending' %}
+                    {% if status == 'completed' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">Completed</span>
+                    {% elif status == 'in_progress' %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-600/20">In Progress</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset bg-yellow-50 text-yellow-700 ring-yellow-600/20">Pending</span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <a href="/hr/lifecycle/separation/{{ separation.id }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total_pages > 1 %}
+{% set query_params = [] %}
+{% if search_query %}
+{% set _ = query_params.append("q=" ~ search_query) %}
+{% endif %}
+{% if current_status %}
+{% set _ = query_params.append("status=" ~ current_status) %}
+{% endif %}
+{% set base_url = "/hr/lifecycle/separation" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="separation-empty-state">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No separation records found</h3>
+    <p class="text-sm text-gray-500">{% if search_query or current_status %}Try adjusting your filters.{% else %}No separation processes have been started yet.{% endif %}</p>
+</div>
+{% endif %}

@@ -10,7 +10,7 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, get_current_principal, Principal
 from app.models.performance import (
     EvaluationPeriod,
     EmployeeScorecardInstance,
@@ -536,7 +536,7 @@ async def get_department_ranking(
 async def get_my_team_performance(
     period_id: int,
     include_indirect: bool = Query(True),
-    # current_user: User = Depends(get_current_user),  # TODO: implement auth
+    principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
 ):
     """
@@ -544,12 +544,17 @@ async def get_my_team_performance(
 
     Requires the current user to be linked to an employee record.
     """
-    # TODO: Get employee_id from current_user
-    # For now, return a placeholder
-    return {
-        "message": "Auth not implemented. Use /manager/{manager_id}/team instead.",
-        "example_url": "/performance/analytics/manager/1/team?period_id=1"
-    }
+    # Find manager's employee record by email
+    manager = db.query(Employee).filter(
+        Employee.email == principal.email
+    ).first()
+
+    if not manager:
+        raise HTTPException(status_code=404, detail="Employee record not found for current user")
+
+    # Use the PerformanceService to get team performance
+    service = PerformanceService(db)
+    return service.get_team_performance(manager.id, period_id, include_indirect=include_indirect)
 
 
 @router.get("/team-comparison", dependencies=[Depends(Require("performance:read"))])

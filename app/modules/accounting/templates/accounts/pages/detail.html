@@ -1,0 +1,279 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+{% set root_type_colors = {
+    'asset': 'text-blue-600 bg-blue-50',
+    'liability': 'text-red-600 bg-red-50',
+    'equity': 'text-purple-600 bg-purple-50',
+    'income': 'text-emerald-600 bg-emerald-50',
+    'expense': 'text-amber-600 bg-amber-50'
+} %}
+
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-2">
+                {% if account.account_number %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 font-mono">
+                    {{ account.account_number }}
+                </span>
+                {% endif %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ root_type_colors.get(account.root_type.value if account.root_type else '', 'bg-gray-50 text-gray-600 ring-gray-500/20') }}">
+                    {{ account.root_type.value.title() if account.root_type else 'Unknown' }}
+                </span>
+                {% if account.is_group %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600">
+                    Group Account
+                </span>
+                {% endif %}
+                {% if account.disabled %}
+                <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium bg-red-50 text-red-700">
+                    Disabled
+                </span>
+                {% endif %}
+            </div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">{{ account.account_name }}</h1>
+            <div class="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                {% if account.account_type %}
+                <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    {{ account.account_type }}
+                </span>
+                {% endif %}
+                {% if account.parent_account %}
+                <span class="flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                    </svg>
+                    {{ account.parent_account }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <a
+                href="/accounting/accounts/{{ account.id }}/edit"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+                Edit
+            </a>
+            <a
+                href="/accounting/accounts"
+                class="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 shadow-sm hover:bg-surface-50 transition-colors"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Back to COA
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Balance Card -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Current Balance</p>
+                        <p class="mt-1 text-3xl font-bold {{ 'text-emerald-600' if balance >= 0 else 'text-red-600' }}">
+                            {% if balance >= 0 %}
+                            {{ '{:,.2f}'.format(balance | float) }}
+                            {% else %}
+                            ({{ '{:,.2f}'.format((balance | float) | abs) }})
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center {{ root_type_colors.get(account.root_type.value if account.root_type else '', 'bg-gray-100 text-gray-600') }}">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Child Accounts (if group) -->
+            {% if account.is_group and children %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-sm font-semibold text-gray-900">Child Accounts ({{ children | length }})</h3>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for child in children %}
+                    <a href="/accounting/accounts/{{ child.id }}" class="flex items-center gap-3 px-6 py-3 hover:bg-surface-50 transition-colors">
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center {{ root_type_colors.get(child.root_type.value if child.root_type else '', 'bg-gray-100 text-gray-600') }}">
+                            {% if child.is_group %}
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+                            </svg>
+                            {% else %}
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            {% endif %}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900 truncate">{{ child.account_name }}</p>
+                            <p class="text-xs text-gray-500">{{ child.account_type or 'Ledger' }}</p>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- GL Entries -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-gray-900">Ledger Entries</h3>
+                    <a href="/accounting/general-ledger?account={{ account.account_name }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        View All
+                    </a>
+                </div>
+                {% if gl_entries %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead>
+                            <tr class="bg-surface-50">
+                                <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Voucher</th>
+                                <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Debit</th>
+                                <th class="py-3 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Credit</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for entry in gl_entries %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm text-gray-900">
+                                    {{ entry.posting_date.strftime('%b %d, %Y') if entry.posting_date else '-' }}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3 text-sm">
+                                    <span class="text-gray-600">{{ entry.voucher_type or '-' }}</span>
+                                    {% if entry.voucher_no %}
+                                    <span class="text-gray-400 font-mono text-xs ml-1">{{ entry.voucher_no }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3 text-sm text-right font-medium {{ 'text-gray-900' if entry.debit > 0 else 'text-gray-400' }}">
+                                    {{ '{:,.2f}'.format(entry.debit | float) if entry.debit else '-' }}
+                                </td>
+                                <td class="whitespace-nowrap py-3 pl-3 pr-6 text-sm text-right font-medium {{ 'text-gray-900' if entry.credit > 0 else 'text-gray-400' }}">
+                                    {{ '{:,.2f}'.format(entry.credit | float) if entry.credit else '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                {% if pagination.total > pagination.per_page %}
+                <div class="px-6 py-4 border-t border-gray-100">
+                    {% include "components/ui/pagination.html" with context %}
+                </div>
+                {% endif %}
+
+                {% else %}
+                <div class="py-12 px-6 text-center">
+                    <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <h3 class="mt-4 text-sm font-medium text-gray-900">No ledger entries</h3>
+                    <p class="mt-1 text-sm text-gray-500">This account has no transactions yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Account Info -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Account Details</h3>
+                <dl class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Account ID</dt>
+                        <dd class="text-gray-900 font-mono">{{ account.id }}</dd>
+                    </div>
+                    {% if account.account_number %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Account Number</dt>
+                        <dd class="text-gray-900 font-mono">{{ account.account_number }}</dd>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Root Type</dt>
+                        <dd class="text-gray-900">{{ account.root_type.value.title() if account.root_type else '-' }}</dd>
+                    </div>
+                    {% if account.account_type %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Account Type</dt>
+                        <dd class="text-gray-900">{{ account.account_type }}</dd>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Is Group</dt>
+                        <dd class="text-gray-900">{{ 'Yes' if account.is_group else 'No' }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Status</dt>
+                        <dd>
+                            {% if account.disabled %}
+                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-red-50 text-red-700">Disabled</span>
+                            {% else %}
+                            <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700">Active</span>
+                            {% endif %}
+                        </dd>
+                    </div>
+                    {% if account.company %}
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500">Company</dt>
+                        <dd class="text-gray-900">{{ account.company }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Actions</h3>
+                <div class="space-y-2">
+                    <a
+                        href="/accounting/accounts/{{ account.id }}/edit"
+                        class="block w-full text-center rounded-xl px-4 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-500 transition-colors"
+                    >
+                        Edit Account
+                    </a>
+                    <a
+                        href="/accounting/general-ledger?account={{ account.account_name }}"
+                        class="block w-full text-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 hover:bg-surface-100 transition-colors"
+                    >
+                        View Full Ledger
+                    </a>
+                    <a
+                        href="/accounting/journal-entries/new?account={{ account.account_name }}"
+                        class="block w-full text-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 hover:bg-surface-100 transition-colors"
+                    >
+                        Create Journal Entry
+                    </a>
+                    <a
+                        href="/accounting/accounts"
+                        class="block w-full text-center rounded-xl px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 hover:bg-surface-100 transition-colors"
+                    >
+                        Back to Chart of Accounts
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

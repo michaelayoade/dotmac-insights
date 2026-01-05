@@ -1,0 +1,97 @@
+{% if cost_centers %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="cost-centers-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Cost Center</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Code</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Parent</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for cc in cost_centers %}
+            <tr class="hover:bg-surface-50 group">
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                        </span>
+                        <div>
+                            <p class="font-medium text-gray-900">{{ cc.cost_center_name }}</p>
+                            {% if cc.description %}
+                            <p class="text-xs text-gray-500 truncate max-w-[200px]">{{ cc.description }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm font-mono text-gray-600 hidden sm:table-cell">
+                    {{ cc.cost_center_code or '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">
+                    {{ cc.parent.cost_center_name if cc.parent else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    {% if cc.is_active or cc.is_active is not defined %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset text-emerald-700 bg-emerald-50 ring-emerald-600/20">
+                        Active
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset text-gray-700 bg-gray-50 ring-gray-600/20">
+                        Inactive
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                            href="/accounting/cost-centers/{{ cc.id }}/edit"
+                            class="text-sm font-medium text-primary-600 hover:text-primary-700"
+                        >
+                            Edit
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" %}
+</div>
+{% endif %}
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center data-testid="cost-centers-empty-state">>
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No cost centers found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6">
+        {% if current_search %}
+        No cost centers match your search criteria.
+        {% else %}
+        Get started by creating your first cost center.
+        {% endif %}
+    </p>
+    {% if not current_search %}
+    <a
+        href="/accounting/cost-centers/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
+        Create Cost Center
+    </a>
+    {% endif %}
+</div>
+{% endif %}

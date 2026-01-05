@@ -106,6 +106,10 @@ class AutomationRule(Base):
     execution_count: Mapped[int] = mapped_column(Integer, default=0)
     last_executed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
+    # Chatwoot sync
+    chatwoot_rule_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

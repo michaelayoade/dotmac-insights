@@ -1,0 +1,79 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Customer Journeys</h1>
+        <p class="mt-1 text-sm text-gray-500">Build lifecycle automations and engagement paths</p>
+    </div>
+    <div class="flex gap-3">
+        <a href="/marketing/journeys/templates" class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-medium">Browse Templates</a>
+        <a href="/marketing/journeys/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            New Journey
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 flex flex-col lg:flex-row gap-4">
+        <input type="search" placeholder="Search journeys..." class="flex-1 rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+        <div class="flex flex-wrap gap-2">
+            <select class="rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-700">
+                <option>All statuses</option>
+                <option>Active</option>
+                <option>Paused</option>
+                <option>Draft</option>
+            </select>
+            <select class="rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-700">
+                <option>All categories</option>
+                <option>Onboarding</option>
+                <option>Nurture</option>
+                <option>Reactivation</option>
+            </select>
+        </div>
+    </div>
+
+{% set journeys = journeys | default([]) %}
+
+    {% if journeys %}
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {% for journey in journeys %}
+            {% include "modules/marketing/templates/partials/journey_card.html" %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 text-sm text-gray-500">
+            No journeys created yet.
+        </div>
+    {% endif %}
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Recommended Templates</h2>
+            <a href="/marketing/journeys/templates" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View all</a>
+        </div>
+        {% set templates = templates | default([]) %}
+        {% if templates %}
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                {% for template in templates %}
+                <div class="rounded-xl border border-gray-100 bg-surface-50 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">{{ template.category }}</p>
+                    <p class="text-sm font-semibold text-gray-900 mt-1">{{ template.name }}</p>
+                    <p class="text-xs text-gray-500 mt-2">{{ template.steps }} · {{ template.goal }}</p>
+                    <a href="/marketing/journeys/templates" class="text-xs text-primary-600 hover:text-primary-700 font-medium mt-3 inline-flex">Use template</a>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="mt-4 text-sm text-gray-500">No templates available.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

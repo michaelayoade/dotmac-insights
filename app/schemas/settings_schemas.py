@@ -372,6 +372,642 @@ SETTING_SCHEMAS: dict[str, dict[int, dict[str, Any]]] = {
             "required": [],
         },
     },
+
+    "billing": {
+        1: {
+            "label": "Billing Configuration",
+            "description": "Subscription billing and payment settings",
+            "type": "object",
+            "properties": {
+                # General billing settings
+                "enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable automated billing",
+                },
+                "default_currency": {
+                    "type": "string",
+                    "default": "NGN",
+                    "description": "Default billing currency",
+                },
+                "supported_currencies": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "default": ["NGN", "USD"],
+                    "description": "Supported currencies for billing",
+                },
+                "tax_rate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "default": 0,
+                    "description": "Default tax rate percentage",
+                },
+                "invoice_prefix": {
+                    "type": "string",
+                    "default": "INV",
+                    "description": "Invoice number prefix",
+                },
+                "invoice_due_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 90,
+                    "default": 7,
+                    "description": "Days until invoice is due",
+                },
+
+                # Daily billing settings
+                "daily_billing_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable daily billing automation",
+                },
+                "daily_billing_hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23,
+                    "default": 1,
+                    "description": "Hour to run daily billing (0-23)",
+                },
+                "daily_billing_minute": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 59,
+                    "default": 0,
+                    "description": "Minute to run daily billing (0-59)",
+                },
+                "daily_billing_type": {
+                    "type": "string",
+                    "enum": ["fixed", "usage_based", "hybrid"],
+                    "default": "fixed",
+                    "description": "Default daily billing type",
+                },
+                "daily_usage_rate_per_gb": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Rate per GB for usage-based billing",
+                },
+                "daily_included_gb": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0,
+                    "description": "Free GB included per day",
+                },
+
+                # Monthly billing settings
+                "monthly_billing_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable monthly billing automation",
+                },
+                "monthly_billing_day": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 28,
+                    "default": 1,
+                    "description": "Day of month for billing (1-28)",
+                },
+                "monthly_billing_hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23,
+                    "default": 2,
+                    "description": "Hour to run monthly billing",
+                },
+
+                # Invoice overdue settings
+                "overdue_check_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable overdue invoice marking",
+                },
+                "overdue_check_hour": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23,
+                    "default": 6,
+                    "description": "Hour to check for overdue invoices",
+                },
+
+                # Retry settings
+                "charge_retry_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable failed charge retries",
+                },
+                "charge_retry_interval_hours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 24,
+                    "default": 4,
+                    "description": "Hours between retry attempts",
+                },
+                "charge_max_retries": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Maximum retry attempts",
+                },
+                "charge_retry_backoff": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Use exponential backoff for retries",
+                },
+
+                # Auto-charge settings
+                "auto_charge_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable automatic charging via payment subscriptions",
+                },
+                "auto_charge_generate_invoice": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Generate invoice before auto-charging",
+                },
+
+                # Suspension settings
+                "auto_suspend_enabled": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Auto-suspend on failed payment",
+                },
+                "auto_suspend_grace_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 30,
+                    "default": 3,
+                    "description": "Grace period before suspension",
+                },
+
+                # Notification settings
+                "send_invoice_email": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Email invoice to customer",
+                },
+                "send_payment_receipt": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Email payment receipt",
+                },
+                "send_payment_failed_alert": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Alert on payment failure",
+                },
+                "send_overdue_reminder": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send overdue invoice reminders",
+                },
+                "overdue_reminder_days": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "default": [1, 3, 7],
+                    "description": "Days after due date to send reminders",
+                },
+            },
+            "required": [],
+        },
+    },
+
+    "subscriptions": {
+        1: {
+            "label": "Subscription Settings",
+            "description": "Subscription lifecycle, billing, and bundle configuration",
+            "type": "object",
+            "properties": {
+                # Billing Settings
+                "default_currency": {
+                    "type": "string",
+                    "default": "NGN",
+                    "description": "Default currency for subscriptions",
+                },
+                "invoice_due_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 90,
+                    "default": 7,
+                    "description": "Days until invoice is due",
+                },
+                "daily_billing_invoice_due_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 1,
+                    "description": "Days until daily billing invoice is due",
+                },
+                "billing_lookback_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 7,
+                    "default": 1,
+                    "description": "Days to look back for billing",
+                },
+                "max_billing_day_of_month": {
+                    "type": "integer",
+                    "minimum": 28,
+                    "maximum": 31,
+                    "default": 28,
+                    "description": "Max day of month for billing anchor (handles Feb)",
+                },
+
+                # Bundle Settings
+                "bundle_expiry_warning_days": {
+                    "type": "array",
+                    "items": {"type": "integer"},
+                    "default": [7, 3, 1],
+                    "description": "Days before expiry to send warnings",
+                },
+                "bundle_cleanup_retention_days": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 365,
+                    "default": 90,
+                    "description": "Days to retain expired/cancelled bundles",
+                },
+                "bundle_default_throttle_speed_kbps": {
+                    "type": "integer",
+                    "minimum": 32,
+                    "maximum": 1024,
+                    "default": 128,
+                    "description": "Default throttle speed when bundle exhausted",
+                },
+                "bundle_expiring_soon_threshold_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 7,
+                    "description": "Days to consider bundle 'expiring soon'",
+                },
+
+                # Usage Alert Thresholds
+                "bundle_alert_threshold_1": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 90,
+                    "default": 50,
+                    "description": "First usage alert threshold (%)",
+                },
+                "bundle_alert_threshold_2": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "Second usage alert threshold (%)",
+                },
+                "bundle_alert_threshold_3": {
+                    "type": "integer",
+                    "minimum": 80,
+                    "maximum": 99,
+                    "default": 95,
+                    "description": "Final usage alert threshold (%)",
+                },
+
+                # RADIUS Settings
+                "radius_username_max_collision_attempts": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 500,
+                    "default": 100,
+                    "description": "Max attempts to resolve username collisions",
+                },
+                "radius_subscription_prefix": {
+                    "type": "string",
+                    "default": "SUB",
+                    "description": "Prefix for subscription-based usernames",
+                },
+
+                # Provisioning Settings
+                "provisioning_retry_attempts": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Number of provisioning retry attempts",
+                },
+                "provisioning_retry_delay_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 300,
+                    "default": 30,
+                    "description": "Delay between provisioning retries",
+                },
+
+                # Lifecycle Settings
+                "auto_suspend_after_grace_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 90,
+                    "default": 0,
+                    "description": "Days after grace period to auto-suspend (0=disabled)",
+                },
+                "auto_cancel_after_suspend_days": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 365,
+                    "default": 30,
+                    "description": "Days after suspension to auto-cancel (0=disabled)",
+                },
+
+                # Session Settings
+                "max_concurrent_sessions": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 1,
+                    "description": "Max concurrent RADIUS sessions per subscription",
+                },
+                "session_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 300,
+                    "maximum": 86400,
+                    "default": 3600,
+                    "description": "Default RADIUS session timeout",
+                },
+                "idle_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "default": 300,
+                    "description": "Default RADIUS idle timeout",
+                },
+
+                # Notification Settings
+                "notify_on_bundle_purchase": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification on bundle purchase",
+                },
+                "notify_on_bundle_exhaustion": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification when bundle exhausted",
+                },
+                "notify_on_bundle_expiry": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification on bundle expiry",
+                },
+                "notify_on_subscription_status_change": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send notification on status changes",
+                },
+            },
+            "required": [],
+        },
+    },
+
+    "monitoring": {
+        1: {
+            "label": "Network Monitoring Settings",
+            "description": "SNMP polling, alerting, and incident management configuration",
+            "type": "object",
+            "properties": {
+                # SNMP Polling Settings
+                "polling_interval_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "default": 300,
+                    "description": "Default SNMP polling interval in seconds",
+                },
+                "polling_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 60,
+                    "default": 10,
+                    "description": "SNMP request timeout in seconds",
+                },
+                "polling_retries": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5,
+                    "default": 2,
+                    "description": "Number of SNMP request retries",
+                },
+                "polling_batch_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20,
+                    "description": "Number of devices to poll concurrently",
+                },
+
+                # Device Down Detection
+                "device_down_after_failures": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Consecutive poll failures before device marked down",
+                },
+                "device_recovery_polls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "default": 2,
+                    "description": "Consecutive successful polls before device marked up",
+                },
+
+                # CPU Alert Thresholds
+                "cpu_warning_percent": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "CPU percentage for warning alert",
+                },
+                "cpu_critical_percent": {
+                    "type": "integer",
+                    "minimum": 70,
+                    "maximum": 100,
+                    "default": 95,
+                    "description": "CPU percentage for critical alert",
+                },
+
+                # Memory Alert Thresholds
+                "memory_warning_percent": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "Memory percentage for warning alert",
+                },
+                "memory_critical_percent": {
+                    "type": "integer",
+                    "minimum": 70,
+                    "maximum": 100,
+                    "default": 95,
+                    "description": "Memory percentage for critical alert",
+                },
+
+                # Temperature Alert Thresholds
+                "temperature_warning_celsius": {
+                    "type": "integer",
+                    "minimum": 40,
+                    "maximum": 80,
+                    "default": 60,
+                    "description": "Temperature (Celsius) for warning alert",
+                },
+                "temperature_critical_celsius": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 100,
+                    "default": 75,
+                    "description": "Temperature (Celsius) for critical alert",
+                },
+
+                # Interface Utilization Thresholds
+                "interface_utilization_warning_percent": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "Interface utilization percentage for warning alert",
+                },
+                "interface_utilization_critical_percent": {
+                    "type": "integer",
+                    "minimum": 70,
+                    "maximum": 100,
+                    "default": 95,
+                    "description": "Interface utilization percentage for critical alert",
+                },
+
+                # Alert Behavior
+                "notification_cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "default": 300,
+                    "description": "Minimum time between repeat notifications",
+                },
+                "auto_resolve_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Automatically resolve alerts when condition clears",
+                },
+                "auto_resolve_delay_seconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 600,
+                    "default": 60,
+                    "description": "Delay before auto-resolving (to avoid flapping)",
+                },
+
+                # Escalation Settings
+                "escalation_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable alert escalation",
+                },
+                "escalation_level_1_minutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 60,
+                    "default": 15,
+                    "description": "Minutes before first escalation",
+                },
+                "escalation_level_2_minutes": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 120,
+                    "default": 30,
+                    "description": "Minutes before second escalation",
+                },
+                "escalation_level_3_minutes": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 240,
+                    "default": 60,
+                    "description": "Minutes before third escalation",
+                },
+
+                # Incident Settings
+                "auto_create_incident": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Auto-create incident for critical alerts",
+                },
+                "incident_auto_resolve_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Auto-resolve incidents when all alerts cleared",
+                },
+                "alert_correlation_window_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 5,
+                    "description": "Window for correlating related alerts into incident",
+                },
+
+                # Metrics Retention
+                "raw_metrics_retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 7,
+                    "description": "Days to retain raw (5-min) metrics",
+                },
+                "hourly_rollup_retention_days": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 365,
+                    "default": 90,
+                    "description": "Days to retain hourly metric rollups",
+                },
+                "daily_rollup_retention_days": {
+                    "type": "integer",
+                    "minimum": 180,
+                    "maximum": 1095,
+                    "default": 730,
+                    "description": "Days to retain daily metric rollups (2 years default)",
+                },
+
+                # Notification Channels
+                "alert_email_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send alert notifications via email",
+                },
+                "alert_sms_enabled": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Send critical alerts via SMS",
+                },
+                "alert_slack_enabled": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Send alerts to Slack",
+                },
+                "alert_slack_webhook_url": {
+                    "type": "string",
+                    "x-secret": True,
+                    "description": "Slack webhook URL for alerts",
+                },
+
+                # NOC Dashboard
+                "noc_dashboard_refresh_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 300,
+                    "default": 30,
+                    "description": "NOC dashboard auto-refresh interval",
+                },
+                "noc_dashboard_alert_sound": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Play sound for new critical alerts",
+                },
+            },
+            "required": [],
+        },
+    },
 }
 
 

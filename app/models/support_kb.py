@@ -5,14 +5,13 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, JSON
+from sqlalchemy import BigInteger, String, Text, Integer, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
-    from app.models.agent import Agent
+    from app.models.party import Party
 
 
 class ArticleStatus(str, Enum):
@@ -59,6 +58,11 @@ class KBCategory(Base):
 
     # Flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+
+    # Chatwoot sync
+    chatwoot_portal_slug: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    chatwoot_category_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -127,6 +131,10 @@ class KBArticle(Base):
     # Related articles (JSON array of article IDs)
     related_article_ids: Mapped[Optional[List[int]]] = mapped_column(JSON, nullable=True)
 
+    # Chatwoot sync
+    chatwoot_article_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -192,11 +200,17 @@ class KBArticleFeedback(Base):
     feedback_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Who gave feedback (one of these, or anonymous)
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
-    agent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
+    agent_party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)

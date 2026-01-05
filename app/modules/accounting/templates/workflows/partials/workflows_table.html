@@ -1,0 +1,134 @@
+{% set doctype_labels = {
+    'journal_entry': 'Journal Entry',
+    'expense': 'Expense',
+    'payment': 'Payment',
+    'supplier_payment': 'Supplier Payment',
+    'invoice': 'Invoice',
+    'purchase_invoice': 'Purchase Invoice',
+    'credit_note': 'Credit Note',
+    'debit_note': 'Debit Note',
+    'bank_transaction': 'Bank Transaction'
+} %}
+
+{% if workflows %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="workflows-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Workflow</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Document Type</th>
+                <th class="px-3 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Steps</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Options</th>
+                <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for workflow in workflows %}
+            <tr class="hover:bg-surface-50 group">
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                            </svg>
+                        </span>
+                        <div>
+                            <a href="/accounting/workflows/{{ workflow.id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                {{ workflow.workflow_name }}
+                            </a>
+                            {% if workflow.description %}
+                            <p class="text-xs text-gray-500 truncate max-w-xs">{{ workflow.description }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600">
+                    {{ doctype_labels.get(workflow.doctype, workflow.doctype.replace('_', ' ').title()) }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-center">
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-700 text-xs font-medium">
+                        {{ workflow.steps|length if workflow.steps else 0 }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm">
+                    {% if workflow.is_active %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                        Active
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium bg-gray-50 text-gray-600 ring-1 ring-inset ring-gray-500/20">
+                        Inactive
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 hidden md:table-cell">
+                    <div class="flex items-center gap-2">
+                        {% if workflow.is_mandatory %}
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-amber-50 text-amber-700">
+                            Mandatory
+                        </span>
+                        {% endif %}
+                        {% if workflow.escalation_enabled %}
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-purple-50 text-purple-700">
+                            Escalation
+                        </span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                            href="/accounting/workflows/{{ workflow.id }}"
+                            class="inline-flex items-center gap-1 rounded-lg bg-gray-50 px-2.5 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+                        >
+                            View
+                        </a>
+                        <a
+                            href="/accounting/workflows/{{ workflow.id }}/edit"
+                            class="inline-flex items-center gap-1 rounded-lg bg-primary-50 px-2.5 py-1.5 text-sm font-medium text-primary-700 hover:bg-primary-100 transition-colors"
+                        >
+                            Edit
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center data-testid="workflows-empty-state">>
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No workflows configured</h3>
+    <p class="text-sm text-gray-500 font-body mb-6">
+        {% if current_search or current_doctype or current_status %}
+        No workflows match your filter criteria. Try adjusting your filters.
+        {% else %}
+        Get started by creating your first approval workflow.
+        {% endif %}
+    </p>
+    {% if not current_search and not current_doctype and not current_status %}
+    <a
+        href="/accounting/workflows/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-primary-700 transition-colors"
+    >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Workflow
+    </a>
+    {% endif %}
+</div>
+{% endif %}

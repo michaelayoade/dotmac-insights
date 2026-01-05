@@ -73,7 +73,7 @@ async def list_sales_persons(
     enabled: Optional[bool] = True,
     department: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List sales persons with filtering."""

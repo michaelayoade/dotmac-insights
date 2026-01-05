@@ -1,0 +1,63 @@
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="credit-notes-table">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-surface-50">
+            <tr>
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Credit Note</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Customer</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Issue Date</th>
+                <th scope="col" class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                <th scope="col" class="px-3 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 bg-white">
+            {% if notes %}
+                {% for note in notes %}
+                <tr class="hover:bg-surface-50 transition-colors">
+                    <td class="py-4 pl-6 pr-3">
+                        <a href="/accounting/credit-notes/{{ note.id }}" class="text-sm font-medium text-gray-900 hover:text-primary-600">
+                            {{ note.credit_number or 'CN-' ~ note.id }}
+                        </a>
+                    </td>
+                    <td class="px-3 py-4 text-sm text-gray-500">
+                        {{ note.customer_account_id or '-' }}
+                    </td>
+                    <td class="px-3 py-4 text-sm text-gray-500">
+                        {{ note.issue_date.strftime('%Y-%m-%d') if note.issue_date else '-' }}
+                    </td>
+                    <td class="px-3 py-4 text-sm text-gray-900 text-right font-mono">
+                        {{ '{:,.2f}'.format(note.amount or 0) }} {{ note.currency or 'NGN' }}
+                    </td>
+                    <td class="px-3 py-4 text-center">
+                        {% set status_class = {
+                            'draft': 'bg-amber-50 text-amber-700',
+                            'issued': 'bg-blue-50 text-blue-700',
+                            'applied': 'bg-emerald-50 text-emerald-700',
+                            'cancelled': 'bg-gray-100 text-gray-600'
+                        }.get(note.status.value if note.status else 'draft', 'bg-gray-100 text-gray-600') %}
+                        <span class="inline-flex items-center rounded-full {{ status_class }} px-2.5 py-0.5 text-xs font-medium">
+                            {{ (note.status.value if note.status else 'draft') | capitalize }}
+                        </span>
+                    </td>
+                    <td class="py-4 pl-3 pr-6 text-right">
+                        <a href="/accounting/credit-notes/{{ note.id }}" class="text-gray-400 hover:text-primary-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-12 text-center text-gray-500" data-testid="credit-notes-empty-state">
+                    <p class="text-sm font-medium">No credit notes found</p>
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>

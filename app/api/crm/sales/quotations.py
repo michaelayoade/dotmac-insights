@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict
 from app.database import get_db
 from app.auth import Require
 from app.models.sales import Quotation, QuotationStatus
-from app.models.contact import Contact
 
 router = APIRouter(prefix="/quotations", tags=["crm-sales-quotations"])
 
@@ -24,7 +23,6 @@ router = APIRouter(prefix="/quotations", tags=["crm-sales-quotations"])
 
 class QuotationBase(BaseModel):
     """Base schema for quotations."""
-    contact_id: Optional[int] = None
     customer_name: Optional[str] = None
     quotation_date: Optional[date] = None
     valid_till: Optional[date] = None
@@ -42,7 +40,6 @@ class QuotationCreate(QuotationBase):
 
 class QuotationUpdate(BaseModel):
     """Schema for updating a quotation."""
-    contact_id: Optional[int] = None
     customer_name: Optional[str] = None
     quotation_date: Optional[date] = None
     valid_till: Optional[date] = None
@@ -57,7 +54,6 @@ class QuotationResponse(BaseModel):
     """Schema for quotation response."""
     id: int
     erpnext_id: Optional[str]
-    contact_id: Optional[int]
     customer_name: Optional[str]
     status: str
     quotation_date: Optional[date]
@@ -95,7 +91,6 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
     return {
         "id": quote.id,
         "erpnext_id": quote.erpnext_id,
-        "contact_id": quote.contact_id,
         "customer_name": quote.customer_name,
         "status": quote.status.value if quote.status else None,
         "quotation_date": quote.transaction_date.isoformat() if quote.transaction_date else None,
@@ -117,10 +112,9 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
 @router.get("", dependencies=[Depends(Require("crm:read"))])
 async def list_quotations(
     status: Optional[str] = None,
-    contact_id: Optional[int] = None,
     customer_name: Optional[str] = None,
     limit: int = Query(default=50, le=200),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List quotations with filtering."""
@@ -130,9 +124,6 @@ async def list_quotations(
         status_enum = _parse_status(status)
         if status_enum:
             query = query.filter(Quotation.status == status_enum)
-
-    if contact_id:
-        query = query.filter(Quotation.contact_id == contact_id)
 
     if customer_name:
         query = query.filter(Quotation.customer_name.ilike(f"%{customer_name}%"))
@@ -167,14 +158,8 @@ async def create_quotation(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a new quotation."""
-    # Validate contact if provided
-    if payload.contact_id:
-        contact = db.query(Contact).filter(Contact.id == payload.contact_id).first()
-        if not contact:
-            raise HTTPException(status_code=400, detail="Contact not found")
-
     quote = Quotation(
-        contact_id=payload.contact_id,
+        party_name=payload.customer_name,
         customer_name=payload.customer_name,
         transaction_date=payload.quotation_date,
         valid_till=payload.valid_till,
@@ -260,7 +245,7 @@ async def submit_quotation(quotation_id: int, db: Session = Depends(get_db)) -> 
     if quote.status != QuotationStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Only draft quotations can be submitted")
 
-    quote.status = QuotationStatus.SUBMITTED
+    quote.status = QuotationStatus.OPEN
     quote.docstatus = 1
     db.commit()
     db.refresh(quote)
@@ -285,9 +270,8 @@ async def convert_to_order(quotation_id: int, db: Session = Depends(get_db)) -> 
 
     # Create sales order from quotation
     order = SalesOrder(
-        contact_id=quote.contact_id,
-        customer_id=quote.customer_id,
-        customer_name=quote.customer_name,
+        customer_name=quote.customer_name or quote.party_name,
+        customer=quote.party_name,
         transaction_date=datetime.now(timezone.utc),
         currency=quote.currency,
         total=quote.total,
@@ -308,4 +292,164 @@ async def convert_to_order(quotation_id: int, db: Session = Depends(get_db)) -> 
         "success": True,
         "message": "Quotation converted to sales order",
         "order_id": order.id,
+    }
+
+
+# =============================================================================
+# SUBSCRIPTION CONVERSION ENDPOINTS
+# =============================================================================
+
+class SubscriptionConversionRequest(BaseModel):
+    """Request schema for converting quotation to subscription."""
+    start_date: Optional[datetime] = None
+    generate_invoice: bool = True
+    provision_immediately: bool = False
+    ppp_username: Optional[str] = None
+    ppp_password: Optional[str] = None
+    router_id: Optional[int] = None
+    access_method: Optional[str] = None  # pppoe, hotspot, dhcp
+
+
+@router.get("/{quotation_id}/subscription-preview", dependencies=[Depends(Require("crm:read"))])
+async def preview_subscription_conversion(
+    quotation_id: int,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Preview what will be created when converting quotation to subscription."""
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from app.services.subscriptions.quote_conversion import QuoteConversionService
+
+    # For sync session, we need to adapt the service call
+    quote = db.query(Quotation).filter(
+        Quotation.id == quotation_id,
+        Quotation.is_deleted == False
+    ).first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    # Return preview data based on quotation
+    from app.models.document_lines import QuotationItem
+    from app.models.tariff import Tariff
+
+    items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation_id).all()
+
+    subscriptions_preview = []
+    total_mrr = Decimal("0")
+
+    for item in items:
+        tariff = None
+        if item.tariff_id:
+            tariff = db.query(Tariff).filter(Tariff.id == item.tariff_id).first()
+
+        if tariff:
+            price = item.rate or tariff.price
+            subscriptions_preview.append({
+                "plan_name": tariff.title,
+                "price": float(price),
+                "download_speed": tariff.speed_download,
+                "upload_speed": tariff.speed_upload,
+                "billing_cycle": item.billing_cycle or "monthly",
+            })
+            total_mrr += price
+
+    return {
+        "quotation_id": quotation_id,
+        "party_id": quote.party_id,
+        "party_name": quote.party_name,
+        "subscriptions": subscriptions_preview,
+        "total_mrr": float(total_mrr),
+        "invoice_total": float(quote.grand_total or 0),
+        "can_convert": len(subscriptions_preview) > 0 and quote.party_id is not None,
+    }
+
+
+@router.post("/{quotation_id}/convert-to-subscription", dependencies=[Depends(Require("crm:write"))])
+async def convert_to_subscription(
+    quotation_id: int,
+    payload: SubscriptionConversionRequest,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Convert a quotation with service plans to subscription(s).
+
+    This creates subscriptions for each service plan item in the quotation.
+    Optionally generates an invoice and triggers provisioning.
+    """
+    from app.models.subscription import Subscription, SubscriptionStatus, SubscriptionType
+    from app.models.document_lines import QuotationItem
+    from app.models.tariff import Tariff
+
+    quote = db.query(Quotation).filter(
+        Quotation.id == quotation_id,
+        Quotation.is_deleted == False
+    ).first()
+    if not quote:
+        raise HTTPException(status_code=404, detail="Quotation not found")
+
+    if quote.converted_subscription_id:
+        raise HTTPException(status_code=400, detail="Quotation already converted to subscription")
+
+    if not quote.party_id:
+        raise HTTPException(status_code=400, detail="Quotation has no linked party/customer")
+
+    # Get service plan items
+    items = db.query(QuotationItem).filter(QuotationItem.quotation_id == quotation_id).all()
+    service_items = []
+
+    for item in items:
+        if item.tariff_id:
+            tariff = db.query(Tariff).filter(Tariff.id == item.tariff_id).first()
+            if tariff:
+                service_items.append((item, tariff))
+
+    if not service_items:
+        raise HTTPException(
+            status_code=400,
+            detail="No service plan items found in quotation. Add items with tariff_id."
+        )
+
+    # Create subscriptions
+    start_date = payload.start_date or datetime.now(timezone.utc)
+    created_subscriptions: List[int] = []
+
+    for item, tariff in service_items:
+        subscription = Subscription(
+            party_id=quote.party_id,
+            tariff_id=tariff.id,
+            service_type=SubscriptionType.INTERNET,
+            plan_name=tariff.title,
+            plan_code=tariff.service_name,
+            description=item.description or tariff.description,
+            price=item.rate or tariff.price,
+            currency=quote.currency or "NGN",
+            billing_cycle=item.billing_cycle or "monthly",
+            download_speed=tariff.speed_download,
+            upload_speed=tariff.speed_upload,
+            status=SubscriptionStatus.PENDING,
+            start_date=start_date,
+            access_method=payload.access_method or "pppoe",
+            ppp_username=payload.ppp_username,
+            ppp_password=payload.ppp_password,
+            router_id=payload.router_id,
+        )
+        db.add(subscription)
+        db.flush()
+        created_subscriptions.append(subscription.id)
+
+        # Provision immediately if requested
+        if payload.provision_immediately:
+            subscription.status = SubscriptionStatus.ACTIVE
+            subscription.provisioned_at = datetime.now(timezone.utc)
+
+    # Update quotation
+    quote.converted_subscription_id = created_subscriptions[0] if created_subscriptions else None
+    quote.converted_at = datetime.now(timezone.utc)
+    quote.status = QuotationStatus.ORDERED
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Created {len(created_subscriptions)} subscription(s) from quotation",
+        "subscription_ids": created_subscriptions,
+        "primary_subscription_id": created_subscriptions[0] if created_subscriptions else None,
     }

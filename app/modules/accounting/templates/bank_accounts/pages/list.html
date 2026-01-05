@@ -1,0 +1,111 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Bank Accounts</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage company bank accounts and transactions</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set bank_account_columns = [
+    {'key': 'account', 'label': 'Account', 'required': True},
+    {'key': 'bank', 'label': 'Bank'},
+    {'key': 'number', 'label': 'Account number'},
+    {'key': 'currency', 'label': 'Currency'},
+] %}
+<div x-data="columnPicker('bank-accounts-table', {{ bank_account_columns  | tojson | e }})">
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <a href="/accounting/bank-accounts" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Accounts</p>
+        <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_accounts }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+    <a href="/accounting/bank-accounts?reconciled=false" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Unreconciled Txns</p>
+        <p class="mt-1 text-2xl font-bold text-amber-600">{{ stats.unreconciled_txns }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View unreconciled →</p>
+    </a>
+    <a href="/accounting/bank-accounts?status=pending" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-blue-200 transition-all cursor-pointer group">
+        <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Pending Txns</p>
+        <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.pending_txns }}</p>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-blue-600">View pending →</p>
+    </a>
+</div>
+
+<!-- Search -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center" x-data="{ open: false }">
+        <div class="relative max-w-md flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query }}"
+                placeholder="Search bank accounts..."
+                class="block w-full pl-11 pr-4 py-2.5 rounded-xl border-0 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm transition-colors"
+                hx-get="/accounting/bank-accounts/table"
+                hx-target="#accounts-container"
+                hx-trigger="input changed delay:300ms, search"
+                hx-push-url="true"
+            >
+        </div>
+        <div class="relative" @click.away="open = false">
+            <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+                @click="open = !open"
+            >
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                Columns
+            </button>
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="absolute right-0 z-10 mt-2 w-52 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+            >
+                <template x-for="col in columns" :key="col.key">
+                    <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                        <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            :checked="isVisible(col.key)"
+                            :disabled="col.required"
+                            @change="toggleColumn(col.key)"
+                        >
+                        <span x-text="col.label"></span>
+                    </label>
+                </template>
+                <button
+                    type="button"
+                    class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                    @click="resetColumns()"
+                >
+                    Reset columns
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Accounts Container -->
+<div id="accounts-container">
+    {% include "modules/accounting/templates/bank_accounts/partials/bank_accounts_table.html" %}
+</div>
+</div>
+{% endblock %}

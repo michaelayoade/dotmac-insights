@@ -1,0 +1,98 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+{% set leave_type_columns = [
+    {'key': 'name', 'label': 'Name', 'required': True},
+    {'key': 'max_leaves', 'label': 'Max Leaves'},
+    {'key': 'carry_forward', 'label': 'Carry Forward'},
+    {'key': 'lwp', 'label': 'LWP'},
+    {'key': 'encashment', 'label': 'Encashment'},
+] %}
+<div class="space-y-6" x-data="columnPicker('leave-types-table', {{ leave_type_columns | tojson | e }})">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Leave Types</h1>
+            <p class="mt-1 text-sm text-gray-500">Manage leave type configurations</p>
+        </div>
+        <a href="/hr/leave/types/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            New Leave Type
+        </a>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form hx-get="/hr/leave/types" hx-target="#table-container" hx-push-url="true" class="flex flex-col sm:flex-row gap-4 items-start sm:items-center" x-data="{ open: false }">
+            <div class="flex-1">
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search leave types..."
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+            </div>
+            <label class="flex items-center gap-2 text-sm text-gray-600">
+                <input type="checkbox" name="include_inactive" {% if include_inactive %}checked{% endif %}
+                    class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                Include inactive
+            </label>
+            <div class="relative" @click.away="open = false">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 border border-gray-200 rounded-xl hover:bg-surface-100 transition-all duration-200"
+                    @click="open = !open"
+                >
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                    <span>Columns</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div
+                    x-show="open"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+                >
+                    <template x-for="col in columns" :key="col.key">
+                        <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                            <input
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                :checked="isVisible(col.key)"
+                                :disabled="col.required"
+                                @change="toggleColumn(col.key)"
+                            >
+                            <span x-text="col.label"></span>
+                        </label>
+                    </template>
+                    <button
+                        type="button"
+                        class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                        @click="resetColumns()"
+                    >
+                        Reset columns
+                    </button>
+                </div>
+            </div>
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                Search
+            </button>
+            {% if search_query %}
+            <a href="/hr/leave/types" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="table-container">
+        {% include "modules/hr/templates/leave_types/partials/leave_types_table.html" %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,95 @@
+{#
+Tabs Component - Secondary Navigation
+
+Usage:
+{% set tabs = [
+    {"label": "Overview", "href": "/module", "active": current_path == "/module"},
+    {"label": "Details", "href": "/module/details", "active": current_path.startswith("/module/details")},
+    {"label": "Settings", "href": "/module/settings", "active": current_path.startswith("/module/settings")},
+] %}
+{% include "components/ui/tabs.html" %}
+
+Options:
+- tabs: List of tab objects with label, href, and active boolean
+- aria_label: Optional aria-label for the nav element (default: "Secondary navigation")
+- size: "sm" or "md" (default: "md")
+- htmx: Enable HTMX navigation (default: true)
+#}
+
+{% set size_classes = {
+    "sm": "py-3 text-xs",
+    "md": "py-4 text-sm"
+} %}
+
+<nav
+    class="border-b border-gray-200 mb-6 relative"
+    aria-label="{{ aria_label | default('Secondary navigation') }}"
+    {% if testid %}data-testid="{{ testid }}"{% endif %}
+    x-data="{
+        canScrollLeft: false,
+        canScrollRight: false,
+        checkScroll() {
+            const el = this.$refs.tabsContainer;
+            if (el) {
+                this.canScrollLeft = el.scrollLeft > 0;
+                this.canScrollRight = el.scrollLeft < (el.scrollWidth - el.clientWidth - 5);
+            }
+        }
+    }"
+    x-init="$nextTick(() => checkScroll())"
+>
+    <!-- Left scroll fade -->
+    <div
+        class="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent pointer-events-none z-10"
+        x-show="canScrollLeft"
+        x-transition:enter="transition-opacity duration-150"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+    ></div>
+
+    <!-- Right scroll fade -->
+    <div
+        class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10"
+        x-show="canScrollRight"
+        x-transition:enter="transition-opacity duration-150"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+    ></div>
+
+    <div
+        class="flex space-x-8 overflow-x-auto scrollbar-none -mb-px"
+        x-ref="tabsContainer"
+        @scroll.debounce.50ms="checkScroll()"
+    >
+        {% for tab in tabs | default([]) %}
+        <a
+            href="{{ tab.href }}"
+            {% if tab.active %}aria-current="page"{% endif %}
+            class="{% if tab.active %}border-primary-500 text-primary-600{% else %}border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300{% endif %}
+                   whitespace-nowrap px-1 border-b-2 font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 rounded-t-sm
+                   {{ size_classes[size | default('md')] }}"
+            {% if htmx | default(true) %}
+            hx-get="{{ tab.href }}"
+            hx-target="#main-content"
+            hx-push-url="true"
+            hx-indicator="#page-loader"
+            {% endif %}
+        >
+            {% if tab.icon %}
+            <span class="inline-flex items-center gap-2">
+                {% include "components/icons/" ~ tab.icon ~ ".html" ignore missing %}
+                {{ tab.label }}
+            </span>
+            {% else %}
+            {{ tab.label }}
+            {% endif %}
+            {% if tab.badge %}
+            <span class="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full
+                         {% if tab.active %}bg-primary-100 text-primary-600{% else %}bg-gray-100 text-gray-600{% endif %}">
+                {{ tab.badge }}
+            </span>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</nav>

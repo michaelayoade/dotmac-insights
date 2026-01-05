@@ -1,0 +1,111 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Automation Logs</h1>
+            <p class="mt-1 text-sm text-gray-500">Execution history for automation rules</p>
+        </div>
+        <a href="/support/automation" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+            Automation Rules
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Executions (30d)</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.total_30d | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Successful</p>
+            <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.success_30d | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Success Rate</p>
+            <p class="text-2xl font-bold {% if stats.success_rate >= 95 %}text-emerald-600{% elif stats.success_rate >= 80 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ stats.success_rate }}%</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Avg Time</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.avg_time_ms }}ms</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <form method="get" class="flex flex-wrap gap-4">
+            <select name="rule_id" class="px-4 py-2 rounded-lg ring-1 ring-gray-200 text-sm">
+                <option value="">All Rules</option>
+                {% for rule in rules %}
+                <option value="{{ rule.id }}" {% if rule_filter == rule.id %}selected{% endif %}>{{ rule.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="trigger" class="px-4 py-2 rounded-lg ring-1 ring-gray-200 text-sm">
+                <option value="">All Triggers</option>
+                {% for t in trigger_options %}
+                <option value="{{ t }}" {% if trigger_filter == t %}selected{% endif %}>{{ t | replace('_', ' ') | title }}</option>
+                {% endfor %}
+            </select>
+            <select name="success" class="px-4 py-2 rounded-lg ring-1 ring-gray-200 text-sm">
+                <option value="">All Status</option>
+                <option value="true" {% if success_filter == true %}selected{% endif %}>Success</option>
+                <option value="false" {% if success_filter == false %}selected{% endif %}>Failed</option>
+            </select>
+            <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700">Filter</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rule</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ticket</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trigger</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Duration</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for log in logs %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ log.created_at.strftime('%b %d %H:%M:%S') if log.created_at else '-' }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ log.rule.name if log.rule else 'Unknown' }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            {% if log.ticket_id %}
+                            <a href="/support/tickets/{{ log.ticket_id }}" class="text-primary-600 hover:text-primary-700">#{{ log.ticket_id }}</a>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600">{{ log.trigger | replace('_', ' ') | title }}</td>
+                        <td class="px-6 py-4">
+                            {% if log.success %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Success</span>
+                            {% else %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500 text-right">{{ log.execution_time_ms or 0 }}ms</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">No logs found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if pagination.total_pages > 1 %}
+        {% set query_params = [] %}
+        {% if rule_filter %}{% set _ = query_params.append("rule_id=" ~ rule_filter) %}{% endif %}
+        {% if success_filter is not none %}{% set _ = query_params.append("success=" ~ success_filter) %}{% endif %}
+        {% if trigger_filter %}{% set _ = query_params.append("trigger=" ~ trigger_filter) %}{% endif %}
+        {% set base_url = "/support/automation/logs" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+        {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": pagination.total_pages, "has_prev": pagination.has_prev, "has_next": pagination.has_next, "prev_page": pagination.prev_page, "next_page": pagination.next_page, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url=base_url %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

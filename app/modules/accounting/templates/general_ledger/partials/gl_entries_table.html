@@ -1,0 +1,98 @@
+{% if entries %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="gl-entries-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Date</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Account</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Voucher</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Debit</th>
+                <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 pr-6">Credit</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for entry in entries %}
+            <tr class="hover:bg-surface-50 group">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-600">
+                    {{ entry.posting_date.strftime('%b %d, %Y') if entry.posting_date else '-' }}
+                </td>
+                <td class="px-3 py-4">
+                    <div>
+                        <p class="font-medium text-gray-900">{{ entry.account }}</p>
+                        {% if entry.party %}
+                        <p class="text-xs text-gray-500">{{ entry.party_type }}: {{ entry.party }}</p>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="px-3 py-4 text-sm hidden sm:table-cell">
+                    <div>
+                        <span class="text-gray-900">{{ entry.voucher_no or '-' }}</span>
+                        {% if entry.voucher_type %}
+                        <p class="text-xs text-gray-500">{{ entry.voucher_type }}</p>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-right font-mono {{ 'text-blue-600 font-medium' if entry.debit and entry.debit > 0 else 'text-gray-400' }}">
+                    {{ '{:,.2f}'.format(entry.debit) if entry.debit and entry.debit > 0 else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 pr-6 text-sm text-right font-mono {{ 'text-red-600 font-medium' if entry.credit and entry.credit > 0 else 'text-gray-400' }}">
+                    {{ '{:,.2f}'.format(entry.credit) if entry.credit and entry.credit > 0 else '-' }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <!-- Totals Footer -->
+        <tfoot class="bg-surface-50">
+            <tr>
+                <td colspan="3" class="py-3.5 pl-6 pr-3 text-sm font-semibold text-gray-900" data-testid="gl-entries-empty-state">
+                    Page Totals
+                </td>
+                <td class="px-3 py-3.5 text-sm text-right font-mono font-semibold text-blue-600">
+                    {% set page_debit = entries|selectattr('debit')|map(attribute='debit')|select('gt', 0)|list %}
+                    {{ '{:,.2f}'.format(page_debit|sum) if page_debit else '0.00' }}
+                </td>
+                <td class="px-3 py-3.5 pr-6 text-sm text-right font-mono font-semibold text-red-600">
+                    {% set page_credit = entries|selectattr('credit')|map(attribute='credit')|select('gt', 0)|list %}
+                    {{ '{:,.2f}'.format(page_credit|sum) if page_credit else '0.00' }}
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No ledger entries found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6">
+        {% if search_query or current_account_id or current_voucher_type or date_from or date_to %}
+        No entries match your current filters. Try adjusting your search or filters.
+        {% else %}
+        The general ledger is empty. Post journal entries to see them here.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_account_id or current_voucher_type or date_from or date_to) %}
+    <a
+        href="/accounting/journal-entries/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 transition-colors"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Journal Entry
+    </a>
+    {% endif %}
+</div>
+{% endif %}

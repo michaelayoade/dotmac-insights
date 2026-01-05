@@ -1,0 +1,138 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Departments</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage your organization structure</p>
+    </div>
+    <div>
+        <a
+            href="/hr/departments/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+            data-testid="new-department-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>New Department</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set department_columns = [
+    {'key': 'department', 'label': 'Department', 'required': True},
+    {'key': 'parent', 'label': 'Parent'},
+    {'key': 'company', 'label': 'Company'},
+    {'key': 'employees', 'label': 'Employees'},
+] %}
+<div x-data="columnPicker('departments-table', {{ department_columns  | tojson | e }})">
+<!-- Filters and Search -->
+<div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="departments-filters">
+    <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center" x-data="{ open: false }">
+        <!-- Search -->
+        <div class="flex-1 relative">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+            </div>
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query }}"
+                placeholder="Search departments..."
+                class="block w-full pl-11 pr-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:bg-white focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm"
+                hx-get="/hr/departments/table"
+                hx-target="#departments-table-container"
+                hx-trigger="input changed delay:300ms, search"
+                hx-push-url="true"
+                hx-indicator="#search-spinner"
+                data-testid="departments-search"
+            >
+            <div id="search-spinner" class="htmx-indicator absolute inset-y-0 right-0 pr-3.5 flex items-center">
+                <svg class="w-5 h-5 text-primary-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <div class="relative" @click.away="open = false">
+            <button
+                type="button"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 border-0 rounded-xl hover:bg-surface-100 focus:ring-2 focus:ring-primary-100 transition-all duration-200"
+                @click="open = !open"
+            >
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+                <span>Columns</span>
+                <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div
+                x-show="open"
+                x-cloak
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 scale-95"
+                x-transition:enter-end="opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 scale-100"
+                x-transition:leave-end="opacity-0 scale-95"
+                class="absolute right-0 z-10 mt-2 w-52 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+            >
+                <template x-for="col in columns" :key="col.key">
+                    <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                        <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                            :checked="isVisible(col.key)"
+                            :disabled="col.required"
+                            @change="toggleColumn(col.key)"
+                        >
+                        <span x-text="col.label"></span>
+                    </label>
+                </template>
+                <button
+                    type="button"
+                    class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                    @click="resetColumns()"
+                >
+                    Reset columns
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {% if search_query %}
+    <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2">
+        <span class="text-xs text-gray-500 font-body">Active filters:</span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+            <span>"{{ search_query }}"</span>
+            <button
+                type="button"
+                class="text-gray-400 hover:text-gray-600"
+                hx-get="/hr/departments/table"
+                hx-target="#departments-table-container"
+                hx-push-url="true"
+                onclick="document.querySelector('[name=q]').value = ''"
+            >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Departments Table -->
+<div id="departments-table-container">
+    {% include "modules/hr/templates/departments/partials/departments_table.html" %}
+</div>
+</div>
+{% endblock %}

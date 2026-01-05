@@ -1,0 +1,38 @@
+{# Assets table partial #}
+{% if assets %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="assets-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                <a href="?sort=asset_name&dir={{ 'desc' if sort == 'asset_name' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/assets/table?sort=asset_name&dir={{ 'desc' if sort == 'asset_name' and dir == 'asc' else 'asc' }}" hx-target="#assets-table-container" hx-push-url="true">
+                    Asset
+                    {% if sort == 'asset_name' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Category</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Location</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">
+                <a href="?sort=asset_value&dir={{ 'desc' if sort == 'asset_value' and dir == 'asc' else 'asc' }}" class="group inline-flex items-center gap-1" hx-get="/assets/table?sort=asset_value&dir={{ 'desc' if sort == 'asset_value' and dir == 'asc' else 'asc' }}" hx-target="#assets-table-container" hx-push-url="true">
+                    Book Value
+                    {% if sort == 'asset_value' %}<svg class="w-3 h-3 {{ 'rotate-180' if dir == 'desc' else '' }}" fill="currentColor" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>{% endif %}
+                </a>
+            </th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="relative py-3.5 pl-3 pr-6"><span class="sr-only">Actions</span></th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for asset in assets %}
+            {% include "modules/assets/templates/partials/asset_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="assets-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No assets found</h3>
+    <p class="text-sm text-gray-500">Assets are synced from ERPNext.</p>
+</div>
+{% endif %}

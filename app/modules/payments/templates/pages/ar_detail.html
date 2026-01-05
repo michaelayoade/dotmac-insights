@@ -1,0 +1,176 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3 mb-2">
+                <a href="/payments/receivables" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </a>
+                <h1 class="text-2xl font-display font-bold text-gray-900">{{ payment.receipt_number or 'PMT-' ~ payment.id }}</h1>
+                {% set status_colors = {
+                    'pending': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                    'approved': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'posted': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                    'completed': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'failed': 'bg-red-50 text-red-700 ring-red-600/20',
+                    'refunded': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(payment.status.value.lower() if payment.status else 'pending', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ payment.status.value.replace('_', ' ').title() if payment.status else 'Pending' }}
+                </span>
+            </div>
+            <p class="text-sm text-gray-500">
+                {% if payment.contact %}
+                {{ payment.contact.name }}
+                {% elif payment.customer_account and payment.customer_account.party %}
+                {{ payment.customer_account.party.name }}
+                {% else %}
+                Unknown Customer
+                {% endif %}
+            </p>
+        </div>
+        <div class="flex gap-3">
+            {% if payment.invoice %}
+            <a href="/invoices/{{ payment.invoice.id }}" class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-surface-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                View Invoice
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Payment Date</p>
+            <p class="text-xl font-bold text-gray-900">{{ payment.payment_date.strftime('%b %d, %Y') if payment.payment_date else '-' }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Amount</p>
+            <p class="text-xl font-bold text-gray-900">{{ payment.amount|round(2) }} {{ payment.currency }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Allocated</p>
+            <p class="text-xl font-bold text-green-600">{{ (payment.total_allocated or 0)|round(2) }} {{ payment.currency }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <p class="text-sm text-gray-500 mb-1">Unallocated</p>
+            <p class="text-xl font-bold {{ 'text-yellow-600' if payment.unallocated_amount and payment.unallocated_amount > 0 else 'text-gray-900' }}">{{ (payment.unallocated_amount or 0)|round(2) }} {{ payment.currency }}</p>
+        </div>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Payment Details -->
+        <div class="lg:col-span-1 space-y-6">
+            <!-- Payment Info -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Payment Details</h2>
+                <dl class="space-y-3">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ payment.payment_method.value.replace('_', ' ').title() if payment.payment_method else '-' }}</dd>
+                    </div>
+                    {% if payment.transaction_reference %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Transaction Reference</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{ payment.transaction_reference }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if payment.gateway_reference %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Gateway Reference</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{ payment.gateway_reference }}</dd>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Source</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ payment.source.value.title() if payment.source else 'Internal' }}</dd>
+                    </div>
+                    {% if payment.conversion_rate and payment.conversion_rate != 1 %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Exchange Rate</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ payment.conversion_rate }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Base Amount</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ (payment.base_amount or 0)|round(2) }} {{ payment.base_currency }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <!-- Notes -->
+            {% if payment.notes %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Notes</h2>
+                <p class="text-sm text-gray-600 whitespace-pre-line">{{ payment.notes }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Allocations -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Allocations</h2>
+                </div>
+                {% if payment.allocations %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead><tr class="bg-surface-50">
+                            <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Document</th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Type</th>
+                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Allocated</th>
+                            <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Discount</th>
+                            <th class="py-3 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Write-off</th>
+                        </tr></thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for alloc in payment.allocations %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm font-medium text-gray-900">
+                                    {% if alloc.invoice_id %}
+                                    <a href="/invoices/{{ alloc.invoice_id }}" class="text-primary-600 hover:text-primary-700">{{ alloc.reference_number or 'INV-' ~ alloc.invoice_id }}</a>
+                                    {% else %}
+                                    {{ alloc.reference_number or '-' }}
+                                    {% endif %}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600">{{ alloc.document_type.value.replace('_', ' ').title() if alloc.document_type else 'Invoice' }}</td>
+                                <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ (alloc.allocated_amount or 0)|round(2) }}</td>
+                                <td class="whitespace-nowrap px-3 py-3 text-sm text-green-600 text-right">{{ (alloc.discount_amount or 0)|round(2) }}</td>
+                                <td class="whitespace-nowrap py-3 pl-3 pr-6 text-sm text-orange-600 text-right">{{ (alloc.write_off_amount or 0)|round(2) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-6 text-center">
+                    <p class="text-sm text-gray-500">No allocations yet. This payment is fully unallocated.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Linked Invoice -->
+            {% if payment.invoice %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Linked Invoice</h2>
+                <div class="flex items-center justify-between p-4 bg-surface-50 rounded-xl">
+                    <div>
+                        <p class="font-medium text-gray-900">{{ payment.invoice.invoice_number or 'INV-' ~ payment.invoice.id }}</p>
+                        <p class="text-sm text-gray-500">{{ payment.invoice.invoice_date.strftime('%b %d, %Y') if payment.invoice.invoice_date else '' }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium text-gray-900">{{ (payment.invoice.total_amount or 0)|round(2) }} {{ payment.invoice.currency }}</p>
+                        <p class="text-sm {{ 'text-red-600' if payment.invoice.balance and payment.invoice.balance > 0 else 'text-green-600' }}">Balance: {{ (payment.invoice.balance or 0)|round(2) }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

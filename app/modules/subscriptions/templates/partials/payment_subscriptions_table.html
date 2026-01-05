@@ -1,0 +1,220 @@
+{# Payment Subscriptions table partial - returned for HTMX updates #}
+
+{% if subscriptions %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="payment-subscriptions-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/payments/table?sort=plan_name&dir={% if sort_key == 'plan_name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#payment-subscriptions-table-container"
+                        hx-include="[name='q'], [name='status'], [name='provider']"
+                        hx-push-url="true"
+                    >
+                        Plan
+                        {% if sort_key == 'plan_name' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Customer
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/payments/table?sort=amount&dir={% if sort_key == 'amount' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#payment-subscriptions-table-container"
+                        hx-include="[name='q'], [name='status'], [name='provider']"
+                        hx-push-url="true"
+                    >
+                        Amount
+                        {% if sort_key == 'amount' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Provider
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/payments/table?sort=status&dir={% if sort_key == 'status' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#payment-subscriptions-table-container"
+                        hx-include="[name='q'], [name='status'], [name='provider']"
+                        hx-push-url="true"
+                    >
+                        Status
+                        {% if sort_key == 'status' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/payments/table?sort=next_billing_date&dir={% if sort_key == 'next_billing_date' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#payment-subscriptions-table-container"
+                        hx-include="[name='q'], [name='status'], [name='provider']"
+                        hx-push-url="true"
+                    >
+                        Next Billing
+                        {% if sort_key == 'next_billing_date' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for sub in subscriptions %}
+            <tr class="group hover:bg-surface-50/50 transition-colors" data-testid="payment-subscription-row-{{ sub.id }}">
+                <!-- Plan Name -->
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0">
+                            {% set provider_colors = {
+                                'paystack': 'from-cyan-100 to-teal-200 ring-cyan-200/50 text-cyan-600',
+                                'flutterwave': 'from-orange-100 to-amber-200 ring-orange-200/50 text-orange-600'
+                            } %}
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br {{ provider_colors.get(sub.provider.value, 'from-gray-100 to-slate-200 ring-gray-200/50 text-gray-600') }} ring-2">
+                                {% if sub.provider.value == 'paystack' %}
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm7 14a5 5 0 100-10 5 5 0 000 10z"/>
+                                </svg>
+                                {% elif sub.provider.value == 'flutterwave' %}
+                                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                                </svg>
+                                {% else %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                                </svg>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="min-w-0">
+                            <a href="/subscriptions/payments/{{ sub.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block">
+                                {{ sub.plan_name }}
+                            </a>
+                            <p class="text-xs text-gray-500 truncate">{{ sub.interval.value | title }}{% if sub.service_subscription_id %} · Linked{% endif %}</p>
+                        </div>
+                    </div>
+                </td>
+
+                <!-- Customer -->
+                <td class="px-3 py-4 hidden sm:table-cell">
+                    {% if sub.party %}
+                    <a href="/parties/{{ sub.party.id }}" class="text-sm text-gray-700 hover:text-primary-600 transition-colors">
+                        {{ sub.party.name }}
+                    </a>
+                    {% else %}
+                    <span class="text-sm text-gray-500">{{ sub.customer_email or '-' }}</span>
+                    {% endif %}
+                </td>
+
+                <!-- Amount -->
+                <td class="px-3 py-4">
+                    <p class="text-sm font-semibold text-gray-900 font-display tabular-nums">
+                        {{ sub.currency or '₦' }} {{ "{:,.0f}".format(sub.amount) }}
+                    </p>
+                </td>
+
+                <!-- Provider -->
+                <td class="px-3 py-4 hidden md:table-cell">
+                    {% set provider_badge_colors = {
+                        'paystack': 'bg-cyan-50 text-cyan-700 ring-cyan-600/20',
+                        'flutterwave': 'bg-orange-50 text-orange-700 ring-orange-600/20'
+                    } %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ provider_badge_colors.get(sub.provider.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ sub.provider.value | title }}
+                    </span>
+                </td>
+
+                <!-- Status -->
+                <td class="px-3 py-4">
+                    {% set status_colors = {
+                        'active': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                        'paused': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                        'cancelled': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                        'completed': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'past_due': 'bg-red-50 text-red-700 ring-red-600/20',
+                        'expired': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+                    } %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ status_colors.get(sub.status.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ sub.status.value.replace('_', ' ') | title }}
+                    </span>
+                </td>
+
+                <!-- Next Billing Date -->
+                <td class="px-3 py-4 hidden lg:table-cell">
+                    {% if sub.next_billing_date %}
+                    <span class="text-sm text-gray-600 tabular-nums">{{ sub.next_billing_date.strftime('%d %b %Y') }}</span>
+                    {% else %}
+                    <span class="text-xs text-gray-400">-</span>
+                    {% endif %}
+                </td>
+
+                <!-- Actions -->
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                            href="/subscriptions/payments/{{ sub.id }}"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all"
+                        >
+                            View
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="payment-subscriptions-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-100 to-teal-200 flex items-center justify-center mb-6 ring-2 ring-cyan-200/50">
+        <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No payment subscriptions found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_status or current_provider %}
+        No payment subscriptions match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Payment subscriptions will appear here once customers authorize recurring payments.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

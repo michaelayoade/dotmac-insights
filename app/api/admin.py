@@ -268,6 +268,29 @@ async def update_user(
         logger.info("user_superuser_changed", user_id=user_id, is_superuser=request.is_superuser)
 
     if request.role_ids is not None:
+        # Validate roles before assigning (hierarchical permission check)
+        if not principal.is_superuser:
+            # Get assigner's roles
+            assigner_role_ids = {
+                ur.role_id for ur in db.query(UserRole).filter(
+                    UserRole.user_id == principal.id
+                ).all()
+            } if principal.type == "user" else set()
+
+            for role_id in request.role_ids:
+                role = db.query(Role).filter(Role.id == role_id).first()
+                if not role:
+                    raise HTTPException(status_code=400, detail=f"Role {role_id} not found")
+                # Check if this is a system role
+                if role.is_system:
+                    raise HTTPException(status_code=403, detail="Cannot assign system roles")
+                # Check if assigner has this role
+                if role_id not in assigner_role_ids:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Cannot assign role '{role.name}' - you don't have this role"
+                    )
+
         # Clear existing roles and add new ones
         db.query(UserRole).filter(UserRole.user_id == user_id).delete()
         for role_id in request.role_ids:

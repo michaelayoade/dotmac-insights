@@ -1,0 +1,235 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">My HR</h1>
+            <p class="mt-1 text-sm text-gray-500">Welcome, {{ employee.name }}</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/hr/my/leave/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Apply for Leave
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Actions: Check In/Out -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h2 class="text-lg font-display font-semibold text-gray-900">Today's Attendance</h2>
+                <p class="text-sm text-gray-500">{{ today.strftime('%A, %B %d, %Y') }}</p>
+            </div>
+            <div class="flex gap-3">
+                {% if not today_attendance %}
+                    <form method="POST" action="/hr/my/attendance/check-in" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+                            Check In
+                        </button>
+                    </form>
+                {% elif today_attendance and not today_attendance.out_time %}
+                    <div class="flex items-center gap-4">
+                        <div class="text-sm text-gray-600">
+                            <span class="font-medium">Checked in:</span> {{ today_attendance.in_time.strftime('%H:%M') if today_attendance.in_time else '-' }}
+                        </div>
+                        <form method="POST" action="/hr/my/attendance/check-out" class="inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="inline-flex items-center gap-2 px-6 py-3 bg-coral-600 text-white rounded-xl hover:bg-coral-700 font-medium">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                Check Out
+                            </button>
+                        </form>
+                    </div>
+                {% else %}
+                    <div class="flex items-center gap-4 text-sm text-gray-600">
+                        <span><span class="font-medium">In:</span> {{ today_attendance.in_time.strftime('%H:%M') if today_attendance.in_time else '-' }}</span>
+                        <span><span class="font-medium">Out:</span> {{ today_attendance.out_time.strftime('%H:%M') if today_attendance.out_time else '-' }}</span>
+                        <span class="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-medium">Complete</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <a href="/hr/my/leave" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Pending Leave</p>
+                    <p class="text-3xl font-bold text-amber-600 mt-1">{{ pending_leave }}</p>
+                </div>
+                <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </a>
+        <a href="/hr/my/leave/balance" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Leave Balance</p>
+                    <p class="text-3xl font-bold text-purple-600 mt-1">{{ leave_balances|length }}</p>
+                    <p class="text-xs text-gray-500 mt-1">types allocated</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+            </div>
+        </a>
+        <a href="/hr/my/payslips" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Recent Payslips</p>
+                    <p class="text-3xl font-bold text-blue-600 mt-1">{{ recent_payslips|length }}</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </div>
+            </div>
+        </a>
+        <a href="/hr/my/training" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Upcoming Training</p>
+                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ upcoming_training|length }}</p>
+                </div>
+                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Recent Attendance -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Recent Attendance</h2>
+                <a href="/hr/my/attendance" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% if recent_attendance %}
+                    {% for record in recent_attendance %}
+                    <div class="px-6 py-3 flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 {% if record.status == 'Present' %}bg-emerald-100 text-emerald-600{% else %}bg-gray-100 text-gray-500{% endif %} rounded-full flex items-center justify-center font-medium text-sm">
+                                {{ record.attendance_date.strftime('%d') if record.attendance_date else '-' }}
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900">{{ record.attendance_date.strftime('%A') if record.attendance_date else '-' }}</p>
+                                <p class="text-sm text-gray-500">{{ record.attendance_date.strftime('%b %d, %Y') if record.attendance_date else '-' }}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm {% if record.status == 'Present' %}text-emerald-600{% else %}text-gray-500{% endif %} font-medium">{{ record.status }}</p>
+                            {% if record.in_time or record.out_time %}
+                            <p class="text-xs text-gray-500">{{ record.in_time.strftime('%H:%M') if record.in_time else '-' }} - {{ record.out_time.strftime('%H:%M') if record.out_time else '-' }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="px-6 py-8 text-center text-gray-500">
+                        <p>No attendance records</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Recent Payslips -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Recent Payslips</h2>
+                <a href="/hr/my/payslips" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% if recent_payslips %}
+                    {% for payslip in recent_payslips %}
+                    <a href="/hr/my/payslips/{{ payslip.id }}" class="px-6 py-4 flex items-center justify-between hover:bg-surface-50 block">
+                        <div>
+                            <p class="font-medium text-gray-900">{{ payslip.posting_date.strftime('%B %Y') if payslip.posting_date else '-' }}</p>
+                            <p class="text-sm text-gray-500">Posted: {{ payslip.posting_date.strftime('%b %d, %Y') if payslip.posting_date else '-' }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-semibold text-gray-900">${{ '{:,.2f}'.format(payslip.net_pay or 0) }}</p>
+                            <p class="text-xs text-gray-500">Net Pay</p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="px-6 py-8 text-center text-gray-500">
+                        <p>No payslips available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Upcoming Training -->
+    {% if upcoming_training %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Upcoming Training</h2>
+            <a href="/hr/my/training" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View All</a>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for event in upcoming_training %}
+            <a href="/hr/my/training/{{ event.id }}" class="px-6 py-4 flex items-center justify-between hover:bg-surface-50 block">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
+                        <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-900">{{ event.event_name }}</p>
+                        <p class="text-sm text-gray-500">{{ event.training_program.program_name if event.training_program else '' }}</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="font-medium text-gray-900">{{ event.start_date.strftime('%b %d') if event.start_date else '-' }}</p>
+                    <p class="text-xs text-gray-500">{{ event.start_date.strftime('%Y') if event.start_date else '' }}</p>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Links -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <a href="/hr/my/leave" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all group">
+            <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-amber-100 transition-colors">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+            <p class="font-medium text-gray-900">My Leave</p>
+            <p class="text-sm text-gray-500">Leave requests</p>
+        </a>
+        <a href="/hr/my/attendance" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all group">
+            <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-emerald-100 transition-colors">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <p class="font-medium text-gray-900">My Attendance</p>
+            <p class="text-sm text-gray-500">Time records</p>
+        </a>
+        <a href="/hr/my/payslips" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all group">
+            <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-blue-100 transition-colors">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+            <p class="font-medium text-gray-900">My Payslips</p>
+            <p class="text-sm text-gray-500">Salary slips</p>
+        </a>
+        <a href="/hr/my/appraisals" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:ring-primary-200 transition-all group">
+            <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-purple-100 transition-colors">
+                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>
+            </div>
+            <p class="font-medium text-gray-900">My Appraisals</p>
+            <p class="text-sm text-gray-500">Performance reviews</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

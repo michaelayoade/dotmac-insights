@@ -1,9 +1,5 @@
 """
-Accounting Module Router
-
-Combines all accounting sub-modules into a single router.
-This module replaces the monolithic app/api/accounting.py with a
-structured decomposition into focused sub-routers.
+Accounting API router.
 
 Sub-modules:
 - dashboard: Overview metrics and KPIs
@@ -23,6 +19,7 @@ Sub-modules:
 - ar_payments: Customer payments with allocations
 - notes: Credit notes (AR) and debit notes (AP)
 - attachments: Document attachment upload and management
+- invoices: AR invoice CRUD and workflow (source of truth for invoices)
 """
 
 from fastapi import APIRouter
@@ -45,6 +42,8 @@ from .ar_payments import router as ar_payments_router
 from .notes import router as notes_router
 from .attachments import router as attachments_router
 from .payment_modes import router as payment_modes_router
+from .invoices import router as invoices_router
+from .soft_validation import router as soft_validation_router
 
 router = APIRouter(tags=["accounting"])
 
@@ -67,6 +66,8 @@ router.include_router(ar_payments_router, tags=["Accounting - AR Payments"])
 router.include_router(notes_router, tags=["Accounting - Credit/Debit Notes"])
 router.include_router(attachments_router, tags=["Accounting - Attachments"])
 router.include_router(payment_modes_router, tags=["Accounting - Payment Modes"])
+router.include_router(invoices_router, tags=["Accounting - Invoices"])
+router.include_router(soft_validation_router, tags=["Accounting - Validation"])
 
 # Re-export common items for convenience
 from .helpers import (

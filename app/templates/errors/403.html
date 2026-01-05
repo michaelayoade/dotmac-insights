@@ -1,0 +1,58 @@
+{% extends "layouts/base.html" %}
+
+{% block title %}Access Denied{% endblock %}
+
+{% block body %}
+<div class="min-h-screen bg-gradient-to-br from-surface-50 via-surface-100 to-primary-50/30 flex items-center justify-center p-4">
+    <div class="max-w-md w-full text-center animate-fade-up">
+        <!-- Icon -->
+        <div class="mx-auto w-20 h-20 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-500/25 mb-8">
+            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+            </svg>
+        </div>
+
+        <!-- Content -->
+        <h1 class="text-3xl font-display font-bold text-gray-900 mb-3" data-testid="error-title">
+            Access Denied
+        </h1>
+        <p class="text-gray-600 mb-8" data-testid="error-message">
+            {% if detail %}
+            {{ detail }}
+            {% else %}
+            You don't have permission to access this resource. Please contact your administrator if you believe this is an error.
+            {% endif %}
+        </p>
+
+        <!-- Actions -->
+        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+            <a
+                href="/"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:bg-primary-500 hover:shadow-primary-500/30 transition-all"
+                data-testid="go-home-button"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                Go to Dashboard
+            </a>
+            <button
+                type="button"
+                onclick="history.back()"
+                class="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-warm ring-1 ring-gray-200 hover:bg-gray-50 transition-all"
+                data-testid="go-back-button"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                Go Back
+            </button>
+        </div>
+
+        <!-- Help Text -->
+        <p class="mt-8 text-sm text-gray-500">
+            Error 403 &mdash; Forbidden
+        </p>
+    </div>
+</div>
+{% endblock %}

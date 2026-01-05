@@ -1,8 +1,8 @@
 [tool.poetry]
-name = "dotmac-insights"
-version = "0.1.0"
-description = "Business intelligence dashboard for Dotmac Technologies"
-authors = ["Dotmac Technologies"]
+name = "dotmac-bos"
+version = "1.0.0"
+description = "Business Operating System - Comprehensive ERP platform for business operations"
+authors = ["Michael Ayoade <michaelayoade@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -27,6 +27,7 @@ pandas = "^2.2.0"
 openpyxl = "^3.1.0"
 prometheus-client = "^0.19.0"
 jinja2 = "^3.1.0"
+pysnmp-lextudio = "^6.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.0.0"

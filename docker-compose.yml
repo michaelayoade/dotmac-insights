@@ -43,24 +43,20 @@ services:
       - .env
     ports:
       - "8000:8000"
+    volumes:
+      # Mount source code for hot-reloading in development
+      - ./app:/app/app
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    command: >
-      gunicorn app.main:app
-      --workers 4
-      --worker-class uvicorn.workers.UvicornWorker
-      --bind 0.0.0.0:8000
-      --access-logfile -
-      --error-logfile -
     restart: unless-stopped
 
   celery_worker:

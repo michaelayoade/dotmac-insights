@@ -71,8 +71,27 @@ class Settings(BaseSettings):
 
     # Branding (used in templates and emails)
     company_name: str = "dotMac Limited"
-    product_name: str = "DotMac Insights"
-    support_email: str = "support@dotmac.com"
+    product_name: str = "DotMac BOS"
+    support_email: str = "support@dotmac.ng"
+
+    # Marketing integrations
+    meta_app_id: Optional[str] = None
+    meta_app_secret: Optional[str] = None
+    meta_redirect_uri: Optional[str] = None
+    twitter_client_id: Optional[str] = None
+    twitter_client_secret: Optional[str] = None
+    twitter_redirect_uri: Optional[str] = None
+    linkedin_client_id: Optional[str] = None
+    linkedin_client_secret: Optional[str] = None
+    linkedin_redirect_uri: Optional[str] = None
+    whatsapp_access_token: Optional[str] = None
+    email_unsubscribe_secret: Optional[str] = None
+    marketing_public_base_url: Optional[str] = None
+
+    meta_webhook_secret: Optional[str] = None
+    twitter_webhook_secret: Optional[str] = None
+    linkedin_webhook_secret: Optional[str] = None
+    whatsapp_webhook_secret: Optional[str] = None
 
     # OpenBao (secrets management)
     openbao_url: Optional[str] = None  # e.g., http://localhost:8200
@@ -137,7 +156,7 @@ class Settings(BaseSettings):
     # OTEL observability
     otel_enabled: bool = False
     otel_exporter_endpoint: Optional[str] = None
-    otel_service_name: str = "dotmac-insights"
+    otel_service_name: str = "dotmac-bos"
     otel_service_namespace: str = "dotmac"
     otel_trace_sample_rate: float = 0.1  # 10% sampling default to avoid overhead
 
@@ -183,6 +202,8 @@ if settings.is_production and settings.auth_disabled:
 
 # Production safety checks
 if settings.is_production and not os.getenv("PYTEST_CURRENT_TEST"):
+    if not (os.getenv("CONFIG_ENCRYPTION_KEY") or os.getenv("SECRET_KEY")):
+        raise ValueError("CONFIG_ENCRYPTION_KEY or SECRET_KEY must be set in production")
     if not settings.database_url or settings.database_url.startswith("sqlite"):
         raise ValueError("DATABASE_URL must be set to a non-sqlite database in production")
     if not settings.cors_origins_list:

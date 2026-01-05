@@ -1,0 +1,102 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Audit Log</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Track changes and activity across accounting records</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <div class="flex-1 min-w-[200px]">
+            <div class="relative">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ current_search or '' }}"
+                    placeholder="Search by document or user..."
+                    class="block w-full rounded-xl border-0 py-2.5 pl-10 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    hx-get="/accounting/audit-log/table"
+                    hx-target="#audit-log-table"
+                    hx-include="[name='doc_type'], [name='action'], [name='date_from'], [name='date_to']"
+                    hx-push-url="true"
+                    hx-trigger="input changed delay:300ms, search"
+                >
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="sm:w-40">
+            <select
+                name="doc_type"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/audit-log/table"
+                hx-target="#audit-log-table"
+                hx-include="[name='q'], [name='action'], [name='date_from'], [name='date_to']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+                <option value="">All Types</option>
+                {% for opt in doc_type_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_doc_type == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="sm:w-36">
+            <select
+                name="action"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/audit-log/table"
+                hx-target="#audit-log-table"
+                hx-include="[name='q'], [name='doc_type'], [name='date_from'], [name='date_to']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+                <option value="">All Actions</option>
+                {% for opt in action_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_action == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="sm:w-40">
+            <input
+                type="date"
+                name="date_from"
+                value="{{ current_date_from or '' }}"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/audit-log/table"
+                hx-target="#audit-log-table"
+                hx-include="[name='q'], [name='doc_type'], [name='action'], [name='date_to']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+        </div>
+        <div class="sm:w-40">
+            <input
+                type="date"
+                name="date_to"
+                value="{{ current_date_to or '' }}"
+                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                hx-get="/accounting/audit-log/table"
+                hx-target="#audit-log-table"
+                hx-include="[name='q'], [name='doc_type'], [name='action'], [name='date_from']"
+                hx-push-url="true"
+                hx-trigger="change"
+            >
+        </div>
+    </form>
+</div>
+
+<!-- Audit Log Table -->
+<div id="audit-log-table">
+    {% include "modules/accounting/templates/audit_log/partials/audit_log_table.html" %}
+</div>
+{% endblock %}

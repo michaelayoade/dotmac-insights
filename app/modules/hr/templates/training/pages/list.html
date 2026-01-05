@@ -1,0 +1,106 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Training Events</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage employee training and development</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="/hr/training/programs" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            Programs
+        </a>
+        <a href="/hr/training/new" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Event
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% set training_event_columns = [
+    {'key': 'event', 'label': 'Event', 'required': True},
+    {'key': 'program', 'label': 'Program'},
+    {'key': 'date', 'label': 'Date'},
+    {'key': 'trainer', 'label': 'Trainer'},
+    {'key': 'status', 'label': 'Status'},
+] %}
+<div x-data="columnPicker('training-events-table', {{ training_event_columns  | tojson | e }})">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="p-4 border-b border-gray-100">
+        <form hx-get="/hr/training/table" hx-target="#events-table-container" hx-push-url="true" hx-trigger="input changed delay:300ms from:#search-input, change from:select" class="flex flex-col sm:flex-row gap-4 items-start sm:items-center" x-data="{ open: false }">
+            <div class="flex-1">
+                <input type="search" name="q" id="search-input" value="{{ q or '' }}" placeholder="Search events..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div class="flex gap-3">
+                <select name="status" class="px-4 py-2.5 text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">All Status</option>
+                    <option value="Scheduled" {{ 'selected' if status == 'Scheduled' else '' }}>Scheduled</option>
+                    <option value="In Progress" {{ 'selected' if status == 'In Progress' else '' }}>In Progress</option>
+                    <option value="Completed" {{ 'selected' if status == 'Completed' else '' }}>Completed</option>
+                    <option value="Cancelled" {{ 'selected' if status == 'Cancelled' else '' }}>Cancelled</option>
+                </select>
+            </div>
+            <div class="relative" @click.away="open = false">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50"
+                    @click="open = !open"
+                >
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                    <span>Columns</span>
+                    <svg class="w-4 h-4 text-gray-400 transition-transform" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div
+                    x-show="open"
+                    x-cloak
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    class="absolute right-0 z-10 mt-2 w-52 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
+                >
+                    <template x-for="col in columns" :key="col.key">
+                        <label class="flex items-center gap-2 px-2.5 py-2 text-sm text-gray-700 rounded-lg hover:bg-surface-50">
+                            <input
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                :checked="isVisible(col.key)"
+                                :disabled="col.required"
+                                @change="toggleColumn(col.key)"
+                            >
+                            <span x-text="col.label"></span>
+                        </label>
+                    </template>
+                    <button
+                        type="button"
+                        class="w-full text-left px-2.5 py-2 text-xs text-primary-600 hover:text-primary-500 rounded-lg hover:bg-primary-50 transition-colors"
+                        @click="resetColumns()"
+                    >
+                        Reset columns
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="events-table-container">
+    {% include "modules/hr/templates/training/partials/events_table.html" %}
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" %}
+</div>
+{% endif %}
+</div>
+{% endblock %}

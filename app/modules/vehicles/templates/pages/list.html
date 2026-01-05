@@ -1,0 +1,59 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Fleet Management</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage company vehicles and fleet</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <input type="search" name="q" value="{{ q }}" placeholder="Search vehicles..."
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm"
+                    hx-get="/vehicles/table"
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-target="#table-container"
+                    hx-include="[name='status'], [name='fuel_type']"
+                    hx-push-url="true">
+            </div>
+            <div class="flex gap-3">
+                <select name="status"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/vehicles/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='fuel_type']"
+                    hx-push-url="true">
+                    <option value="">All Status</option>
+                    <option value="active" {{ 'selected' if status_filter == 'active' else '' }}>Active</option>
+                    <option value="inactive" {{ 'selected' if status_filter == 'inactive' else '' }}>Inactive</option>
+                </select>
+                {% if fuel_types %}
+                <select name="fuel_type"
+                    class="px-4 py-2.5 text-sm text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100"
+                    hx-get="/vehicles/table"
+                    hx-trigger="change"
+                    hx-target="#table-container"
+                    hx-include="[name='q'], [name='status']"
+                    hx-push-url="true">
+                    <option value="">All Fuel Types</option>
+                    {% for ft in fuel_types %}
+                    <option value="{{ ft }}" {{ 'selected' if fuel_type_filter == ft else '' }}>{{ ft }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div id="table-container">
+        {% include "modules/vehicles/templates/partials/vehicles_table.html" %}
+    </div>
+</div>
+{% endblock %}

@@ -47,3 +47,13 @@ out/
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Compiled CSS (built from src/styles.css)
+app/static/css/styles.css
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+tests/e2e-browser/.auth/
+blob-report/

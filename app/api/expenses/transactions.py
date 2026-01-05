@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -35,7 +35,7 @@ def compute_import_hash(card_id: int, transaction_date: datetime, amount: Decima
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-@router.get("/", response_model=List[CorporateCardTransactionRead], dependencies=[Depends(Require("expenses:read"))])
+@router.get("/", dependencies=[Depends(Require("expenses:read"))])
 def list_transactions(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -44,7 +44,7 @@ def list_transactions(
     status: Optional[str] = Query(default=None, description="Filter by status"),
     unmatched_only: bool = Query(default=False, description="Only show unmatched transactions"),
     db: Session = Depends(get_db),
-):
+) -> Dict[str, Any]:
     """List corporate card transactions with optional filters."""
     query = db.query(CorporateCardTransaction).order_by(
         CorporateCardTransaction.transaction_date.desc()
@@ -70,8 +70,44 @@ def list_transactions(
             ])
         )
 
+    total = query.count()
     transactions = query.offset(offset).limit(limit).all()
-    return transactions
+
+    def serialize_transaction(txn: CorporateCardTransaction) -> Dict[str, Any]:
+        return {
+            "id": txn.id,
+            "card_id": txn.card_id,
+            "statement_id": txn.statement_id,
+            "transaction_date": txn.transaction_date.isoformat() if txn.transaction_date else None,
+            "posting_date": txn.posting_date.isoformat() if txn.posting_date else None,
+            "merchant_name": txn.merchant_name,
+            "merchant_category_code": txn.merchant_category_code,
+            "description": txn.description,
+            "amount": float(txn.amount) if txn.amount is not None else None,
+            "currency": txn.currency,
+            "original_amount": float(txn.original_amount) if txn.original_amount is not None else None,
+            "original_currency": txn.original_currency,
+            "conversion_rate": float(txn.conversion_rate) if txn.conversion_rate is not None else None,
+            "transaction_reference": txn.transaction_reference,
+            "authorization_code": txn.authorization_code,
+            "status": txn.status.value if txn.status else None,
+            "expense_claim_line_id": txn.expense_claim_line_id,
+            "match_confidence": float(txn.match_confidence) if txn.match_confidence is not None else None,
+            "disputed_at": txn.disputed_at.isoformat() if txn.disputed_at else None,
+            "dispute_reason": txn.dispute_reason,
+            "resolution_notes": txn.resolution_notes,
+            "import_hash": txn.import_hash,
+            "imported_at": txn.imported_at.isoformat() if txn.imported_at else None,
+            "created_at": txn.created_at.isoformat() if txn.created_at else None,
+            "updated_at": txn.updated_at.isoformat() if txn.updated_at else None,
+        }
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [serialize_transaction(txn) for txn in transactions],
+    }
 
 
 @router.get("/{transaction_id}", response_model=CorporateCardTransactionRead, dependencies=[Depends(Require("expenses:read"))])

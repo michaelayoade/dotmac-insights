@@ -1,6 +1,7 @@
 """Shared helpers for the accounting module."""
 from __future__ import annotations
 
+import threading
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple, TypeVar, cast
@@ -16,9 +17,7 @@ from app.cache import get_redis_client, invalidate_pattern
 T = TypeVar("T")
 
 
-# =============================================================================
 # Sign Convention Documentation
-# =============================================================================
 """
 IFRS Sign Conventions (enforced throughout the system):
 
@@ -45,9 +44,7 @@ STATEMENT OF CHANGES IN EQUITY:
 """
 
 
-# =============================================================================
 # Constants
-# =============================================================================
 
 LIABILITY_ACCOUNT_TYPES = {"Payable", "Current Liability"}
 ASSET_ACCOUNT_TYPES = {"Receivable", "Bank", "Cash", "Fixed Asset", "Stock", "Current Asset"}
@@ -187,9 +184,7 @@ REPORT_CACHE_KEYS = [
 ]
 
 
-# =============================================================================
 # Date Parsing
-# =============================================================================
 
 def parse_date(value: Optional[str], field_name: str) -> Optional[date]:
     """Parse date string to date object.
@@ -245,9 +240,79 @@ def get_fiscal_year_dates(db: Session, fiscal_year: Optional[str] = None) -> Tup
     return date(today.year, 1, 1), date(today.year, 12, 31)
 
 
-# =============================================================================
+# Cached Account Lookups (Performance Optimization)
+
+# Module-level cache for accounts (cleared on write operations)
+# Thread-safe implementation using RLock
+_accounts_cache: Optional[Dict[str, "Account"]] = None
+_accounts_cache_time: Optional[datetime] = None
+_accounts_cache_lock = threading.RLock()  # Reentrant lock for thread safety
+_ACCOUNTS_CACHE_TTL_SECONDS = 300  # 5 minutes
+
+
+def get_accounts_by_erpnext_id(db: Session, force_refresh: bool = False) -> Dict[str, "Account"]:
+    """Get all accounts indexed by erpnext_id with caching.
+
+    This function caches the Account table lookup to avoid repeated full table scans
+    in report generation. The cache is module-level and refreshes every 5 minutes
+    or when force_refresh is True.
+
+    Thread-safe: Uses RLock to prevent race conditions during cache refresh.
+
+    Args:
+        db: Database session
+        force_refresh: If True, bypass cache and reload from database
+
+    Returns:
+        Dict mapping erpnext_id to Account objects
+    """
+    global _accounts_cache, _accounts_cache_time
+
+    now = datetime.now()
+
+    # Quick check without lock (double-checked locking pattern)
+    if (
+        not force_refresh
+        and _accounts_cache is not None
+        and _accounts_cache_time is not None
+        and (now - _accounts_cache_time).total_seconds() < _ACCOUNTS_CACHE_TTL_SECONDS
+    ):
+        return _accounts_cache
+
+    # Acquire lock for cache refresh
+    with _accounts_cache_lock:
+        # Re-check after acquiring lock (another thread may have refreshed)
+        if (
+            not force_refresh
+            and _accounts_cache is not None
+            and _accounts_cache_time is not None
+            and (now - _accounts_cache_time).total_seconds() < _ACCOUNTS_CACHE_TTL_SECONDS
+        ):
+            return _accounts_cache
+
+        # Refresh cache
+        _accounts_cache = {
+            acc.erpnext_id: acc
+            for acc in db.query(Account).all()
+            if acc.erpnext_id
+        }
+        _accounts_cache_time = now
+        return _accounts_cache
+
+
+def invalidate_accounts_cache() -> None:
+    """Invalidate the accounts cache.
+
+    Call this after any Account write operations (create, update, delete).
+    Thread-safe: Uses lock to prevent race conditions.
+    """
+    global _accounts_cache, _accounts_cache_time
+    with _accounts_cache_lock:
+        _accounts_cache = None
+        _accounts_cache_time = None
+
+
 # Currency Resolution
-# =============================================================================
 
 def resolve_currency_or_raise(db: Session, column, requested: Optional[str]) -> Optional[str]:
     """Ensure we do not mix currencies.
@@ -278,9 +343,7 @@ def resolve_currency_or_raise(db: Session, column, requested: Optional[str]) -> 
     return cast(str, currencies[0])
 
 
-# =============================================================================
 # Pagination
-# =============================================================================
 
 def paginate(
     query: Query,
@@ -324,9 +387,7 @@ def paginate(
     return total, results
 
 
-# =============================================================================
 # Account Balance Helpers
-# =============================================================================
 
 def get_account_balances(
     db: Session,
@@ -604,7 +665,7 @@ def gl_ar_ap_balances(db: Session, as_of: date) -> Dict[str, float]:
     Returns:
         Dict with 'ar' and 'ap' totals
     """
-    accounts = {acc.erpnext_id: acc for acc in db.query(Account).all()}
+    accounts = get_accounts_by_erpnext_id(db)
 
     entries = (
         db.query(
@@ -634,9 +695,7 @@ def gl_ar_ap_balances(db: Session, as_of: date) -> Dict[str, float]:
     return {"ar": ar_total, "ap": ap_total}
 
 
-# =============================================================================
 # Export Helpers
-# =============================================================================
 
 def export_headers(base_filename: str, extension: str) -> Dict[str, str]:
     """Generate HTTP headers for file download.
@@ -683,9 +742,7 @@ def stream_export(
     )
 
 
-# =============================================================================
 # Cache Invalidation
-# =============================================================================
 
 async def invalidate_report_cache(keys: Optional[List[str]] = None) -> int:
     """Invalidate accounting report caches after mutations.
@@ -714,9 +771,7 @@ async def invalidate_report_cache(keys: Optional[List[str]] = None) -> int:
     return deleted
 
 
-# =============================================================================
 # Serialization Helpers
-# =============================================================================
 
 def serialize_account(acc: Account) -> Dict[str, Any]:
     """Serialize an Account to a dict for API response.

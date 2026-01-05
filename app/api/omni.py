@@ -12,7 +12,7 @@ from email.header import decode_header
 from email.message import Message as EmailMessage
 import base64
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
@@ -30,11 +30,50 @@ from app.models.omni import (
     OmniWebhookEvent,
     OmniAttachment,
 )
-from app.models.agent import Agent, Team, TeamMember
+from app.models.party import Party, PartyRole
+from app.models.agent import Team, TeamMember
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from app.tasks.omni_email import poll_email_channel
+from app.core.crypto import encrypt_sensitive_value, decrypt_sensitive_value, is_encrypted
+
+
+def _sanitize_channel_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Sanitize channel config for API responses - mask sensitive values."""
+    if not config:
+        return {}
+    sanitized = config.copy()
+    # Replace sensitive fields with boolean indicators
+    if "smtp_password" in sanitized:
+        sanitized["smtp_configured"] = bool(sanitized["smtp_password"])
+        del sanitized["smtp_password"]
+    if "imap_password" in sanitized:
+        sanitized["imap_configured"] = bool(sanitized["imap_password"])
+        del sanitized["imap_password"]
+    if "api_key" in sanitized:
+        sanitized["api_key_configured"] = bool(sanitized["api_key"])
+        del sanitized["api_key"]
+    if "api_secret" in sanitized:
+        sanitized["api_secret_configured"] = bool(sanitized["api_secret"])
+        del sanitized["api_secret"]
+    return sanitized
+
+
+def _encrypt_channel_config(config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Encrypt sensitive values in channel config before saving."""
+    if not config:
+        return {}
+    encrypted = config.copy()
+    sensitive_fields = ["smtp_password", "imap_password", "api_key", "api_secret"]
+    for field in sensitive_fields:
+        if field in encrypted and encrypted[field]:
+            value = encrypted[field]
+            # Only encrypt if not already encrypted
+            if not is_encrypted(value):
+                encrypted[field] = encrypt_sensitive_value(value)
+    return encrypted
+
 
 # Authenticated Omni endpoints
 router = APIRouter(prefix="/omni", tags=["omni"])
@@ -92,7 +131,7 @@ def _get_or_create_conversation(
     db: Session,
     channel: OmniChannel,
     external_thread_id: Optional[str],
-    customer_id: Optional[int],
+    party_id: Optional[int],
     ticket_id: Optional[int],
     subject: Optional[str],
 ) -> OmniConversation:
@@ -110,7 +149,7 @@ def _get_or_create_conversation(
         conv = OmniConversation(
             channel_id=channel.id,
             external_thread_id=external_thread_id,
-            customer_id=customer_id,
+            party_id=party_id,
             ticket_id=ticket_id,
             subject=subject,
             status="open",
@@ -125,7 +164,7 @@ def _get_or_create_participant(
     handle: str,
     channel_type: str,
     display_name: Optional[str],
-    customer_id: Optional[int],
+    party_id: Optional[int],
 ) -> OmniParticipant:
     participant = (
         db.query(OmniParticipant)
@@ -137,7 +176,7 @@ def _get_or_create_participant(
             handle=handle,
             channel_type=channel_type,
             display_name=display_name,
-            customer_id=customer_id,
+            party_id=party_id,
         )
         db.add(participant)
         db.flush()
@@ -151,10 +190,9 @@ def _persist_message(
     body: Optional[str],
     subject: Optional[str],
     participant: Optional[OmniParticipant],
-    customer_id: Optional[int],
     ticket_id: Optional[int],
     channel: Optional[OmniChannel],
-    agent: Optional[Agent],
+    agent: Optional[Party],
     metadata: Optional[Dict[str, Any]] = None,
     attachments: Optional[List[Dict[str, Any]]] = None,
 ) -> OmniMessage:
@@ -164,10 +202,9 @@ def _persist_message(
         body=body,
         subject=subject,
         participant_id=participant.id if participant else None,
-        customer_id=customer_id,
         ticket_id=ticket_id,
         channel_id=channel.id if channel else None,
-        agent_id=agent.id if agent else None,
+        party_id=agent.id if agent else None,
         meta=metadata,
         created_at=datetime.now(timezone.utc),
     )
@@ -246,7 +283,9 @@ def _send_email_via_smtp(channel: OmniChannel, to_address: str, subject: Optiona
     host = cfg.get("smtp_host")
     port = int(cfg.get("smtp_port") or 587)
     username = cfg.get("smtp_username")
-    password = cfg.get("smtp_password")
+    # Support both encrypted and plaintext passwords (backwards compatibility)
+    raw_password = cfg.get("smtp_password")
+    password = decrypt_sensitive_value(raw_password) if raw_password else None
     use_tls = cfg.get("use_tls", True)
     from_address = cfg.get("from_address") or username
     if not host or not username or not password or not from_address:
@@ -364,14 +403,14 @@ async def ingest_webhook(
             handle=sender,
             channel_type=channel.type,
             display_name=payload_json.get("sender_name"),
-            customer_id=None,
+            party_id=None,
         )
 
     conv = _get_or_create_conversation(
         db,
         channel=channel,
         external_thread_id=thread_id,
-        customer_id=None,
+        party_id=None,
         ticket_id=None,
         subject=subject,
     )
@@ -383,7 +422,6 @@ async def ingest_webhook(
         body=body_text,
         subject=subject,
         participant=participant,
-        customer_id=None,
         ticket_id=None,
         channel=channel,
         agent=None,
@@ -417,7 +455,7 @@ async def list_channels(
                 "name": ch.name,
                 "type": ch.type,
                 "is_active": ch.is_active,
-                "config": ch.config,
+                "config": _sanitize_channel_config(ch.config),
                 "webhook_secret": bool(ch.webhook_secret),
             }
             for ch in channels
@@ -443,10 +481,12 @@ async def create_channel(
     if existing:
         raise HTTPException(status_code=400, detail="Channel name already exists")
 
+    # Encrypt sensitive values in config before saving
+    encrypted_config = _encrypt_channel_config(payload.get("config"))
     channel = OmniChannel(
         name=payload["name"],
         type=payload["type"],
-        config=payload.get("config") or {},
+        config=encrypted_config,
         webhook_secret=payload.get("webhook_secret"),
         is_active=payload.get("is_active", True),
     )
@@ -487,7 +527,8 @@ async def update_channel(
     if "type" in payload and payload["type"]:
         channel.type = payload["type"]
     if "config" in payload and payload["config"] is not None:
-        channel.config = payload["config"]
+        # Encrypt sensitive values before saving
+        channel.config = _encrypt_channel_config(payload["config"])
     if "webhook_secret" in payload:
         channel.webhook_secret = payload["webhook_secret"]
     if "is_active" in payload and payload["is_active"] is not None:
@@ -546,7 +587,7 @@ async def get_channel(
         "name": channel.name,
         "type": channel.type,
         "is_active": channel.is_active,
-        "config": channel.config,
+        "config": _sanitize_channel_config(channel.config),
         "webhook_secret_configured": bool(channel.webhook_secret),
         "webhook_url": f"/api/omni/webhooks/{channel.name}",
         "stats": {
@@ -566,7 +607,7 @@ async def list_channel_webhook_events(
     channel_id: int,
     processed: Optional[bool] = None,
     limit: int = 50,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List webhook events received for a specific channel."""
@@ -741,8 +782,14 @@ async def send_message(
 
     channel = _get_channel_or_404(db, payload["channel"])
     agent = None
-    if payload.get("agent_id"):
-        agent = db.query(Agent).filter(Agent.id == payload["agent_id"]).first()
+    agent_id = payload.get("party_id") or payload.get("agent_id")
+    if agent_id:
+        agent = (
+            db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(Party.id == agent_id, PartyRole.role == "support_agent")
+            .first()
+        )
 
     # Resolve conversation (existing or new)
     conv = None
@@ -752,7 +799,7 @@ async def send_message(
         conv = OmniConversation(
             channel_id=channel.id,
             external_thread_id=None,
-            customer_id=None,
+            party_id=None,
             ticket_id=payload.get("ticket_id"),
             subject=payload.get("subject"),
             status="open",
@@ -765,7 +812,7 @@ async def send_message(
         handle=payload["to"],
         channel_type=channel.type,
         display_name=None,
-        customer_id=None,
+        party_id=None,
     )
 
     msg = _persist_message(
@@ -775,7 +822,6 @@ async def send_message(
         body=payload["body"],
         subject=payload.get("subject"),
         participant=participant,
-        customer_id=None,
         ticket_id=payload.get("ticket_id"),
         channel=channel,
         agent=agent,
@@ -823,7 +869,7 @@ async def send_message(
 )
 async def list_conversations(
     ticket_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     channel: Optional[str] = None,
     status: Optional[str] = None,
     agent_id: Optional[int] = None,
@@ -831,14 +877,14 @@ async def list_conversations(
     start: Optional[str] = None,
     end: Optional[str] = None,
     limit: int = 100,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     query = db.query(OmniConversation)
     if ticket_id:
         query = query.filter(OmniConversation.ticket_id == ticket_id)
-    if customer_id:
-        query = query.filter(OmniConversation.customer_id == customer_id)
+    if party_id:
+        query = query.filter(OmniConversation.party_id == party_id)
     if channel:
         ch = db.query(OmniChannel.id).filter(OmniChannel.name == channel).first()
         if not ch:
@@ -847,19 +893,19 @@ async def list_conversations(
     if status:
         query = query.filter(OmniConversation.status == status)
     if agent_id:
-        # conversations with messages by agent_id
+        # conversations with messages by agent (party)
         query = query.filter(
             OmniConversation.id.in_(
-                db.query(OmniMessage.conversation_id).filter(OmniMessage.agent_id == agent_id)
+                db.query(OmniMessage.conversation_id).filter(OmniMessage.party_id == agent_id)
             )
         )
     if team_id:
         # conversations with messages assigned to agents in the team
-        agent_ids = [row.agent_id for row in db.query(TeamMember).filter(TeamMember.team_id == team_id).all()]
-        if agent_ids:
+        party_ids = [row.party_id for row in db.query(TeamMember).filter(TeamMember.team_id == team_id).all()]
+        if party_ids:
             query = query.filter(
                 OmniConversation.id.in_(
-                    db.query(OmniMessage.conversation_id).filter(OmniMessage.agent_id.in_(agent_ids))
+                    db.query(OmniMessage.conversation_id).filter(OmniMessage.party_id.in_(party_ids))
                 )
             )
     if start:
@@ -888,7 +934,7 @@ async def list_conversations(
                 "channel_id": c.channel_id,
                 "external_thread_id": c.external_thread_id,
                 "ticket_id": c.ticket_id,
-                "customer_id": c.customer_id,
+                "party_id": c.party_id,
                 "status": c.status,
                 "subject": c.subject,
                 "last_message_at": c.last_message_at.isoformat() if c.last_message_at else None,
@@ -907,7 +953,7 @@ async def list_messages(
     direction: Optional[str] = None,
     delivery_status: Optional[str] = None,
     limit: int = 100,
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     query = db.query(OmniMessage).filter(OmniMessage.conversation_id == conversation_id)
@@ -928,22 +974,23 @@ async def list_messages(
                 "body": m.body,
                 "subject": m.subject,
                 "participant_id": m.participant_id,
-                "agent_id": m.agent_id,
+                "party_id": m.party_id,
+                "agent_id": m.party_id,
                 "delivery_status": m.delivery_status,
                 "provider_message_id": m.provider_message_id,
                 "meta": m.meta,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
-        "attachments": [
-            {
-                "id": att.id,
-                "filename": att.filename,
-                "url": att.url,
-                "mime_type": att.mime_type,
-                "size_bytes": att.size_bytes,
+                "attachments": [
+                    {
+                        "id": att.id,
+                        "filename": att.filename,
+                        "url": att.url,
+                        "mime_type": att.mime_type,
+                        "size_bytes": att.size_bytes,
+                    }
+                    for att in m.attachments
+                ],
             }
-            for att in m.attachments
-        ],
-    }
             for m in messages
         ],
     }

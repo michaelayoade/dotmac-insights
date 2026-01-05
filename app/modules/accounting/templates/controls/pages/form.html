@@ -1,0 +1,269 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Accounting Controls</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Configure global accounting settings and controls</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="/accounting/controls" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Form -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- General Settings -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">General Settings</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Require Approval for Journal Entries</label>
+                            <p class="text-xs text-gray-500 mt-0.5">All journal entries must be approved before posting</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="require_je_approval"
+                                value="1"
+                                {{ 'checked' if controls and controls.require_je_approval else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Require Approval for Payments</label>
+                            <p class="text-xs text-gray-500 mt-0.5">All payments must be approved before processing</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="require_payment_approval"
+                                value="1"
+                                {{ 'checked' if controls and controls.require_payment_approval else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Allow Backdating</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Allow posting entries to past periods</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="allow_backdating"
+                                value="1"
+                                {{ 'checked' if controls and controls.allow_backdating else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Enforce Cost Center</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Require cost center for all transactions</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="enforce_cost_center"
+                                value="1"
+                                {{ 'checked' if controls and controls.enforce_cost_center else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Approval Thresholds -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Approval Thresholds</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label for="auto_approve_below" class="block text-sm font-medium text-gray-700 mb-1">Auto-Approve Below Amount</label>
+                        <p class="text-xs text-gray-500 mb-2">Transactions below this amount are auto-approved</p>
+                        <div class="relative w-48">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                            <input
+                                type="number"
+                                id="auto_approve_below"
+                                name="auto_approve_below"
+                                value="{{ controls.auto_approve_below if controls and controls.auto_approve_below else '' }}"
+                                step="0.01"
+                                min="0"
+                                class="block w-full rounded-xl border-0 py-2.5 pl-8 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="0.00"
+                            >
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="require_dual_approval_above" class="block text-sm font-medium text-gray-700 mb-1">Require Dual Approval Above</label>
+                        <p class="text-xs text-gray-500 mb-2">Transactions above this amount require two approvers</p>
+                        <div class="relative w-48">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                            <input
+                                type="number"
+                                id="require_dual_approval_above"
+                                name="require_dual_approval_above"
+                                value="{{ controls.require_dual_approval_above if controls and controls.require_dual_approval_above else '' }}"
+                                step="0.01"
+                                min="0"
+                                class="block w-full rounded-xl border-0 py-2.5 pl-8 pr-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="10000.00"
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Period Controls -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Period Controls</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Prevent Posting to Closed Periods</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Block transactions in closed fiscal periods</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                name="prevent_closed_period_posting"
+                                value="1"
+                                {{ 'checked' if not controls or controls.prevent_closed_period_posting else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label for="max_backdate_days" class="block text-sm font-medium text-gray-700 mb-1">Maximum Backdate Days</label>
+                        <p class="text-xs text-gray-500 mb-2">Maximum days in the past for backdating (if allowed)</p>
+                        <input
+                            type="number"
+                            id="max_backdate_days"
+                            name="max_backdate_days"
+                            value="{{ controls.max_backdate_days if controls and controls.max_backdate_days else 30 }}"
+                            min="0"
+                            class="block w-32 rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                        >
+                    </div>
+                </div>
+            </div>
+
+            <!-- Numbering -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Document Numbering</h2>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="je_prefix" class="block text-sm font-medium text-gray-700 mb-1">Journal Entry Prefix</label>
+                            <input
+                                type="text"
+                                id="je_prefix"
+                                name="je_prefix"
+                                value="{{ controls.je_prefix if controls and controls.je_prefix else 'JE-' }}"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="JE-"
+                            >
+                        </div>
+                        <div>
+                            <label for="payment_prefix" class="block text-sm font-medium text-gray-700 mb-1">Payment Prefix</label>
+                            <input
+                                type="text"
+                                id="payment_prefix"
+                                name="payment_prefix"
+                                value="{{ controls.payment_prefix if controls and controls.payment_prefix else 'PAY-' }}"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="PAY-"
+                            >
+                        </div>
+                        <div>
+                            <label for="invoice_prefix" class="block text-sm font-medium text-gray-700 mb-1">Invoice Prefix</label>
+                            <input
+                                type="text"
+                                id="invoice_prefix"
+                                name="invoice_prefix"
+                                value="{{ controls.invoice_prefix if controls and controls.invoice_prefix else 'INV-' }}"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="INV-"
+                            >
+                        </div>
+                        <div>
+                            <label for="cn_prefix" class="block text-sm font-medium text-gray-700 mb-1">Credit Note Prefix</label>
+                            <input
+                                type="text"
+                                id="cn_prefix"
+                                name="cn_prefix"
+                                value="{{ controls.cn_prefix if controls and controls.cn_prefix else 'CN-' }}"
+                                class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                                placeholder="CN-"
+                            >
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Save Actions -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="p-6 space-y-3">
+                    <button
+                        type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-primary-700 transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        Save Settings
+                    </button>
+                </div>
+            </div>
+
+            <!-- Help -->
+            <div class="bg-blue-50 rounded-xl p-6">
+                <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-medium text-blue-900">About Controls</h3>
+                        <p class="mt-1 text-sm text-blue-700">
+                            These settings affect all accounting operations across the system. Changes take effect immediately.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

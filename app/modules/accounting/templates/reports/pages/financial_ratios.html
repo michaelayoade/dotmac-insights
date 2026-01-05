@@ -1,0 +1,117 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Financial Ratios</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Liquidity, solvency, efficiency, and profitability insights</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Report Navigation -->
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="/accounting/reports/trial-balance" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Trial Balance</a>
+    <a href="/accounting/reports/balance-sheet" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Balance Sheet</a>
+    <a href="/accounting/reports/income-statement" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Income Statement</a>
+    <a href="/accounting/reports/cash-flow" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100">Cash Flow</a>
+    <a href="/accounting/reports/financial-ratios" class="px-4 py-2 rounded-lg text-sm font-medium bg-primary-100 text-primary-700">Financial Ratios</a>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="GET" class="flex flex-wrap items-center gap-4">
+        <label class="text-sm font-medium text-gray-700">As of Date:</label>
+        <input
+            type="date"
+            name="as_of"
+            value="{{ as_of_param or period.end_date }}"
+            class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+        >
+        <div class="flex items-center gap-2">
+            <label class="text-sm font-medium text-gray-700">Fiscal Year:</label>
+            <input
+                type="text"
+                name="fiscal_year"
+                value="{{ fiscal_year_param }}"
+                placeholder="2024"
+                class="rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm w-28"
+            >
+        </div>
+        <button
+            type="submit"
+            class="px-4 py-2.5 rounded-xl bg-primary-600 text-white text-sm font-semibold hover:bg-primary-500 transition-colors"
+        >
+            Update
+        </button>
+        <div class="ml-auto text-sm text-gray-500">
+            Period: {{ period.start_date }} - {{ period.end_date }} ({{ period.days }} days)
+        </div>
+    </form>
+</div>
+
+{% set status_styles = {
+    'good': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    'warning': 'bg-amber-50 text-amber-700 border-amber-100',
+    'critical': 'bg-red-50 text-red-700 border-red-100',
+    'info': 'bg-slate-50 text-slate-700 border-slate-100'
+} %}
+
+{% set sections = [
+    {'title': 'Liquidity', 'ratios': liquidity_ratios},
+    {'title': 'Solvency', 'ratios': solvency_ratios},
+    {'title': 'Efficiency', 'ratios': efficiency_ratios},
+    {'title': 'Profitability', 'ratios': profitability_ratios},
+] %}
+
+<div class="space-y-6">
+    {% for section in sections %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">{{ section.title }} Ratios</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 p-6">
+            {% for key, ratio in section.ratios.items() %}
+            <div class="rounded-xl border {{ status_styles.get(ratio.status, 'bg-slate-50 text-slate-700 border-slate-100') }} p-4">
+                <div class="flex items-center justify-between">
+                    <p class="text-sm font-semibold capitalize">{{ key.replace('_', ' ') }}</p>
+                    <span class="text-xs font-semibold uppercase tracking-wider">{{ ratio.status }}</span>
+                </div>
+                <p class="mt-2 text-2xl font-bold font-mono">{{ ratio.value }}</p>
+                {% if ratio.days is defined %}
+                <p class="text-xs text-gray-500">{{ ratio.days }} days</p>
+                {% endif %}
+                <p class="mt-2 text-xs text-gray-600">{{ ratio.interpretation }}</p>
+                {% if ratio.benchmark %}
+                <p class="mt-2 text-xs font-medium text-gray-500">Benchmark: {{ ratio.benchmark }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-6">
+    <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Key Components</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Assets</p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 font-mono">{{ '{:,.2f}'.format(components.total_assets) }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Liabilities</p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 font-mono">{{ '{:,.2f}'.format(components.total_liabilities) }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 font-mono">{{ '{:,.2f}'.format(components.revenue) }}</p>
+        </div>
+        <div>
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Net Income</p>
+            <p class="mt-1 text-lg font-semibold text-gray-900 font-mono">{{ '{:,.2f}'.format(components.net_income) }}</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -14,7 +14,7 @@ import json
 
 from app.database import get_db
 # Core models
-from app.models.customer import Customer
+from app.models.party import Party, CustomerAccount
 from app.models.subscription import Subscription
 from app.models.invoice import Invoice
 from app.models.payment import Payment
@@ -71,21 +71,13 @@ from app.models.sales import (
     SalesPerson,
     ItemGroup,
 )
-# Auth/RBAC models
-from app.models.auth import (
-    User,
-    Role,
-    Permission,
-    UserRole,
-    RolePermission,
-    ServiceToken,
-    TokenDenylist,
-)
+# Note: Auth/RBAC models NOT exposed in data explorer for security
 from app.auth import Require
 
 router = APIRouter()
 
 # Table categories for organization
+# Note: "auth" category excluded for security - contains sensitive auth data
 TABLE_CATEGORIES = {
     "core_business": "Core Business Data",
     "people": "People & Contacts",
@@ -94,14 +86,14 @@ TABLE_CATEGORIES = {
     "accounting": "Accounting & Finance",
     "hr": "HR & Teams",
     "sales": "Sales & CRM",
-    "auth": "Authentication & RBAC",
     "system": "System & Logs",
 }
 
 # Available tables for exploration (organized by category)
 TABLES = {
     # Core business data
-    "customers": Customer,
+    "customer_accounts": CustomerAccount,
+    "parties": Party,
     "subscriptions": Subscription,
     "invoices": Invoice,
     "payments": Payment,
@@ -155,21 +147,15 @@ TABLES = {
     "territories": Territory,
     "sales_persons": SalesPerson,
     "item_groups": ItemGroup,
-    # Auth/RBAC
-    "auth_users": User,
-    "auth_roles": Role,
-    "auth_permissions": Permission,
-    "auth_user_roles": UserRole,
-    "auth_role_permissions": RolePermission,
-    "auth_service_tokens": ServiceToken,
-    "auth_token_denylist": TokenDenylist,
+    # Note: Auth/RBAC tables excluded for security
     # System
     "sync_logs": SyncLog,
 }
 
 # Map tables to categories
 TABLE_TO_CATEGORY = {
-    "customers": "core_business",
+    "customer_accounts": "core_business",
+    "parties": "people",
     "subscriptions": "core_business",
     "invoices": "core_business",
     "payments": "core_business",
@@ -216,13 +202,7 @@ TABLE_TO_CATEGORY = {
     "territories": "sales",
     "sales_persons": "sales",
     "item_groups": "sales",
-    "auth_users": "auth",
-    "auth_roles": "auth",
-    "auth_permissions": "auth",
-    "auth_user_roles": "auth",
-    "auth_role_permissions": "auth",
-    "auth_service_tokens": "auth",
-    "auth_token_denylist": "auth",
+    # Note: Auth tables excluded for security
     "sync_logs": "system",
 }
 
@@ -287,7 +267,7 @@ async def list_tables(db: Session = Depends(get_db)) -> Dict[str, Any]:
 @router.get("/tables/{table_name}", dependencies=[Depends(Require("explorer:read"))])
 async def explore_table(
     table_name: str,
-    limit: int = Query(default=100, ge=1, le=1000),
+    limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     order_by: Optional[str] = None,
     order_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
@@ -302,6 +282,25 @@ async def explore_table(
         raise HTTPException(status_code=404, detail=f"Table not found: {table_name}")
 
     model = TABLES[table_name]
+
+    # Security: Whitelist allowed columns for ordering and date filtering
+    # This prevents potential SQL injection via column names
+    allowed_order_columns = {"id", "created_at", "updated_at", "name", "status", "created", "modified"}
+    allowed_date_columns = {"created_at", "updated_at", "created", "modified", "posting_date", "due_date", "start_date", "end_date", "date"}
+
+    # Validate order_by against whitelist
+    if order_by and order_by not in allowed_order_columns:
+        # Also allow if column exists on model (but not arbitrary strings)
+        if not hasattr(model, order_by):
+            raise HTTPException(status_code=400, detail=f"Invalid order_by column: {order_by}")
+
+    # Validate date_column against whitelist
+    if date_column and date_column not in allowed_date_columns:
+        # Also allow if it's an actual date column on the model
+        actual_date_cols = _get_date_columns(model)
+        if date_column not in actual_date_cols:
+            raise HTTPException(status_code=400, detail=f"Invalid date_column: {date_column}")
+
     query = db.query(model)
 
     # Apply date filtering
@@ -384,18 +383,36 @@ async def get_table_stats(
     }
 
     # Add specific stats based on table
-    if table_name == "customers":
+    if table_name == "customer_accounts":
         stats["by_status"] = {
-            row.status.value: int(getattr(row, "count", 0) or 0)
-            for row in db.query(Customer.status, func.count(Customer.id).label("count"))
-            .group_by(Customer.status)
+            row.status: int(getattr(row, "count", 0) or 0)
+            for row in db.query(CustomerAccount.status, func.count(CustomerAccount.id).label("count"))
+            .group_by(CustomerAccount.status)
             .all()
+            if row.status
         }
-        stats["by_type"] = {
-            row.customer_type.value: int(getattr(row, "count", 0) or 0)
-            for row in db.query(Customer.customer_type, func.count(Customer.id).label("count"))
-            .group_by(Customer.customer_type)
+        stats["by_tier"] = {
+            row.tier: int(getattr(row, "count", 0) or 0)
+            for row in db.query(CustomerAccount.tier, func.count(CustomerAccount.id).label("count"))
+            .group_by(CustomerAccount.tier)
             .all()
+            if row.tier
+        }
+
+    elif table_name == "parties":
+        stats["by_type"] = {
+            row.type: int(getattr(row, "count", 0) or 0)
+            for row in db.query(Party.type, func.count(Party.id).label("count"))
+            .group_by(Party.type)
+            .all()
+            if row.type
+        }
+        stats["by_status"] = {
+            row.status: int(getattr(row, "count", 0) or 0)
+            for row in db.query(Party.status, func.count(Party.id).label("count"))
+            .group_by(Party.status)
+            .all()
+            if row.status
         }
 
     elif table_name == "subscriptions":
@@ -507,7 +524,7 @@ async def get_table_stats(
             .all()
             if row.status
         }
-        stats["with_customer"] = db.query(Project).filter(Project.customer_id.isnot(None)).count()
+        stats["with_customer_account"] = db.query(Project).filter(Project.customer_account_id.isnot(None)).count()
         stats["with_manager"] = db.query(Project).filter(Project.project_manager_id.isnot(None)).count()
 
     elif table_name == "tariffs":
@@ -537,7 +554,7 @@ async def get_table_stats(
             .all()
             if row.status
         }
-        stats["converted"] = db.query(Lead).filter(Lead.customer_id.isnot(None)).count()
+        stats["converted"] = db.query(Lead).filter(Lead.customer_account_id.isnot(None)).count()
 
     elif table_name == "network_monitors":
         stats["by_ping_state"] = {
@@ -567,7 +584,7 @@ async def get_table_stats(
     elif table_name == "ipv4_addresses":
         stats["used"] = db.query(IPv4Address).filter(IPv4Address.is_used.is_(True)).count()
         stats["available"] = db.query(IPv4Address).filter(IPv4Address.is_used.is_(False)).count()
-        stats["assigned_to_customer"] = db.query(IPv4Address).filter(IPv4Address.customer_id.isnot(None)).count()
+        stats["assigned_to_party"] = db.query(IPv4Address).filter(IPv4Address.party_id.isnot(None)).count()
 
     elif table_name == "accounts":
         stats["by_account_type"] = {
@@ -710,40 +727,61 @@ async def check_data_quality(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Check data quality and completeness across all tables."""
     report = {}
 
-    # Customers
-    total_customers = db.query(Customer).count()
-    customers_with_email = db.query(Customer).filter(Customer.email.isnot(None)).count()
-    customers_with_phone = db.query(Customer).filter(Customer.phone.isnot(None)).count()
-    customers_with_pop = db.query(Customer).filter(Customer.pop_id.isnot(None)).count()
-    customers_linked_splynx = db.query(Customer).filter(Customer.splynx_id.isnot(None)).count()
-    customers_linked_erpnext = db.query(Customer).filter(Customer.erpnext_id.isnot(None)).count()
-    customers_linked_chatwoot = db.query(Customer).filter(Customer.chatwoot_contact_id.isnot(None)).count()
+    # Parties
+    total_parties = db.query(Party).count()
+    parties_with_email = db.query(Party).filter(Party.primary_email.isnot(None)).count()
+    parties_with_phone = db.query(Party).filter(Party.primary_phone.isnot(None)).count()
 
-    report["customers"] = {
-        "total": total_customers,
+    report["parties"] = {
+        "total": total_parties,
         "completeness": {
-            "has_email": customers_with_email,
-            "has_phone": customers_with_phone,
-            "has_pop": customers_with_pop,
-        },
-        "linkage": {
-            "linked_to_splynx": customers_linked_splynx,
-            "linked_to_erpnext": customers_linked_erpnext,
-            "linked_to_chatwoot": customers_linked_chatwoot,
+            "has_email": parties_with_email,
+            "has_phone": parties_with_phone,
         },
         "quality_score": round(
-            (customers_with_email + customers_with_phone + customers_with_pop)
-            / (total_customers * 3)
+            (parties_with_email + parties_with_phone)
+            / (total_parties * 2)
             * 100
-            if total_customers > 0
+            if total_parties > 0
             else 0,
+            2,
+        ),
+    }
+
+    # Customer accounts
+    total_accounts = db.query(CustomerAccount).count()
+    accounts_with_billing_email = db.query(CustomerAccount).filter(
+        CustomerAccount.billing_email.isnot(None)
+    ).count()
+    accounts_linked_splynx = db.query(CustomerAccount).filter(
+        CustomerAccount.external_ids["splynx_id"].astext.isnot(None)
+    ).count()
+    accounts_linked_erpnext = db.query(CustomerAccount).filter(
+        CustomerAccount.external_ids["erpnext_id"].astext.isnot(None)
+    ).count()
+    accounts_linked_chatwoot = db.query(CustomerAccount).filter(
+        CustomerAccount.external_ids["chatwoot_id"].astext.isnot(None)
+    ).count()
+
+    report["customer_accounts"] = {
+        "total": total_accounts,
+        "completeness": {
+            "has_billing_email": accounts_with_billing_email,
+        },
+        "linkage": {
+            "linked_to_splynx": accounts_linked_splynx,
+            "linked_to_erpnext": accounts_linked_erpnext,
+            "linked_to_chatwoot": accounts_linked_chatwoot,
+        },
+        "quality_score": round(
+            accounts_with_billing_email / total_accounts * 100 if total_accounts > 0 else 0,
             2,
         ),
     }
 
     # Invoices
     total_invoices = db.query(Invoice).count()
-    invoices_with_customer = db.query(Invoice).filter(Invoice.customer_id.isnot(None)).count()
+    invoices_with_customer = db.query(Invoice).filter(Invoice.customer_account_id.isnot(None)).count()
 
     report["invoices"] = {
         "total": total_invoices,
@@ -753,7 +791,7 @@ async def check_data_quality(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     # Conversations
     total_conversations = db.query(Conversation).count()
-    conversations_with_customer = db.query(Conversation).filter(Conversation.customer_id.isnot(None)).count()
+    conversations_with_customer = db.query(Conversation).filter(Conversation.customer_account_id.isnot(None)).count()
 
     report["conversations"] = {
         "total": total_conversations,
@@ -763,7 +801,8 @@ async def check_data_quality(db: Session = Depends(get_db)) -> Dict[str, Any]:
 
     # Overall data health
     total_records = sum([
-        total_customers,
+        total_parties,
+        total_accounts,
         db.query(Subscription).count(),
         total_invoices,
         db.query(Payment).count(),
@@ -788,27 +827,46 @@ async def search_all(
     results = {}
     search_term = f"%{q}%"
 
-    # Search customers
-    customers = (
-        db.query(Customer)
+    # Search parties
+    parties = (
+        db.query(Party)
         .filter(
-            Customer.name.ilike(search_term)
-            | Customer.email.ilike(search_term)
-            | Customer.phone.ilike(search_term)
-            | Customer.account_number.ilike(search_term)
+            Party.name.ilike(search_term)
+            | Party.primary_email.ilike(search_term)
+            | Party.primary_phone.ilike(search_term)
         )
         .limit(limit)
         .all()
     )
-    results["customers"] = [
+    results["parties"] = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "email": p.primary_email,
+            "phone": p.primary_phone,
+            "status": p.status,
+        }
+        for p in parties
+    ]
+
+    # Search customer accounts
+    customer_accounts = (
+        db.query(CustomerAccount)
+        .filter(
+            CustomerAccount.account_number.ilike(search_term)
+            | CustomerAccount.billing_email.ilike(search_term)
+        )
+        .limit(limit)
+        .all()
+    )
+    results["customer_accounts"] = [
         {
             "id": c.id,
-            "name": c.name,
-            "email": c.email,
-            "phone": c.phone,
-            "status": c.status.value,
+            "account_number": c.account_number,
+            "billing_email": c.billing_email,
+            "status": c.status,
         }
-        for c in customers
+        for c in customer_accounts
     ]
 
     # Search invoices

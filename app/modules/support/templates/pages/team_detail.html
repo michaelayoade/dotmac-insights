@@ -1,0 +1,323 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <a href="/support/teams" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </a>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-2xl font-display font-bold text-gray-900">{{ team.name }}</h1>
+                    {% if team.is_active %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
+                    {% else %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Inactive</span>
+                    {% endif %}
+                </div>
+                <p class="mt-1 text-sm text-gray-500">{{ team.description or 'Support team' }}</p>
+            </div>
+        </div>
+        <a href="/support/teams" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+            All Teams
+        </a>
+    </div>
+
+    <!-- Enhanced Stats Grid (6 cards) -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <!-- Members -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Members</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.member_count }}</p>
+                </div>
+                <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Agents -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Active</p>
+                    <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.active_agents }}</p>
+                </div>
+                <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Capacity -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Capacity</p>
+                    <p class="text-2xl font-bold text-blue-600 mt-1">{{ stats.total_capacity }}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tickets 30d -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">30d Tickets</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.total_30d }}</p>
+                </div>
+                <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- SLA -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">SLA</p>
+                    <p class="text-2xl font-bold {% if stats.sla_attainment_pct >= 90 %}text-emerald-600{% elif stats.sla_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ stats.sla_attainment_pct }}%</p>
+                </div>
+                <div class="w-10 h-10 {% if stats.sla_attainment_pct >= 90 %}bg-emerald-50{% elif stats.sla_attainment_pct >= 70 %}bg-amber-50{% else %}bg-red-50{% endif %} rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 {% if stats.sla_attainment_pct >= 90 %}text-emerald-600{% elif stats.sla_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- CSAT -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">CSAT</p>
+                    {% if stats.csat_score %}
+                    <p class="text-2xl font-bold {% if stats.csat_score >= 4.0 %}text-emerald-600{% elif stats.csat_score >= 3.0 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ stats.csat_score }}/5</p>
+                    {% else %}
+                    <p class="text-2xl font-bold text-gray-400 mt-1">--</p>
+                    {% endif %}
+                </div>
+                <div class="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content with Sidebar -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content (2/3) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Team Performance vs Org Average -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Performance vs Organization</h2>
+                    <p class="text-sm text-gray-500">30-day comparison against organization average</p>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <!-- SLA Comparison -->
+                        <div class="text-center">
+                            <p class="text-sm text-gray-500 mb-2">SLA Attainment</p>
+                            <p class="text-3xl font-bold {% if stats.sla_attainment_pct >= stats.org_avg_sla %}text-emerald-600{% else %}text-red-600{% endif %}">{{ stats.sla_attainment_pct }}%</p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                {% if stats.sla_attainment_pct >= stats.org_avg_sla %}
+                                <span class="text-emerald-600">+{{ (stats.sla_attainment_pct - stats.org_avg_sla)|round(1) }}%</span> vs org
+                                {% else %}
+                                <span class="text-red-600">{{ (stats.sla_attainment_pct - stats.org_avg_sla)|round(1) }}%</span> vs org
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-gray-400">Org avg: {{ stats.org_avg_sla }}%</p>
+                        </div>
+
+                        <!-- Resolution Time Comparison -->
+                        <div class="text-center">
+                            <p class="text-sm text-gray-500 mb-2">Avg Resolution</p>
+                            <p class="text-3xl font-bold {% if stats.avg_resolution_hours <= stats.org_avg_resolution %}text-emerald-600{% else %}text-amber-600{% endif %}">{{ stats.avg_resolution_hours }}h</p>
+                            <p class="text-xs text-gray-500 mt-1">
+                                {% if stats.avg_resolution_hours <= stats.org_avg_resolution %}
+                                <span class="text-emerald-600">{{ (stats.org_avg_resolution - stats.avg_resolution_hours)|round(1) }}h faster</span>
+                                {% else %}
+                                <span class="text-amber-600">{{ (stats.avg_resolution_hours - stats.org_avg_resolution)|round(1) }}h slower</span>
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-gray-400">Org avg: {{ stats.org_avg_resolution }}h</p>
+                        </div>
+
+                        <!-- CSAT Comparison -->
+                        <div class="text-center">
+                            <p class="text-sm text-gray-500 mb-2">CSAT Score</p>
+                            {% if stats.csat_score %}
+                            <p class="text-3xl font-bold {% if stats.csat_score >= (stats.org_avg_csat or 0) %}text-emerald-600{% else %}text-amber-600{% endif %}">{{ stats.csat_score }}/5</p>
+                            {% if stats.org_avg_csat %}
+                            <p class="text-xs text-gray-500 mt-1">
+                                {% if stats.csat_score >= stats.org_avg_csat %}
+                                <span class="text-emerald-600">+{{ (stats.csat_score - stats.org_avg_csat)|round(1) }}</span> vs org
+                                {% else %}
+                                <span class="text-amber-600">{{ (stats.csat_score - stats.org_avg_csat)|round(1) }}</span> vs org
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-gray-400">Org avg: {{ stats.org_avg_csat }}/5</p>
+                            {% endif %}
+                            {% else %}
+                            <p class="text-3xl font-bold text-gray-400">--</p>
+                            <p class="text-xs text-gray-400 mt-1">No data</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Members Table (Enhanced) -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Team Members</h3>
+                    <p class="text-sm text-gray-500">Individual agent performance (30 days)</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-surface-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Agent</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Open</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Resolved</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">SLA %</th>
+                                <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">CSAT</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Utilization</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-100">
+                            {% for item in agents %}
+                            {% set perf = agent_performance.get(item.agent.id) %}
+                            {% set is_top = item.agent.id in (top_performers|map(attribute='agent_id')|list) %}
+                            <tr class="hover:bg-surface-50 {% if is_top %}bg-amber-50/30{% endif %}">
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-full {% if is_top %}bg-amber-100{% else %}bg-primary-100{% endif %} flex items-center justify-center">
+                                            {% if is_top %}
+                                            <svg class="w-4 h-4 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                            {% else %}
+                                            <span class="text-sm font-medium text-primary-700">{{ item.agent.display_name[0] if item.agent.display_name else 'A' }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <div>
+                                            <a href="/support/agents/{{ item.agent.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ item.agent.display_name or 'Unknown' }}</a>
+                                            <p class="text-xs text-gray-500">{{ item.agent.primary_email or '-' }}</p>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-3 py-4 text-center text-sm text-gray-900">{{ item.open_tickets }}</td>
+                                <td class="px-3 py-4 text-center text-sm">
+                                    {% if perf %}
+                                    <span class="text-emerald-600 font-medium">{{ perf.resolved_tickets }}</span>
+                                    {% else %}
+                                    <span class="text-gray-400">--</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-4 text-center">
+                                    {% if perf %}
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if perf.sla_attainment_pct >= 90 %}bg-emerald-50 text-emerald-700{% elif perf.sla_attainment_pct >= 70 %}bg-amber-50 text-amber-700{% else %}bg-red-50 text-red-700{% endif %}">
+                                        {{ perf.sla_attainment_pct }}%
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-400">--</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-4 text-center text-sm">
+                                    {% if perf and perf.csat_score %}
+                                    <span class="{% if perf.csat_score >= 4.0 %}text-emerald-600{% elif perf.csat_score >= 3.0 %}text-amber-600{% else %}text-red-600{% endif %}">{{ perf.csat_score }}/5</span>
+                                    {% else %}
+                                    <span class="text-gray-400">--</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div class="h-full rounded-full {% if item.utilization >= 90 %}bg-red-500{% elif item.utilization >= 75 %}bg-amber-500{% else %}bg-emerald-500{% endif %}" style="width: {{ [[item.utilization, 100]|min, 0]|max }}%"></div>
+                                        </div>
+                                        <span class="text-xs text-gray-500 w-10 text-right">{{ item.utilization }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="px-6 py-12 text-center text-gray-500">No team members</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar (1/3) -->
+        <div class="space-y-6">
+            <!-- Team Workload -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Current Workload</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex items-center justify-between text-sm mb-2">
+                            <span class="text-gray-600">Utilization</span>
+                            <span class="font-medium {% if stats.utilization_pct >= 90 %}text-red-600{% elif stats.utilization_pct >= 75 %}text-amber-600{% else %}text-emerald-600{% endif %}">{{ stats.utilization_pct|round|int }}%</span>
+                        </div>
+                        <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full transition-all {% if stats.utilization_pct >= 90 %}bg-red-500{% elif stats.utilization_pct >= 75 %}bg-amber-500{% else %}bg-emerald-500{% endif %}" style="width: {{ [[stats.utilization_pct, 100]|min, 0]|max }}%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">{{ stats.current_open }} of {{ stats.total_capacity }} slots used</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Performers -->
+            {% if top_performers %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">Top Performers</h3>
+                <ol class="space-y-3">
+                    {% for performer in top_performers %}
+                    <li class="flex items-center gap-3">
+                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full {% if loop.index == 1 %}bg-amber-100 text-amber-700{% elif loop.index == 2 %}bg-gray-100 text-gray-600{% else %}bg-orange-100 text-orange-700{% endif %} text-xs font-bold">
+                            {{ loop.index }}
+                        </span>
+                        <div class="flex-1 min-w-0">
+                            <a href="/support/agents/{{ performer.agent_id }}" class="text-sm font-medium text-gray-900 hover:text-primary-600 truncate block">{{ performer.agent_name }}</a>
+                            <p class="text-xs text-gray-500">{{ performer.resolved_tickets }} resolved, {{ performer.sla_attainment_pct }}% SLA</p>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </div>
+            {% endif %}
+
+            <!-- 30-Day Summary -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">30-Day Summary</h3>
+                <dl class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Total Handled</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ stats.total_30d }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Resolved</dt>
+                        <dd class="text-sm font-medium text-emerald-600">{{ stats.resolved_30d }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Resolution Rate</dt>
+                        <dd class="text-sm font-medium {% if stats.resolution_rate >= 90 %}text-emerald-600{% elif stats.resolution_rate >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ stats.resolution_rate }}%</dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Avg First Response</dt>
+                        <dd class="text-sm font-medium text-gray-900">{{ stats.avg_first_response_hours }}h</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

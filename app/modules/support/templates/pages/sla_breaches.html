@@ -1,0 +1,90 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">SLA Breaches</h1>
+            <p class="mt-1 text-sm text-gray-500">Tickets that breached SLA targets</p>
+        </div>
+        <div class="flex gap-3">
+            <select onchange="window.location.href='?days='+this.value" class="px-4 py-2.5 bg-white text-gray-700 rounded-xl font-medium ring-1 ring-gray-200">
+                <option value="30" {% if period_days == 30 %}selected{% endif %}>Last 30 days</option>
+                <option value="60" {% if period_days == 60 %}selected{% endif %}>Last 60 days</option>
+                <option value="90" {% if period_days == 90 %}selected{% endif %}>Last 90 days</option>
+            </select>
+            <a href="/support/sla" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
+                SLA Policies
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Total Breaches</p>
+            <p class="text-2xl font-bold text-red-600 mt-1">{{ stats.total_breaches | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">First Response</p>
+            <p class="text-2xl font-bold text-amber-600 mt-1">{{ stats.first_response_breaches | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Resolution</p>
+            <p class="text-2xl font-bold text-orange-600 mt-1">{{ stats.resolution_breaches | format_number }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <p class="text-sm font-medium text-gray-500">Breach Rate</p>
+            <p class="text-2xl font-bold {% if stats.breach_rate > 10 %}text-red-600{% elif stats.breach_rate > 5 %}text-amber-600{% else %}text-emerald-600{% endif %} mt-1">{{ stats.breach_rate }}%</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Breached Tickets</h3>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    {% for ticket in tickets %}
+                    <a href="/support/tickets/{{ ticket.id }}" class="px-6 py-4 hover:bg-surface-50 flex items-center justify-between block">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900">#{{ ticket.id }} - {{ ticket.subject[:50] }}{% if ticket.subject|length > 50 %}...{% endif %}</p>
+                            <p class="text-sm text-gray-500">{{ ticket.created_at.strftime('%b %d, %Y') if ticket.created_at else '' }}</p>
+                        </div>
+                        <div class="ml-4">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Breached</span>
+                        </div>
+                    </a>
+                    {% else %}
+                    <div class="px-6 py-12 text-center text-gray-500">No breaches in this period</div>
+                    {% endfor %}
+                </div>
+                {% if pagination.total_pages > 1 %}
+                {% set query_params = [] %}
+                {% if period_days %}
+                {% set _ = query_params.append("days=" ~ period_days) %}
+                {% endif %}
+                {% set base_url = "/support/sla-breaches" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+                {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": pagination.total_pages, "has_prev": pagination.has_prev, "has_next": pagination.has_next, "prev_page": pagination.prev_page, "next_page": pagination.next_page, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url=base_url %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h3 class="text-lg font-display font-semibold text-gray-900 mb-4">By Priority</h3>
+            <div class="space-y-3">
+                {% for item in by_priority %}
+                <div class="flex items-center justify-between py-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {% if item.priority == 'urgent' %}bg-red-100 text-red-800{% elif item.priority == 'high' %}bg-orange-100 text-orange-800{% elif item.priority == 'medium' %}bg-amber-100 text-amber-800{% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ item.priority | title }}
+                    </span>
+                    <span class="text-sm font-medium text-gray-900">{{ item.count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{# Leave types table partial #}
+{% if leave_types %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="types-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('type')" x-cloak>Leave Type</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell" x-show="isVisible('max_days')" x-cloak>Max Days</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell" x-show="isVisible('carry_forward')" x-cloak>Carry Forward</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('lwp')" x-cloak>LWP</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for lt in leave_types %}
+            <tr class="hover:bg-surface-50">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 font-medium text-gray-900" x-show="isVisible('type')" x-cloak>{{ lt.leave_type_name }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell" x-show="isVisible('max_days')" x-cloak>{{ lt.max_leaves_allowed }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell" x-show="isVisible('carry_forward')" x-cloak>{{ 'Yes' if lt.is_carry_forward else 'No' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell" x-show="isVisible('lwp')" x-cloak>{{ 'Yes' if lt.is_lwp else 'No' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="types-empty-state">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No leave types found</h3>
+    <p class="text-sm text-gray-500">Leave types are synced from ERPNext.</p>
+</div>
+{% endif %}

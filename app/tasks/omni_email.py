@@ -19,8 +19,8 @@ from app.models.omni import (
     OmniMessage,
     OmniAttachment,
 )
-from app.models.agent import Agent
 from app.worker import celery_app
+from app.core.crypto import decrypt_sensitive_value
 
 
 def _decode_header_value(value: Optional[object]) -> str:
@@ -192,7 +192,9 @@ def poll_email_channel(self, channel_id: int):
         host = cfg.get("imap_host")
         port = int(cfg.get("imap_port") or 993)
         username = cfg.get("imap_username")
-        password = cfg.get("imap_password")
+        # Support both encrypted and plaintext passwords (backwards compatibility)
+        raw_password = cfg.get("imap_password")
+        password = decrypt_sensitive_value(raw_password) if raw_password else None
         folder = cfg.get("imap_folder", "INBOX")
         use_ssl = cfg.get("imap_use_ssl", True)
 
@@ -237,7 +239,7 @@ def poll_email_channel(self, channel_id: int):
         db.commit()
 
         for num in seen_nums:
-            imap.store(num, "+FLAGS", "\\Seen")
+            imap.store(num.decode(), "+FLAGS", "\\Seen")
     except Exception as exc:
         db.rollback()
         raise self.retry(exc=exc)

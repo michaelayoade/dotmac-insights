@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum, Date, ForeignKey
+from sqlalchemy import BigInteger, String, Text, Enum, Date, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List
@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 import enum
 from app.database import Base, SoftDeleteMixin
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
@@ -38,7 +39,11 @@ class SalesOrder(Base):
     # Customer
     customer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=True,
+    )
 
     # Order details
     order_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -175,6 +180,22 @@ class Quotation(SoftDeleteMixin, Base):
     # Conversion
     order_lost_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Party link (for subscription conversion)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Subscription conversion tracking
+    converted_subscription_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subscriptions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    converted_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
@@ -184,6 +205,8 @@ class Quotation(SoftDeleteMixin, Base):
     items: Mapped[List["QuotationItem"]] = relationship(
         back_populates="quotation", cascade="all, delete-orphan"
     )
+    party = relationship("Party", backref="quotations")
+    converted_subscription = relationship("Subscription", backref="source_quotation")
     sales_partner_rel: Mapped[Optional["SalesPerson"]] = relationship(
         "SalesPerson",
         foreign_keys=[sales_partner_id],
@@ -251,8 +274,11 @@ class ERPNextLead(Base):
 
     # Conversion tracking
     converted: Mapped[bool] = mapped_column(default=False)
-    customer_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("customers.id", ondelete="SET NULL"), nullable=True, index=True
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Sync metadata
@@ -265,10 +291,11 @@ class ERPNextLead(Base):
 
 
 # ============= ITEM (PRODUCT/SERVICE) =============
-class Item(Base):
+class Item(SoftValidationMixin, Base):
     """Products/Services from ERPNext."""
 
     __tablename__ = "items"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -421,10 +448,11 @@ class SalesPerson(Base):
 
 
 # ============= ITEM GROUP =============
-class ItemGroup(Base):
+class ItemGroup(SoftValidationMixin, Base):
     """Product categories from ERPNext."""
 
     __tablename__ = "item_groups"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)

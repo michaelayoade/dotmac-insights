@@ -1,4 +1,3 @@
-from app.models.customer import Customer
 from app.models.customer_usage import CustomerUsage
 from app.models.pop import Pop
 from app.models.subscription import Subscription
@@ -58,10 +57,25 @@ from app.models.document_lines import (
 )
 from app.models.purchasing_order import PurchaseOrder, PurchaseOrderStatus
 from app.models.books_settings import DebitNote, DebitNoteStatus
+from app.models.accounting_operational_settings import AccountingOperationalSettings
 from app.models.customer_note import CustomerNote
 from app.models.administrator import Administrator
 from app.models.network_monitor import NetworkMonitor
 from app.models.lead import Lead
+from app.models.party import (
+    Party,
+    PartyRole,
+    PartyRelation,
+    PartyExternalId,
+    CustomerAccount,
+    CustomerAccountContact,
+    CustomerAccountTeam,
+    CustomerAccountReseller,
+    Credential,
+    Membership,
+    RefPartyRoleType,
+    RefRelationType,
+)
 from app.models.ipv4_address import IPv4Address
 from app.models.ticket_message import TicketMessage
 from app.models.transaction_category import TransactionCategory
@@ -96,6 +110,14 @@ from app.models.auth import (
     RolePermission,
     ServiceToken,
     TokenDenylist,
+    # Granular RBAC models
+    PermissionCategory,
+    Group,
+    GroupMember,
+    GroupRole,
+    UserPermission,
+    UserSession,
+    RBACAuditLog,
 )
 from app.models.sync_cursor import SyncCursor, FailedSyncRecord
 from app.models.sync_schedule import SyncSchedule
@@ -138,6 +160,7 @@ from app.models.tax_ng import (
     EInvoiceLine,
 )
 from app.models.accounting_ext import FiscalPeriod
+from app.models.activity_log import ActivityLog
 from app.models.settings import SettingGroup, SettingsAuditLog
 from app.models.inventory import (
     Warehouse,
@@ -221,14 +244,6 @@ from app.models.crm import (
     LeadSource,
     Campaign,
 )
-from app.models.contact import (
-    Contact,
-    ContactType,
-    ContactCategory,
-    ContactStatus,
-    BillingType,
-    LeadQualification,
-)
 from app.models.contact_list import ContactList
 from app.models.performance import (
     EvaluationPeriod,
@@ -253,7 +268,7 @@ from app.models.performance import (
     ScorecardInstanceStatus,
     OverrideReason,
 )
-from app.models.agent import Agent, Team, TeamMember
+from app.models.agent import Team, TeamMember
 from app.models.omni import (
     OmniChannel,
     OmniChannelType,
@@ -350,9 +365,113 @@ from app.models.migration import (
     RecordAction,
     EntityType,
 )
+from app.models.provisioning_log import (
+    ProvisioningLog,
+    ProvisioningAction,
+    ProvisioningStatus,
+)
+from app.models.radius_credential_sequence import RADIUSCredentialSequence
+from app.models.cleanup import (
+    CleanupRule,
+    CleanupScan,
+    CleanupIssue,
+    CleanupJob,
+    CleanupIssueType,
+    CleanupActionType,
+    IssueSeverity,
+    IssueStatus,
+    CleanupScanStatus,
+    CleanupJobStatus,
+    CleanupEntityType,
+)
+from app.models.data_bundle import (
+    DataBundleProduct,
+    CustomerBundle,
+    BundleUsageLog,
+    BundleTransaction,
+    BundleType,
+    ExpiryType,
+    ExhaustionAction,
+    BundleStatus,
+)
+from app.models.snmp_metrics import (
+    SNMPPollingConfig,
+    SNMPVersion,
+    SNMPAuthProtocol,
+    SNMPPrivProtocol,
+    PollStatus,
+    DeviceMetric,
+    InterfaceMetric,
+    InterfaceState,
+    InterfaceOperStatus,
+    InterfaceMetricRollup,
+    MetricAggregation,
+    SubscriptionUsageMetric,
+)
+from app.models.traffic_metrics import (
+    TrafficMetric,
+    TrafficThreshold,
+    TrafficAlert,
+)
+from app.models.network_incident import (
+    NetworkIncident,
+    IncidentUpdate,
+    IncidentAffectedSubscription,
+    IncidentSeverity,
+    IncidentStatus,
+)
+from app.models.upselling import (
+    UpsellOpportunity,
+    UpsellAnalysisRun,
+    UpsellConversionEvent,
+    UpsellTriggerType,
+    UpsellStatus,
+)
+from app.models.alerts import (
+    AlertRule,
+    Alert,
+    AlertEscalation,
+    AlertSuppression,
+    AlertType,
+    AlertSeverity,
+    AlertStatus,
+)
+from app.models.cleaning_operation import (
+    CleaningOperation,
+    CleaningOperationType,
+    CleaningOperationStatus,
+)
+from app.models.marketing import (
+    MarketingCampaign,
+    MarketingCampaignType,
+    MarketingCampaignStatus,
+    JourneyTemplate,
+    CustomerJourney,
+    JourneyStep,
+    JourneyEnrollment,
+    SocialAccount,
+    SocialPost,
+    EmailTemplate,
+    EmailCampaign,
+    EmailSend,
+    MarketingAudience,
+    MarketingIntegration,
+    MarketingConsent,
+    SuppressionEntry,
+    MarketingWebhookEvent,
+    JourneyStatus,
+    JourneyStepType,
+    JourneyEnrollmentStatus,
+    SocialPlatform,
+    SocialPostStatus,
+    EmailCampaignStatus,
+    EmailSendStatus,
+    ConsentChannel,
+    ConsentStatus,
+    MarketingIntegrationStatus,
+)
 
 __all__ = [
-    "Customer",
     "CustomerUsage",
     "Pop",
     "Subscription",
@@ -443,6 +562,14 @@ __all__ = [
     "RolePermission",
     "ServiceToken",
     "TokenDenylist",
+    # Granular RBAC models
+    "PermissionCategory",
+    "Group",
+    "GroupMember",
+    "GroupRole",
+    "UserPermission",
+    "UserSession",
+    "RBACAuditLog",
     # Sync infrastructure
     "SyncCursor",
     "FailedSyncRecord",
@@ -562,13 +689,6 @@ __all__ = [
     "CustomerNotificationPreference",
     "TimeEntryType",
     "PhotoType",
-    # Contact model (replaces UnifiedContact)
-    "Contact",
-    "ContactType",
-    "ContactCategory",
-    "ContactStatus",
-    "BillingType",
-    "LeadQualification",
     # Performance models
     "EvaluationPeriod",
     "EvaluationPeriodType",
@@ -591,8 +711,7 @@ __all__ = [
     "PerformanceSnapshot",
     "ScorecardInstanceStatus",
     "OverrideReason",
-    # Agent/Team models
-    "Agent",
+    # Team models (Agent deprecated - use Party with support_agent role)
     "Team",
     "TeamMember",
     # Omni models
@@ -680,4 +799,99 @@ __all__ = [
     "DedupStrategy",
     "RecordAction",
     "EntityType",
+    # Provisioning models
+    "ProvisioningLog",
+    "ProvisioningAction",
+    "ProvisioningStatus",
+    # RADIUS credential sequence
+    "RADIUSCredentialSequence",
+    # Cleanup models
+    "CleanupRule",
+    "CleanupScan",
+    "CleanupIssue",
+    "CleanupJob",
+    "CleanupIssueType",
+    "CleanupActionType",
+    "IssueSeverity",
+    "IssueStatus",
+    "CleanupScanStatus",
+    "CleanupJobStatus",
+    "CleanupEntityType",
+    # Data Bundles
+    "DataBundleProduct",
+    "CustomerBundle",
+    "BundleUsageLog",
+    "BundleTransaction",
+    "BundleType",
+    "ExpiryType",
+    "ExhaustionAction",
+    "BundleStatus",
+    # SNMP Monitoring models
+    "SNMPPollingConfig",
+    "SNMPVersion",
+    "SNMPAuthProtocol",
+    "SNMPPrivProtocol",
+    "PollStatus",
+    "DeviceMetric",
+    "InterfaceMetric",
+    "InterfaceState",
+    "InterfaceOperStatus",
+    "InterfaceMetricRollup",
+    "MetricAggregation",
+    "SubscriptionUsageMetric",
+    # Traffic Monitoring models
+    "TrafficMetric",
+    "TrafficThreshold",
+    "TrafficAlert",
+    # Network Incident models
+    "NetworkIncident",
+    "IncidentUpdate",
+    "IncidentAffectedSubscription",
+    "IncidentSeverity",
+    "IncidentStatus",
+    # Upselling models
+    "UpsellOpportunity",
+    "UpsellAnalysisRun",
+    "UpsellConversionEvent",
+    "UpsellTriggerType",
+    "UpsellStatus",
+    # Alert models
+    "AlertRule",
+    "Alert",
+    "AlertEscalation",
+    "AlertSuppression",
+    "AlertType",
+    "AlertSeverity",
+    "AlertStatus",
+    # Cleaning operations
+    "CleaningOperation",
+    "CleaningOperationType",
+    "CleaningOperationStatus",
+    "MarketingCampaign",
+    "MarketingCampaignType",
+    "MarketingCampaignStatus",
+    "JourneyTemplate",
+    "CustomerJourney",
+    "JourneyStep",
+    "JourneyEnrollment",
+    "SocialAccount",
+    "SocialPost",
+    "EmailTemplate",
+    "EmailCampaign",
+    "EmailSend",
+    "MarketingAudience",
+    "MarketingIntegration",
+    "MarketingConsent",
+    "SuppressionEntry",
+    "MarketingWebhookEvent",
+    "JourneyStatus",
+    "JourneyStepType",
+    "JourneyEnrollmentStatus",
+    "SocialPlatform",
+    "SocialPostStatus",
+    "EmailCampaignStatus",
+    "EmailSendStatus",
+    "ConsentChannel",
+    "ConsentStatus",
+    "MarketingIntegrationStatus",
 ]

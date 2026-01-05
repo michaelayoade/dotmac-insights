@@ -1,0 +1,240 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Bulk Update</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Update multiple records at once</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/data-cleaner"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<div x-data="{
+    selectedTable: '',
+    filters: [],
+    updates: [],
+    loading: false,
+    hasPreview: false,
+    addFilter() {
+        this.filters.push({ field: '', value: '' });
+    },
+    removeFilter(index) {
+        this.filters.splice(index, 1);
+    },
+    addUpdate() {
+        this.updates.push({ field: '', value: '' });
+    },
+    removeUpdate(index) {
+        this.updates.splice(index, 1);
+    }
+}">
+    <!-- Configuration Form -->
+    <form
+        hx-post="/settings/data-cleaner/bulk-update/preview"
+        hx-target="#preview-results"
+        hx-indicator="#preview-spinner"
+        @htmx:before-request="loading = true"
+        @htmx:after-request="loading = false; hasPreview = true"
+    >
+        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+        <!-- Table Selection -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Select Table</h2>
+            <select
+                name="table"
+                x-model="selectedTable"
+                required
+                class="w-full max-w-md rounded-xl border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500"
+            >
+                <option value="">Choose a table...</option>
+                {% for table in tables %}
+                <option value="{{ table.value }}">{{ table.label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Filters</h2>
+                    <p class="text-sm text-gray-500 mt-1">Define which records to update (optional)</p>
+                </div>
+                <button
+                    type="button"
+                    @click="addFilter"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-rose-700 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Filter
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <template x-for="(filter, index) in filters" :key="index">
+                    <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-xl ring-1 ring-gray-200">
+                        <select
+                            :name="'filter_' + filter.field"
+                            x-model="filter.field"
+                            class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-sm"
+                        >
+                            <option value="">Select field...</option>
+                            <option value="status">Status</option>
+                            <option value="is_active">Is Active</option>
+                            <option value="party_type">Party Type</option>
+                            <option value="territory">Territory</option>
+                            <option value="customer_group">Customer Group</option>
+                        </select>
+                        <span class="text-gray-400">=</span>
+                        <input
+                            type="text"
+                            :name="'filter_' + filter.field"
+                            x-model="filter.value"
+                            placeholder="Value..."
+                            class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-sm"
+                        >
+                        <button
+                            type="button"
+                            @click="removeFilter(index)"
+                            class="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </template>
+                <div x-show="filters.length === 0" class="text-center py-6 text-gray-500">
+                    <p>No filters added. All records in the table will be updated.</p>
+                    <p class="text-sm mt-1">Click "Add Filter" to limit which records are affected.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Updates Section -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">Updates</h2>
+                    <p class="text-sm text-gray-500 mt-1">Define what values to set</p>
+                </div>
+                <button
+                    type="button"
+                    @click="addUpdate"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-rose-700 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Add Update
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <template x-for="(update, index) in updates" :key="index">
+                    <div class="flex items-center gap-3 p-4 bg-rose-50 rounded-xl ring-1 ring-rose-200">
+                        <select
+                            x-model="update.field"
+                            class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-sm"
+                        >
+                            <option value="">Select field...</option>
+                            <option value="status">Status</option>
+                            <option value="is_active">Is Active</option>
+                            <option value="party_type">Party Type</option>
+                            <option value="territory">Territory</option>
+                            <option value="customer_group">Customer Group</option>
+                            <option value="sales_person">Sales Person</option>
+                            <option value="payment_terms">Payment Terms</option>
+                        </select>
+                        <span class="text-gray-400">&rarr;</span>
+                        <input
+                            type="text"
+                            :name="'update_' + update.field"
+                            x-model="update.value"
+                            placeholder="New value..."
+                            class="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-rose-500 focus:ring-rose-500 text-sm"
+                        >
+                        <button
+                            type="button"
+                            @click="removeUpdate(index)"
+                            class="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </div>
+                </template>
+                <div x-show="updates.length === 0" class="text-center py-6 text-gray-500">
+                    <p>No updates defined.</p>
+                    <p class="text-sm mt-1">Click "Add Update" to define what values to set.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Button -->
+        <div class="flex items-center gap-4 mb-6">
+            <button
+                type="submit"
+                :disabled="!selectedTable || updates.length === 0 || loading"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-rose-600 text-white rounded-xl font-medium hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+                <span id="preview-spinner" class="htmx-indicator">
+                    <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </span>
+                <svg x-show="!loading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+                <span x-text="loading ? 'Scanning...' : 'Preview Changes'"></span>
+            </button>
+            <span x-show="!selectedTable || updates.length === 0" class="text-sm text-gray-500">
+                Select a table and add at least one update
+            </span>
+        </div>
+    </form>
+
+    <!-- Preview Results Container -->
+    <div id="preview-results">
+        <!-- HTMX will load bulk_update_preview.html partial here -->
+    </div>
+
+    <!-- Warning Card -->
+    <div class="bg-red-50 rounded-2xl ring-1 ring-red-100 p-6 mt-6" x-show="!hasPreview">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="font-semibold text-red-900 mb-2">Use With Caution</h3>
+                <ul class="text-sm text-red-700 space-y-1">
+                    <li>Bulk updates can affect many records at once</li>
+                    <li>Always preview changes before executing</li>
+                    <li>All bulk update operations can be rolled back if needed</li>
+                    <li>Use filters to limit the scope of changes</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

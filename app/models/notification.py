@@ -98,6 +98,24 @@ class NotificationEventType(enum.Enum):
     MILESTONE_COMPLETED = "milestone_completed"  # Milestone completed
     MILESTONE_OVERDUE = "milestone_overdue"  # Milestone past due date
 
+    # NOC / Network Monitoring events
+    DEVICE_DOWN = "device_down"
+    DEVICE_UP = "device_up"
+    DEVICE_HIGH_CPU = "device_high_cpu"
+    DEVICE_HIGH_MEMORY = "device_high_memory"
+    DEVICE_HIGH_TEMPERATURE = "device_high_temperature"
+    INTERFACE_DOWN = "interface_down"
+    INTERFACE_UP = "interface_up"
+    INTERFACE_FLAPPING = "interface_flapping"
+    ALERT_TRIGGERED = "alert_triggered"
+    ALERT_ACKNOWLEDGED = "alert_acknowledged"
+    ALERT_RESOLVED = "alert_resolved"
+    ALERT_ESCALATED = "alert_escalated"
+    INCIDENT_CREATED = "incident_created"
+    INCIDENT_UPDATED = "incident_updated"
+    INCIDENT_RESOLVED = "incident_resolved"
+    TRAFFIC_THRESHOLD_BREACHED = "traffic_threshold_breached"
+
     # Generic
     CUSTOM = "custom"
 

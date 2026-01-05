@@ -19,8 +19,10 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape, TemplateNot
 from app.templates.filters import register_filters
 
 
-# Template directory path
+# Template directory paths
 TEMPLATES_DIR = Path(__file__).parent
+APP_DIR = TEMPLATES_DIR.parent
+MODULES_DIR = APP_DIR / "modules"
 
 
 @lru_cache(maxsize=1)
@@ -29,13 +31,16 @@ def get_template_env() -> Environment:
     Get the configured Jinja2 environment.
 
     Returns a cached Environment instance with:
-    - FileSystemLoader pointing to app/templates
+    - FileSystemLoader pointing to app/templates and app/
     - Autoescape enabled for HTML files
     - Custom filters registered
     - Global context variables set
     """
+    # Include both templates dir and app dir for module templates
+    search_paths = [str(TEMPLATES_DIR), str(APP_DIR)]
+
     env = Environment(
-        loader=FileSystemLoader(str(TEMPLATES_DIR)),
+        loader=FileSystemLoader(search_paths),
         autoescape=select_autoescape(
             enabled_extensions=("html", "htm", "xml", "html.j2"),
             default_for_string=False,
@@ -144,7 +149,7 @@ class TemplateRenderer:
         """Render a template by name."""
         template = self.env.get_template(template_name)
         ctx = {**(context or {}), **kwargs}
-        return template.render(ctx)
+        return str(template.render(ctx))
 
     def render_string(
         self,
@@ -155,7 +160,7 @@ class TemplateRenderer:
         """Render a template string."""
         template = self.env.from_string(template_str)
         ctx = {**(context or {}), **kwargs}
-        return template.render(ctx)
+        return str(template.render(ctx))
 
     def exists(self, template_name: str) -> bool:
         """Check if a template exists."""

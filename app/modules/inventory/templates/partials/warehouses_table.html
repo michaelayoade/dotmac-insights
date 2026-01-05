@@ -1,0 +1,88 @@
+{# Warehouses table partial - returned for HTMX updates #}
+
+{% if warehouses %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="warehouses-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/inventory/table?sort=warehouse_name&dir={% if sort_key == 'warehouse_name' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#warehouses-table-container"
+                        hx-include="[name='q'], [name='type']"
+                        hx-push-url="true"
+                        data-testid="sort-name"
+                    >
+                        Warehouse
+                        {% if sort_key == 'warehouse_name' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% else %}
+                        <svg class="w-4 h-4 text-gray-300 group-hover:text-gray-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Type
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Parent
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Status
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100" id="warehouses-tbody">
+            {% for warehouse in warehouses %}
+            {% include "modules/inventory/templates/partials/warehouse_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="warehouses-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No warehouses found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_type %}
+        No warehouses match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by adding your first warehouse to manage inventory locations.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_type) %}
+    <a
+        href="/inventory/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        data-testid="empty-add-warehouse-btn"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Add Your First Warehouse
+    </a>
+    {% endif %}
+</div>
+{% endif %}

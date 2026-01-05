@@ -1,0 +1,108 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Dispatch Board</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ dispatch_date.strftime('%A, %B %d, %Y') }}</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <div class="flex items-center rounded-xl bg-surface-50 p-1">
+            <a
+                href="/field-service/dispatch?date={{ prev_date }}"
+                class="p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+                title="Previous Day"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </a>
+            <a
+                href="/field-service/dispatch?date={{ today }}"
+                class="px-3 py-2 text-sm font-medium text-gray-700 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+            >
+                Today
+            </a>
+            <a
+                href="/field-service/dispatch?date={{ next_date }}"
+                class="p-2 text-gray-500 hover:text-primary-600 hover:bg-white rounded-lg transition-all"
+                title="Next Day"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+        <a
+            href="/field-service/new?date={{ dispatch_date.isoformat() }}"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 transition-all duration-200"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>New Order</span>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- View Mode Tabs -->
+<div class="flex items-center gap-2 mb-6">
+    <a href="/field-service" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+        List
+    </a>
+    <a href="/field-service/calendar" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+        Calendar
+    </a>
+    <a href="/field-service/dispatch?date={{ dispatch_date.isoformat() }}" class="px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg">
+        Dispatch
+    </a>
+    <a href="/field-service/map?date={{ dispatch_date.isoformat() }}" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+        Map
+    </a>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6" data-testid="stats-grid">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="stat-card-total">
+        <div class="text-xs font-medium text-gray-500 uppercase">Total</div>
+        <div class="mt-1 text-2xl font-bold text-gray-900">{{ summary.total }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="stat-card-unassigned">
+        <div class="text-xs font-medium text-gray-500 uppercase">Unassigned</div>
+        <div class="mt-1 text-2xl font-bold text-amber-600">{{ summary.unassigned }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="stat-card-assigned">
+        <div class="text-xs font-medium text-gray-500 uppercase">Assigned</div>
+        <div class="mt-1 text-2xl font-bold text-blue-600">{{ summary.assigned }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="stat-card-in-field">
+        <div class="text-xs font-medium text-gray-500 uppercase">In Field</div>
+        <div class="mt-1 text-2xl font-bold text-cyan-600">{{ summary.in_field }}</div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4" data-testid="stat-card-completed">
+        <div class="text-xs font-medium text-gray-500 uppercase">Completed</div>
+        <div class="mt-1 text-2xl font-bold text-green-600">{{ summary.completed }}</div>
+    </div>
+</div>
+
+<!-- Dispatch Board -->
+<div class="flex items-center gap-2 text-xs text-gray-500 mb-3">
+    <div id="dispatch-assign-indicator" class="htmx-indicator">
+        <svg class="w-4 h-4 text-primary-500 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+    <span>Updating dispatch board...</span>
+</div>
+<div id="dispatch-board" class="flex gap-4 overflow-x-auto pb-4" data-testid="dispatch-board">
+    {% include "field_service/partials/dispatch_board.html" %}
+</div>
+
+<!-- Technician Workload -->
+<div class="mt-8" id="dispatch-workload-container">
+    {% include "field_service/partials/dispatch_workload.html" %}
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Numeric, Index
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Numeric, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import JSON
 from datetime import datetime, date
@@ -11,7 +11,7 @@ from app.database import Base, SoftDeleteMixin
 from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
+    from app.models.party import CustomerAccount
     from app.models.employee import Employee
     from app.models.expense import Expense
     from app.models.ticket import Ticket
@@ -83,7 +83,12 @@ class Project(Base):
     cost_center: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # FK Relationships
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id"),
+        nullable=True,
+        index=True,
+    )
     project_manager_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
 
     # ERPNext references (for linking)
@@ -144,7 +149,7 @@ class Project(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Optional["Customer"]] = relationship(back_populates="projects")
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship()
     project_manager: Mapped[Optional["Employee"]] = relationship(back_populates="managed_projects")
     expenses: Mapped[List["Expense"]] = relationship(back_populates="project")
     tickets: Mapped[List["Ticket"]] = relationship(back_populates="project")

@@ -1,0 +1,109 @@
+{# Workflow tasks table partial - for HTMX updates #}
+<div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-100" data-testid="tasks-table">
+        <thead>
+            <tr class="bg-gradient-to-r from-surface-50 to-surface-100/50">
+                <th class="py-3.5 pl-6 pr-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Task
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden sm:table-cell">
+                    Module
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display hidden md:table-cell">
+                    Due Date
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Priority
+                </th>
+                <th class="px-3 py-3.5 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider font-display">
+                    Status
+                </th>
+                <th class="py-3.5 pl-3 pr-6 w-32">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+            {% if tasks %}
+                {% for task in tasks %}
+                {% include "modules/workflow_tasks/templates/partials/task_row.html" %}
+                {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-6 py-16 text-center" data-testid="tasks-empty-state">
+                    <div class="mx-auto w-20 h-20 bg-gradient-to-br from-primary-50 to-primary-100 rounded-2xl flex items-center justify-center mb-5 ring-1 ring-primary-200/50">
+                        <svg class="w-10 h-10 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                        </svg>
+                    </div>
+                    {% if search_query %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">No matching tasks</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        No tasks match your search criteria. Try adjusting your filters or search terms.
+                    </p>
+                    {% else %}
+                    <h3 class="text-base font-semibold text-gray-900 mb-1.5 font-display">You're all caught up!</h3>
+                    <p class="text-sm text-gray-500 font-body max-w-xs mx-auto">
+                        No pending tasks at the moment. New tasks will appear here when they're assigned to you.
+                    </p>
+                    <div class="mt-5">
+                        <span class="inline-flex items-center gap-2 text-sm text-primary-600 font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            All tasks completed
+                        </span>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+{% if pagination.total_pages > 1 %}
+<div class="px-6 py-4 border-t border-gray-100 bg-gradient-to-r from-surface-50/50 to-transparent">
+    <div class="flex items-center justify-between">
+        <p class="text-sm text-gray-500 font-body">
+            Showing <span class="font-semibold text-gray-700 tabular-nums">{{ (pagination.page - 1) * pagination.per_page + 1 }}</span> to <span class="font-semibold text-gray-700 tabular-nums">{{ [pagination.page * pagination.per_page, pagination.total]|min }}</span> of <span class="font-semibold text-gray-700 tabular-nums">{{ pagination.total }}</span> tasks
+        </p>
+        <div class="flex items-center gap-2">
+            {# Page indicator #}
+            <span class="text-xs text-gray-400 font-medium">
+                Page {{ pagination.page }} of {{ pagination.total_pages }}
+            </span>
+
+            <div class="flex gap-1">
+                {% if pagination.page > 1 %}
+                <button
+                    hx-get="/tasks/table?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_module %}&module={{ current_module }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}"
+                    hx-target="#tasks-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Previous
+                </button>
+                {% endif %}
+                {% if pagination.page < pagination.total_pages %}
+                <button
+                    hx-get="/tasks/table?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_module %}&module={{ current_module }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}"
+                    hx-target="#tasks-table-container"
+                    hx-push-url="true"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
+                >
+                    Next
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

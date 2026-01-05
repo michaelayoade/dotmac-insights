@@ -1,0 +1,76 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{% if policy %}/hr/leave/policies/{{ policy.id }}{% else %}/hr/leave/policies{% endif %}" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">{{ page_title }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{% if policy %}Edit policy settings{% else %}Create a new leave policy{% endif %}</p>
+        </div>
+    </div>
+
+    <form method="post" action="{% if policy %}/hr/leave/policies/{{ policy.id }}{% else %}/hr/leave/policies{% endif %}" class="space-y-6">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Basic Info -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Policy Information</h2>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Policy Name *</label>
+                <input type="text" name="leave_policy_name" value="{{ form_data.leave_policy_name if form_data else (policy.leave_policy_name if policy else '') }}" required
+                    class="w-full max-w-md px-4 py-2.5 border {% if errors.leave_policy_name %}border-red-300{% else %}border-gray-200{% endif %} rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    placeholder="e.g., Standard Policy">
+                {% if errors.leave_policy_name %}
+                <p class="mt-1 text-sm text-red-600">{{ errors.leave_policy_name }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Leave Allocations -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Annual Leave Allocations</h2>
+            <p class="text-sm text-gray-500 mb-4">Specify the number of days allocated per year for each leave type.</p>
+
+            {% if leave_types %}
+            <div class="space-y-3">
+                {% for lt in leave_types %}
+                <div class="flex items-center gap-4 p-3 border border-gray-100 rounded-lg hover:bg-surface-50">
+                    <div class="flex-1">
+                        <span class="text-sm font-medium text-gray-900">{{ lt.leave_type_name }}</span>
+                        {% if lt.is_lwp %}
+                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">LWP</span>
+                        {% endif %}
+                    </div>
+                    <div class="w-32">
+                        <input type="hidden" name="leave_type_id" value="{{ lt.id }}">
+                        <input type="number" name="annual_allocation" min="0" step="0.5"
+                            value="{% if existing_allocations %}{{ existing_allocations.get(lt.id, 0) }}{% else %}0{% endif %}"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                            placeholder="Days">
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <p>No active leave types found.</p>
+                <a href="/hr/leave/types/new" class="text-primary-600 hover:text-primary-500">Create a leave type first</a>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <a href="{% if policy %}/hr/leave/policies/{{ policy.id }}{% else %}/hr/leave/policies{% endif %}" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                Cancel
+            </a>
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                {{ 'Update Policy' if policy else 'Create Policy' }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "layouts/module.html" %}
+
+{% block title %}Leads{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Leads</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ total }} total leads</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/crm/leads/new" class="btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Lead
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white shadow rounded-lg p-4">
+        <form hx-get="/crm/leads/table" hx-target="#leads-table" hx-trigger="submit, change from:select" class="flex flex-wrap gap-4">
+            <div class="flex-1 min-w-[200px]">
+                <input type="text" name="search" value="{{ search }}" placeholder="Search leads..."
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    hx-get="/crm/leads/table" hx-target="#leads-table" hx-trigger="keyup changed delay:300ms">
+            </div>
+            <div class="w-40">
+                <select name="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">All Statuses</option>
+                    {% for opt in status_options %}
+                    <option value="{{ opt.value }}" {% if status_filter == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-secondary">Search</button>
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div id="leads-table" class="bg-white shadow rounded-lg overflow-hidden">
+        {% include "modules/crm/templates/leads/partials/leads_table.html" %}
+    </div>
+</div>
+{% endblock %}

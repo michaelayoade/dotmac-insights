@@ -31,6 +31,7 @@ from app.schemas.settings_schemas import (
     get_defaults,
 )
 from app.services.secrets_service import get_secrets, SecretsServiceError
+from app.services.activity_logger import ActivityLogger
 
 logger = structlog.get_logger()
 
@@ -354,6 +355,19 @@ class SettingsService:
             user_agent=user_agent,
         )
         self.db.add(audit)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action=f"settings.{action}",
+            user=user,
+            entity_type="settings",
+            entity_id=group,
+            summary=f"{action.title()} settings group '{group}'",
+            metadata={"group": group, "action": action},
+            request=request,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
 
     def has_secrets(self, group: str, data: dict) -> bool:
         """Check if data contains any non-redacted secret fields."""

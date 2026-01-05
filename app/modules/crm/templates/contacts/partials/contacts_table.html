@@ -1,0 +1,66 @@
+{% if contacts %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="contacts-table">
+    <table class="min-w-full divide-y divide-gray-100" id="contacts-table">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="w-12 py-3.5 pl-6 pr-2">
+                    <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        @change="toggleAll($el.checked, '[data-bulk-id]')"
+                        :checked="allSelected"
+                        data-testid="select-all-contacts"
+                        aria-label="Select all contacts"
+                    >
+                </th>
+                <th class="py-3.5 pl-2 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Name</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Email</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Phone</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Type</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Status</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for contact in contacts %}
+            {% include "modules/crm/templates/contacts/partials/contact_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% with pagination=pagination, base_url="/crm/contacts", htmx_target="#contacts-table-container" %}
+    {% include "components/ui/pagination.html" %}
+    {% endwith %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="contacts-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a4 4 0 00-4-4h-3M9 20H4v-2a4 4 0 014-4h3m4-4a4 4 0 10-8 0 4 4 0 008 0zm6 4a3 3 0 10-6 0 3 3 0 006 0z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No contacts found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_type or current_status %}
+        No contacts match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by creating your first contact.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_type or current_status) %}
+    <a
+        href="/crm/contacts/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Contact
+    </a>
+    {% endif %}
+</div>
+{% endif %}

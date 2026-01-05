@@ -1,0 +1,128 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Data Insights</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Data quality scorecard and anomaly detection</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Data Completeness Scorecard -->
+{% if completeness %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-8">
+    <div class="flex items-center justify-between mb-6">
+        <h3 class="font-semibold text-gray-900">Data Completeness</h3>
+        {% if completeness.grade %}
+        <div class="flex items-center gap-2">
+            <span class="text-sm text-gray-500">Grade:</span>
+            {% set grade_colors = {
+                "A": "bg-green-100 text-green-800",
+                "B": "bg-blue-100 text-blue-800",
+                "C": "bg-yellow-100 text-yellow-800",
+                "D": "bg-orange-100 text-orange-800",
+                "F": "bg-red-100 text-red-800"
+            } %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-lg font-bold {{ grade_colors.get(completeness.grade, 'bg-gray-100 text-gray-800') }}">
+                {{ completeness.grade }}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Overall Score -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-medium text-gray-700">Overall Completeness</span>
+            <span class="text-sm font-bold text-gray-900">{{ "{:.1f}%".format(completeness.overall_completeness | default(0)) }}</span>
+        </div>
+        <div class="w-full bg-gray-200 rounded-full h-3">
+            <div class="h-3 rounded-full {{ 'bg-green-500' if completeness.overall_completeness >= 80 else 'bg-yellow-500' if completeness.overall_completeness >= 60 else 'bg-red-500' }}" style="width: {{ completeness.overall_completeness | default(0) }}%"></div>
+        </div>
+    </div>
+
+    <!-- Breakdowns -->
+    {% if completeness.customer %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for field, value in completeness.customer.items() %}
+        <div class="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+            <span class="text-sm text-gray-700 capitalize">{{ field | replace("_", " ") }}</span>
+            <span class="text-sm font-medium {{ 'text-green-600' if value >= 80 else 'text-yellow-600' if value >= 50 else 'text-red-600' }}">{{ "{:.0f}%".format(value) }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Recommendations -->
+    {% if completeness.recommendations %}
+    <div class="mt-6 pt-6 border-t border-gray-100">
+        <h4 class="text-sm font-medium text-gray-700 mb-3">Recommendations</h4>
+        <ul class="space-y-2">
+            {% for rec in completeness.recommendations[:5] %}
+            <li class="flex items-start gap-2 text-sm text-gray-600">
+                <svg class="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span>{{ rec }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Anomalies -->
+{% if anomalies %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Detected Anomalies</h3>
+
+    {% set severity_colors = {
+        "high": "bg-red-50 border-red-200 text-red-800",
+        "medium": "bg-yellow-50 border-yellow-200 text-yellow-800",
+        "low": "bg-blue-50 border-blue-200 text-blue-800"
+    } %}
+
+    {% set severity_icons = {
+        "high": "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z",
+        "medium": "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+        "low": "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+    } %}
+
+    <div class="space-y-4">
+        {% for category, items in anomalies.items() %}
+        {% if items and items | length > 0 %}
+        <div class="border rounded-xl p-4 {{ severity_colors.get(items[0].severity | default('low'), 'bg-gray-50 border-gray-200 text-gray-800') if items[0].severity is defined else 'bg-gray-50 border-gray-200' }}">
+            <div class="flex items-center gap-2 mb-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ severity_icons.get(items[0].severity | default('low'), severity_icons['low']) if items[0].severity is defined else severity_icons['low'] }}"/>
+                </svg>
+                <span class="font-medium capitalize">{{ category | replace("_", " ") }}</span>
+                <span class="text-sm opacity-75">({{ items | length }})</span>
+            </div>
+            <ul class="text-sm space-y-1 ml-7">
+                {% for item in items[:5] %}
+                <li>{{ item.description | default(item | string) }}</li>
+                {% endfor %}
+                {% if items | length > 5 %}
+                <li class="text-gray-500">... and {{ items | length - 5 }} more</li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    {% if not anomalies or anomalies | length == 0 %}
+    <div class="text-center py-8">
+        <svg class="mx-auto h-12 w-12 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <p class="mt-2 text-sm text-gray-500">No anomalies detected. Your data looks healthy!</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

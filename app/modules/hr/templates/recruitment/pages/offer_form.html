@@ -1,0 +1,59 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <form method="POST" action="{{ form_action }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ form_title }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ form_subtitle }}</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="applicant_id" class="block text-sm font-medium text-gray-700 mb-1.5">Applicant <span class="text-red-500">*</span></label>
+                <select name="applicant_id" id="applicant_id" {{ 'disabled' if offer else 'required' }} class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm {{ 'bg-gray-50 text-gray-500' if offer else '' }}">
+                    <option value="">Select applicant</option>
+                    {% for opt in applicant_options %}
+                    <option value="{{ opt.value }}" {{ 'selected' if (form_data and form_data.applicant_id == opt.value) or (selected_applicant_id == opt.value) else '' }}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+                {% if errors.applicant_id %}<p class="mt-1.5 text-sm text-red-600">{{ errors.applicant_id }}</p>{% endif %}
+                {% if offer %}<p class="mt-1 text-xs text-gray-500">Applicant is locked once created.</p>{% endif %}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="offer_date" class="block text-sm font-medium text-gray-700 mb-1.5">Offer Date <span class="text-red-500">*</span></label>
+                    <input type="date" name="offer_date" id="offer_date" required value="{{ form_data.offer_date if form_data else '' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    {% if errors.offer_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.offer_date }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="expiry_date" class="block text-sm font-medium text-gray-700 mb-1.5">Expiry Date</label>
+                    <input type="date" name="expiry_date" id="expiry_date" value="{{ form_data.expiry_date if form_data else '' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="designation" class="block text-sm font-medium text-gray-700 mb-1.5">Designation</label>
+                    <input type="text" name="designation" id="designation" value="{{ form_data.designation if form_data else '' }}" placeholder="e.g., Senior Engineer" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+                <div>
+                    <label for="salary_structure" class="block text-sm font-medium text-gray-700 mb-1.5">Salary Structure</label>
+                    <input type="text" name="salary_structure" id="salary_structure" value="{{ form_data.salary_structure if form_data else '' }}" placeholder="Structure name" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                </div>
+            </div>
+            <div>
+                <label for="base" class="block text-sm font-medium text-gray-700 mb-1.5">Base Salary <span class="text-red-500">*</span></label>
+                <input type="number" step="0.01" min="0" name="base" id="base" value="{{ form_data.base if form_data else '' }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                {% if errors.base %}<p class="mt-1.5 text-sm text-red-600">{{ errors.base }}</p>{% endif %}
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="{{ cancel_href }}" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
+                <span x-show="!submitting">{{ submit_label }}</span>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -169,7 +169,7 @@ INVENTORY_ENTITIES: dict[str, EntityConfig] = {
             "purchase_date": {"type": FieldType.DATE, "description": "Purchase date"},
             "purchase_rate": {"type": FieldType.DECIMAL, "normalizer": "currency", "description": "Purchase rate"},
             "delivery_date": {"type": FieldType.DATE, "description": "Delivery date"},
-            "customer_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customers", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer (if sold)"},
+            "customer_account_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customer_accounts", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer (if sold)"},
             "warranty_expiry_date": {"type": FieldType.DATE, "description": "Warranty expiry date"},
             "status": {"type": FieldType.ENUM, "enum_values": ["inactive", "active", "delivered", "expired"], "default": "inactive", "description": "Status"},
         },
@@ -235,7 +235,7 @@ INVENTORY_ENTITIES: dict[str, EntityConfig] = {
         "fields": {
             "id": {"type": FieldType.INTEGER, "description": "Internal ID"},
             "issue_number": {"type": FieldType.STRING, "unique": True, "max_length": 100, "description": "Issue number"},
-            "customer_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customers", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
+            "customer_account_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "customer_accounts", "fk_lookup_fields": ["id", "email", "name"], "description": "Customer"},
             "invoice_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "invoices", "fk_lookup_fields": ["id", "invoice_number"], "description": "Sales invoice"},
             "posting_date": {"type": FieldType.DATE, "required": True, "description": "Posting date"},
             "warehouse_id": {"type": FieldType.FOREIGN_KEY, "fk_entity": "warehouses", "fk_lookup_fields": ["id", "name"], "description": "Source warehouse"},

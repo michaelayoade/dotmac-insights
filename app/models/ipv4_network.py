@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text
+from sqlalchemy import String, Text, case, func
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.ext.hybrid import hybrid_property
 from datetime import datetime
 from typing import Optional
 from app.database import Base
@@ -53,3 +54,19 @@ class IPv4Network(Base):
     def cidr(self) -> str:
         """Return network in CIDR notation."""
         return f"{self.network}/{self.mask}"
+
+    @hybrid_property
+    def total(self) -> int:
+        """Total usable addresses in the subnet (accounts for network/broadcast)."""
+        total = 1 << max(0, 32 - self.mask)
+        if not self.allow_use_network_and_broadcast and total >= 2:
+            return total - 2
+        return total
+
+    @total.expression
+    def total(cls) -> object:
+        base_total = func.power(2, 32 - cls.mask)
+        return case(
+            (cls.allow_use_network_and_broadcast.is_(True), base_total),
+            else_=base_total - 2,
+        )

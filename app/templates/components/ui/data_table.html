@@ -1,0 +1,164 @@
+{#
+Data Table Component
+
+Usage:
+{% set table = {
+    columns: [
+        {"key": "name", "label": "Name", "sortable": true},
+        {"key": "email", "label": "Email", "sortable": true},
+        {"key": "status", "label": "Status", "sortable": false},
+        {"key": "actions", "label": "", "align": "right"},
+    ],
+    rows: contacts,
+    empty_message: "No parties found",
+    empty_icon: "users",
+    empty_action_label: "Add Party",
+    empty_action_href: "/parties",
+    selectable: true,
+    sort_key: "name",
+    sort_dir: "asc",
+    base_url: "/parties",
+    row_template: "modules/support/templates/partials/party_search_results.html",
+    htmx_target: "#contacts-table",
+} %}
+{% include "components/ui/data_table.html" %}
+#}
+
+<!-- Responsive table wrapper with scroll hint -->
+<div class="relative" x-data="{ showScrollHint: false }" x-init="showScrollHint = $el.querySelector('.table-scroll-container')?.scrollWidth > $el.querySelector('.table-scroll-container')?.clientWidth">
+    <!-- Right scroll fade hint (mobile only) -->
+    <div
+        class="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent pointer-events-none z-10 sm:hidden"
+        x-show="showScrollHint"
+        x-transition
+    ></div>
+
+    <div class="table-scroll-container overflow-x-auto -mx-4 sm:mx-0 scrollbar-thin" @scroll="showScrollHint = $el.scrollLeft < ($el.scrollWidth - $el.clientWidth - 20)">
+        <div class="inline-block min-w-full align-middle px-4 sm:px-0">
+            <div class="overflow-hidden bg-white shadow-warm-sm ring-1 ring-gray-100 sm:rounded-xl" data-testid="data-table">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-surface-50">
+                        <tr>
+                            {% if table.selectable %}
+                            <th scope="col" class="relative w-12 px-4 sm:w-14 sm:px-6">
+                                <input
+                                    type="checkbox"
+                                    class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 sm:left-6"
+                                    x-data
+                                    @change="document.querySelectorAll('input[name=selected]').forEach(cb => cb.checked = $el.checked)"
+                                    data-testid="select-all-checkbox"
+                                    aria-label="Select all rows"
+                                >
+                            </th>
+                            {% endif %}
+
+                            {% for col in table.columns %}
+                            <th
+                                scope="col"
+                                class="{% if loop.first and not table.selectable %}py-3 pl-4 pr-3 sm:pl-6{% elif loop.last %}py-3 pl-3 pr-4 sm:pr-6{% else %}px-3 py-3{% endif %} text-left text-xs font-semibold uppercase tracking-wide text-gray-500"
+                            >
+                                {% if col.sortable %}
+                                <a
+                                    href="{{ table.base_url }}?sort={{ col.key }}&dir={% if table.sort_key == col.key and table.sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                                    class="group inline-flex items-center gap-1 hover:text-gray-700 transition-colors"
+                                    {% if table.htmx_target %}
+                                    hx-get="{{ table.base_url }}?sort={{ col.key }}&dir={% if table.sort_key == col.key and table.sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                                    hx-target="{{ table.htmx_target }}"
+                                    hx-push-url="true"
+                                    {% endif %}
+                                    data-testid="sort-{{ col.key }}"
+                                >
+                                    {{ col.label }}
+                                    {% if table.sort_key == col.key %}
+                                        {% if table.sort_dir == 'asc' %}
+                                        <svg class="h-4 w-4 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        {% else %}
+                                        <svg class="h-4 w-4 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                        {% endif %}
+                                    {% else %}
+                                    <svg class="h-4 w-4 text-gray-300 group-hover:text-gray-400 transition-colors" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                    </svg>
+                                    {% endif %}
+                                </a>
+                                {% else %}
+                                <span class="{% if col.align == 'right' %}block text-right{% endif %}">{{ col.label }}</span>
+                                {% endif %}
+                            </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 bg-white" id="{{ table.htmx_target | replace('#', '') if table.htmx_target else 'table-body' }}">
+                        {% if table.rows %}
+                            {% for row in table.rows %}
+                                {% if table.row_template %}
+                                    {% include table.row_template %}
+                                {% else %}
+                                <tr class="hover:bg-surface-50 transition-colors" data-testid="table-row-{{ row.id if row.id else loop.index }}" data-row-id="{{ row.id if row.id else loop.index }}">
+                                    {% if table.selectable %}
+                                    <td class="relative w-12 px-4 sm:w-14 sm:px-6">
+                                        <input
+                                            type="checkbox"
+                                            name="selected"
+                                            value="{{ row.id }}"
+                                            class="absolute left-4 top-1/2 -mt-2 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 sm:left-6"
+                                            data-testid="select-row-{{ row.id }}"
+                                            data-bulk-checkbox
+                                            data-bulk-id="{{ row.id }}"
+                                        >
+                                    </td>
+                                    {% endif %}
+                                    {% for col in table.columns %}
+                                    <td class="{% if loop.first and not table.selectable %}py-4 pl-4 pr-3 sm:pl-6{% elif loop.last %}py-4 pl-3 pr-4 sm:pr-6{% else %}px-3 py-4{% endif %} whitespace-nowrap text-sm {% if loop.first %}font-medium text-gray-900{% else %}text-gray-500{% endif %} {% if col.align == 'right' %}text-right{% endif %}">
+                                        {{ row[col.key] | default("") }}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        {% else %}
+                        <!-- Enhanced empty state -->
+                        <tr>
+                            <td colspan="{{ table.columns | length + (1 if table.selectable else 0) }}" class="py-12">
+                                <div class="text-center">
+                                    <!-- Icon -->
+                                    <div class="mx-auto w-12 h-12 rounded-xl bg-surface-100 flex items-center justify-center mb-4">
+                                        {% if table.empty_icon %}
+                                            {% include "components/icons/" ~ table.empty_icon ~ ".html" ignore missing %}
+                                        {% else %}
+                                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                        </svg>
+                                        {% endif %}
+                                    </div>
+                                    <!-- Message -->
+                                    <h3 class="text-sm font-semibold text-gray-900">{{ table.empty_title | default("No results found") }}</h3>
+                                    <p class="mt-1 text-sm text-gray-500">{{ table.empty_message | default("Try adjusting your search or filters.") }}</p>
+                                    <!-- Action button -->
+                                    {% if table.empty_action_href %}
+                                    <div class="mt-6">
+                                        <a
+                                            href="{{ table.empty_action_href }}"
+                                            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-xl shadow-lg shadow-primary-600/25 hover:bg-primary-500 transition-all"
+                                        >
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                            </svg>
+                                            {{ table.empty_action_label | default("Create New") }}
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

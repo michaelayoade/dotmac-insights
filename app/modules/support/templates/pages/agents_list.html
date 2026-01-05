@@ -1,0 +1,291 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">Support Agents</h1>
+            <p class="mt-1 text-sm text-gray-500">Team performance dashboard and agent management</p>
+        </div>
+    </div>
+
+    <!-- Enhanced Stats Grid (6 cards) -->
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <!-- Total Agents -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total Agents</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.total }}</p>
+                </div>
+                <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Active</p>
+                    <p class="text-2xl font-bold text-emerald-600 mt-1">{{ stats.active }}</p>
+                </div>
+                <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Now -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Available</p>
+                    <p class="text-2xl font-bold text-blue-600 mt-1">{{ stats.available }}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avg Resolution Time -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Avg Resolution</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">{{ stats.avg_resolution_hours }}h</p>
+                </div>
+                <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avg SLA -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Avg SLA</p>
+                    <p class="text-2xl font-bold {% if stats.avg_sla_pct >= 90 %}text-emerald-600{% elif stats.avg_sla_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ stats.avg_sla_pct }}%</p>
+                </div>
+                <div class="w-10 h-10 {% if stats.avg_sla_pct >= 90 %}bg-emerald-50{% elif stats.avg_sla_pct >= 70 %}bg-amber-50{% else %}bg-red-50{% endif %} rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 {% if stats.avg_sla_pct >= 90 %}text-emerald-600{% elif stats.avg_sla_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avg CSAT -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Avg CSAT</p>
+                    {% if stats.avg_csat %}
+                    <p class="text-2xl font-bold {% if stats.avg_csat >= 4.0 %}text-emerald-600{% elif stats.avg_csat >= 3.0 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ stats.avg_csat }}/5</p>
+                    {% else %}
+                    <p class="text-2xl font-bold text-gray-400 mt-1">--</p>
+                    {% endif %}
+                </div>
+                <div class="w-10 h-10 bg-pink-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content with Sidebar -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Content (2/3) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Top Performers -->
+            {% if top_performers %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Top Performers</h2>
+                    <p class="text-sm text-gray-500">Based on SLA attainment and resolution rate (30 days, min 5 tickets)</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead><tr class="bg-surface-50">
+                            <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Rank</th>
+                            <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Agent</th>
+                            <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Tickets</th>
+                            <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Resolution</th>
+                            <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Avg Time</th>
+                            <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">SLA</th>
+                            <th class="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">CSAT</th>
+                            <th class="py-3 pl-3 pr-6 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Utilization</th>
+                        </tr></thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for performer in top_performers %}
+                            <tr class="hover:bg-surface-50">
+                                <td class="whitespace-nowrap py-3 pl-6 pr-3">
+                                    {% if loop.index <= 3 %}
+                                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full {% if loop.index == 1 %}bg-amber-100 text-amber-700{% elif loop.index == 2 %}bg-gray-100 text-gray-600{% else %}bg-orange-100 text-orange-700{% endif %} text-xs font-bold">
+                                        {{ loop.index }}
+                                    </span>
+                                    {% else %}
+                                    <span class="text-gray-500 text-sm pl-2">{{ loop.index }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3">
+                                    <a href="/support/agents/{{ performer.agent_id }}" class="font-medium text-gray-900 hover:text-primary-600">
+                                        {{ performer.agent_name }}
+                                    </a>
+                                    {% if performer.team_name %}
+                                    <p class="text-xs text-gray-500">{{ performer.team_name }}</p>
+                                    {% endif %}
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3 text-center text-sm text-gray-900">{{ performer.total_tickets }}</td>
+                                <td class="whitespace-nowrap px-3 py-3 text-center">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if performer.resolution_rate >= 90 %}bg-emerald-50 text-emerald-700{% elif performer.resolution_rate >= 70 %}bg-amber-50 text-amber-700{% else %}bg-red-50 text-red-700{% endif %}">
+                                        {{ performer.resolution_rate }}%
+                                    </span>
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3 text-center text-sm text-gray-600">{{ performer.avg_resolution_hours }}h</td>
+                                <td class="whitespace-nowrap px-3 py-3 text-center">
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {% if performer.sla_attainment_pct >= 90 %}bg-emerald-50 text-emerald-700{% elif performer.sla_attainment_pct >= 70 %}bg-amber-50 text-amber-700{% else %}bg-red-50 text-red-700{% endif %}">
+                                        {{ performer.sla_attainment_pct }}%
+                                    </span>
+                                </td>
+                                <td class="whitespace-nowrap px-3 py-3 text-center text-sm">
+                                    {% if performer.csat_score %}
+                                    <span class="{% if performer.csat_score >= 4.0 %}text-emerald-600{% elif performer.csat_score >= 3.0 %}text-amber-600{% else %}text-red-600{% endif %}">{{ performer.csat_score }}/5</span>
+                                    {% else %}
+                                    <span class="text-gray-400">--</span>
+                                    {% endif %}
+                                </td>
+                                <td class="whitespace-nowrap py-3 pl-3 pr-6">
+                                    <div class="flex items-center gap-2">
+                                        <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div class="h-full rounded-full {% if performer.utilization_pct >= 90 %}bg-red-500{% elif performer.utilization_pct >= 75 %}bg-amber-500{% else %}bg-emerald-500{% endif %}" style="width: {{ [[performer.utilization_pct, 100]|min, 0]|max }}%"></div>
+                                        </div>
+                                        <span class="text-xs text-gray-500 w-10 text-right">{{ performer.utilization_pct|round|int }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Filters -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+                <form hx-get="/support/agents" hx-target="#table-container" hx-push-url="true" class="flex flex-col sm:flex-row gap-4">
+                    <div class="flex-1">
+                        <input type="text" name="q" value="{{ search_query }}" placeholder="Search agents..."
+                            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </div>
+                    <select name="status" class="px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                        <option value="">All Status</option>
+                        <option value="active" {% if current_status == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if current_status == 'inactive' %}selected{% endif %}>Inactive</option>
+                    </select>
+                    <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                        Search
+                    </button>
+                    {% if search_query or current_status %}
+                    <a href="/support/agents" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
+                        Clear
+                    </a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <!-- Table -->
+            <div id="table-container">
+                {% include "modules/support/templates/partials/agents_table.html" %}
+            </div>
+        </div>
+
+        <!-- Sidebar (1/3) -->
+        <div class="space-y-6">
+            <!-- Workload Distribution -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Workload Distribution</h3>
+                <div class="space-y-3">
+                    {% for key, tier in workload_tiers.items() %}
+                    <div>
+                        <div class="flex items-center justify-between text-sm mb-1">
+                            <span class="text-gray-600">{{ tier.label }}</span>
+                            <span class="font-medium text-gray-900">{{ tier.agents|length }}</span>
+                        </div>
+                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            {% set pct = (tier.agents|length / stats.active * 100) if stats.active > 0 else 0 %}
+                            <div class="h-full rounded-full bg-{{ tier.color }}-500" style="width: {{ pct|round|int }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- At Capacity Alerts -->
+            {% if at_capacity %}
+            <div class="bg-red-50 rounded-2xl ring-1 ring-red-100 p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <h3 class="text-sm font-semibold text-red-900">At Capacity ({{ at_capacity|length }})</h3>
+                </div>
+                <p class="text-xs text-red-700 mb-3">These agents are at 90%+ utilization</p>
+                <ul class="space-y-2">
+                    {% for agent in at_capacity[:5] %}
+                    <li class="flex items-center justify-between">
+                        <a href="/support/agents/{{ agent.agent_id }}" class="text-sm text-red-800 hover:text-red-900 font-medium truncate">
+                            {{ agent.agent_name }}
+                        </a>
+                        <span class="text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded">{{ agent.utilization_pct|round|int }}%</span>
+                    </li>
+                    {% endfor %}
+                    {% if at_capacity|length > 5 %}
+                    <li class="text-xs text-red-600">+{{ at_capacity|length - 5 }} more</li>
+                    {% endif %}
+                </ul>
+            </div>
+            {% else %}
+            <div class="bg-emerald-50 rounded-2xl ring-1 ring-emerald-100 p-5">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <h3 class="text-sm font-semibold text-emerald-900">Capacity Healthy</h3>
+                </div>
+                <p class="text-sm text-emerald-700">All agents are below 90% utilization</p>
+            </div>
+            {% endif %}
+
+            <!-- Quick Stats -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">30-Day Summary</h3>
+                <dl class="space-y-3">
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Total Tickets Handled</dt>
+                        <dd class="text-sm font-medium text-gray-900">
+                            {% set total_handled = top_performers|sum(attribute='total_tickets') if top_performers else 0 %}
+                            {{ total_handled }}
+                        </dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Total Resolved</dt>
+                        <dd class="text-sm font-medium text-emerald-600">
+                            {% set total_resolved = top_performers|sum(attribute='resolved_tickets') if top_performers else 0 %}
+                            {{ total_resolved }}
+                        </dd>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <dt class="text-sm text-gray-600">Team Resolution Rate</dt>
+                        <dd class="text-sm font-medium text-gray-900">
+                            {% if total_handled > 0 %}
+                            {{ ((total_resolved / total_handled) * 100)|round(1) }}%
+                            {% else %}
+                            --
+                            {% endif %}
+                        </dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

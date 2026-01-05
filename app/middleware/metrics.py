@@ -21,7 +21,7 @@ Metrics are exposed at /metrics endpoint when configured.
 
 from contextlib import contextmanager
 from time import time
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -36,6 +36,19 @@ logger = structlog.get_logger(__name__)
 # =============================================================================
 # PROMETHEUS METRICS DEFINITIONS
 # =============================================================================
+
+WEBHOOK_AUTH_FAILURES: Any
+CONTACTS_AUTH_FAILURES: Any
+CONTACTS_DUAL_WRITE_SUCCESS: Any
+CONTACTS_DUAL_WRITE_FAILURES: Any
+TICKETS_DUAL_WRITE_SUCCESS: Any
+TICKETS_DUAL_WRITE_FAILURES: Any
+OUTBOUND_SYNC_TOTAL: Any
+CONTACTS_DRIFT_PCT: Any
+TICKETS_DRIFT_PCT: Any
+CONTACTS_QUERY_LATENCY: Any
+API_REQUEST_LATENCY: Any
+API_REQUESTS_TOTAL: Any
 
 if PROMETHEUS_AVAILABLE:
     # Auth failure counters

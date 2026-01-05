@@ -1,0 +1,178 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/purchasing" class="hover:text-primary-600">Purchase Orders</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ order.erpnext_id or 'PO-' ~ order.id }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ order.erpnext_id or 'Purchase Order #' ~ order.id }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ order.supplier_name or 'Purchase Order' }}</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Order Details</h3>
+                {% set status_colors = {
+                    'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'to_receive_and_bill': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+                    'to_bill': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                    'to_receive': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+                    'completed': 'bg-green-50 text-green-700 ring-green-600/20',
+                    'cancelled': 'bg-red-50 text-red-700 ring-red-600/20',
+                    'closed': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                    'on_hold': 'bg-orange-50 text-orange-700 ring-orange-600/20'
+                } %}
+                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(order.status.value if order.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                    {{ (order.status.value if order.status else 'draft')|replace('_', ' ')|title }}
+                </span>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Order Number</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ order.erpnext_id or 'Not assigned' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Supplier</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ order.supplier_name or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Transaction Date</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ order.transaction_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Expected Delivery</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ order.schedule_date or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Order Type</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ order.order_type or '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Company</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ order.company or '-' }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if order.items %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Order Items</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Item</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Qty</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Rate</th>
+                    <th class="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for item in order.items %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="py-3 pl-6 pr-3 text-sm text-gray-900">
+                            <div class="font-medium">{{ item.item_code or item.item_name or '-' }}</div>
+                            {% if item.description %}<div class="text-xs text-gray-500 truncate max-w-xs">{{ item.description }}</div>{% endif %}
+                        </td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ item.qty|round(2) }} {{ item.uom or '' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-900 text-right">{{ item.rate|round(2) }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-medium text-gray-900 text-right">{{ item.amount|round(2) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-surface-50">
+                        <td colspan="3" class="py-3 pl-6 pr-3 text-sm font-semibold text-gray-900 text-right">Total</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm font-bold text-gray-900 text-right">{{ order.grand_total|round(2) }} {{ order.currency }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-12 px-6 text-center">
+            <p class="text-gray-500">No items in this order.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-gradient-to-br from-primary-600 to-primary-700 rounded-2xl shadow-lg shadow-primary-600/25 overflow-hidden text-white">
+            <div class="px-6 py-5">
+                <h3 class="text-lg font-display font-semibold opacity-90">Grand Total</h3>
+                <p class="mt-4 text-4xl font-bold">{{ order.grand_total|round(2) }}</p>
+                <p class="text-sm opacity-75">{{ order.currency }}</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Receipt & Billing</h3>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Received</dt>
+                    <dd class="mt-1">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 bg-gray-100 rounded-full h-2">
+                                <div class="bg-green-500 h-2 rounded-full" style="width: {{ order.per_received|default(0) }}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-900">{{ order.per_received|default(0)|round(0) }}%</span>
+                        </div>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Billed</dt>
+                    <dd class="mt-1">
+                        <div class="flex items-center gap-3">
+                            <div class="flex-1 bg-gray-100 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full" style="width: {{ order.per_billed|default(0) }}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-900">{{ order.per_billed|default(0)|round(0) }}%</span>
+                        </div>
+                    </dd>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Amounts</h3>
+            </div>
+            <div class="px-6 py-6 space-y-3">
+                <div class="flex justify-between">
+                    <span class="text-sm text-gray-500">Net Total</span>
+                    <span class="text-sm text-gray-900">{{ order.net_total|round(2) }} {{ order.currency }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-sm text-gray-500">Taxes & Charges</span>
+                    <span class="text-sm text-gray-900">{{ order.total_taxes_and_charges|round(2) }} {{ order.currency }}</span>
+                </div>
+                <div class="flex justify-between pt-3 border-t border-gray-100">
+                    <span class="text-sm font-semibold text-gray-900">Grand Total</span>
+                    <span class="text-sm font-bold text-gray-900">{{ order.grand_total|round(2) }} {{ order.currency }}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if order.terms %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Terms</h3>
+            </div>
+            <div class="px-6 py-6">
+                <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ order.terms }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,78 @@
+{# Grace period extension modal #}
+<div
+    class="fixed inset-0 z-50 overflow-y-auto"
+    x-data="{ open: true }"
+    x-show="open"
+    x-transition:enter="ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+>
+    <div class="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" @click="open = false; setTimeout(() => $el.parentElement.remove(), 200)"></div>
+
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div
+            class="relative w-full max-w-md transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all"
+            x-show="open"
+            x-transition:enter="ease-out duration-300"
+            x-transition:enter-start="opacity-0 scale-95"
+            x-transition:enter-end="opacity-100 scale-100"
+            x-transition:leave="ease-in duration-200"
+            x-transition:leave-start="opacity-100 scale-100"
+            x-transition:leave-end="opacity-0 scale-95"
+            @click.away="open = false; setTimeout(() => $el.parentElement.parentElement.remove(), 200)"
+        >
+            <form method="POST" action="/subscriptions/{{ subscription.id }}/grace" hx-post="/subscriptions/{{ subscription.id }}/grace" hx-swap="none">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <h3 class="text-lg font-display font-semibold text-gray-900">Extend Grace Period</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Current grace policy: {{ grace_period_days }} day(s).
+                    </p>
+                </div>
+
+                <div class="px-6 py-5 space-y-4">
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Additional days</label>
+                        <input
+                            type="number"
+                            name="days"
+                            min="1"
+                            value="{{ grace_period_days }}"
+                            class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-300 focus:ring-primary-100"
+                            required
+                        >
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-700">Reason</label>
+                        <textarea
+                            name="reason"
+                            rows="3"
+                            class="mt-2 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-primary-300 focus:ring-primary-100"
+                            placeholder="Why is the grace period being extended?"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <div class="px-6 py-4 bg-gray-50 flex items-center justify-end gap-3">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 hover:border-gray-300 transition-all"
+                        @click="open = false; setTimeout(() => $el.closest('#modal-container').innerHTML = '', 200)"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-xl shadow-lg transition-all bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 shadow-purple-600/25"
+                    >
+                        Extend Grace
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

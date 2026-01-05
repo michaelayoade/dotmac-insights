@@ -1,0 +1,201 @@
+{% extends "layouts/app.html" %}
+
+{% set doctype_labels = {
+    'journal_entry': 'Journal Entry',
+    'expense': 'Expense',
+    'payment': 'Payment',
+    'supplier_payment': 'Supplier Payment',
+    'invoice': 'Invoice',
+    'purchase_invoice': 'Purchase Invoice',
+    'credit_note': 'Credit Note',
+    'debit_note': 'Debit Note',
+    'bank_transaction': 'Bank Transaction'
+} %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/accounting/workflows" class="hover:text-primary-600">Workflows</a>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+            <span class="text-gray-900">{{ 'Edit' if workflow else 'New' }} Workflow</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">
+            {{ 'Edit Workflow' if workflow else 'Create Workflow' }}
+        </h1>
+        <p class="mt-1.5 text-gray-500 font-body">
+            {{ 'Update workflow configuration' if workflow else 'Configure a new approval workflow' }}
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="POST" action="{{ '/accounting/workflows/' ~ workflow.id if workflow else '/accounting/workflows' }}" class="space-y-6">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Form -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Basic Information -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Workflow Information</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label for="workflow_name" class="block text-sm font-medium text-gray-700 mb-1">
+                            Workflow Name <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            id="workflow_name"
+                            name="workflow_name"
+                            value="{{ workflow.workflow_name if workflow else '' }}"
+                            required
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            placeholder="e.g., Journal Entry Approval"
+                        >
+                    </div>
+
+                    <div>
+                        <label for="doctype" class="block text-sm font-medium text-gray-700 mb-1">
+                            Document Type <span class="text-red-500">*</span>
+                        </label>
+                        <select
+                            id="doctype"
+                            name="doctype"
+                            required
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                        >
+                            <option value="">Select document type</option>
+                            {% for value, label in doctype_labels.items() %}
+                            <option value="{{ value }}" {{ 'selected' if workflow and workflow.doctype == value else '' }}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                            id="description"
+                            name="description"
+                            rows="3"
+                            class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                            placeholder="Describe when this workflow should be used..."
+                        >{{ workflow.description if workflow else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Escalation Settings -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Escalation Settings</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label for="escalation_enabled" class="text-sm font-medium text-gray-700">Enable Escalation</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Automatically escalate if not approved within time limit</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="escalation_enabled"
+                                name="escalation_enabled"
+                                value="1"
+                                {{ 'checked' if workflow and workflow.escalation_enabled else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+
+                    <div>
+                        <label for="escalation_hours" class="block text-sm font-medium text-gray-700 mb-1">Escalation After (Hours)</label>
+                        <input
+                            type="number"
+                            id="escalation_hours"
+                            name="escalation_hours"
+                            value="{{ workflow.escalation_hours if workflow and workflow.escalation_hours else 24 }}"
+                            min="1"
+                            class="block w-48 rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                        >
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-6">
+            <!-- Status & Options -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <h2 class="text-lg font-display font-semibold text-gray-900">Options</h2>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label for="is_active" class="text-sm font-medium text-gray-700">Active</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Enable this workflow</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="is_active"
+                                name="is_active"
+                                value="1"
+                                {{ 'checked' if not workflow or workflow.is_active else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <label for="is_mandatory" class="text-sm font-medium text-gray-700">Mandatory</label>
+                            <p class="text-xs text-gray-500 mt-0.5">Require approval for all documents</p>
+                        </div>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input
+                                type="checkbox"
+                                id="is_mandatory"
+                                name="is_mandatory"
+                                value="1"
+                                {{ 'checked' if workflow and workflow.is_mandatory else '' }}
+                                class="sr-only peer"
+                            >
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-100 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+                <div class="p-6 space-y-3">
+                    <button
+                        type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-warm-sm hover:bg-primary-700 transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {{ 'Update Workflow' if workflow else 'Create Workflow' }}
+                    </button>
+                    <a
+                        href="{{ '/accounting/workflows/' ~ workflow.id if workflow else '/accounting/workflows' }}"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-surface-50 transition-colors"
+                    >
+                        Cancel
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

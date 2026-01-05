@@ -1,0 +1,229 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Merge Duplicates</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Combine {{ preview.duplicate_records | length + 1 }} records into one</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/data-cleaner/duplicates"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to Duplicates
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<div x-data="{ showAdvanced: false }">
+    <!-- Primary Record Card -->
+    <div class="bg-emerald-50 rounded-2xl ring-2 ring-emerald-200 p-6 mb-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="font-semibold text-emerald-900">Primary Record (Will Be Kept)</h2>
+                <p class="text-sm text-emerald-700">All data from duplicates will be merged into this record</p>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl ring-1 ring-emerald-200 p-4">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                <div>
+                    <span class="text-gray-500">ID</span>
+                    <p class="font-mono font-medium text-gray-900">#{{ preview.primary_record.id }}</p>
+                </div>
+                <div>
+                    <span class="text-gray-500">Name</span>
+                    <p class="font-medium text-gray-900">{{ preview.primary_record.get('name') or preview.primary_record.get('display_name') or '-' }}</p>
+                </div>
+                {% if preview.primary_record.get('primary_email') %}
+                <div>
+                    <span class="text-gray-500">Email</span>
+                    <p class="font-medium text-gray-900">{{ preview.primary_record.primary_email }}</p>
+                </div>
+                {% endif %}
+                {% if preview.primary_record.get('primary_phone') %}
+                <div>
+                    <span class="text-gray-500">Phone</span>
+                    <p class="font-medium text-gray-900">{{ preview.primary_record.primary_phone }}</p>
+                </div>
+                {% endif %}
+                {% if preview.primary_record.get('created_at') %}
+                <div>
+                    <span class="text-gray-500">Created</span>
+                    <p class="font-medium text-gray-900">{{ preview.primary_record.created_at.strftime('%b %d, %Y') }}</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicate Records to Merge -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                </svg>
+            </div>
+            <div>
+                <h2 class="font-semibold text-gray-900">Duplicate Records (Will Be Merged)</h2>
+                <p class="text-sm text-gray-500">These records will be soft-deleted after merging</p>
+            </div>
+        </div>
+        <div class="space-y-3">
+            {% for record in preview.duplicate_records %}
+            <div class="bg-gray-50 rounded-xl ring-1 ring-gray-200 p-4">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-500">ID</span>
+                        <p class="font-mono font-medium text-gray-900">#{{ record.id }}</p>
+                    </div>
+                    <div>
+                        <span class="text-gray-500">Name</span>
+                        <p class="font-medium text-gray-900">{{ record.get('name') or record.get('display_name') or '-' }}</p>
+                    </div>
+                    {% if record.get('primary_email') %}
+                    <div>
+                        <span class="text-gray-500">Email</span>
+                        <p class="font-medium text-gray-900">{{ record.primary_email }}</p>
+                    </div>
+                    {% endif %}
+                    {% if record.get('primary_phone') %}
+                    <div>
+                        <span class="text-gray-500">Phone</span>
+                        <p class="font-medium text-gray-900">{{ record.primary_phone }}</p>
+                    </div>
+                    {% endif %}
+                    {% if record.get('created_at') %}
+                    <div>
+                        <span class="text-gray-500">Created</span>
+                        <p class="font-medium text-gray-900">{{ record.created_at.strftime('%b %d, %Y') }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Related Records Impact -->
+    {% if preview.related_records_to_relink %}
+    <div class="bg-blue-50 rounded-2xl ring-1 ring-blue-100 p-6 mb-6">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h3 class="font-semibold text-blue-900 mb-2">Related Records to Update</h3>
+                <p class="text-sm text-blue-700 mb-3">
+                    The following related records will be updated to point to the primary record:
+                </p>
+                <div class="flex flex-wrap gap-3">
+                    {% for table_name, count in preview.related_records_to_relink.items() %}
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg ring-1 ring-blue-200">
+                        <span class="font-medium text-blue-900">{{ table_name }}</span>
+                        <span class="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
+                            {{ count }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Merged Result Preview -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="font-semibold text-gray-900">Merged Result Preview</h2>
+                    <p class="text-sm text-gray-500">How the primary record will look after merge</p>
+                </div>
+            </div>
+            <button
+                @click="showAdvanced = !showAdvanced"
+                class="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
+                <span x-text="showAdvanced ? 'Hide Details' : 'Show All Fields'"></span>
+            </button>
+        </div>
+        <div class="bg-indigo-50 rounded-xl ring-1 ring-indigo-100 p-4">
+            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                {% for key, value in preview.merged_result.items() %}
+                {% if not key.startswith('_') and key not in ['id', 'created_at', 'updated_at', 'deleted_at', 'company_id'] %}
+                <div x-show="showAdvanced || '{{ key }}' in ['name', 'display_name', 'primary_email', 'primary_phone', 'status']" x-cloak>
+                    <span class="text-indigo-600 text-xs uppercase tracking-wide">{{ key | replace('_', ' ') }}</span>
+                    <p class="font-medium text-gray-900 truncate">
+                        {% if value is mapping %}
+                            <span class="text-gray-400">[object]</span>
+                        {% elif value is iterable and value is not string %}
+                            <span class="text-gray-400">[list]</span>
+                        {% else %}
+                            {{ value if value is not none else '-' }}
+                        {% endif %}
+                    </p>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Execute Merge -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h3 class="font-semibold text-gray-900">Ready to Merge</h3>
+                <p class="text-sm text-gray-500 mt-1">
+                    This will merge <strong class="text-amber-600">{{ preview.duplicate_records | length }}</strong> duplicate(s) into the primary record.
+                    {% if preview.related_records_to_relink %}
+                    <strong class="text-blue-600">{{ preview.related_records_to_relink.values() | sum }}</strong> related records will be updated.
+                    {% endif %}
+                </p>
+            </div>
+            <form
+                hx-post="/settings/data-cleaner/duplicates/merge"
+                hx-confirm="Are you sure you want to merge these records? Duplicate records will be soft-deleted."
+            >
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="table" value="{{ table }}">
+                <input type="hidden" name="primary_id" value="{{ primary_id }}">
+                <input type="hidden" name="duplicate_ids" value="{{ duplicate_ids | join(',') }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-600/20"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                    Execute Merge
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    [x-cloak] { display: none !important; }
+</style>
+{% endblock %}

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey
+from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey, Index, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.utils.datetime_utils import utc_now
@@ -8,10 +8,12 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 from app.models.document_lines import BillLine
 
 if TYPE_CHECKING:
     from app.models.bank_transaction_split import BankTransactionSplit
+    from app.models.party import SupplierAccount
 
 
 # ============= SUPPLIER =============
@@ -166,6 +168,13 @@ class CostCenter(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
+    # Relationships - back references
+    gl_entries: Mapped[List["GLEntry"]] = relationship(
+        "GLEntry",
+        foreign_keys="GLEntry.cost_center_id",
+        back_populates="cost_center_rel"
+    )
+
     def __repr__(self) -> str:
         return f"<CostCenter {self.cost_center_name}>"
 
@@ -216,10 +225,22 @@ class BankAccount(Base):
     is_default: Mapped[bool] = mapped_column(default=False)
     disabled: Mapped[bool] = mapped_column(default=False)
 
+    # FK relationship to Chart of Accounts
+    account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True, index=True
+    )
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
+
+    # Relationships
+    account_rel: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[account_id],
+        back_populates="bank_accounts"
+    )
 
     def __repr__(self) -> str:
         return f"<BankAccount {self.account_name} - {self.bank}>"
@@ -241,7 +262,7 @@ class JournalEntryType(enum.Enum):
     EXCHANGE_RATE_REVALUATION = "exchange_rate_revaluation"
 
 
-class JournalEntry(Base):
+class JournalEntry(SoftValidationMixin, Base):
     """Journal entries from ERPNext for double-entry bookkeeping."""
 
     __tablename__ = "journal_entries"
@@ -278,7 +299,7 @@ class JournalEntry(Base):
         return f"<JournalEntry {self.erpnext_id} - {self.total_debit}>"
 
 
-class JournalEntryItem(Base):
+class JournalEntryItem(SoftValidationMixin, Base):
     """Line items for journal entries."""
 
     __tablename__ = "journal_entry_accounts"
@@ -334,7 +355,7 @@ class PurchaseInvoiceStatus(enum.Enum):
     RETURN = "return"
 
 
-class PurchaseInvoice(Base):
+class PurchaseInvoice(SoftValidationMixin, Base):
     """Purchase invoices from ERPNext (vendor bills)."""
 
     __tablename__ = "purchase_invoices"
@@ -349,6 +370,9 @@ class PurchaseInvoice(Base):
     supplier_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     supplier_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    supplier_account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("supplier_accounts.id", ondelete="SET NULL"), nullable=True, index=True
     )
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -387,7 +411,11 @@ class PurchaseInvoice(Base):
     # Additional links
     fiscal_period_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fiscal_periods.id"), nullable=True)
     journal_entry_id: Mapped[Optional[int]] = mapped_column(ForeignKey("journal_entries.id"), nullable=True)
+
+    # Audit columns
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -399,13 +427,42 @@ class PurchaseInvoice(Base):
         back_populates="purchase_invoice",
         cascade="all, delete-orphan",
     )
+    supplier_account: Mapped[Optional["SupplierAccount"]] = relationship()
+
+    __table_args__ = (
+        Index(
+            "ix_purchase_invoices_status_date_currency",
+            "status",
+            "posting_date",
+            "currency",
+            postgresql_where=text("outstanding_amount > 0"),
+        ),
+        Index(
+            "ix_purchase_invoices_due_status",
+            "due_date",
+            "status",
+            postgresql_where=text("outstanding_amount > 0"),
+        ),
+        Index(
+            "ix_purchase_invoices_supplier_outstanding",
+            "supplier_name",
+            text("outstanding_amount DESC"),
+        ),
+        Index("ix_purchase_invoices_payment_terms_id", "payment_terms_id"),
+        Index("ix_purchase_invoices_fiscal_period_id", "fiscal_period_id"),
+        Index("ix_purchase_invoices_journal_entry_id", "journal_entry_id"),
+        # Audit column indexes
+        Index("ix_purchase_invoices_created_by_id", "created_by_id"),
+        Index("ix_purchase_invoices_updated_by_id", "updated_by_id"),
+        Index("ix_purchase_invoices_deleted_by_id", "deleted_by_id"),
+    )
 
     def __repr__(self) -> str:
         return f"<PurchaseInvoice {self.erpnext_id} - {self.supplier_name}>"
 
 
 # ============= GL ENTRY (General Ledger) =============
-class GLEntry(Base):
+class GLEntry(SoftValidationMixin, Base):
     """General Ledger entries from ERPNext - the core of double-entry accounting."""
 
     __tablename__ = "gl_entries"
@@ -432,9 +489,45 @@ class GLEntry(Base):
 
     is_cancelled: Mapped[bool] = mapped_column(default=False)
 
+    # FK relationships to master data
+    account_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True, index=True
+    )
+    cost_center_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("cost_centers.id"), nullable=True, index=True
+    )
+
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
+
+    __table_args__ = (
+        Index(
+            "ix_gl_entries_voucher_party_cancelled",
+            "voucher_type",
+            "party_type",
+            "is_cancelled",
+            text("posting_date DESC"),
+        ),
+        Index(
+            "ix_gl_entries_account_cancelled_date",
+            "account",
+            "is_cancelled",
+            "posting_date",
+        ),
+    )
+
+    # Relationships
+    account_rel: Mapped[Optional["Account"]] = relationship(
+        "Account",
+        foreign_keys=[account_id],
+        back_populates="gl_entries"
+    )
+    cost_center_rel: Mapped[Optional["CostCenter"]] = relationship(
+        "CostCenter",
+        foreign_keys=[cost_center_id],
+        back_populates="gl_entries"
+    )
 
     def __repr__(self) -> str:
         return f"<GLEntry {self.erpnext_id} - {self.account}>"
@@ -449,7 +542,7 @@ class AccountType(enum.Enum):
     EXPENSE = "expense"
 
 
-class Account(Base):
+class Account(SoftValidationMixin, Base):
     """Chart of accounts from ERPNext."""
 
     __tablename__ = "accounts"
@@ -474,6 +567,22 @@ class Account(Base):
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
+    # Relationships - back references
+    gl_entries: Mapped[List["GLEntry"]] = relationship(
+        "GLEntry",
+        foreign_keys="GLEntry.account_id",
+        back_populates="account_rel"
+    )
+
+    __table_args__ = (
+        Index("ix_accounts_root_type_disabled", "root_type", "disabled"),
+    )
+    bank_accounts: Mapped[List["BankAccount"]] = relationship(
+        "BankAccount",
+        foreign_keys="BankAccount.account_id",
+        back_populates="account_rel"
+    )
+
     def __repr__(self) -> str:
         return f"<Account {self.account_name}>"
 
@@ -487,7 +596,7 @@ class BankTransactionStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class BankTransaction(Base):
+class BankTransaction(SoftValidationMixin, Base):
     """Bank transactions from ERPNext - imported bank statement lines or manual entries."""
 
     __tablename__ = "bank_transactions"
@@ -544,8 +653,10 @@ class BankTransaction(Base):
     workflow_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
-    # Audit
+    # Audit columns
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -559,11 +670,19 @@ class BankTransaction(Base):
         cascade="all, delete-orphan",
     )
 
+    __table_args__ = (
+        Index("ix_bank_transactions_transaction_id", "transaction_id"),
+        # Audit column indexes
+        Index("ix_bank_transactions_created_by_id", "created_by_id"),
+        Index("ix_bank_transactions_updated_by_id", "updated_by_id"),
+        Index("ix_bank_transactions_deleted_by_id", "deleted_by_id"),
+    )
+
     def __repr__(self) -> str:
         return f"<BankTransaction {self.erpnext_id} - {self.deposit or self.withdrawal}>"
 
 
-class BankTransactionPayment(Base):
+class BankTransactionPayment(SoftValidationMixin, Base):
     """Link table for bank transaction allocations to payment entries."""
 
     __tablename__ = "bank_transaction_payments"
@@ -596,40 +715,35 @@ class BankReconciliationStatus(enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-class BankReconciliation(Base):
+class BankReconciliation(SoftValidationMixin, Base):
     """Bank reconciliation records."""
 
     __tablename__ = "bank_reconciliations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    erpnext_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True, nullable=True)
 
-    bank_account: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    bank_account: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    from_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
-    to_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    from_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    to_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
 
     bank_statement_opening_balance: Mapped[Decimal] = mapped_column(
-        Numeric(18, 6), default=Decimal("0")
+        Numeric(18, 4), default=Decimal("0")
     )
     bank_statement_closing_balance: Mapped[Decimal] = mapped_column(
-        Numeric(18, 6), default=Decimal("0")
+        Numeric(18, 4), default=Decimal("0")
     )
     account_opening_balance: Mapped[Decimal] = mapped_column(
-        Numeric(18, 6), default=Decimal("0")
+        Numeric(18, 4), default=Decimal("0")
     )
-    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    total_credits: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
-    total_debits: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), default=Decimal("0"))
 
     status: Mapped[BankReconciliationStatus] = mapped_column(
         Enum(BankReconciliationStatus),
         default=BankReconciliationStatus.DRAFT,
         index=True,
     )
-    docstatus: Mapped[int] = mapped_column(default=0)
 
-    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 

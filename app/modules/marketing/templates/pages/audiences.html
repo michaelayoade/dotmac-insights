@@ -1,0 +1,56 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Audiences</h1>
+        <p class="mt-1 text-sm text-gray-500">Build segments to target the right customers</p>
+    </div>
+    <a href="/marketing/audiences/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Audience
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set audiences = audiences | default([]) %}
+
+<div class="space-y-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 flex flex-col lg:flex-row gap-4">
+        <input type="search" placeholder="Search audiences..." class="flex-1 rounded-xl border-0 bg-surface-50 px-4 py-2.5 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+        <div class="flex flex-wrap gap-2">
+            <button class="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Refresh</button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Audience Segments</h2>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% if audiences %}
+                {% for audience in audiences %}
+                <div class="px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ audience.name }}</p>
+                        <p class="text-xs text-gray-500">{{ audience.criteria }}</p>
+                    </div>
+                    <div class="flex items-center gap-6 text-sm text-gray-600">
+                        <span>{{ audience.members }} members</span>
+                        <span>Updated {{ audience.updated }}</span>
+                        <a href="/marketing/audiences" class="text-primary-600 hover:text-primary-700 font-medium">View</a>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="px-6 py-6 text-sm text-gray-500">No audiences defined.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

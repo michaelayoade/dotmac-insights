@@ -1,0 +1,309 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Sync Management</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Monitor and manage data synchronization from external systems</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/sync/schedules"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
+        >
+            <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            Schedules
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Stats Cards -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8" data-testid="sync-stats">
+    <!-- Total Syncs -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center ring-2 ring-blue-200/50">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "{:,}".format(stats.total_syncs) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Syncs (24h)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Rate -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center ring-2 ring-emerald-200/50">
+                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ stats.success_rate }}%</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Success Rate</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records Synced -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-violet-100 to-purple-200 flex items-center justify-center ring-2 ring-violet-200/50">
+                <svg class="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold text-gray-900 tabular-nums">{{ "{:,}".format(stats.records_created + stats.records_updated) }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Records (24h)</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pending Failures -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br {{ 'from-red-100 to-rose-200 ring-red-200/50' if stats.pending_failures > 0 else 'from-gray-100 to-slate-200 ring-gray-200/50' }} flex items-center justify-center ring-2">
+                <svg class="w-6 h-6 {{ 'text-red-600' if stats.pending_failures > 0 else 'text-gray-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-2xl font-display font-bold {{ 'text-red-600' if stats.pending_failures > 0 else 'text-gray-900' }} tabular-nums">{{ stats.pending_failures }}</p>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Failed Records</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sync Sources -->
+{% for source_key, source in sources.items() %}
+<div class="mb-8">
+    <div class="flex items-center gap-3 mb-4">
+        <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br
+            {% if source_key == 'splynx' %}from-cyan-100 to-teal-200 ring-cyan-200/50{% elif source_key == 'erpnext' %}from-orange-100 to-amber-200 ring-orange-200/50{% else %}from-violet-100 to-purple-200 ring-violet-200/50{% endif %}
+            flex items-center justify-center ring-2">
+            {% if source_key == 'splynx' %}
+            <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+            </svg>
+            {% elif source_key == 'erpnext' %}
+            <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            </svg>
+            {% else %}
+            <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+            </svg>
+            {% endif %}
+        </div>
+        <div>
+            <h2 class="text-lg font-display font-semibold text-gray-900">{{ source.label }}</h2>
+            <p class="text-sm text-gray-500">{{ source.description }}</p>
+        </div>
+    </div>
+
+    <!-- Entity Categories -->
+    {% for category, entities in source.categories.items() %}
+    <div class="mb-6">
+        <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">{{ category }}</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for entity in entities %}
+            <a
+                href="/settings/sync/{{ source_key }}/{{ entity.id }}"
+                class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:shadow-warm hover:ring-primary-200 transition-all"
+                data-testid="sync-entity-{{ source_key }}-{{ entity.id }}"
+            >
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-surface-100 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
+                            {% if entity.icon == 'users' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                            {% elif entity.icon == 'wifi' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                            </svg>
+                            {% elif entity.icon == 'file-text' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            {% elif entity.icon == 'credit-card' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                            </svg>
+                            {% elif entity.icon == 'server' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                            </svg>
+                            {% elif entity.icon == 'map-pin' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            {% elif entity.icon == 'message-square' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                            </svg>
+                            {% elif entity.icon == 'tag' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                            </svg>
+                            {% elif entity.icon == 'globe' %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            {% else %}
+                            <svg class="w-4.5 h-4.5 text-gray-500 group-hover:text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors">{{ entity.label }}</p>
+                            <p class="text-xs text-gray-500">
+                                {% if entity.last_sync_at %}
+                                {{ entity.last_sync_at.strftime('%d %b %H:%M') }}
+                                {% else %}
+                                Never synced
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex-shrink-0">
+                        {% if entity.last_log %}
+                            {% if entity.last_log.status.value == 'completed' %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 text-emerald-600">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            </span>
+                            {% elif entity.last_log.status.value == 'failed' %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-600">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </span>
+                            {% elif entity.last_log.status.value == 'started' %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600">
+                                <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-600">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-400">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                                </svg>
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Stats Row -->
+                <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
+                    <span class="text-gray-500">{{ "{:,}".format(entity.records_synced) }} records</span>
+                    {% if entity.failed_records > 0 %}
+                    <span class="inline-flex items-center gap-1 text-red-600">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/>
+                        </svg>
+                        {{ entity.failed_records }} failed
+                    </span>
+                    {% endif %}
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endfor %}
+
+<!-- Recent Sync Activity -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="recent-sync-logs">
+    <div class="px-6 py-4 border-b border-gray-100 bg-surface-50">
+        <h2 class="text-lg font-display font-semibold text-gray-900">Recent Activity</h2>
+    </div>
+    {% if recent_logs %}
+    <div class="divide-y divide-gray-100">
+        {% for log in recent_logs %}
+        <div class="px-6 py-4 hover:bg-surface-50/50 transition-colors">
+            <div class="flex items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    {% set status_colors = {
+                        'completed': 'from-emerald-100 to-emerald-200 ring-emerald-200/50 text-emerald-600',
+                        'failed': 'from-red-100 to-rose-200 ring-red-200/50 text-red-600',
+                        'started': 'from-blue-100 to-indigo-200 ring-blue-200/50 text-blue-600',
+                        'partial': 'from-amber-100 to-amber-200 ring-amber-200/50 text-amber-600'
+                    } %}
+                    <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br {{ status_colors.get(log.status.value, 'from-gray-100 to-slate-200 ring-gray-200/50 text-gray-600') }} ring-1 flex items-center justify-center">
+                        {% if log.status.value == 'completed' %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {% elif log.status.value == 'failed' %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        {% elif log.status.value == 'started' %}
+                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/>
+                        </svg>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">
+                            {{ log.source.value | title }} / {{ log.entity_type }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {% if log.records_created or log.records_updated %}
+                            +{{ log.records_created }} created, {{ log.records_updated }} updated
+                            {% if log.records_failed %}, {{ log.records_failed }} failed{% endif %}
+                            {% elif log.error_message %}
+                            {{ log.error_message[:50] }}...
+                            {% else %}
+                            {{ log.sync_type | title }}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs text-gray-500">{{ log.started_at.strftime('%d %b %H:%M') }}</p>
+                    {% if log.duration_seconds %}
+                    <p class="text-xs text-gray-400">{{ log.duration_seconds }}s</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="p-8 text-center">
+        <p class="text-sm text-gray-500">No sync activity recorded yet</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

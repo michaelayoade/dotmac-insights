@@ -282,6 +282,306 @@ def sync_splynx_routers(self, full_sync: bool = False):
         raise self.retry(exc=e)
 
 
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_leads(self, full_sync: bool = False):
+    """Sync leads from Splynx."""
+    task_name = "sync_splynx_leads"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_leads_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_customer_notes(self, full_sync: bool = False):
+    """Sync customer notes from Splynx."""
+    task_name = "sync_splynx_customer_notes"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_customer_notes_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_usage(self, full_sync: bool = False):
+    """Sync usage/traffic data from Splynx."""
+    task_name = "sync_splynx_usage"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_customer_usage_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_payment_methods(self, full_sync: bool = False):
+    """Sync payment methods from Splynx."""
+    task_name = "sync_splynx_payment_methods"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_payment_methods_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_transaction_categories(self, full_sync: bool = False):
+    """Sync transaction categories from Splynx."""
+    task_name = "sync_splynx_transaction_categories"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_transaction_categories_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_locations(self, full_sync: bool = False):
+    """Sync locations/POPs from Splynx."""
+    task_name = "sync_splynx_locations"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_customers_task(full_sync))  # Locations synced with customers
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_ipv4_networks(self, full_sync: bool = False):
+    """Sync IPv4 networks from Splynx."""
+    task_name = "sync_splynx_ipv4_networks"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_ipv4_networks_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_ipv4_addresses(self, full_sync: bool = False):
+    """Sync IPv4 addresses from Splynx."""
+    task_name = "sync_splynx_ipv4_addresses"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_ipv4_addresses_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_ipv6_networks(self, full_sync: bool = False):
+    """Sync IPv6 networks from Splynx."""
+    task_name = "sync_splynx_ipv6_networks"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_ipv6_networks_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_network_monitors(self, full_sync: bool = False):
+    """Sync network monitors from Splynx."""
+    task_name = "sync_splynx_network_monitors"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_network_monitors_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_ticket_messages(self, full_sync: bool = False):
+    """Sync ticket messages from Splynx."""
+    task_name = "sync_splynx_ticket_messages"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_ticket_messages_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_splynx_administrators(self, full_sync: bool = False):
+    """Sync administrators from Splynx."""
+    task_name = "sync_splynx_administrators"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = SplynxSync(db)
+                run_async(sync_client.sync_administrators_task(full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=120)
 def sync_splynx_all(self, full_sync: bool = True):
     """Run full sync of all Splynx entities.
@@ -660,6 +960,231 @@ def sync_chatwoot_conversations(self, full_sync: bool = False):
             try:
                 sync_client = ChatwootSync(db)
                 run_async(sync_client.sync_conversations_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_inboxes(self, full_sync: bool = False):
+    """Sync Chatwoot inboxes to OmniChannel."""
+    task_name = "sync_chatwoot_inboxes"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_inboxes_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_teams(self, full_sync: bool = False):
+    """Sync Chatwoot teams to Team model."""
+    task_name = "sync_chatwoot_teams"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_teams_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_labels(self, full_sync: bool = False):
+    """Sync Chatwoot labels to TicketTag model."""
+    task_name = "sync_chatwoot_labels"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_labels_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_canned_responses(self, full_sync: bool = False):
+    """Sync Chatwoot canned responses to CannedResponse model."""
+    task_name = "sync_chatwoot_canned_responses"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_canned_responses_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_custom_attributes(self, full_sync: bool = False):
+    """Sync Chatwoot custom attributes to TicketCustomField model."""
+    task_name = "sync_chatwoot_custom_attributes"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_custom_attributes_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_automation_rules(self, full_sync: bool = False):
+    """Sync Chatwoot automation rules to AutomationRule model."""
+    task_name = "sync_chatwoot_automation_rules"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_automation_rules_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_csat(self, full_sync: bool = False):
+    """Sync CSAT survey responses from Chatwoot conversations."""
+    task_name = "sync_chatwoot_csat"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_csat_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=120)
+def sync_chatwoot_reports(self, full_sync: bool = False):
+    """Sync Chatwoot report metrics to ChatwootMetricSnapshot model."""
+    task_name = "sync_chatwoot_reports"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name, timeout=600):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_reports_task(full_sync=full_sync))
+                _invalidate_analytics_cache(task_name)
+                logger.info("task_completed", task=task_name)
+                return {"status": "success", "task": task_name}
+            finally:
+                db.close()
+    except TaskLockError:
+        logger.warning("task_skipped_locked", task=task_name)
+        return {"status": "skipped", "reason": "lock_held", "task": task_name}
+    except Exception as e:
+        logger.error("task_failed", task=task_name, error=str(e))
+        raise self.retry(exc=e)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
+def sync_chatwoot_help_center(self, full_sync: bool = False):
+    """Sync Chatwoot Help Center content to KB models."""
+    task_name = "sync_chatwoot_help_center"
+    logger.info("task_started", task=task_name, full_sync=full_sync)
+
+    try:
+        with TaskLock(task_name):
+            db = SessionLocal()
+            try:
+                sync_client = ChatwootSync(db)
+                run_async(sync_client.sync_help_center_task(full_sync=full_sync))
                 _invalidate_analytics_cache(task_name)
                 logger.info("task_completed", task=task_name)
                 return {"status": "success", "task": task_name}

@@ -14,16 +14,28 @@ from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.auth import Require, get_current_principal
-from app.models.auth import User
-from app.services.audit_logger import AuditLogger, serialize_for_audit
 from app.models.hr_appraisal import (
-    AppraisalTemplate,
-    AppraisalTemplateGoal,
     Appraisal,
     AppraisalStatus,
-    AppraisalGoal,
 )
-from .helpers import decimal_or_default, csv_response, validate_date_order, status_counts
+from app.services.hr.appraisal import AppraisalService
+from app.services.hr.appraisal_types import (
+    AppraisalCreateData,
+    AppraisalFilters,
+    AppraisalGoalData,
+    AppraisalUpdateData,
+    TemplateCreateData,
+    TemplateFilters,
+    TemplateGoalData,
+    TemplateUpdateData,
+)
+from app.services.hr.errors import (
+    AppraisalNotFoundError,
+    AppraisalTemplateNotFoundError,
+    ValidationError,
+)
+from app.services.types import PaginationParams
+from .helpers import decimal_or_default, csv_response, validate_date_order
 
 router = APIRouter()
 
@@ -54,17 +66,17 @@ class AppraisalTemplateUpdate(BaseModel):
 async def list_appraisal_templates(
     search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List appraisal templates with filtering."""
-    query = db.query(AppraisalTemplate)
-
-    if search:
-        query = query.filter(AppraisalTemplate.template_name.ilike(f"%{search}%"))
-
-    total = query.count()
-    templates = query.order_by(AppraisalTemplate.template_name).offset(offset).limit(limit).all()
+    service = AppraisalService(db)
+    result = service.list_templates(
+        TemplateFilters(search=search),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    templates = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -88,9 +100,11 @@ async def get_appraisal_template(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get appraisal template detail with goals."""
-    t = db.query(AppraisalTemplate).filter(AppraisalTemplate.id == template_id).first()
-    if not t:
-        raise HTTPException(status_code=404, detail="Appraisal template not found")
+    service = AppraisalService(db)
+    try:
+        t = service.get_template(template_id)
+    except AppraisalTemplateNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     goals = [
         {
@@ -117,26 +131,34 @@ async def get_appraisal_template(
 async def create_appraisal_template(
     payload: AppraisalTemplateCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new appraisal template with goals."""
-    template = AppraisalTemplate(
-        template_name=payload.template_name,
-        description=payload.description,
-    )
-    db.add(template)
-    db.flush()
-
+    goals = []
     if payload.goals:
         for idx, g in enumerate(payload.goals):
-            goal = AppraisalTemplateGoal(
-                appraisal_template_id=template.id,
-                kra=g.kra,
-                per_weightage=decimal_or_default(g.per_weightage),
-                idx=g.idx if g.idx is not None else idx,
+            goals.append(
+                TemplateAppraisalGoalData(
+                    kra=g.kra,
+                    per_weightage=decimal_or_default(g.per_weightage),
+                    idx=g.idx if g.idx is not None else idx,
+                )
             )
-            db.add(goal)
 
-    db.commit()
+    service = AppraisalService(db, principal)
+    try:
+        template = service.create_template(
+            TemplateCreateData(
+                template_name=payload.template_name,
+                description=payload.description,
+                goals=goals,
+            )
+        )
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_appraisal_template(template.id, db)
 
 
@@ -145,48 +167,57 @@ async def update_appraisal_template(
     template_id: int,
     payload: AppraisalTemplateUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an appraisal template and optionally replace goals."""
-    template = db.query(AppraisalTemplate).filter(AppraisalTemplate.id == template_id).first()
-    if not template:
-        raise HTTPException(status_code=404, detail="Appraisal template not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-    goals_data = update_data.pop("goals", None)
-
-    for field, value in update_data.items():
-        if value is not None:
-            setattr(template, field, value)
-
-    if goals_data is not None:
-        db.query(AppraisalTemplateGoal).filter(
-            AppraisalTemplateGoal.appraisal_template_id == template.id
-        ).delete(synchronize_session=False)
-        for idx, g in enumerate(goals_data):
-            goal = AppraisalTemplateGoal(
-                appraisal_template_id=template.id,
-                kra=g.get("kra"),
-                per_weightage=decimal_or_default(g.get("per_weightage")),
-                idx=g.get("idx") if g.get("idx") is not None else idx,
+    goals = None
+    if payload.goals is not None:
+        goals = []
+        for idx, g in enumerate(payload.goals):
+            goals.append(
+                TemplateAppraisalGoalData(
+                    kra=g.kra,
+                    per_weightage=decimal_or_default(g.per_weightage),
+                    idx=g.idx if g.idx is not None else idx,
+                )
             )
-            db.add(goal)
 
-    db.commit()
-    return await get_appraisal_template(template.id, db)
+    service = AppraisalService(db, principal)
+    try:
+        service.update_template(
+            template_id,
+            TemplateUpdateData(
+                template_name=payload.template_name,
+                description=payload.description,
+                goals=goals,
+            ),
+        )
+        db.commit()
+    except AppraisalTemplateNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return await get_appraisal_template(template_id, db)
 
 
 @router.delete("/appraisal-templates/{template_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_appraisal_template(
     template_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an appraisal template."""
-    template = db.query(AppraisalTemplate).filter(AppraisalTemplate.id == template_id).first()
-    if not template:
-        raise HTTPException(status_code=404, detail="Appraisal template not found")
+    service = AppraisalService(db, principal)
+    try:
+        service.delete_template(template_id)
+        db.commit()
+    except AppraisalTemplateNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(template)
-    db.commit()
     return {"message": "Appraisal template deleted", "id": template_id}
 
 
@@ -243,21 +274,6 @@ class AppraisalBulkAction(BaseModel):
     appraisal_ids: List[int]
 
 
-def _require_appraisal_status(appraisal: Appraisal, allowed: List[AppraisalStatus]):
-    if appraisal.status not in allowed:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid status transition from {appraisal.status.value if appraisal.status else None}",
-        )
-
-
-def _load_appraisal(db: Session, appraisal_id: int) -> Appraisal:
-    appraisal = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
-    if not appraisal:
-        raise HTTPException(status_code=404, detail="Appraisal not found")
-    return appraisal
-
-
 @router.get("/appraisals", dependencies=[Depends(Require("hr:read"))])
 async def list_appraisals(
     employee_id: Optional[int] = None,
@@ -266,29 +282,30 @@ async def list_appraisals(
     to_date: Optional[date] = None,
     company: Optional[str] = None,
     limit: int = Query(default=100, le=500),
-    offset: int = 0,
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """List appraisals with filtering."""
-    query = db.query(Appraisal)
-
-    if employee_id:
-        query = query.filter(Appraisal.employee_id == employee_id)
+    status_enum = None
     if status:
         try:
             status_enum = AppraisalStatus(status)
-            query = query.filter(Appraisal.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
-    if from_date:
-        query = query.filter(Appraisal.start_date >= from_date)
-    if to_date:
-        query = query.filter(Appraisal.end_date <= to_date)
-    if company:
-        query = query.filter(Appraisal.company.ilike(f"%{company}%"))
 
-    total = query.count()
-    appraisals = query.order_by(Appraisal.start_date.desc()).offset(offset).limit(limit).all()
+    service = AppraisalService(db)
+    result = service.list_appraisals(
+        AppraisalFilters(
+            employee_id=employee_id,
+            status=status_enum,
+            from_date=from_date,
+            to_date=to_date,
+            company=company,
+        ),
+        pagination=PaginationParams(offset=offset, limit=limit),
+    )
+    appraisals = result.items
+    total = result.total
 
     return {
         "total": total,
@@ -391,9 +408,11 @@ async def get_appraisal(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Get appraisal detail with goals."""
-    a = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
-    if not a:
-        raise HTTPException(status_code=404, detail="Appraisal not found")
+    service = AppraisalService(db)
+    try:
+        a = service.get_appraisal(appraisal_id)
+    except AppraisalNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     goals = [
         {
@@ -435,43 +454,58 @@ async def get_appraisal(
 async def create_appraisal(
     payload: AppraisalCreate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a new appraisal with goals."""
     validate_date_order(payload.start_date, payload.end_date)
+    if payload.employee_id is None:
+        raise HTTPException(status_code=400, detail="employee_id is required")
 
-    appraisal = Appraisal(
-        employee=payload.employee,
-        employee_id=payload.employee_id,
-        employee_name=payload.employee_name,
-        appraisal_template=payload.appraisal_template,
-        appraisal_template_id=payload.appraisal_template_id,
-        start_date=payload.start_date,
-        end_date=payload.end_date,
-        status=payload.status or AppraisalStatus.DRAFT,
-        company=payload.company,
-        total_score=decimal_or_default(payload.total_score),
-        self_score=decimal_or_default(payload.self_score),
-        final_score=decimal_or_default(payload.final_score),
-        feedback=payload.feedback,
-        reflections=payload.reflections,
-    )
-    db.add(appraisal)
-    db.flush()
-
+    goals = []
     if payload.goals:
         for idx, g in enumerate(payload.goals):
-            goal = AppraisalGoal(
-                appraisal_id=appraisal.id,
-                kra=g.kra,
-                per_weightage=decimal_or_default(g.per_weightage),
-                goal=g.goal,
-                score_earned=decimal_or_default(g.score_earned),
-                self_score=decimal_or_default(g.self_score),
-                idx=g.idx if g.idx is not None else idx,
+            goals.append(
+                AppraisalGoalData(
+                    kra=g.kra or "",
+                    per_weightage=decimal_or_default(g.per_weightage),
+                    goal=g.goal,
+                    score_earned=decimal_or_default(g.score_earned),
+                    self_score=decimal_or_default(g.self_score),
+                    idx=g.idx if g.idx is not None else idx,
+                )
             )
-            db.add(goal)
 
-    db.commit()
+    service = AppraisalService(db, principal)
+    try:
+        appraisal = service.create_appraisal(
+            AppraisalCreateData(
+                employee_id=payload.employee_id,
+                employee=payload.employee,
+                employee_name=payload.employee_name,
+                appraisal_template=payload.appraisal_template,
+                appraisal_template_id=payload.appraisal_template_id,
+                start_date=payload.start_date,
+                end_date=payload.end_date,
+                company=payload.company,
+                feedback=payload.feedback,
+                reflections=payload.reflections,
+                goals=goals,
+            )
+        )
+        if payload.status and payload.status != AppraisalStatus.DRAFT:
+            if payload.status == AppraisalStatus.SUBMITTED:
+                service.submit_appraisal(appraisal.id)
+            elif payload.status == AppraisalStatus.COMPLETED:
+                service.complete_appraisal(appraisal.id)
+            elif payload.status == AppraisalStatus.CANCELLED:
+                service.cancel_appraisal(appraisal.id)
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported status transition on create")
+        db.commit()
+    except (ValidationError, AppraisalTemplateNotFoundError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_appraisal(appraisal.id, db)
 
 
@@ -480,57 +514,69 @@ async def update_appraisal(
     appraisal_id: int,
     payload: AppraisalUpdate,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Update an appraisal and optionally replace goals."""
-    appraisal = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
-    if not appraisal:
-        raise HTTPException(status_code=404, detail="Appraisal not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-    goals_data = update_data.pop("goals", None)
-
-    decimal_fields = ["total_score", "self_score", "final_score"]
-    for field, value in update_data.items():
-        if value is not None:
-            if field in decimal_fields:
-                setattr(appraisal, field, decimal_or_default(value))
-            else:
-                setattr(appraisal, field, value)
-
-    validate_date_order(appraisal.start_date, appraisal.end_date)
-
-    if goals_data is not None:
-        db.query(AppraisalGoal).filter(
-            AppraisalGoal.appraisal_id == appraisal.id
-        ).delete(synchronize_session=False)
-        for idx, g in enumerate(goals_data):
-            goal = AppraisalGoal(
-                appraisal_id=appraisal.id,
-                kra=g.get("kra"),
-                per_weightage=decimal_or_default(g.get("per_weightage")),
-                goal=g.get("goal"),
-                score_earned=decimal_or_default(g.get("score_earned")),
-                self_score=decimal_or_default(g.get("self_score")),
-                idx=g.get("idx") if g.get("idx") is not None else idx,
+    goals = None
+    if payload.goals is not None:
+        goals = []
+        for idx, g in enumerate(payload.goals):
+            goals.append(
+                AppraisalGoalData(
+                    kra=g.kra or "",
+                    per_weightage=decimal_or_default(g.per_weightage),
+                    goal=g.goal,
+                    score_earned=decimal_or_default(g.score_earned),
+                    self_score=decimal_or_default(g.self_score),
+                    idx=g.idx if g.idx is not None else idx,
+                )
             )
-            db.add(goal)
 
-    db.commit()
-    return await get_appraisal(appraisal.id, db)
+    service = AppraisalService(db, principal)
+    try:
+        service.update_appraisal(
+            appraisal_id,
+            AppraisalUpdateData(
+                start_date=payload.start_date,
+                end_date=payload.end_date,
+                feedback=payload.feedback,
+                reflections=payload.reflections,
+                goals=goals,
+            ),
+        )
+        if payload.status:
+            if payload.status == AppraisalStatus.SUBMITTED:
+                service.submit_appraisal(appraisal_id)
+            elif payload.status == AppraisalStatus.COMPLETED:
+                service.complete_appraisal(appraisal_id)
+            elif payload.status == AppraisalStatus.CANCELLED:
+                service.cancel_appraisal(appraisal_id)
+        db.commit()
+    except AppraisalNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return await get_appraisal(appraisal_id, db)
 
 
 @router.delete("/appraisals/{appraisal_id}", dependencies=[Depends(Require("hr:write"))])
 async def delete_appraisal(
     appraisal_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Delete an appraisal."""
-    appraisal = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
-    if not appraisal:
-        raise HTTPException(status_code=404, detail="Appraisal not found")
+    service = AppraisalService(db, principal)
+    try:
+        service.delete_appraisal(appraisal_id)
+        db.commit()
+    except AppraisalNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    db.delete(appraisal)
-    db.commit()
     return {"message": "Appraisal deleted", "id": appraisal_id}
 
 
@@ -538,12 +584,20 @@ async def delete_appraisal(
 async def submit_appraisal(
     appraisal_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Submit an appraisal for review."""
-    appraisal = _load_appraisal(db, appraisal_id)
-    _require_appraisal_status(appraisal, [AppraisalStatus.DRAFT])
-    appraisal.status = AppraisalStatus.SUBMITTED
-    db.commit()
+    service = AppraisalService(db, principal)
+    try:
+        service.submit_appraisal(appraisal_id)
+        db.commit()
+    except AppraisalNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_appraisal(appraisal_id, db)
 
 
@@ -551,12 +605,20 @@ async def submit_appraisal(
 async def complete_appraisal(
     appraisal_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Mark an appraisal as completed."""
-    appraisal = _load_appraisal(db, appraisal_id)
-    _require_appraisal_status(appraisal, [AppraisalStatus.SUBMITTED])
-    appraisal.status = AppraisalStatus.COMPLETED
-    db.commit()
+    service = AppraisalService(db, principal)
+    try:
+        service.complete_appraisal(appraisal_id)
+        db.commit()
+    except AppraisalNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_appraisal(appraisal_id, db)
 
 
@@ -564,12 +626,20 @@ async def complete_appraisal(
 async def cancel_appraisal(
     appraisal_id: int,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Cancel an appraisal."""
-    appraisal = _load_appraisal(db, appraisal_id)
-    _require_appraisal_status(appraisal, [AppraisalStatus.DRAFT, AppraisalStatus.SUBMITTED])
-    appraisal.status = AppraisalStatus.CANCELLED
-    db.commit()
+    service = AppraisalService(db, principal)
+    try:
+        service.cancel_appraisal(appraisal_id)
+        db.commit()
+    except AppraisalNotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+
     return await get_appraisal(appraisal_id, db)
 
 
@@ -577,14 +647,17 @@ async def cancel_appraisal(
 async def bulk_submit_appraisals(
     payload: AppraisalBulkAction,
     db: Session = Depends(get_db),
+    principal=Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Bulk submit appraisals."""
     updated = 0
+    service = AppraisalService(db, principal)
     for app_id in payload.appraisal_ids:
-        appraisal = db.query(Appraisal).filter(Appraisal.id == app_id).first()
-        if appraisal and appraisal.status == AppraisalStatus.DRAFT:
-            appraisal.status = AppraisalStatus.SUBMITTED
+        try:
+            service.submit_appraisal(app_id)
             updated += 1
+        except (AppraisalNotFoundError, ValidationError):
+            continue
     db.commit()
     return {"updated": updated, "requested": len(payload.appraisal_ids)}
 

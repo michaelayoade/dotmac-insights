@@ -1,0 +1,112 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Support Analytics</h1>
+        <p class="mt-1.5 text-gray-500 font-body">SLA attainment, ticket trends, and agent productivity</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <select
+            name="days"
+            class="rounded-xl border-gray-200 bg-white text-sm font-medium text-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            hx-get="/analytics/support"
+            hx-target="#main-content"
+            hx-push-url="true"
+        >
+            <option value="7" {{ 'selected' if days == 7 else '' }}>Last 7 days</option>
+            <option value="30" {{ 'selected' if days == 30 else '' }}>Last 30 days</option>
+            <option value="90" {{ 'selected' if days == 90 else '' }}>Last 90 days</option>
+        </select>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    {% set stat = {"label": "Total Conversations", "value": "{:,}".format(metrics.total_conversations | default(0)), "icon": "life-buoy", "color": "blue"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Open", "value": "{:,}".format(metrics.open | default(0)), "icon": "life-buoy", "color": "yellow"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Resolution Rate", "value": "{:.1f}%".format(metrics.resolution_rate | default(0)), "icon": "trending-up", "color": "green"} %}
+    {% include "components/ui/stat_card.html" %}
+
+    {% set stat = {"label": "Avg Resolution", "value": "{:.1f}h".format(metrics.avg_resolution_hours | default(0)), "icon": "calendar", "color": "primary"} %}
+    {% include "components/ui/stat_card.html" %}
+</div>
+
+<!-- SLA Attainment -->
+{% if sla %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-8">
+    <h3 class="font-semibold text-gray-900 mb-4">SLA Attainment</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div class="text-center p-4 rounded-xl bg-green-50">
+            <div class="text-3xl font-bold text-green-700">{{ sla.sla_attainment.met | default(0) }}</div>
+            <div class="text-sm text-green-600 mt-1">SLA Met</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-red-50">
+            <div class="text-3xl font-bold text-red-700">{{ sla.sla_attainment.breached | default(0) }}</div>
+            <div class="text-sm text-red-600 mt-1">SLA Breached</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-blue-50">
+            <div class="text-3xl font-bold text-blue-700">{{ "{:.1f}%".format(sla.sla_attainment.rate | default(0)) }}</div>
+            <div class="text-sm text-blue-600 mt-1">Attainment Rate</div>
+        </div>
+    </div>
+
+    {% if sla.by_priority %}
+    <div class="mt-6 pt-6 border-t border-gray-100">
+        <h4 class="text-sm font-medium text-gray-700 mb-3">Tickets by Priority</h4>
+        <div class="flex flex-wrap gap-3">
+            {% for priority, count in sla.by_priority.items() %}
+            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100">
+                <span class="text-sm text-gray-700 capitalize">{{ priority }}</span>
+                <span class="text-sm font-medium text-gray-900">{{ count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Agent Productivity -->
+{% if agents %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <h3 class="font-semibold text-gray-900 mb-4">Agent Productivity</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tickets</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Resolved</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Resolution Rate</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Hours</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for agent in agents[:10] %}
+                <tr class="hover:bg-surface-50">
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ agent.name }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">{{ agent.department | default("-") }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ agent.total_tickets }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ agent.resolved }}</td>
+                    <td class="px-4 py-3 text-sm text-right">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ 'bg-green-100 text-green-800' if agent.resolution_rate >= 80 else 'bg-yellow-100 text-yellow-800' if agent.resolution_rate >= 50 else 'bg-red-100 text-red-800' }}">
+                            {{ "{:.1f}%".format(agent.resolution_rate) }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ "{:.1f}".format(agent.avg_resolution_hours) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -81,22 +81,48 @@ class MetricsComputationService:
         self.db.query(KPIResult).filter(KPIResult.scorecard_instance_id == scorecard_id).delete()
         self.db.query(KRAResult).filter(KRAResult.scorecard_instance_id == scorecard_id).delete()
 
+        # Batch load all related data upfront to avoid N+1 queries
+        kra_ids = [item.kra_id for item in template_items]
+
+        # Load all KRAs in one query
+        kras_list = self.db.query(KRADefinition).filter(
+            KRADefinition.id.in_(kra_ids)
+        ).all() if kra_ids else []
+        kras_map = {kra.id: kra for kra in kras_list}
+
+        # Load all KRA-KPI mappings in one query
+        kpi_mappings_list = self.db.query(KRAKPIMap).filter(
+            KRAKPIMap.kra_id.in_(kra_ids)
+        ).all() if kra_ids else []
+        kpi_mappings_by_kra: Dict[int, List[KRAKPIMap]] = {}
+        for mapping in kpi_mappings_list:
+            if mapping.kra_id not in kpi_mappings_by_kra:
+                kpi_mappings_by_kra[mapping.kra_id] = []
+            kpi_mappings_by_kra[mapping.kra_id].append(mapping)
+
+        # Load all KPIs in one query
+        kpi_ids = [m.kpi_id for m in kpi_mappings_list]
+        kpis_list = self.db.query(KPIDefinition).filter(
+            KPIDefinition.id.in_(kpi_ids)
+        ).all() if kpi_ids else []
+        kpis_map = {kpi.id: kpi for kpi in kpis_list}
+
         kra_scores = {}
         errors = []
 
         for item in template_items:
-            kra = self.db.query(KRADefinition).filter(KRADefinition.id == item.kra_id).first()
+            kra = kras_map.get(item.kra_id)
             if not kra:
                 continue
 
-            # Get KPIs linked to this KRA
-            kpi_mappings = self.db.query(KRAKPIMap).filter(KRAKPIMap.kra_id == kra.id).all()
+            # Get KPIs linked to this KRA (from pre-loaded data)
+            kpi_mappings = kpi_mappings_by_kra.get(kra.id, [])
 
             kpi_weighted_total = Decimal("0")
             kpi_weight_sum = Decimal("0")
 
             for kpi_map in kpi_mappings:
-                kpi = self.db.query(KPIDefinition).filter(KPIDefinition.id == kpi_map.kpi_id).first()
+                kpi = kpis_map.get(kpi_map.kpi_id)
                 if not kpi:
                     continue
 

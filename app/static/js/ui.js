@@ -1,0 +1,684 @@
+(function() {
+    function toastManager() {
+        return {
+            toasts: [],
+            nextId: 0,
+            show(detail) {
+                const id = this.nextId++;
+                const toast = {
+                    id,
+                    message: detail.message,
+                    type: detail.type || 'info',
+                    entering: true,
+                    leaving: false,
+                    hidden: false
+                };
+                this.toasts.push(toast);
+
+                setTimeout(() => { toast.entering = false; }, 300);
+                setTimeout(() => this.dismiss(id), 5000);
+            },
+            dismiss(id) {
+                const toast = this.toasts.find(t => t.id === id);
+                if (toast && !toast.leaving) {
+                    toast.leaving = true;
+                    setTimeout(() => {
+                        toast.hidden = true;
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 250);
+                }
+            }
+        };
+    }
+
+    window.toastManager = toastManager;
+
+    function globalSearch() {
+        return {
+            query: '',
+            results: [],
+            loading: false,
+            open: false,
+            focusedIndex: -1,
+
+            get groupedResults() {
+                const groups = {};
+                for (const item of this.results) {
+                    if (!groups[item.type]) {
+                        groups[item.type] = { type: item.type, label: this.getLabel(item.type), items: [] };
+                    }
+                    groups[item.type].items.push(item);
+                }
+                return Object.values(groups);
+            },
+
+            get totalItems() {
+                return this.results.length;
+            },
+
+            getLabel(type) {
+                const labels = {
+                    contact: 'Contacts',
+                    customer: 'Customers',
+                    ticket: 'Tickets',
+                    invoice: 'Invoices',
+                    employee: 'Employees',
+                    project: 'Projects',
+                    subscription: 'Subscriptions',
+                    module: 'Modules'
+                };
+                return labels[type] || type.charAt(0).toUpperCase() + type.slice(1) + 's';
+            },
+
+            getGlobalIndex(groupIndex, itemIndex) {
+                let index = 0;
+                for (let i = 0; i < groupIndex; i++) {
+                    index += this.groupedResults[i].items.length;
+                }
+                return index + itemIndex;
+            },
+
+            getIconClass(item) {
+                const type = item?.type;
+                const classes = {
+                    contact: 'bg-primary-50 text-primary-600',
+                    customer: 'bg-blue-50 text-blue-600',
+                    ticket: 'bg-amber-50 text-amber-600',
+                    invoice: 'bg-emerald-50 text-emerald-600',
+                    employee: 'bg-violet-50 text-violet-600',
+                    project: 'bg-cyan-50 text-cyan-600',
+                    subscription: 'bg-pink-50 text-pink-600',
+                    module: 'bg-slate-100 text-slate-700'
+                };
+                return classes[type] || 'bg-gray-50 text-gray-600';
+            },
+
+            getIcon(item) {
+                const type = item?.type;
+                if (type === 'module') {
+                    return this.getModuleIcon(item?.icon);
+                }
+                const icons = {
+                    contact: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
+                    customer: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>',
+                    ticket: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
+                    invoice: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+                    employee: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/></svg>',
+                    project: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>',
+                    subscription: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>'
+                };
+                return icons[type] || '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>';
+            },
+
+            getModuleIcon(iconName) {
+                const icons = {
+                    users: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-1a4 4 0 00-3-3.87M9 20H4v-1a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M12 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
+                    book: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v15m8-13H7a4 4 0 00-4 4v9a1 1 0 001 1h16a1 1 0 001-1V8a1 1 0 00-1-1z"/></svg>',
+                    truck: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17a2 2 0 104 0m-4 0a2 2 0 104 0m-9-6h9V5H5a2 2 0 00-2 2v6m0 0a2 2 0 002 2h1m14 0h1a2 2 0 002-2v-3a2 2 0 00-2-2h-3V7a2 2 0 00-2-2h-2v6"/></svg>',
+                    globe: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2c3 3.5 3 14.5 0 20M12 2c-3 3.5-3 14.5 0 20"/></svg>'
+                };
+                return icons[iconName] || '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>';
+            },
+
+            getModuleResults(query) {
+                const registry = window.moduleRegistry || [];
+                const q = query.toLowerCase();
+                return registry
+                    .filter((module) => module && module.label && module.label.toLowerCase().includes(q))
+                    .map((module) => ({
+                        id: `module-${module.id || module.label}`,
+                        type: 'module',
+                        title: module.label,
+                        subtitle: module.group || 'Module',
+                        url: module.href,
+                        icon: module.icon || 'grid'
+                    }));
+            },
+
+            getStatusClass(status) {
+                if (!status) return '';
+                const s = status.toLowerCase();
+                if (['active', 'open', 'paid', 'approved'].includes(s)) {
+                    return 'bg-emerald-100 text-emerald-700';
+                }
+                if (['pending', 'draft', 'unpaid'].includes(s)) {
+                    return 'bg-amber-100 text-amber-700';
+                }
+                if (['closed', 'cancelled', 'inactive'].includes(s)) {
+                    return 'bg-gray-100 text-gray-600';
+                }
+                return 'bg-gray-100 text-gray-600';
+            },
+
+            async search() {
+                if (this.query.length < 2) {
+                    this.results = [];
+                    this.open = false;
+                    return;
+                }
+
+                this.loading = true;
+                this.open = true;
+
+                try {
+                    const response = await fetch(`/api/search?q=${encodeURIComponent(this.query)}`);
+                    if (response.ok) {
+                        const data = await response.json();
+                        const apiResults = data.results || [];
+                        const moduleResults = this.getModuleResults(this.query);
+                        this.results = [...moduleResults, ...apiResults];
+                    } else {
+                        this.results = this.getModuleResults(this.query);
+                    }
+                } catch (e) {
+                    this.results = this.getModuleResults(this.query);
+                } finally {
+                    this.loading = false;
+                    this.focusedIndex = -1;
+                }
+            },
+
+            close() {
+                this.open = false;
+                this.focusedIndex = -1;
+            },
+
+            focusNext() {
+                if (this.totalItems === 0) return;
+                this.focusedIndex = (this.focusedIndex + 1) % this.totalItems;
+            },
+
+            focusPrev() {
+                if (this.totalItems === 0) return;
+                this.focusedIndex = this.focusedIndex <= 0 ? this.totalItems - 1 : this.focusedIndex - 1;
+            },
+
+            selectFocused() {
+                if (this.focusedIndex >= 0 && this.focusedIndex < this.totalItems) {
+                    const item = this.results[this.focusedIndex];
+                    if (item && item.url) {
+                        window.location.href = item.url;
+                    }
+                }
+            }
+        };
+    }
+
+    window.globalSearch = globalSearch;
+
+    window.showToast = function(message, type = 'success') {
+        window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } }));
+    };
+
+    window.showModal = function(content) {
+        const contentEl = document.getElementById('modal-content');
+        if (contentEl) {
+            contentEl.innerHTML = content;
+            document.body.classList.add('overflow-hidden');
+            window.dispatchEvent(new CustomEvent('open-modal'));
+        }
+    };
+
+    window.showConfirmModal = function(message, options = {}) {
+        const confirmLabel = options.confirmLabel || 'Confirm';
+        const cancelLabel = options.cancelLabel || 'Cancel';
+        const title = options.title || 'Please confirm';
+
+        return new Promise((resolve) => {
+            showModal(`
+                <div class="text-center" data-modal="confirm">
+                    <div class="mx-auto w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5 19h14a2 2 0 001.995-1.858L19 5H5L3.005 17.142A2 2 0 005 19z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2" data-modal-title></h3>
+                    <p class="text-sm text-gray-500 mb-6" data-modal-message></p>
+                    <div class="flex gap-3 justify-center">
+                        <button data-modal-cancel class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"></button>
+                        <button data-modal-confirm class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-xl hover:bg-primary-500 transition-colors"></button>
+                    </div>
+                </div>
+            `);
+            const modalRoot = document.getElementById('modal-content');
+            const modal = modalRoot?.querySelector('[data-modal="confirm"]');
+            const titleEl = modal?.querySelector('[data-modal-title]');
+            const messageEl = modal?.querySelector('[data-modal-message]');
+            const cancelBtn = modal?.querySelector('[data-modal-cancel]');
+            const confirmBtn = modal?.querySelector('[data-modal-confirm]');
+
+            if (titleEl) titleEl.textContent = title;
+            if (messageEl) messageEl.textContent = message;
+            if (cancelBtn) cancelBtn.textContent = cancelLabel;
+            if (confirmBtn) confirmBtn.textContent = confirmLabel;
+
+            cancelBtn?.addEventListener('click', () => {
+                hideModal();
+                resolve(false);
+            }, { once: true });
+            confirmBtn?.addEventListener('click', () => {
+                hideModal();
+                resolve(true);
+            }, { once: true });
+        });
+    };
+
+    window.hideModal = function() {
+        document.body.classList.remove('overflow-hidden');
+        window.dispatchEvent(new CustomEvent('close-modal'));
+    };
+
+    window.addEventListener('open-modal', function() {
+        document.body.classList.add('overflow-hidden');
+    });
+
+    window.addEventListener('close-modal', function() {
+        document.body.classList.remove('overflow-hidden');
+    });
+
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        const trigger = evt.detail.xhr.getResponseHeader('HX-Trigger');
+        if (trigger) {
+            try {
+                const parsed = JSON.parse(trigger);
+                if (parsed.showToast) {
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: parsed.showToast }));
+                }
+                if (parsed.closeModal) {
+                    window.dispatchEvent(new CustomEvent('close-modal'));
+                }
+            } catch (e) {
+                // Ignore malformed HX-Trigger payloads.
+            }
+        }
+    });
+
+    document.addEventListener('htmx:responseError', function() {
+        window.dispatchEvent(new CustomEvent('show-toast', {
+            detail: { message: 'An error occurred. Please try again.', type: 'error' }
+        }));
+    });
+
+    document.addEventListener('htmx:beforeSwap', function(evt) {
+        if (evt.detail.xhr.status === 401) {
+            const redirectUrl = evt.detail.xhr.getResponseHeader('HX-Redirect');
+            window.location.href = redirectUrl || '/login';
+            evt.detail.shouldSwap = false;
+        }
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        const toastMessage = evt.detail.xhr.getResponseHeader('HX-Toast');
+        const toastType = evt.detail.xhr.getResponseHeader('HX-Toast-Type') || 'success';
+        if (toastMessage) {
+            showToast(decodeURIComponent(toastMessage), toastType);
+        }
+
+        if (window.Alpine && evt.detail.target) {
+            Alpine.initTree(evt.detail.target);
+        }
+
+        if (evt.detail.target && evt.detail.target.id === 'main-content') {
+            const contentTitle = document.querySelector('#main-content [data-testid="page-title"]');
+            const titleText = contentTitle ? contentTitle.textContent.trim() : '';
+            const fallbackTitle = evt.detail.target.dataset.pageTitle || '';
+            const resolvedTitle = titleText || fallbackTitle;
+            if (resolvedTitle) {
+                const productName = document.body?.dataset?.productName || '';
+                document.title = productName ? `${resolvedTitle} | ${productName}` : resolvedTitle;
+            }
+        }
+    });
+
+    document.body.addEventListener('htmx:confirm', function(evt) {
+        if (evt.detail.question && evt.detail.elt.hasAttribute('hx-delete')) {
+            evt.preventDefault();
+            const itemName = evt.detail.elt.dataset.itemName || 'this item';
+            const deleteId = evt.detail.elt.dataset.deleteId;
+            if (!deleteId) {
+                showToast('Delete action is missing an identifier.', 'error');
+                return;
+            }
+            showModal(`
+                <div class="text-center" data-modal="delete-confirm">
+                    <div class="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete <span data-modal-item></span>?</h3>
+                    <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
+                    <div class="flex gap-3 justify-center">
+                        <button data-modal-close class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
+                            Cancel
+                        </button>
+                        <button data-confirm-delete class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 transition-colors">
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            `);
+            const modalRoot = document.getElementById('modal-content');
+            const modal = modalRoot?.querySelector('[data-modal="delete-confirm"]');
+            const nameEl = modal?.querySelector('[data-modal-item]');
+            if (nameEl) nameEl.textContent = itemName;
+            const cancelBtn = modal?.querySelector('[data-modal-close]');
+            cancelBtn?.addEventListener('click', hideModal, { once: true });
+            const confirmBtn = modal?.querySelector('[data-confirm-delete]');
+            confirmBtn?.addEventListener('click', () => {
+                hideModal();
+                window.dispatchEvent(new CustomEvent('confirm-delete', { detail: { deleteId } }));
+            }, { once: true });
+
+            const handleConfirm = function(event) {
+                if (!event.detail || event.detail.deleteId !== deleteId) return;
+                const safeDeleteId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(deleteId) : deleteId;
+                const deleteTarget = document.querySelector(`[data-delete-id='${safeDeleteId}']`);
+                if (!deleteTarget) {
+                    showToast('Unable to find the item to delete. Please refresh and try again.', 'error');
+                    return;
+                }
+                evt.detail.issueRequest();
+            };
+
+            window.addEventListener('confirm-delete', handleConfirm, { once: true });
+        }
+    });
+
+    function getShortcutsModal() {
+        return document.getElementById('keyboard-shortcuts-modal');
+    }
+
+    function getFocusableElements(container) {
+        if (!container) return [];
+        const selector = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+        return Array.from(container.querySelectorAll(selector)).filter((el) => !el.hasAttribute('disabled'));
+    }
+
+    function isShortcutsOpen(modal) {
+        return modal && modal.getAttribute('aria-hidden') !== 'true';
+    }
+
+    let lastShortcutsFocus = null;
+
+    window.openShortcutsModal = function() {
+        const modal = getShortcutsModal();
+        if (!modal) return;
+        lastShortcutsFocus = document.activeElement;
+        window.dispatchEvent(new CustomEvent('open-shortcuts'));
+        document.body.classList.add('overflow-hidden');
+        window.setTimeout(() => {
+            const focusables = getFocusableElements(modal);
+            if (focusables.length) {
+                focusables[0].focus();
+            } else {
+                modal.focus();
+            }
+        }, 0);
+    };
+
+    window.closeShortcutsModal = function() {
+        const modal = getShortcutsModal();
+        if (!modal) return;
+        window.dispatchEvent(new CustomEvent('close-shortcuts'));
+        document.body.classList.remove('overflow-hidden');
+        if (lastShortcutsFocus && document.contains(lastShortcutsFocus)) {
+            lastShortcutsFocus.focus();
+        }
+        lastShortcutsFocus = null;
+    };
+
+    const navChordState = {
+        waiting: false,
+        timer: null
+    };
+
+    function getNavShortcuts() {
+        if (window.moduleShortcuts) return window.moduleShortcuts;
+        return {
+            d: '/',
+            s: '/support',
+            h: '/hr',
+            a: '/accounting',
+            p: '/projects',
+            o: '/operations',
+            i: '/subscriptions'
+        };
+    }
+
+    document.addEventListener('keydown', function(evt) {
+        if (evt.key === 'Tab') {
+            const modal = getShortcutsModal();
+            if (isShortcutsOpen(modal)) {
+                const focusables = getFocusableElements(modal);
+                if (!focusables.length) {
+                    evt.preventDefault();
+                    modal.focus();
+                    return;
+                }
+                const first = focusables[0];
+                const last = focusables[focusables.length - 1];
+                if (evt.shiftKey && document.activeElement === first) {
+                    evt.preventDefault();
+                    last.focus();
+                } else if (!evt.shiftKey && document.activeElement === last) {
+                    evt.preventDefault();
+                    first.focus();
+                }
+            }
+        }
+
+        if (evt.key === 'Escape') {
+            const modal = getShortcutsModal();
+            if (isShortcutsOpen(modal) && window.closeShortcutsModal) {
+                window.closeShortcutsModal();
+                return;
+            }
+            window.dispatchEvent(new CustomEvent('close-sidebar'));
+            window.dispatchEvent(new CustomEvent('close-modal'));
+        }
+
+        if (evt.key === '?' && !['INPUT', 'TEXTAREA'].includes(evt.target.tagName)) {
+            const shortcutsModal = getShortcutsModal();
+            if (shortcutsModal) {
+                if (isShortcutsOpen(shortcutsModal)) {
+                    window.closeShortcutsModal();
+                } else {
+                    window.openShortcutsModal();
+                }
+            }
+        }
+
+        if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(evt.target.tagName) && !evt.target.isContentEditable) {
+            const navKey = evt.key.toLowerCase();
+            if (navChordState.waiting) {
+                navChordState.waiting = false;
+                if (navChordState.timer) {
+                    window.clearTimeout(navChordState.timer);
+                    navChordState.timer = null;
+                }
+                const shortcuts = getNavShortcuts();
+                if (shortcuts[navKey]) {
+                    evt.preventDefault();
+                    window.location.href = shortcuts[navKey];
+                    return;
+                }
+            }
+
+            if (navKey === 'g') {
+                navChordState.waiting = true;
+                navChordState.timer = window.setTimeout(() => {
+                    navChordState.waiting = false;
+                    navChordState.timer = null;
+                }, 800);
+            }
+        }
+
+        // Cmd/Ctrl+K to focus global search
+        if ((evt.metaKey || evt.ctrlKey) && evt.key === 'k') {
+            evt.preventDefault();
+            const searchInput = document.querySelector('[data-testid="global-search-input"]');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+    });
+
+    // Inbox WebSocket Component
+    window.inboxWebSocket = function(options = {}) {
+        return {
+            ws: null,
+            connected: false,
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 5,
+            reconnectDelay: 3000,
+            channel: options.channel || 'conversations',
+            agentId: options.agentId || null,
+            onMessage: options.onMessage || null,
+
+            init() {
+                this.connect();
+                // Reconnect on visibility change
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible' && !this.connected) {
+                        this.connect();
+                    }
+                });
+            },
+
+            connect() {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+
+                const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                let url = `${protocol}//${location.host}/ws/inbox?channel=${this.channel}`;
+                if (this.agentId) url += `&agent_id=${this.agentId}`;
+
+                try {
+                    this.ws = new WebSocket(url);
+
+                    this.ws.onopen = () => {
+                        this.connected = true;
+                        this.reconnectAttempts = 0;
+                        console.log('[Inbox WS] Connected to', this.channel);
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            this.handleMessage(data);
+                        } catch (e) {
+                            console.error('[Inbox WS] Parse error:', e);
+                        }
+                    };
+
+                    this.ws.onclose = (event) => {
+                        this.connected = false;
+                        console.log('[Inbox WS] Disconnected:', event.code);
+                        this.scheduleReconnect();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('[Inbox WS] Error:', error);
+                    };
+                } catch (e) {
+                    console.error('[Inbox WS] Connection failed:', e);
+                    this.scheduleReconnect();
+                }
+            },
+
+            scheduleReconnect() {
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                    console.log('[Inbox WS] Max reconnect attempts reached');
+                    return;
+                }
+                this.reconnectAttempts++;
+                const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
+                console.log(`[Inbox WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
+                setTimeout(() => this.connect(), delay);
+            },
+
+            handleMessage(data) {
+                // Call custom handler if provided
+                if (this.onMessage) {
+                    this.onMessage(data);
+                }
+
+                // Handle specific event types
+                switch (data.event || data.type) {
+                    case 'connected':
+                        console.log('[Inbox WS] Connection confirmed');
+                        break;
+
+                    case 'stats_update':
+                        // Update stats badges
+                        this.updateStats(data.data || data);
+                        break;
+
+                    case 'new_message':
+                        // Trigger HTMX refresh of messages
+                        htmx.trigger('#messages-container', 'ws-new-message');
+                        // Show notification
+                        if (data.data?.preview) {
+                            showToast(`New message: ${data.data.preview.substring(0, 50)}...`, 'info');
+                        }
+                        break;
+
+                    case 'conversation_update':
+                        // Trigger HTMX refresh of conversation list
+                        htmx.trigger('#conversations-container', 'ws-conversation-update');
+                        break;
+
+                    case 'assignment':
+                        // Trigger refresh and show notification
+                        htmx.trigger('#conversations-container', 'ws-conversation-update');
+                        if (data.data?.conversation_id) {
+                            showToast('New conversation assigned to you', 'info');
+                        }
+                        break;
+
+                    case 'pong':
+                        // Heartbeat response
+                        break;
+
+                    default:
+                        console.log('[Inbox WS] Unknown event:', data);
+                }
+            },
+
+            updateStats(stats) {
+                // Update open count
+                const openEl = document.querySelector('[data-stat="open-count"]');
+                if (openEl && stats.open_count !== undefined) {
+                    openEl.textContent = stats.open_count;
+                }
+
+                // Update pending count
+                const pendingEl = document.querySelector('[data-stat="pending-count"]');
+                if (pendingEl && stats.pending_count !== undefined) {
+                    pendingEl.textContent = stats.pending_count;
+                }
+
+                // Update unread count in navbar badge
+                const unreadBadge = document.querySelector('[data-inbox-unread]');
+                if (unreadBadge && stats.unread_count !== undefined) {
+                    unreadBadge.textContent = stats.unread_count;
+                    unreadBadge.classList.toggle('hidden', stats.unread_count === 0);
+                }
+            },
+
+            send(data) {
+                if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                    this.ws.send(JSON.stringify(data));
+                }
+            },
+
+            destroy() {
+                if (this.ws) {
+                    this.ws.close();
+                    this.ws = null;
+                }
+            }
+        };
+    };
+})();

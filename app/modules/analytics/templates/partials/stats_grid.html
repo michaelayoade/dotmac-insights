@@ -1,0 +1,43 @@
+{# Stats Grid Partial - Key overview metrics #}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5" data-testid="analytics-stats-grid">
+    <!-- MRR -->
+    {% set stat = {
+        "label": "Monthly Recurring Revenue",
+        "value": "{:,.0f}".format(overview.revenue.mrr | default(0)),
+        "icon": "dollar-sign",
+        "color": "green",
+        "href": "/analytics/revenue"
+    } %}
+    {% include "components/ui/stat_card.html" %}
+
+    <!-- Active Customers -->
+    {% set stat = {
+        "label": "Active Customers",
+        "value": "{:,}".format(overview.customers.active | default(0)),
+        "icon": "users",
+        "color": "blue",
+        "href": "/analytics/customers"
+    } %}
+    {% include "components/ui/stat_card.html" %}
+
+    <!-- Open Tickets -->
+    {% set stat = {
+        "label": "Open Tickets",
+        "value": overview.support.open_tickets | default(0),
+        "icon": "life-buoy",
+        "color": "yellow",
+        "href": "/analytics/support"
+    } %}
+    {% include "components/ui/stat_card.html" %}
+
+    <!-- Churn Rate -->
+    {% set churn_rate = overview.customers.churn_rate | default(0) %}
+    {% set stat = {
+        "label": "Churn Rate",
+        "value": "{:.1f}%".format(churn_rate),
+        "icon": "trending-up",
+        "color": "red" if churn_rate > 5 else "green",
+        "href": "/analytics/customers"
+    } %}
+    {% include "components/ui/stat_card.html" %}
+</div>

@@ -18,13 +18,14 @@ from app.auth import get_current_principal, Require
 from app.integrations.payments.webhooks import webhook_processor
 from app.integrations.payments.exceptions import WebhookVerificationError
 from app.middleware.metrics import increment_webhook_auth_failure
+from app.middleware.rate_limit import check_webhook_rate_limit
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
-@router.post("/paystack")
+@router.post("/paystack", dependencies=[Depends(check_webhook_rate_limit)])
 async def paystack_webhook(
     request: Request,
     x_paystack_signature: str = Header(..., alias="x-paystack-signature"),
@@ -69,7 +70,7 @@ async def paystack_webhook(
         return {"status": "error", "message": str(e)}
 
 
-@router.post("/flutterwave")
+@router.post("/flutterwave", dependencies=[Depends(check_webhook_rate_limit)])
 async def flutterwave_webhook(
     request: Request,
     verif_hash: str = Header(None, alias="verif-hash"),
@@ -345,6 +346,9 @@ def get_provider_stats(
         WebhookEvent.provider == provider_name,
         WebhookEvent.received_at >= cutoff,
     ).first()
+    total_events = overall.total if overall else 0
+    processed_events = overall.processed if overall else 0
+    error_events = overall.errors if overall else 0
 
     # Daily breakdown
     daily_result = db.query(
@@ -403,10 +407,10 @@ def get_provider_stats(
         "provider": provider_name,
         "period_days": days,
         "summary": {
-            "total_events": overall.total,
-            "processed": overall.processed,
-            "errors": overall.errors,
-            "success_rate": round((overall.processed / overall.total) * 100, 1) if overall.total > 0 else None,
+            "total_events": total_events,
+            "processed": processed_events,
+            "errors": error_events,
+            "success_rate": round((processed_events / total_events) * 100, 1) if total_events > 0 else None,
         },
         "daily": daily_data,
         "event_types": event_types,

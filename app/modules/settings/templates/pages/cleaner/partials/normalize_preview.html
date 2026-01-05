@@ -1,0 +1,171 @@
+<!-- Normalization Preview Partial - loaded via HTMX -->
+
+<!-- Stats Summary -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+    <h3 class="text-lg font-semibold text-gray-900 mb-4">Scan Results</h3>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="text-center p-4 bg-teal-50 rounded-xl ring-1 ring-teal-100">
+            <p class="text-3xl font-bold text-teal-600 tabular-nums">{{ preview.records_to_normalize }}</p>
+            <p class="text-sm text-teal-700 mt-1">To Normalize</p>
+        </div>
+        <div class="text-center p-4 bg-emerald-50 rounded-xl ring-1 ring-emerald-100">
+            <p class="text-3xl font-bold text-emerald-600 tabular-nums">{{ preview.already_normalized }}</p>
+            <p class="text-sm text-emerald-700 mt-1">Already Good</p>
+        </div>
+        <div class="text-center p-4 bg-amber-50 rounded-xl ring-1 ring-amber-100">
+            <p class="text-3xl font-bold text-amber-600 tabular-nums">{{ preview.invalid_values }}</p>
+            <p class="text-sm text-amber-700 mt-1">Invalid Values</p>
+        </div>
+        <div class="text-center p-4 bg-gray-50 rounded-xl ring-1 ring-gray-200">
+            <p class="text-3xl font-bold text-gray-700 tabular-nums">{{ preview.records_to_normalize + preview.already_normalized + preview.invalid_values }}</p>
+            <p class="text-sm text-gray-600 mt-1">Total Records</p>
+        </div>
+    </div>
+</div>
+
+{% if preview.records_to_normalize > 0 %}
+<!-- Sample Changes Table -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-900">Sample Changes</h3>
+        <p class="text-sm text-gray-500 mt-1">Showing up to {{ preview.sample_changes | length }} of {{ preview.records_to_normalize }} records to be changed</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Record ID</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Before</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">After</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for change in preview.sample_changes %}
+                <tr class="hover:bg-surface-50 transition-colors">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        #{{ change.record_id }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% for field_name in change.changed_fields %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400">{{ field_name }}:</span>
+                            <code class="text-sm bg-red-50 text-red-700 px-2 py-0.5 rounded font-mono">{{ change.before.get(field_name, '-') }}</code>
+                        </div>
+                        {% endfor %}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        {% for field_name in change.changed_fields %}
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-gray-400">{{ field_name }}:</span>
+                            <code class="text-sm bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-mono">{{ change.after.get(field_name, '-') }}</code>
+                        </div>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Execute Button -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h3 class="font-semibold text-gray-900">Ready to Execute</h3>
+            <p class="text-sm text-gray-500 mt-1">
+                This will update <strong class="text-teal-600">{{ preview.records_to_normalize }}</strong> records. The operation can be rolled back if needed.
+            </p>
+        </div>
+        <form
+            hx-post="/settings/data-cleaner/normalize/execute"
+            hx-confirm="Are you sure you want to normalize {{ preview.records_to_normalize }} records? This action can be rolled back."
+        >
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="field" value="{{ field }}">
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 transition-colors shadow-lg shadow-teal-600/20"
+            >
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                Execute Normalization
+            </button>
+        </form>
+    </div>
+</div>
+{% else %}
+<!-- No Changes Needed -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <div class="text-center py-8">
+        <div class="mx-auto w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900">All Clean!</h3>
+        <p class="text-sm text-gray-500 mt-2">
+            No {{ field }} need normalization. All values are already in the correct format.
+        </p>
+    </div>
+</div>
+{% endif %}
+
+{% if preview.invalid_samples %}
+<!-- Invalid Values Warning -->
+<div class="bg-amber-50 rounded-2xl ring-1 ring-amber-200 p-6 mt-6">
+    <div class="flex items-start gap-4">
+        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div class="flex-1">
+            <h3 class="font-semibold text-amber-900 mb-2">Invalid Values Found</h3>
+            <p class="text-sm text-amber-700 mb-4">
+                The following records have {{ field }} values that cannot be automatically normalized. Please review and fix these manually.
+            </p>
+            <div class="bg-white rounded-xl ring-1 ring-amber-200 overflow-hidden">
+                <table class="min-w-full divide-y divide-amber-100">
+                    <thead class="bg-amber-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-amber-700 uppercase">Record</th>
+                            <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-amber-700 uppercase">Invalid Value</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-amber-50">
+                        {% for invalid in preview.invalid_samples[:10] %}
+                        <tr>
+                            <td class="px-4 py-2 text-sm text-gray-900">
+                                {% if invalid.get('name') %}
+                                    {{ invalid.name }}
+                                {% else %}
+                                    #{{ invalid.get('id', 'N/A') }}
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-2">
+                                <code class="text-sm bg-red-50 text-red-700 px-2 py-0.5 rounded font-mono">
+                                    {{ invalid.get('primary_phone') or invalid.get('primary_email') or '-' }}
+                                </code>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% if preview.invalid_samples | length > 10 %}
+                <div class="px-4 py-2 bg-amber-50 text-center text-sm text-amber-700">
+                    ...and {{ preview.invalid_samples | length - 10 }} more
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

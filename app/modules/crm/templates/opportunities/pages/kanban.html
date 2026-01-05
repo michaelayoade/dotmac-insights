@@ -1,0 +1,117 @@
+{% extends "layouts/module.html" %}
+
+{% block title %}Pipeline - Kanban{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Pipeline</h1>
+            <p class="mt-1 text-sm text-gray-500">Drag and drop opportunities between stages</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/crm/opportunities?view=kanban" class="btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+                </svg>
+                Kanban
+            </a>
+            <a href="/crm/opportunities?view=list" class="btn btn-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                </svg>
+                List
+            </a>
+            <a href="/crm/opportunities?action=new" class="btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Opportunity
+            </a>
+        </div>
+    </div>
+
+    <!-- Kanban Board -->
+    <div class="flex gap-4 overflow-x-auto pb-4">
+        {% for stage in stages %}
+        <div class="flex-shrink-0 w-80">
+            <div class="bg-gray-100 rounded-lg">
+                <!-- Stage Header -->
+                <div class="p-3 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-medium text-gray-900">{{ stage.name }}</h3>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-700">
+                            {{ opportunities_by_stage[stage.id]|length if opportunities_by_stage else 0 }}
+                        </span>
+                    </div>
+                    {% if opportunities_by_stage and opportunities_by_stage[stage.id] %}
+                    <p class="mt-1 text-xs text-gray-500">
+                        ${{ '{:,.0f}'.format(opportunities_by_stage[stage.id]|sum(attribute='amount') or 0) }}
+                    </p>
+                    {% endif %}
+                </div>
+
+                <!-- Cards -->
+                <div class="p-2 space-y-2 min-h-[200px]" data-stage-id="{{ stage.id }}">
+                    {% if opportunities_by_stage and opportunities_by_stage[stage.id] %}
+                        {% for opp in opportunities_by_stage[stage.id] %}
+                        <a href="/crm/opportunities/{{ opp.id }}" class="block bg-white rounded-lg shadow p-3 hover:shadow-md transition-shadow">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-900 truncate">{{ opp.name }}</p>
+                                    {% if opp.party %}
+                                    <p class="text-xs text-gray-500 truncate">{{ opp.party.name }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-2 flex items-center justify-between">
+                                <span class="text-sm font-semibold text-gray-900">${{ '{:,.0f}'.format(opp.amount or 0) }}</span>
+                                <span class="text-xs text-gray-500">{{ opp.probability or 0 }}%</span>
+                            </div>
+                            {% if opp.expected_close_date %}
+                            <div class="mt-2 text-xs text-gray-500">
+                                Close: {{ opp.expected_close_date.strftime('%b %d') }}
+                            </div>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                    <div class="text-center py-8 text-gray-400 text-sm">
+                        No opportunities
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Won/Lost columns -->
+        <div class="flex-shrink-0 w-80">
+            <div class="bg-green-50 rounded-lg">
+                <div class="p-3 border-b border-green-200">
+                    <h3 class="text-sm font-medium text-green-800">Won</h3>
+                </div>
+                <div class="p-2 min-h-[200px]">
+                    <a href="/crm/opportunities?status=won" class="block text-center py-4 text-sm text-green-600 hover:text-green-800">
+                        View won deals
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-shrink-0 w-80">
+            <div class="bg-red-50 rounded-lg">
+                <div class="p-3 border-b border-red-200">
+                    <h3 class="text-sm font-medium text-red-800">Lost</h3>
+                </div>
+                <div class="p-2 min-h-[200px]">
+                    <a href="/crm/opportunities?status=lost" class="block text-center py-4 text-sm text-red-600 hover:text-red-800">
+                        View lost deals
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

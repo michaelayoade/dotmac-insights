@@ -1,0 +1,112 @@
+{# Single service order row - used in table and for HTMX row updates #}
+<tr id="order-row-{{ order.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="order-row-{{ order.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 ring-1 ring-emerald-200/50 group-hover:from-emerald-100 group-hover:to-emerald-200 transition-all">
+                    <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                </span>
+            </div>
+            <div>
+                <a
+                    href="/field-service/{{ order.id }}"
+                    class="font-medium text-gray-900 hover:text-primary-600 transition-colors font-body"
+                    data-testid="order-number-{{ order.id }}"
+                >
+                    {{ order.order_number }}
+                </a>
+                <p class="text-xs text-gray-500 font-body truncate max-w-[200px]">{{ order.title }}</p>
+            </div>
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden sm:table-cell">
+        {% set type_styles = {
+            'installation': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            'repair': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+            'maintenance': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'inspection': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+            'relocation': 'bg-cyan-50 text-cyan-700 ring-cyan-600/20',
+            'upgrade': 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+            'disconnection': 'bg-red-50 text-red-700 ring-red-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ type_styles.get(order.order_type.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="order-type-{{ order.id }}">
+            {{ order.order_type.value | title }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm">
+        {% set status_styles = {
+            'draft': 'bg-gray-50 text-gray-600 ring-gray-500/20',
+            'scheduled': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'dispatched': 'bg-purple-50 text-purple-700 ring-purple-600/20',
+            'en_route': 'bg-cyan-50 text-cyan-700 ring-cyan-600/20',
+            'on_site': 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+            'in_progress': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+            'pending_parts': 'bg-orange-50 text-orange-700 ring-orange-600/20',
+            'completed': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            'cancelled': 'bg-red-50 text-red-700 ring-red-600/20',
+            'rescheduled': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+            'failed': 'bg-red-50 text-red-700 ring-red-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_styles.get(order.status.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="order-status-{{ order.id }}">
+            {{ order.status.value | replace('_', ' ') | title }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden md:table-cell">
+        {% set priority_styles = {
+            'low': 'bg-gray-100 text-gray-600',
+            'medium': 'bg-blue-50 text-blue-700',
+            'high': 'bg-orange-50 text-orange-700',
+            'urgent': 'bg-red-50 text-red-700',
+            'emergency': 'bg-red-100 text-red-800'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium {{ priority_styles.get(order.priority.value, 'bg-gray-100 text-gray-600') }}" data-testid="order-priority-{{ order.id }}">
+            {{ order.priority.value | title }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden lg:table-cell" data-testid="order-scheduled-{{ order.id }}">
+        <span class="{{ 'text-red-600 font-medium' if order.is_overdue else '' }}">
+            {{ order.scheduled_date | format_date }}
+        </span>
+    </td>
+    <td class="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/field-service/{{ order.id }}"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                title="View"
+                data-testid="order-view-{{ order.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            <a
+                href="/field-service/{{ order.id }}/edit"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                title="Edit"
+                data-testid="order-edit-{{ order.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+            <button
+                type="button"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete"
+                hx-delete="/field-service/{{ order.id }}"
+                hx-target="#order-row-{{ order.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to delete service order '{{ order.order_number }}'? This cannot be undone."
+                data-testid="order-delete-{{ order.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </div>
+    </td>
+</tr>

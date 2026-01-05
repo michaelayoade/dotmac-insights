@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum
+from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
@@ -8,8 +8,8 @@ import enum
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.customer import Customer
     from app.models.employee import Employee
+    from app.models.party import CustomerAccount
     from app.models.unified_ticket import UnifiedTicket
 
 
@@ -37,9 +37,14 @@ class Conversation(Base):
     # External ID
     chatwoot_id: Mapped[Optional[int]] = mapped_column(unique=True, index=True, nullable=True)
 
-    # Customer link
-    customer_id: Mapped[Optional[int]] = mapped_column(ForeignKey("customers.id"), nullable=True, index=True)
+    # Chatwoot contact link
     chatwoot_contact_id: Mapped[Optional[int]] = mapped_column(index=True, nullable=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Link to UnifiedTicket (for dual-write sync)
     unified_ticket_id: Mapped[Optional[int]] = mapped_column(
@@ -88,7 +93,7 @@ class Conversation(Base):
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    customer: Mapped[Optional[Customer]] = relationship(back_populates="conversations")
+    customer_account: Mapped[Optional["CustomerAccount"]] = relationship(foreign_keys=[customer_account_id])
     messages: Mapped[List[Message]] = relationship(back_populates="conversation")
     employee: Mapped[Optional["Employee"]] = relationship(foreign_keys=[employee_id])
 
@@ -97,6 +102,11 @@ class Conversation(Base):
         "UnifiedTicket",
         foreign_keys=[unified_ticket_id],
         backref="legacy_conversation"
+    )
+
+    __table_args__ = (
+        Index("ix_conversations_assigned_agent_id", "assigned_agent_id"),
+        Index("ix_conversations_assigned_team_id", "assigned_team_id"),
     )
 
     def __repr__(self) -> str:
@@ -143,6 +153,10 @@ class Message(Base):
 
     # Relationships
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+    __table_args__ = (
+        Index("ix_messages_sender_id", "sender_id"),
+    )
 
     def __repr__(self) -> str:
         return f"<Message {self.chatwoot_id} - {self.message_type}>"

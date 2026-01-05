@@ -1,0 +1,17 @@
+{# Revenue Metrics Partial - HTMX refreshable #}
+<div class="space-y-6">
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {% set stat = {"label": "Current MRR", "value": "{:,.0f}".format(revenue.mrr | default(0)), "icon": "dollar-sign", "color": "green"} %}
+        {% include "components/ui/stat_card.html" %}
+
+        {% set stat = {"label": "Outstanding", "value": "{:,.0f}".format(revenue.outstanding | default(0)), "icon": "file-text", "color": "yellow"} %}
+        {% include "components/ui/stat_card.html" %}
+
+        {% set stat = {"label": "DSO", "value": "{:.0f} days".format(dso.current_dso | default(0)), "icon": "calendar", "color": "blue"} %}
+        {% include "components/ui/stat_card.html" %}
+
+        {% set stat = {"label": "Overdue", "value": revenue.overdue_invoices | default(0), "icon": "credit-card", "color": "red"} %}
+        {% include "components/ui/stat_card.html" %}
+    </div>
+</div>

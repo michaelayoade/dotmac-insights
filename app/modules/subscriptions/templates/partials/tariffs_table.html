@@ -1,0 +1,189 @@
+{# Tariffs table partial - returned for HTMX updates #}
+
+{% if tariffs %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="tariffs-table">
+    <table class="min-w-full divide-y divide-gray-100" data-testid="tariffs-table-grid">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/tariffs/table?sort=title&dir={% if sort_key == 'title' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#tariffs-table-container"
+                        hx-include="[name='q'], [name='tariff_type']"
+                        hx-push-url="true"
+                    >
+                        Tariff
+                        {% if sort_key == 'title' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Type
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/subscriptions/tariffs/table?sort=price&dir={% if sort_key == 'price' and sort_dir == 'asc' %}desc{% else %}asc{% endif %}"
+                        hx-target="#tariffs-table-container"
+                        hx-include="[name='q'], [name='tariff_type']"
+                        hx-push-url="true"
+                    >
+                        Price
+                        {% if sort_key == 'price' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'desc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Speed
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell">
+                    Subscriptions
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for tariff in tariffs %}
+            <tr class="group hover:bg-surface-50/50 transition-colors" data-testid="tariff-row-{{ tariff.id }}">
+                <!-- Tariff Name -->
+                <td class="py-4 pl-6 pr-3">
+                    <div class="flex items-center gap-3">
+                        <div class="flex-shrink-0">
+                            {% set type_colors = {
+                                'internet': 'from-blue-100 to-cyan-200 ring-blue-200/50 text-blue-600',
+                                'recurring': 'from-violet-100 to-purple-200 ring-violet-200/50 text-violet-600',
+                                'one_time': 'from-amber-100 to-orange-200 ring-amber-200/50 text-amber-600'
+                            } %}
+                            <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br {{ type_colors.get(tariff.tariff_type.value, 'from-gray-100 to-slate-200 ring-gray-200/50 text-gray-600') }} ring-2">
+                                {% if tariff.tariff_type.value == 'internet' %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                                </svg>
+                                {% elif tariff.tariff_type.value == 'recurring' %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                {% else %}
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                                </svg>
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="min-w-0">
+                            <a href="/subscriptions/tariffs/{{ tariff.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block" data-testid="tariff-name">
+                                {{ tariff.title }}
+                            </a>
+                            {% if tariff.service_name %}
+                            <p class="text-xs text-gray-500 truncate">{{ tariff.service_name }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+
+                <!-- Type -->
+                <td class="px-3 py-4 hidden sm:table-cell">
+                    {% set type_badge_colors = {
+                        'internet': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'recurring': 'bg-violet-50 text-violet-700 ring-violet-600/20',
+                        'one_time': 'bg-amber-50 text-amber-700 ring-amber-600/20'
+                    } %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ type_badge_colors.get(tariff.tariff_type.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ tariff.tariff_type.value.replace('_', ' ') | title }}
+                    </span>
+                </td>
+
+                <!-- Price -->
+                <td class="px-3 py-4">
+                    <p class="text-sm font-semibold text-gray-900 font-display tabular-nums" data-testid="tariff-price">
+                        {{ tariff.currency }} {{ "{:,.0f}".format(tariff.price) }}
+                    </p>
+                </td>
+
+                <!-- Speed -->
+                <td class="px-3 py-4 hidden md:table-cell">
+                    {% if tariff.speed_download or tariff.speed_upload %}
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="inline-flex items-center gap-1 text-gray-600">
+                            <svg class="w-3 h-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+                            </svg>
+                            {{ format_speed(tariff.speed_download) }}
+                        </span>
+                        <span class="text-gray-300">/</span>
+                        <span class="inline-flex items-center gap-1 text-gray-600">
+                            <svg class="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                            </svg>
+                            {{ format_speed(tariff.speed_upload) }}
+                        </span>
+                    </div>
+                    {% else %}
+                    <span class="text-xs text-gray-400">-</span>
+                    {% endif %}
+                </td>
+
+                <!-- Subscription Count -->
+                <td class="px-3 py-4 hidden lg:table-cell">
+                    <span class="inline-flex items-center gap-1.5 text-sm text-gray-700">
+                        <span class="font-semibold tabular-nums">{{ subscription_counts.get(tariff.id, 0) }}</span>
+                        <span class="text-gray-400">active</span>
+                    </span>
+                </td>
+
+                <!-- Actions -->
+                <td class="py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a
+                            href="/subscriptions/tariffs/{{ tariff.id }}"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all"
+                        >
+                            View
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center empty-state data-testid="tariffs-empty-state"> data-testid="empty-state" data-empty-type="tariffs">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center mb-6 ring-2 ring-blue-200/50">
+        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No tariffs found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_tariff_type %}
+        No tariffs match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Tariffs will appear here once synced from Splynx.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

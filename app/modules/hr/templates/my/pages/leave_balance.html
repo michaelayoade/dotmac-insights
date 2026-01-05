@@ -1,0 +1,80 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">My Leave Balance</h1>
+            <p class="mt-1 text-sm text-gray-500">Current leave allocations and usage</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/hr/my/leave" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to Requests
+            </a>
+            <a href="/hr/my/leave/new" class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Apply for Leave
+            </a>
+        </div>
+    </div>
+
+    <!-- Balance Cards -->
+    {% if leave_usage %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for usage in leave_usage %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">{{ usage.allocation.leave_type }}</h3>
+                <div class="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-4">
+                <div class="flex justify-between text-sm mb-1">
+                    <span class="text-gray-500">Used</span>
+                    <span class="font-medium text-gray-700">{{ usage.used }} / {{ usage.allocated }} days</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-2.5">
+                    {% set percentage = (usage.used / usage.allocated * 100) if usage.allocated > 0 else 0 %}
+                    <div class="h-2.5 rounded-full {% if percentage >= 90 %}bg-red-500{% elif percentage >= 70 %}bg-amber-500{% else %}bg-emerald-500{% endif %}"
+                        style="width: {{ [percentage, 100]|min }}%"></div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-2xl font-bold text-gray-900">{{ usage.allocated }}</p>
+                    <p class="text-xs text-gray-500">Allocated</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-amber-600">{{ usage.used }}</p>
+                    <p class="text-xs text-gray-500">Used</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-emerald-600">{{ usage.remaining }}</p>
+                    <p class="text-xs text-gray-500">Remaining</p>
+                </div>
+            </div>
+
+            <!-- Period -->
+            <div class="mt-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
+                <p>Period: {{ usage.allocation.from_date.strftime('%b %d, %Y') if usage.allocation.from_date else '-' }} - {{ usage.allocation.to_date.strftime('%b %d, %Y') if usage.allocation.to_date else '-' }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center">
+        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <h3 class="text-lg font-semibold text-gray-900 mb-2">No Leave Allocations</h3>
+        <p class="text-gray-500">You don't have any leave allocations for the current period.</p>
+        <p class="text-sm text-gray-400 mt-2">Contact HR to get your leave allocation set up.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

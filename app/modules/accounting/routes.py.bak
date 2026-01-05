@@ -1,0 +1,4639 @@
+"""
+Accounting Routes - Invoices and Payments Management with SSR + HTMX.
+
+Permission Requirements:
+- accounting:read - View invoices and payments
+- accounting:write - Create, update invoices and payments
+"""
+from __future__ import annotations
+
+from typing import Optional
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+
+from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
+from fastapi.responses import HTMLResponse
+from sqlalchemy import func, or_, and_
+
+from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
+from app.web.context import (
+    get_base_context,
+    get_navigation_context,
+    build_breadcrumbs,
+    build_pagination_context,
+)
+from app.templates.environment import get_template_env
+from app.models.invoice import Invoice, InvoiceStatus
+from app.models.payment import Payment, PaymentStatus, PaymentMethod
+from app.models.accounting import (
+    Account, AccountType, GLEntry, JournalEntry, JournalEntryItem, JournalEntryType,
+    BankAccount, BankTransaction, BankTransactionStatus, BankReconciliation, BankReconciliationStatus,
+    FiscalYear, Supplier, PurchaseInvoice, PurchaseInvoiceStatus, CostCenter,
+)
+from app.models.accounting_ext import (
+    FiscalPeriod, FiscalPeriodStatus, FiscalPeriodType, AuditLog, AuditAction,
+    ApprovalWorkflow, ApprovalStep, DocumentApproval, ApprovalHistory, ApprovalStatus, ApprovalMode,
+    AccountingControl,
+)
+from app.models.auth import User
+from app.models.supplier_payment import SupplierPayment, SupplierPaymentStatus
+from sqlalchemy.orm import selectinload
+from app.core.security import is_htmx_request, htmx_toast, set_flash, validate_csrf
+from fastapi.responses import RedirectResponse
+
+# Permission dependencies
+RequireAccountingRead = Depends(require_scope("accounting:read"))
+RequireAccountingWrite = Depends(require_scope("accounting:write"))
+
+router = APIRouter(prefix="/accounting", tags=["accounting"])
+templates = get_template_env()
+
+
+def get_invoice_status_options():
+    """Get status options for invoice filter dropdown."""
+    return [
+        {"value": s.value, "label": s.value.replace("_", " ").title()}
+        for s in InvoiceStatus
+    ]
+
+
+def get_payment_method_options():
+    """Get method options for payment filter dropdown."""
+    return [
+        {"value": m.value, "label": m.value.replace("_", " ").title()}
+        for m in PaymentMethod
+    ]
+
+
+def get_invoice_stats(db) -> dict:
+    """Calculate invoice statistics."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Total count
+    total_count = db.query(func.count(Invoice.id)).scalar() or 0
+
+    # Outstanding (pending + partially_paid)
+    outstanding = db.query(func.sum(Invoice.balance)).filter(
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID])
+    ).scalar() or Decimal("0")
+
+    # Overdue
+    overdue = db.query(func.sum(Invoice.balance)).filter(
+        Invoice.status == InvoiceStatus.OVERDUE
+    ).scalar() or Decimal("0")
+
+    # Paid this month
+    paid_this_month = db.query(func.sum(Invoice.amount_paid)).filter(
+        Invoice.paid_date >= month_start
+    ).scalar() or Decimal("0")
+
+    return {
+        "total_count": total_count,
+        "outstanding": outstanding,
+        "overdue": overdue,
+        "paid_this_month": paid_this_month,
+    }
+
+
+def get_payment_stats(db) -> dict:
+    """Calculate payment statistics."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month_start = (month_start - timedelta(days=1)).replace(day=1)
+
+    # Total count
+    total_count = db.query(func.count(Payment.id)).scalar() or 0
+
+    # This month
+    this_month = db.query(func.sum(Payment.amount)).filter(
+        Payment.payment_date >= month_start
+    ).scalar() or Decimal("0")
+
+    # Last month
+    last_month = db.query(func.sum(Payment.amount)).filter(
+        Payment.payment_date >= last_month_start,
+        Payment.payment_date < month_start
+    ).scalar() or Decimal("0")
+
+    # Unallocated
+    unallocated = db.query(func.sum(Payment.unallocated_amount)).filter(
+        Payment.unallocated_amount > 0
+    ).scalar() or Decimal("0")
+
+    return {
+        "total_count": total_count,
+        "this_month": this_month,
+        "last_month": last_month,
+        "unallocated": unallocated,
+    }
+
+
+# =============================================================================
+# INVOICES
+# =============================================================================
+
+@router.get("/invoices", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def invoices_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+    sort: str = Query("invoice_date", description="Sort field"),
+    dir: str = Query("desc", description="Sort direction"),
+):
+    """Invoices list page."""
+    # Build query
+    query = db.query(Invoice)
+
+    # Search
+    if q:
+        search_filter = or_(
+            Invoice.invoice_number.ilike(f"%{q}%"),
+            Invoice.description.ilike(f"%{q}%"),
+        )
+        query = query.filter(search_filter)
+
+    # Filters
+    if status:
+        query = query.filter(Invoice.status == status)
+
+    # Count total
+    total = query.count()
+
+    # Sort
+    sort_column = getattr(Invoice, sort, Invoice.invoice_date)
+    if dir == "desc":
+        sort_column = sort_column.desc()
+    query = query.order_by(sort_column)
+
+    # Paginate
+    offset = (page - 1) * per_page
+    invoices = query.offset(offset).limit(per_page).all()
+
+    # Get stats
+    stats = get_invoice_stats(db)
+
+    # Build context
+    context = get_base_context(request, response, user, csrf_token)
+    context["invoices"] = invoices
+    context["search_query"] = q or ""
+    context["current_status"] = status
+    context["status_options"] = get_invoice_status_options()
+    context["stats"] = stats
+    context["sort_key"] = sort
+    context["sort_dir"] = dir
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    # HTMX partial or full page
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/invoices/partials/invoices_table.html")
+        return HTMLResponse(template.render(context))
+
+    # Full page
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Invoices"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Finance", "href": "/accounting/invoices"},
+        {"label": "Invoices"},
+    ])
+
+    template = templates.get_template("modules/accounting/templates/invoices/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/invoices/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def invoices_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+    sort: str = Query("invoice_date"),
+    dir: str = Query("desc"),
+):
+    """Invoices table partial for HTMX updates."""
+    return await invoices_list(
+        request, response, user, csrf_token, db,
+        q, status, page, per_page, sort, dir
+    )
+
+
+@router.get("/invoices/{invoice_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def invoice_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    invoice_id: int,
+):
+    """Invoice detail page."""
+    invoice = db.query(Invoice).filter(
+        Invoice.id == invoice_id,
+        ).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = invoice.invoice_number or f"INV-{invoice.id}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Finance", "href": "/accounting/invoices"},
+        {"label": "Invoices", "href": "/accounting/invoices"},
+        {"label": invoice.invoice_number or f"INV-{invoice.id}"},
+    ])
+    context["invoice"] = invoice
+
+    template = templates.get_template("modules/accounting/templates/invoices/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# PAYMENTS
+# =============================================================================
+
+@router.get("/payments", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def payments_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    method: Optional[str] = Query(None, description="Filter by method"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+    sort: str = Query("payment_date", description="Sort field"),
+    dir: str = Query("desc", description="Sort direction"),
+):
+    """Payments list page."""
+    # Build query
+    query = db.query(Payment)
+
+    # Search
+    if q:
+        search_filter = or_(
+            Payment.receipt_number.ilike(f"%{q}%"),
+            Payment.transaction_reference.ilike(f"%{q}%"),
+        )
+        query = query.filter(search_filter)
+
+    # Filters
+    if method:
+        query = query.filter(Payment.payment_method == method)
+
+    # Count total
+    total = query.count()
+
+    # Sort
+    sort_column = getattr(Payment, sort, Payment.payment_date)
+    if dir == "desc":
+        sort_column = sort_column.desc()
+    query = query.order_by(sort_column)
+
+    # Paginate
+    offset = (page - 1) * per_page
+    payments = query.offset(offset).limit(per_page).all()
+
+    # Get stats
+    stats = get_payment_stats(db)
+
+    # Build context
+    context = get_base_context(request, response, user, csrf_token)
+    context["payments"] = payments
+    context["search_query"] = q or ""
+    context["current_method"] = method
+    context["method_options"] = get_payment_method_options()
+    context["stats"] = stats
+    context["sort_key"] = sort
+    context["sort_dir"] = dir
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    # HTMX partial or full page
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/payments/partials/payments_table.html")
+        return HTMLResponse(template.render(context))
+
+    # Full page
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Payments"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Finance", "href": "/accounting/invoices"},
+        {"label": "Payments"},
+    ])
+
+    template = templates.get_template("modules/accounting/templates/payments/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/payments/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def payments_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    method: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+    sort: str = Query("payment_date"),
+    dir: str = Query("desc"),
+):
+    """Payments table partial for HTMX updates."""
+    return await payments_list(
+        request, response, user, csrf_token, db,
+        q, method, page, per_page, sort, dir
+    )
+
+
+@router.get("/payments/{payment_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def payment_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    payment_id: int,
+):
+    """Payment detail page."""
+    payment = db.query(Payment).filter(
+        Payment.id == payment_id,
+        ).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = payment.receipt_number or f"PAY-{payment.id}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Finance", "href": "/accounting/invoices"},
+        {"label": "Payments", "href": "/accounting/payments"},
+        {"label": payment.receipt_number or f"PAY-{payment.id}"},
+    ])
+    context["payment"] = payment
+
+    template = templates.get_template("modules/accounting/templates/payments/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# CHART OF ACCOUNTS
+# =============================================================================
+
+def get_root_type_options():
+    """Get root type options for account filter dropdown."""
+    return [
+        {"value": t.value, "label": t.value.title()}
+        for t in AccountType
+    ]
+
+
+def get_account_type_options():
+    """Get common account type options."""
+    return [
+        {"value": "Accumulated Depreciation", "label": "Accumulated Depreciation"},
+        {"value": "Bank", "label": "Bank"},
+        {"value": "Cash", "label": "Cash"},
+        {"value": "Chargeable", "label": "Chargeable"},
+        {"value": "Cost of Goods Sold", "label": "Cost of Goods Sold"},
+        {"value": "Depreciation", "label": "Depreciation"},
+        {"value": "Direct Expense", "label": "Direct Expense"},
+        {"value": "Direct Income", "label": "Direct Income"},
+        {"value": "Equity", "label": "Equity"},
+        {"value": "Expense Account", "label": "Expense Account"},
+        {"value": "Expenses Included In Asset Valuation", "label": "Expenses Included In Asset Valuation"},
+        {"value": "Expenses Included In Valuation", "label": "Expenses Included In Valuation"},
+        {"value": "Fixed Asset", "label": "Fixed Asset"},
+        {"value": "Income Account", "label": "Income Account"},
+        {"value": "Indirect Expense", "label": "Indirect Expense"},
+        {"value": "Indirect Income", "label": "Indirect Income"},
+        {"value": "Payable", "label": "Payable"},
+        {"value": "Receivable", "label": "Receivable"},
+        {"value": "Round Off", "label": "Round Off"},
+        {"value": "Stock", "label": "Stock"},
+        {"value": "Stock Adjustment", "label": "Stock Adjustment"},
+        {"value": "Stock Received But Not Billed", "label": "Stock Received But Not Billed"},
+        {"value": "Tax", "label": "Tax"},
+        {"value": "Temporary", "label": "Temporary"},
+    ]
+
+
+def get_parent_account_options(db, exclude_id: int = None):
+    """Get parent account options (groups only)."""
+    query = db.query(Account).filter(
+        Account.is_group == True,
+        Account.disabled == False,
+    )
+    if exclude_id:
+        query = query.filter(Account.id != exclude_id)
+    accounts = query.order_by(Account.account_name).all()
+    return [
+        {"value": str(a.id), "label": f"{a.account_name} ({a.root_type.value.title() if a.root_type else 'Unknown'})"}
+        for a in accounts
+    ]
+
+
+def build_account_tree(accounts: list, parent: str = None) -> list:
+    """Build hierarchical account tree structure."""
+    tree = []
+    for account in accounts:
+        if account.parent_account == parent:
+            children = build_account_tree(accounts, account.account_name)
+            node = {
+                "account": account,
+                "children": children,
+                "has_children": len(children) > 0,
+            }
+            tree.append(node)
+    return tree
+
+
+def get_account_balance(db, account_name: str) -> Decimal:
+    """Calculate account balance from GL entries."""
+    result = db.query(
+        func.sum(GLEntry.debit) - func.sum(GLEntry.credit)
+    ).filter(
+        GLEntry.account == account_name,
+        GLEntry.is_cancelled == False,
+    ).scalar()
+    return result or Decimal("0")
+
+
+def get_account_stats(db) -> dict:
+    """Calculate account statistics."""
+    total_count = db.query(func.count(Account.id)).filter(
+        Account.disabled == False
+    ).scalar() or 0
+
+    group_count = db.query(func.count(Account.id)).filter(
+        Account.disabled == False,
+        Account.is_group == True,
+    ).scalar() or 0
+
+    by_root_type = {}
+    for root_type in AccountType:
+        count = db.query(func.count(Account.id)).filter(
+            Account.disabled == False,
+            Account.root_type == root_type,
+        ).scalar() or 0
+        by_root_type[root_type.value] = count
+
+    return {
+        "total_count": total_count,
+        "group_count": group_count,
+        "ledger_count": total_count - group_count,
+        "by_root_type": by_root_type,
+    }
+
+
+@router.get("/accounts", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def accounts_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    root_type: Optional[str] = Query(None, description="Filter by root type"),
+    show_disabled: bool = Query(False, description="Show disabled accounts"),
+    view: str = Query("tree", description="View mode: tree or flat"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(100, ge=10, le=500),
+):
+    """Chart of Accounts list page."""
+    # Build query
+    query = db.query(Account)
+
+    if not show_disabled:
+        query = query.filter(Account.disabled == False)
+
+    # Search
+    if q:
+        search_filter = or_(
+            Account.account_name.ilike(f"%{q}%"),
+            Account.account_number.ilike(f"%{q}%"),
+        )
+        query = query.filter(search_filter)
+
+    # Filter by root type
+    if root_type:
+        query = query.filter(Account.root_type == root_type)
+
+    # Count total
+    total = query.count()
+
+    # Sort and fetch all for tree view, or paginate for flat view
+    query = query.order_by(Account.root_type, Account.account_name)
+
+    if view == "tree" and not q:
+        # For tree view, get all accounts to build hierarchy
+        accounts = query.all()
+        account_tree = build_account_tree(accounts)
+    else:
+        # For flat view or search, paginate
+        offset = (page - 1) * per_page
+        accounts = query.offset(offset).limit(per_page).all()
+        account_tree = None
+
+    # Get stats
+    stats = get_account_stats(db)
+
+    # Build context
+    context = get_base_context(request, response, user, csrf_token)
+    context["accounts"] = accounts
+    context["account_tree"] = account_tree
+    context["search_query"] = q or ""
+    context["current_root_type"] = root_type
+    context["show_disabled"] = show_disabled
+    context["view_mode"] = view
+    context["root_type_options"] = get_root_type_options()
+    context["stats"] = stats
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    # HTMX partial or full page
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/accounts/partials/accounts_tree.html")
+        return HTMLResponse(template.render(context))
+
+    # Full page
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Chart of Accounts"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Chart of Accounts"},
+    ])
+
+    template = templates.get_template("modules/accounting/templates/accounts/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/accounts/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def accounts_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    root_type: Optional[str] = Query(None),
+    show_disabled: bool = Query(False),
+    view: str = Query("tree"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(100, ge=10, le=500),
+):
+    """Accounts table partial for HTMX updates."""
+    return await accounts_list(
+        request, response, user, csrf_token, db,
+        q, root_type, show_disabled, view, page, per_page
+    )
+
+
+@router.get("/accounts/new", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def account_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New account form page."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Account"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Chart of Accounts", "href": "/accounting/accounts"},
+        {"label": "New Account"},
+    ])
+    context["account"] = None
+    context["root_type_options"] = get_root_type_options()
+    context["account_type_options"] = get_account_type_options()
+    context["parent_options"] = get_parent_account_options(db)
+    context["errors"] = {}
+
+    template = templates.get_template("modules/accounting/templates/accounts/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/accounts", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def account_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+):
+    """Create a new account."""
+    form = await request.form()
+
+    # Validate
+    errors = {}
+    account_name = form.get("account_name", "").strip()
+    account_number = form.get("account_number", "").strip() or None
+    root_type_value = form.get("root_type", "").strip()
+    account_type = form.get("account_type", "").strip() or None
+    parent_id = form.get("parent_account", "").strip() or None
+    is_group = form.get("is_group") == "on"
+
+    if not account_name:
+        errors["account_name"] = "Account name is required"
+
+    if not root_type_value:
+        errors["root_type"] = "Root type is required"
+
+    # Check for duplicate name
+    existing = db.query(Account).filter(
+        Account.account_name == account_name,
+        Account.disabled == False,
+    ).first()
+    if existing:
+        errors["account_name"] = "An account with this name already exists"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Account"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/accounts"},
+            {"label": "Chart of Accounts", "href": "/accounting/accounts"},
+            {"label": "New Account"},
+        ])
+        context["account"] = None
+        context["root_type_options"] = get_root_type_options()
+        context["account_type_options"] = get_account_type_options()
+        context["parent_options"] = get_parent_account_options(db)
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/accounting/templates/accounts/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Get parent account name if parent_id provided
+    parent_account_name = None
+    if parent_id:
+        parent = db.query(Account).filter(Account.id == int(parent_id)).first()
+        if parent:
+            parent_account_name = parent.account_name
+
+    # Create account
+    account = Account(
+        account_name=account_name,
+        account_number=account_number,
+        root_type=AccountType(root_type_value),
+        account_type=account_type,
+        parent_account=parent_account_name,
+        is_group=is_group,
+        disabled=False,
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+
+    set_flash(response, f"Account '{account_name}' created successfully.", "success")
+    return RedirectResponse(url=f"/accounting/accounts/{account.id}", status_code=303)
+
+
+@router.get("/accounts/{account_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def account_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Account detail page with ledger entries."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    # Get GL entries for this account
+    gl_query = db.query(GLEntry).filter(
+        GLEntry.account == account.account_name,
+        GLEntry.is_cancelled == False,
+    ).order_by(GLEntry.posting_date.desc())
+
+    total_entries = gl_query.count()
+    offset = (page - 1) * per_page
+    gl_entries = gl_query.offset(offset).limit(per_page).all()
+
+    # Calculate balance
+    balance = get_account_balance(db, account.account_name)
+
+    # Get child accounts if this is a group
+    children = []
+    if account.is_group:
+        children = db.query(Account).filter(
+            Account.parent_account == account.account_name,
+            Account.disabled == False,
+        ).order_by(Account.account_name).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = account.account_name
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Chart of Accounts", "href": "/accounting/accounts"},
+        {"label": account.account_name},
+    ])
+    context["account"] = account
+    context["gl_entries"] = gl_entries
+    context["balance"] = balance
+    context["children"] = children
+    context["pagination"] = build_pagination_context(page, per_page, total_entries)
+
+    template = templates.get_template("modules/accounting/templates/accounts/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/accounts/{account_id}/edit", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def account_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+):
+    """Account edit form page."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit {account.account_name}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Chart of Accounts", "href": "/accounting/accounts"},
+        {"label": account.account_name, "href": f"/accounting/accounts/{account.id}"},
+        {"label": "Edit"},
+    ])
+    context["account"] = account
+    context["root_type_options"] = get_root_type_options()
+    context["account_type_options"] = get_account_type_options()
+    context["parent_options"] = get_parent_account_options(db, exclude_id=account.id)
+    context["errors"] = {}
+
+    template = templates.get_template("modules/accounting/templates/accounts/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/accounts/{account_id}", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def account_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    account_id: int,
+):
+    """Update an existing account."""
+    account = db.query(Account).filter(Account.id == account_id).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    form = await request.form()
+
+    # Validate
+    errors = {}
+    account_name = form.get("account_name", "").strip()
+    account_number = form.get("account_number", "").strip() or None
+    root_type_value = form.get("root_type", "").strip()
+    account_type = form.get("account_type", "").strip() or None
+    parent_id = form.get("parent_account", "").strip() or None
+    is_group = form.get("is_group") == "on"
+    disabled = form.get("disabled") == "on"
+
+    if not account_name:
+        errors["account_name"] = "Account name is required"
+
+    if not root_type_value:
+        errors["root_type"] = "Root type is required"
+
+    # Check for duplicate name (excluding this account)
+    existing = db.query(Account).filter(
+        Account.account_name == account_name,
+        Account.id != account_id,
+        Account.disabled == False,
+    ).first()
+    if existing:
+        errors["account_name"] = "An account with this name already exists"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {account.account_name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/accounts"},
+            {"label": "Chart of Accounts", "href": "/accounting/accounts"},
+            {"label": account.account_name, "href": f"/accounting/accounts/{account.id}"},
+            {"label": "Edit"},
+        ])
+        context["account"] = account
+        context["root_type_options"] = get_root_type_options()
+        context["account_type_options"] = get_account_type_options()
+        context["parent_options"] = get_parent_account_options(db, exclude_id=account.id)
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template("modules/accounting/templates/accounts/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Get parent account name if parent_id provided
+    parent_account_name = None
+    if parent_id:
+        parent = db.query(Account).filter(Account.id == int(parent_id)).first()
+        if parent:
+            parent_account_name = parent.account_name
+
+    # Update account
+    account.account_name = account_name
+    account.account_number = account_number
+    account.root_type = AccountType(root_type_value)
+    account.account_type = account_type
+    account.parent_account = parent_account_name
+    account.is_group = is_group
+    account.disabled = disabled
+    db.commit()
+
+    set_flash(response, f"Account '{account_name}' updated successfully.", "success")
+    return RedirectResponse(url=f"/accounting/accounts/{account.id}", status_code=303)
+
+
+# =============================================================================
+# JOURNAL ENTRIES
+# =============================================================================
+
+def get_voucher_type_options():
+    """Get voucher type options for JE filter dropdown."""
+    return [
+        {"value": t.value, "label": t.value.replace("_", " ").title()}
+        for t in JournalEntryType
+    ]
+
+
+def get_docstatus_options():
+    """Get document status options."""
+    return [
+        {"value": "0", "label": "Draft"},
+        {"value": "1", "label": "Posted"},
+        {"value": "2", "label": "Cancelled"},
+    ]
+
+
+def get_je_stats(db) -> dict:
+    """Calculate journal entry statistics."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    total_count = db.query(func.count(JournalEntry.id)).scalar() or 0
+
+    draft_count = db.query(func.count(JournalEntry.id)).filter(
+        JournalEntry.docstatus == 0
+    ).scalar() or 0
+
+    posted_count = db.query(func.count(JournalEntry.id)).filter(
+        JournalEntry.docstatus == 1
+    ).scalar() or 0
+
+    this_month = db.query(func.count(JournalEntry.id)).filter(
+        JournalEntry.posting_date >= month_start,
+        JournalEntry.docstatus == 1,
+    ).scalar() or 0
+
+    return {
+        "total_count": total_count,
+        "draft_count": draft_count,
+        "posted_count": posted_count,
+        "this_month": this_month,
+    }
+
+
+@router.get("/journal-entries", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def journal_entries_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    voucher_type: Optional[str] = Query(None, description="Filter by voucher type"),
+    docstatus: Optional[str] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+    sort: str = Query("posting_date", description="Sort field"),
+    dir: str = Query("desc", description="Sort direction"),
+):
+    """Journal Entries list page."""
+    # Build query with eager loading
+    query = db.query(JournalEntry).options(selectinload(JournalEntry.items))
+
+    # Search
+    if q:
+        search_filter = or_(
+            JournalEntry.erpnext_id.ilike(f"%{q}%"),
+            JournalEntry.user_remark.ilike(f"%{q}%"),
+            JournalEntry.cheque_no.ilike(f"%{q}%"),
+        )
+        query = query.filter(search_filter)
+
+    # Filters
+    if voucher_type:
+        query = query.filter(JournalEntry.voucher_type == voucher_type)
+
+    if docstatus:
+        query = query.filter(JournalEntry.docstatus == int(docstatus))
+
+    # Count total
+    total = query.count()
+
+    # Sort
+    sort_column = getattr(JournalEntry, sort, JournalEntry.posting_date)
+    if dir == "desc":
+        sort_column = sort_column.desc()
+    query = query.order_by(sort_column)
+
+    # Paginate
+    offset = (page - 1) * per_page
+    entries = query.offset(offset).limit(per_page).all()
+
+    # Get stats
+    stats = get_je_stats(db)
+
+    # Build context
+    context = get_base_context(request, response, user, csrf_token)
+    context["entries"] = entries
+    context["search_query"] = q or ""
+    context["current_voucher_type"] = voucher_type
+    context["current_docstatus"] = docstatus
+    context["voucher_type_options"] = get_voucher_type_options()
+    context["docstatus_options"] = get_docstatus_options()
+    context["stats"] = stats
+    context["sort_key"] = sort
+    context["sort_dir"] = dir
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    # HTMX partial or full page
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/journal_entries/partials/journal_entries_table.html")
+        return HTMLResponse(template.render(context))
+
+    # Full page
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Journal Entries"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Journal Entries"},
+    ])
+
+    template = templates.get_template("modules/accounting/templates/journal_entries/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/journal-entries/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def journal_entries_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    voucher_type: Optional[str] = Query(None),
+    docstatus: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+    sort: str = Query("posting_date"),
+    dir: str = Query("desc"),
+):
+    """Journal entries table partial for HTMX updates."""
+    return await journal_entries_list(
+        request, response, user, csrf_token, db,
+        q, voucher_type, docstatus, page, per_page, sort, dir
+    )
+
+
+@router.get("/journal-entries/new", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def journal_entry_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account: Optional[str] = Query(None, description="Pre-fill account"),
+):
+    """New journal entry form page."""
+    # Get accounts for dropdown
+    accounts = db.query(Account).filter(
+        Account.disabled == False,
+        Account.is_group == False,
+    ).order_by(Account.account_name).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Journal Entry"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+        {"label": "New Entry"},
+    ])
+    context["entry"] = None
+    context["voucher_type_options"] = get_voucher_type_options()
+    context["accounts"] = accounts
+    context["prefill_account"] = account
+    context["errors"] = {}
+
+    template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/journal-entries", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def journal_entry_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+):
+    """Create a new journal entry."""
+    form = await request.form()
+
+    # Get accounts for error re-render
+    accounts = db.query(Account).filter(
+        Account.disabled == False,
+        Account.is_group == False,
+    ).order_by(Account.account_name).all()
+
+    # Validate
+    errors = {}
+    posting_date = form.get("posting_date", "").strip()
+    voucher_type_value = form.get("voucher_type", "").strip()
+    user_remark = form.get("user_remark", "").strip() or None
+    cheque_no = form.get("cheque_no", "").strip() or None
+
+    if not posting_date:
+        errors["posting_date"] = "Posting date is required"
+
+    if not voucher_type_value:
+        errors["voucher_type"] = "Voucher type is required"
+
+    # Parse line items
+    line_items = []
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+
+    # Get all account/debit/credit fields
+    i = 0
+    while True:
+        account_field = form.get(f"items[{i}][account]")
+        if account_field is None:
+            break
+
+        account_val = account_field.strip()
+        debit_val = form.get(f"items[{i}][debit]", "0").strip() or "0"
+        credit_val = form.get(f"items[{i}][credit]", "0").strip() or "0"
+        description = form.get(f"items[{i}][description]", "").strip() or None
+
+        if account_val:
+            try:
+                debit = Decimal(debit_val)
+                credit = Decimal(credit_val)
+                line_items.append({
+                    "account": account_val,
+                    "debit": debit,
+                    "credit": credit,
+                    "description": description,
+                    "idx": i,
+                })
+                total_debit += debit
+                total_credit += credit
+            except (ValueError, TypeError):
+                errors[f"items[{i}]"] = "Invalid debit/credit amount"
+
+        i += 1
+
+    # Validate line items
+    if len(line_items) < 2:
+        errors["items"] = "At least two line items are required"
+
+    # Check debit = credit
+    if abs(total_debit - total_credit) > Decimal("0.01"):
+        errors["balance"] = f"Debits ({total_debit}) must equal credits ({total_credit})"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Journal Entry"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/accounts"},
+            {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+            {"label": "New Entry"},
+        ])
+        context["entry"] = None
+        context["voucher_type_options"] = get_voucher_type_options()
+        context["accounts"] = accounts
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["line_items"] = line_items
+
+        template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Create journal entry
+    entry = JournalEntry(
+        voucher_type=JournalEntryType(voucher_type_value),
+        posting_date=datetime.strptime(posting_date, "%Y-%m-%d"),
+        user_remark=user_remark,
+        cheque_no=cheque_no,
+        total_debit=total_debit,
+        total_credit=total_credit,
+        docstatus=0,  # Draft
+    )
+    db.add(entry)
+    db.flush()
+
+    # Add line items
+    for item in line_items:
+        # Find account ID
+        acct = db.query(Account).filter(Account.account_name == item["account"]).first()
+        if acct:
+            je_item = JournalEntryItem(
+                journal_entry_id=entry.id,
+                account=item["account"],
+                account_id=acct.id,
+                debit=item["debit"],
+                credit=item["credit"],
+                idx=item["idx"],
+            )
+            db.add(je_item)
+
+    db.commit()
+    db.refresh(entry)
+
+    set_flash(response, "Journal entry created successfully.", "success")
+    return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
+
+
+@router.get("/journal-entries/{entry_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def journal_entry_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    entry_id: int,
+):
+    """Journal entry detail page."""
+    entry = db.query(JournalEntry).options(
+        selectinload(JournalEntry.items)
+    ).filter(JournalEntry.id == entry_id).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"JE-{entry.id}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+        {"label": f"JE-{entry.id}"},
+    ])
+    context["entry"] = entry
+
+    template = templates.get_template("modules/accounting/templates/journal_entries/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/journal-entries/{entry_id}/edit", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def journal_entry_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    entry_id: int,
+):
+    """Journal entry edit form page."""
+    entry = db.query(JournalEntry).options(
+        selectinload(JournalEntry.items)
+    ).filter(JournalEntry.id == entry_id).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    if entry.docstatus != 0:
+        set_flash(response, "Only draft entries can be edited.", "error")
+        return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
+
+    # Get accounts for dropdown
+    accounts = db.query(Account).filter(
+        Account.disabled == False,
+        Account.is_group == False,
+    ).order_by(Account.account_name).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit JE-{entry.id}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/accounts"},
+        {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+        {"label": f"JE-{entry.id}", "href": f"/accounting/journal-entries/{entry.id}"},
+        {"label": "Edit"},
+    ])
+    context["entry"] = entry
+    context["voucher_type_options"] = get_voucher_type_options()
+    context["accounts"] = accounts
+    context["errors"] = {}
+
+    template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/journal-entries/{entry_id}", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def journal_entry_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    entry_id: int,
+):
+    """Update a journal entry."""
+    entry = db.query(JournalEntry).options(
+        selectinload(JournalEntry.items)
+    ).filter(JournalEntry.id == entry_id).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    if entry.docstatus != 0:
+        set_flash(response, "Only draft entries can be edited.", "error")
+        return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
+
+    form = await request.form()
+
+    # Get accounts for error re-render
+    accounts = db.query(Account).filter(
+        Account.disabled == False,
+        Account.is_group == False,
+    ).order_by(Account.account_name).all()
+
+    # Validate (similar to create)
+    errors = {}
+    posting_date = form.get("posting_date", "").strip()
+    voucher_type_value = form.get("voucher_type", "").strip()
+    user_remark = form.get("user_remark", "").strip() or None
+    cheque_no = form.get("cheque_no", "").strip() or None
+
+    if not posting_date:
+        errors["posting_date"] = "Posting date is required"
+
+    if not voucher_type_value:
+        errors["voucher_type"] = "Voucher type is required"
+
+    # Parse line items
+    line_items = []
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+
+    i = 0
+    while True:
+        account_field = form.get(f"items[{i}][account]")
+        if account_field is None:
+            break
+
+        account_val = account_field.strip()
+        debit_val = form.get(f"items[{i}][debit]", "0").strip() or "0"
+        credit_val = form.get(f"items[{i}][credit]", "0").strip() or "0"
+        description = form.get(f"items[{i}][description]", "").strip() or None
+
+        if account_val:
+            try:
+                debit = Decimal(debit_val)
+                credit = Decimal(credit_val)
+                line_items.append({
+                    "account": account_val,
+                    "debit": debit,
+                    "credit": credit,
+                    "description": description,
+                    "idx": i,
+                })
+                total_debit += debit
+                total_credit += credit
+            except (ValueError, TypeError):
+                errors[f"items[{i}]"] = "Invalid debit/credit amount"
+
+        i += 1
+
+    if len(line_items) < 2:
+        errors["items"] = "At least two line items are required"
+
+    if abs(total_debit - total_credit) > Decimal("0.01"):
+        errors["balance"] = f"Debits ({total_debit}) must equal credits ({total_credit})"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit JE-{entry.id}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/accounts"},
+            {"label": "Journal Entries", "href": "/accounting/journal-entries"},
+            {"label": f"JE-{entry.id}", "href": f"/accounting/journal-entries/{entry.id}"},
+            {"label": "Edit"},
+        ])
+        context["entry"] = entry
+        context["voucher_type_options"] = get_voucher_type_options()
+        context["accounts"] = accounts
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["line_items"] = line_items
+
+        template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Update entry
+    entry.voucher_type = JournalEntryType(voucher_type_value)
+    entry.posting_date = datetime.strptime(posting_date, "%Y-%m-%d")
+    entry.user_remark = user_remark
+    entry.cheque_no = cheque_no
+    entry.total_debit = total_debit
+    entry.total_credit = total_credit
+
+    # Delete old items and add new ones
+    for item in entry.items:
+        db.delete(item)
+
+    for item in line_items:
+        acct = db.query(Account).filter(Account.account_name == item["account"]).first()
+        if acct:
+            je_item = JournalEntryItem(
+                journal_entry_id=entry.id,
+                account=item["account"],
+                account_id=acct.id,
+                debit=item["debit"],
+                credit=item["credit"],
+                idx=item["idx"],
+            )
+            db.add(je_item)
+
+    db.commit()
+
+    set_flash(response, "Journal entry updated successfully.", "success")
+    return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
+
+
+@router.post("/journal-entries/{entry_id}/post", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def journal_entry_post(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    entry_id: int,
+):
+    """Post a journal entry to the general ledger."""
+    entry = db.query(JournalEntry).options(
+        selectinload(JournalEntry.items)
+    ).filter(JournalEntry.id == entry_id).first()
+
+    if not entry:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+
+    if entry.docstatus != 0:
+        set_flash(response, "Only draft entries can be posted.", "error")
+        return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
+
+    # Create GL entries
+    for item in entry.items:
+        gl_entry = GLEntry(
+            posting_date=entry.posting_date,
+            account=item.account,
+            debit=item.debit,
+            credit=item.credit,
+            voucher_type="Journal Entry",
+            voucher_no=f"JE-{entry.id}",
+            is_cancelled=False,
+        )
+        db.add(gl_entry)
+
+    # Update entry status
+    entry.docstatus = 1
+    db.commit()
+
+    set_flash(response, "Journal entry posted to GL successfully.", "success")
+    return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
+
+
+# =============================================================================
+# GENERAL LEDGER
+# =============================================================================
+
+def get_gl_stats(db) -> dict:
+    """Calculate General Ledger statistics."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    total_count = db.query(func.count(GLEntry.id)).filter(
+        GLEntry.is_cancelled == False
+    ).scalar() or 0
+
+    this_month_count = db.query(func.count(GLEntry.id)).filter(
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date >= month_start
+    ).scalar() or 0
+
+    total_debit = db.query(func.sum(GLEntry.debit)).filter(
+        GLEntry.is_cancelled == False
+    ).scalar() or Decimal("0")
+
+    total_credit = db.query(func.sum(GLEntry.credit)).filter(
+        GLEntry.is_cancelled == False
+    ).scalar() or Decimal("0")
+
+    return {
+        "total_count": total_count,
+        "this_month_count": this_month_count,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+    }
+
+
+@router.get("/general-ledger", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def general_ledger(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search by voucher number"),
+    account_id: Optional[int] = Query(None, description="Filter by account"),
+    voucher_type: Optional[str] = Query(None, description="Filter by voucher type"),
+    date_from: Optional[str] = Query(None, description="Start date"),
+    date_to: Optional[str] = Query(None, description="End date"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """General Ledger viewer page."""
+    # Build query
+    query = db.query(GLEntry).filter(GLEntry.is_cancelled == False)
+
+    # Search
+    if q:
+        query = query.filter(
+            or_(
+                GLEntry.voucher_no.ilike(f"%{q}%"),
+                GLEntry.account.ilike(f"%{q}%"),
+            )
+        )
+
+    # Filter by account
+    if account_id:
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if account:
+            query = query.filter(GLEntry.account == account.account_name)
+
+    # Filter by voucher type
+    if voucher_type:
+        query = query.filter(GLEntry.voucher_type == voucher_type)
+
+    # Filter by date range
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(GLEntry.posting_date >= from_date)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, "%Y-%m-%d")
+            query = query.filter(GLEntry.posting_date <= to_date)
+        except ValueError:
+            pass
+
+    # Get total count for pagination
+    total = query.count()
+
+    # Order by posting date (newest first), then by id
+    query = query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc())
+
+    # Paginate
+    entries = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    # Get accounts for filter dropdown
+    accounts = db.query(Account).filter(
+        Account.is_group == False,
+    ).order_by(Account.account_number, Account.account_name).all()
+
+    # Get voucher types for filter
+    voucher_types = db.query(GLEntry.voucher_type).distinct().all()
+    voucher_type_options = [{"value": vt[0], "label": vt[0]} for vt in voucher_types if vt[0]]
+
+    # Get stats
+    stats = get_gl_stats(db)
+
+    # Build context
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "General Ledger", "href": "/accounting/general-ledger", "current": True},
+    ])
+    context["entries"] = entries
+    context["search_query"] = q or ""
+    context["current_account_id"] = account_id
+    context["current_voucher_type"] = voucher_type or ""
+    context["date_from"] = date_from or ""
+    context["date_to"] = date_to or ""
+    context["accounts"] = accounts
+    context["voucher_type_options"] = voucher_type_options
+    context["stats"] = stats
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    # Check if HTMX request for partial update
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/general_ledger/partials/gl_entries_table.html")
+    else:
+        template = templates.get_template("modules/accounting/templates/general_ledger/pages/list.html")
+
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/general-ledger/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def general_ledger_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search by voucher number"),
+    account_id: Optional[int] = Query(None, description="Filter by account"),
+    voucher_type: Optional[str] = Query(None, description="Filter by voucher type"),
+    date_from: Optional[str] = Query(None, description="Start date"),
+    date_to: Optional[str] = Query(None, description="End date"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """General Ledger table partial for HTMX."""
+    # Build query
+    query = db.query(GLEntry).filter(GLEntry.is_cancelled == False)
+
+    # Search
+    if q:
+        query = query.filter(
+            or_(
+                GLEntry.voucher_no.ilike(f"%{q}%"),
+                GLEntry.account.ilike(f"%{q}%"),
+            )
+        )
+
+    # Filter by account
+    if account_id:
+        account = db.query(Account).filter(Account.id == account_id).first()
+        if account:
+            query = query.filter(GLEntry.account == account.account_name)
+
+    # Filter by voucher type
+    if voucher_type:
+        query = query.filter(GLEntry.voucher_type == voucher_type)
+
+    # Filter by date range
+    if date_from:
+        try:
+            from_date = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(GLEntry.posting_date >= from_date)
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            to_date = datetime.strptime(date_to, "%Y-%m-%d")
+            query = query.filter(GLEntry.posting_date <= to_date)
+        except ValueError:
+            pass
+
+    # Get total count for pagination
+    total = query.count()
+
+    # Order by posting date (newest first), then by id
+    query = query.order_by(GLEntry.posting_date.desc(), GLEntry.id.desc())
+
+    # Paginate
+    entries = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    # Build context
+    context = get_base_context(request, response, user, csrf_token)
+    context["entries"] = entries
+    context["search_query"] = q or ""
+    context["current_account_id"] = account_id
+    context["current_voucher_type"] = voucher_type or ""
+    context["date_from"] = date_from or ""
+    context["date_to"] = date_to or ""
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/general_ledger/partials/gl_entries_table.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# FINANCIAL REPORTS
+# =============================================================================
+
+def get_trial_balance_data(db, as_of_date: Optional[datetime] = None) -> dict:
+    """Calculate trial balance data."""
+    if not as_of_date:
+        as_of_date = datetime.utcnow()
+
+    # Get all accounts with their balances
+    accounts_data = []
+
+    accounts = db.query(Account).filter(
+        Account.is_group == False,
+    ).order_by(Account.root_type, Account.account_number, Account.account_name).all()
+
+    total_debit = Decimal("0")
+    total_credit = Decimal("0")
+
+    for account in accounts:
+        # Get GL entries for this account up to the as_of_date
+        debit_sum = db.query(func.sum(GLEntry.debit)).filter(
+            GLEntry.account == account.account_name,
+            GLEntry.is_cancelled == False,
+            GLEntry.posting_date <= as_of_date,
+        ).scalar() or Decimal("0")
+
+        credit_sum = db.query(func.sum(GLEntry.credit)).filter(
+            GLEntry.account == account.account_name,
+            GLEntry.is_cancelled == False,
+            GLEntry.posting_date <= as_of_date,
+        ).scalar() or Decimal("0")
+
+        balance = debit_sum - credit_sum
+
+        # Skip zero balance accounts
+        if balance == 0 and debit_sum == 0 and credit_sum == 0:
+            continue
+
+        # Determine debit/credit balance based on account type
+        debit_balance = Decimal("0")
+        credit_balance = Decimal("0")
+
+        if account.root_type and account.root_type.value in ['asset', 'expense']:
+            if balance >= 0:
+                debit_balance = balance
+            else:
+                credit_balance = abs(balance)
+        else:  # liability, equity, income
+            if balance <= 0:
+                credit_balance = abs(balance)
+            else:
+                debit_balance = balance
+
+        accounts_data.append({
+            "account": account,
+            "debit": debit_balance,
+            "credit": credit_balance,
+        })
+
+        total_debit += debit_balance
+        total_credit += credit_balance
+
+    return {
+        "accounts": accounts_data,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "is_balanced": abs(total_debit - total_credit) < Decimal("0.01"),
+        "as_of_date": as_of_date,
+    }
+
+
+def get_balance_sheet_data(db, as_of_date: Optional[datetime] = None) -> dict:
+    """Calculate balance sheet data."""
+    if not as_of_date:
+        as_of_date = datetime.utcnow()
+
+    def get_section_data(root_type: str) -> list:
+        accounts = db.query(Account).filter(
+            Account.is_group == False,
+            Account.root_type == root_type,
+        ).order_by(Account.account_number, Account.account_name).all()
+
+        result = []
+        for account in accounts:
+            debit_sum = db.query(func.sum(GLEntry.debit)).filter(
+                GLEntry.account == account.account_name,
+                GLEntry.is_cancelled == False,
+                GLEntry.posting_date <= as_of_date,
+            ).scalar() or Decimal("0")
+
+            credit_sum = db.query(func.sum(GLEntry.credit)).filter(
+                GLEntry.account == account.account_name,
+                GLEntry.is_cancelled == False,
+                GLEntry.posting_date <= as_of_date,
+            ).scalar() or Decimal("0")
+
+            balance = debit_sum - credit_sum
+            if root_type in ['liability', 'equity']:
+                balance = -balance  # These normally have credit balances
+
+            if balance != 0:
+                result.append({
+                    "account": account,
+                    "balance": balance,
+                })
+
+        return result
+
+    assets = get_section_data("asset")
+    liabilities = get_section_data("liability")
+    equity = get_section_data("equity")
+
+    # Calculate net income (revenue - expenses) for retained earnings
+    income_sum = db.query(func.sum(GLEntry.credit) - func.sum(GLEntry.debit)).filter(
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date <= as_of_date,
+        GLEntry.account.in_(
+            db.query(Account.account_name).filter(Account.root_type == "income")
+        )
+    ).scalar() or Decimal("0")
+
+    expense_sum = db.query(func.sum(GLEntry.debit) - func.sum(GLEntry.credit)).filter(
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date <= as_of_date,
+        GLEntry.account.in_(
+            db.query(Account.account_name).filter(Account.root_type == "expense")
+        )
+    ).scalar() or Decimal("0")
+
+    net_income = income_sum - expense_sum
+
+    total_assets = sum(a["balance"] for a in assets)
+    total_liabilities = sum(l["balance"] for l in liabilities)
+    total_equity = sum(e["balance"] for e in equity) + net_income
+
+    return {
+        "assets": assets,
+        "liabilities": liabilities,
+        "equity": equity,
+        "net_income": net_income,
+        "total_assets": total_assets,
+        "total_liabilities": total_liabilities,
+        "total_equity": total_equity,
+        "is_balanced": abs(total_assets - (total_liabilities + total_equity)) < Decimal("0.01"),
+        "as_of_date": as_of_date,
+    }
+
+
+def get_income_statement_data(db, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None) -> dict:
+    """Calculate income statement (P&L) data."""
+    now = datetime.utcnow()
+    if not end_date:
+        end_date = now
+    if not start_date:
+        start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    def get_section_data(root_type: str) -> list:
+        accounts = db.query(Account).filter(
+            Account.is_group == False,
+            Account.root_type == root_type,
+        ).order_by(Account.account_number, Account.account_name).all()
+
+        result = []
+        for account in accounts:
+            debit_sum = db.query(func.sum(GLEntry.debit)).filter(
+                GLEntry.account == account.account_name,
+                GLEntry.is_cancelled == False,
+                GLEntry.posting_date >= start_date,
+                GLEntry.posting_date <= end_date,
+            ).scalar() or Decimal("0")
+
+            credit_sum = db.query(func.sum(GLEntry.credit)).filter(
+                GLEntry.account == account.account_name,
+                GLEntry.is_cancelled == False,
+                GLEntry.posting_date >= start_date,
+                GLEntry.posting_date <= end_date,
+            ).scalar() or Decimal("0")
+
+            if root_type == "income":
+                balance = credit_sum - debit_sum
+            else:  # expense
+                balance = debit_sum - credit_sum
+
+            if balance != 0:
+                result.append({
+                    "account": account,
+                    "balance": balance,
+                })
+
+        return result
+
+    income = get_section_data("income")
+    expenses = get_section_data("expense")
+
+    total_income = sum(i["balance"] for i in income)
+    total_expenses = sum(e["balance"] for e in expenses)
+    net_income = total_income - total_expenses
+
+    return {
+        "income": income,
+        "expenses": expenses,
+        "total_income": total_income,
+        "total_expenses": total_expenses,
+        "net_income": net_income,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+
+
+@router.get("/reports/trial-balance", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def trial_balance_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    as_of: Optional[str] = Query(None, description="As of date"),
+):
+    """Trial Balance report."""
+    as_of_date = None
+    if as_of:
+        try:
+            as_of_date = datetime.strptime(as_of, "%Y-%m-%d")
+        except ValueError:
+            pass
+
+    data = get_trial_balance_data(db, as_of_date)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Reports", "href": "/accounting/reports/trial-balance"},
+        {"label": "Trial Balance", "href": "/accounting/reports/trial-balance", "current": True},
+    ])
+    context.update(data)
+    context["as_of_param"] = as_of or ""
+
+    template = templates.get_template("modules/accounting/templates/reports/pages/trial_balance.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/reports/balance-sheet", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def balance_sheet_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    as_of: Optional[str] = Query(None, description="As of date"),
+):
+    """Balance Sheet report."""
+    as_of_date = None
+    if as_of:
+        try:
+            as_of_date = datetime.strptime(as_of, "%Y-%m-%d")
+        except ValueError:
+            pass
+
+    data = get_balance_sheet_data(db, as_of_date)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Reports", "href": "/accounting/reports/trial-balance"},
+        {"label": "Balance Sheet", "href": "/accounting/reports/balance-sheet", "current": True},
+    ])
+    context.update(data)
+    context["as_of_param"] = as_of or ""
+
+    template = templates.get_template("modules/accounting/templates/reports/pages/balance_sheet.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/reports/income-statement", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def income_statement_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    start: Optional[str] = Query(None, description="Start date"),
+    end: Optional[str] = Query(None, description="End date"),
+):
+    """Income Statement (Profit & Loss) report."""
+    start_date = None
+    end_date = None
+
+    if start:
+        try:
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+        except ValueError:
+            pass
+    if end:
+        try:
+            end_date = datetime.strptime(end, "%Y-%m-%d")
+        except ValueError:
+            pass
+
+    data = get_income_statement_data(db, start_date, end_date)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Reports", "href": "/accounting/reports/trial-balance"},
+        {"label": "Income Statement", "href": "/accounting/reports/income-statement", "current": True},
+    ])
+    context.update(data)
+    context["start_param"] = start or ""
+    context["end_param"] = end or ""
+
+    template = templates.get_template("modules/accounting/templates/reports/pages/income_statement.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/reports/cash-flow", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def cash_flow_report(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    start: Optional[str] = Query(None, description="Start date"),
+    end: Optional[str] = Query(None, description="End date"),
+):
+    """Cash Flow Statement report."""
+    now = datetime.utcnow()
+    start_date = None
+    end_date = None
+
+    if start:
+        try:
+            start_date = datetime.strptime(start, "%Y-%m-%d")
+        except ValueError:
+            pass
+    if end:
+        try:
+            end_date = datetime.strptime(end, "%Y-%m-%d")
+        except ValueError:
+            pass
+
+    if not end_date:
+        end_date = now
+    if not start_date:
+        start_date = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    # Simplified cash flow - in a real implementation, you'd categorize accounts
+    # Get cash/bank accounts
+    cash_accounts = db.query(Account).filter(
+        Account.is_group == False,
+        Account.root_type == "asset",
+        or_(
+            Account.account_type.ilike("%cash%"),
+            Account.account_type.ilike("%bank%"),
+            Account.account_name.ilike("%cash%"),
+            Account.account_name.ilike("%bank%"),
+        )
+    ).all()
+
+    cash_account_names = [a.account_name for a in cash_accounts]
+
+    # Opening cash balance
+    opening_debit = db.query(func.sum(GLEntry.debit)).filter(
+        GLEntry.account.in_(cash_account_names),
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date < start_date,
+    ).scalar() or Decimal("0")
+
+    opening_credit = db.query(func.sum(GLEntry.credit)).filter(
+        GLEntry.account.in_(cash_account_names),
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date < start_date,
+    ).scalar() or Decimal("0")
+
+    opening_balance = opening_debit - opening_credit
+
+    # Period cash movement
+    period_debit = db.query(func.sum(GLEntry.debit)).filter(
+        GLEntry.account.in_(cash_account_names),
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date >= start_date,
+        GLEntry.posting_date <= end_date,
+    ).scalar() or Decimal("0")
+
+    period_credit = db.query(func.sum(GLEntry.credit)).filter(
+        GLEntry.account.in_(cash_account_names),
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date >= start_date,
+        GLEntry.posting_date <= end_date,
+    ).scalar() or Decimal("0")
+
+    net_cash_flow = period_debit - period_credit
+    closing_balance = opening_balance + net_cash_flow
+
+    # Get cash transactions for the period
+    cash_transactions = db.query(GLEntry).filter(
+        GLEntry.account.in_(cash_account_names),
+        GLEntry.is_cancelled == False,
+        GLEntry.posting_date >= start_date,
+        GLEntry.posting_date <= end_date,
+    ).order_by(GLEntry.posting_date.desc()).limit(50).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Reports", "href": "/accounting/reports/trial-balance"},
+        {"label": "Cash Flow", "href": "/accounting/reports/cash-flow", "current": True},
+    ])
+    context["cash_accounts"] = cash_accounts
+    context["opening_balance"] = opening_balance
+    context["cash_inflows"] = period_debit
+    context["cash_outflows"] = period_credit
+    context["net_cash_flow"] = net_cash_flow
+    context["closing_balance"] = closing_balance
+    context["transactions"] = cash_transactions
+    context["start_date"] = start_date
+    context["end_date"] = end_date
+    context["start_param"] = start or ""
+    context["end_param"] = end or ""
+
+    template = templates.get_template("modules/accounting/templates/reports/pages/cash_flow.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# BANK ACCOUNTS
+# =============================================================================
+
+def get_bank_account_stats(db) -> dict:
+    """Calculate bank account statistics."""
+    total_count = db.query(func.count(BankAccount.id)).filter(
+        BankAccount.disabled == False
+    ).scalar() or 0
+
+    # Transaction counts
+    unreconciled = db.query(func.count(BankTransaction.id)).filter(
+        BankTransaction.status == BankTransactionStatus.UNRECONCILED
+    ).scalar() or 0
+
+    pending = db.query(func.count(BankTransaction.id)).filter(
+        BankTransaction.status == BankTransactionStatus.PENDING
+    ).scalar() or 0
+
+    return {
+        "total_accounts": total_count,
+        "unreconciled_txns": unreconciled,
+        "pending_txns": pending,
+    }
+
+
+@router.get("/bank-accounts", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def bank_accounts_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Bank accounts list page."""
+    query = db.query(BankAccount).filter(BankAccount.disabled == False)
+
+    if q:
+        query = query.filter(
+            or_(
+                BankAccount.account_name.ilike(f"%{q}%"),
+                BankAccount.bank.ilike(f"%{q}%"),
+                BankAccount.bank_account_no.ilike(f"%{q}%"),
+            )
+        )
+
+    total = query.count()
+    query = query.order_by(BankAccount.account_name)
+    accounts = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    stats = get_bank_account_stats(db)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Bank Accounts", "href": "/accounting/bank-accounts", "current": True},
+    ])
+    context["accounts"] = accounts
+    context["search_query"] = q or ""
+    context["stats"] = stats
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/bank_accounts/partials/bank_accounts_table.html")
+    else:
+        template = templates.get_template("modules/accounting/templates/bank_accounts/pages/list.html")
+
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/bank-accounts/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def bank_accounts_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Bank accounts table partial for HTMX."""
+    query = db.query(BankAccount).filter(BankAccount.disabled == False)
+
+    if q:
+        query = query.filter(
+            or_(
+                BankAccount.account_name.ilike(f"%{q}%"),
+                BankAccount.bank.ilike(f"%{q}%"),
+                BankAccount.bank_account_no.ilike(f"%{q}%"),
+            )
+        )
+
+    total = query.count()
+    query = query.order_by(BankAccount.account_name)
+    accounts = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["accounts"] = accounts
+    context["search_query"] = q or ""
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/bank_accounts/partials/bank_accounts_table.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/bank-accounts/{account_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def bank_account_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+    status: Optional[str] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """Bank account detail page with transactions."""
+    account = db.query(BankAccount).filter(BankAccount.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    # Get transactions
+    txn_query = db.query(BankTransaction).filter(
+        or_(
+            BankTransaction.bank_account_id == account_id,
+            BankTransaction.bank_account == account.account_name,
+        )
+    )
+
+    if status:
+        try:
+            txn_status = BankTransactionStatus(status)
+            txn_query = txn_query.filter(BankTransaction.status == txn_status)
+        except ValueError:
+            pass
+
+    total_txns = txn_query.count()
+    txn_query = txn_query.order_by(BankTransaction.date.desc())
+    transactions = txn_query.offset((page - 1) * per_page).limit(per_page).all()
+
+    # Calculate balance
+    total_deposits = db.query(func.sum(BankTransaction.deposit)).filter(
+        or_(
+            BankTransaction.bank_account_id == account_id,
+            BankTransaction.bank_account == account.account_name,
+        )
+    ).scalar() or Decimal("0")
+
+    total_withdrawals = db.query(func.sum(BankTransaction.withdrawal)).filter(
+        or_(
+            BankTransaction.bank_account_id == account_id,
+            BankTransaction.bank_account == account.account_name,
+        )
+    ).scalar() or Decimal("0")
+
+    balance = total_deposits - total_withdrawals
+
+    # Status options
+    status_options = [{"value": s.value, "label": s.value.replace("_", " ").title()} for s in BankTransactionStatus]
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Bank Accounts", "href": "/accounting/bank-accounts"},
+        {"label": account.account_name, "href": f"/accounting/bank-accounts/{account_id}", "current": True},
+    ])
+    context["account"] = account
+    context["transactions"] = transactions
+    context["total_deposits"] = total_deposits
+    context["total_withdrawals"] = total_withdrawals
+    context["balance"] = balance
+    context["current_status"] = status or ""
+    context["status_options"] = status_options
+    context["pagination"] = build_pagination_context(page, per_page, total_txns)
+
+    template = templates.get_template("modules/accounting/templates/bank_accounts/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/bank-accounts/{account_id}/reconcile", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def bank_reconciliation_page(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+):
+    """Bank reconciliation interface."""
+    account = db.query(BankAccount).filter(BankAccount.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    # Get unreconciled transactions
+    unreconciled_txns = db.query(BankTransaction).filter(
+        or_(
+            BankTransaction.bank_account_id == account_id,
+            BankTransaction.bank_account == account.account_name,
+        ),
+        BankTransaction.status.in_([BankTransactionStatus.UNRECONCILED, BankTransactionStatus.PENDING])
+    ).order_by(BankTransaction.date.desc()).limit(100).all()
+
+    # Get recent reconciliations
+    reconciliations = db.query(BankReconciliation).filter(
+        BankReconciliation.bank_account == account.account_name
+    ).order_by(BankReconciliation.to_date.desc()).limit(10).all()
+
+    # Calculate totals
+    unreconciled_deposits = sum(t.deposit or Decimal("0") for t in unreconciled_txns)
+    unreconciled_withdrawals = sum(t.withdrawal or Decimal("0") for t in unreconciled_txns)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Bank Accounts", "href": "/accounting/bank-accounts"},
+        {"label": account.account_name, "href": f"/accounting/bank-accounts/{account_id}"},
+        {"label": "Reconcile", "href": f"/accounting/bank-accounts/{account_id}/reconcile", "current": True},
+    ])
+    context["account"] = account
+    context["unreconciled_txns"] = unreconciled_txns
+    context["reconciliations"] = reconciliations
+    context["unreconciled_deposits"] = unreconciled_deposits
+    context["unreconciled_withdrawals"] = unreconciled_withdrawals
+
+    template = templates.get_template("modules/accounting/templates/bank_accounts/pages/reconcile.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/bank-accounts/{account_id}/reconcile", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def bank_reconciliation_mark(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    account_id: int,
+):
+    """Mark selected transactions as reconciled."""
+    account = db.query(BankAccount).filter(BankAccount.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Bank account not found")
+
+    form = await request.form()
+    txn_ids = form.getlist("transaction_ids")
+
+    if not txn_ids:
+        set_flash(response, "No transactions selected.", "warning")
+        return RedirectResponse(url=f"/accounting/bank-accounts/{account_id}/reconcile", status_code=303)
+
+    # Mark transactions as reconciled
+    count = 0
+    for txn_id in txn_ids:
+        try:
+            txn = db.query(BankTransaction).filter(BankTransaction.id == int(txn_id)).first()
+            if txn:
+                txn.status = BankTransactionStatus.RECONCILED
+                count += 1
+        except ValueError:
+            pass
+
+    db.commit()
+    set_flash(response, f"Marked {count} transaction(s) as reconciled.", "success")
+    return RedirectResponse(url=f"/accounting/bank-accounts/{account_id}/reconcile", status_code=303)
+
+
+# =============================================================================
+# FISCAL PERIODS
+# =============================================================================
+
+def get_fiscal_period_stats(db) -> dict:
+    """Calculate fiscal period statistics."""
+    now = datetime.utcnow().date()
+
+    total_periods = db.query(func.count(FiscalPeriod.id)).scalar() or 0
+    open_periods = db.query(func.count(FiscalPeriod.id)).filter(
+        FiscalPeriod.status == FiscalPeriodStatus.OPEN
+    ).scalar() or 0
+    closed_periods = db.query(func.count(FiscalPeriod.id)).filter(
+        FiscalPeriod.status.in_([FiscalPeriodStatus.SOFT_CLOSED, FiscalPeriodStatus.HARD_CLOSED])
+    ).scalar() or 0
+
+    # Current period
+    current_period = db.query(FiscalPeriod).filter(
+        FiscalPeriod.start_date <= now,
+        FiscalPeriod.end_date >= now,
+    ).first()
+
+    return {
+        "total_periods": total_periods,
+        "open_periods": open_periods,
+        "closed_periods": closed_periods,
+        "current_period": current_period,
+    }
+
+
+@router.get("/fiscal-periods", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def fiscal_periods_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    year: Optional[str] = Query(None, description="Filter by fiscal year"),
+    status: Optional[str] = Query(None, description="Filter by status"),
+):
+    """Fiscal periods list page."""
+    query = db.query(FiscalPeriod).options(selectinload(FiscalPeriod.fiscal_year))
+
+    # Filter by year
+    if year:
+        fiscal_year = db.query(FiscalYear).filter(FiscalYear.year == year).first()
+        if fiscal_year:
+            query = query.filter(FiscalPeriod.fiscal_year_id == fiscal_year.id)
+
+    # Filter by status
+    if status:
+        try:
+            period_status = FiscalPeriodStatus(status)
+            query = query.filter(FiscalPeriod.status == period_status)
+        except ValueError:
+            pass
+
+    periods = query.order_by(FiscalPeriod.start_date.desc()).all()
+
+    # Get fiscal years for filter
+    fiscal_years = db.query(FiscalYear).filter(FiscalYear.disabled == False).order_by(FiscalYear.year.desc()).all()
+    year_options = [{"value": fy.year, "label": fy.year} for fy in fiscal_years]
+
+    # Status options
+    status_options = [{"value": s.value, "label": s.value.replace("_", " ").title()} for s in FiscalPeriodStatus]
+
+    stats = get_fiscal_period_stats(db)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Fiscal Periods", "href": "/accounting/fiscal-periods", "current": True},
+    ])
+    context["periods"] = periods
+    context["year_options"] = year_options
+    context["status_options"] = status_options
+    context["current_year"] = year or ""
+    context["current_status"] = status or ""
+    context["stats"] = stats
+
+    template = templates.get_template("modules/accounting/templates/fiscal_periods/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/fiscal-periods/{period_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def fiscal_period_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    period_id: int,
+):
+    """Fiscal period detail page."""
+    period = db.query(FiscalPeriod).options(
+        selectinload(FiscalPeriod.fiscal_year)
+    ).filter(FiscalPeriod.id == period_id).first()
+
+    if not period:
+        raise HTTPException(status_code=404, detail="Fiscal period not found")
+
+    # Get GL entry counts for this period
+    gl_count = db.query(func.count(GLEntry.id)).filter(
+        GLEntry.posting_date >= period.start_date,
+        GLEntry.posting_date <= period.end_date,
+        GLEntry.is_cancelled == False,
+    ).scalar() or 0
+
+    # Get totals for this period
+    period_debit = db.query(func.sum(GLEntry.debit)).filter(
+        GLEntry.posting_date >= period.start_date,
+        GLEntry.posting_date <= period.end_date,
+        GLEntry.is_cancelled == False,
+    ).scalar() or Decimal("0")
+
+    period_credit = db.query(func.sum(GLEntry.credit)).filter(
+        GLEntry.posting_date >= period.start_date,
+        GLEntry.posting_date <= period.end_date,
+        GLEntry.is_cancelled == False,
+    ).scalar() or Decimal("0")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Fiscal Periods", "href": "/accounting/fiscal-periods"},
+        {"label": period.period_name, "href": f"/accounting/fiscal-periods/{period_id}", "current": True},
+    ])
+    context["period"] = period
+    context["gl_count"] = gl_count
+    context["period_debit"] = period_debit
+    context["period_credit"] = period_credit
+
+    template = templates.get_template("modules/accounting/templates/fiscal_periods/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/fiscal-periods/{period_id}/close", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def fiscal_period_close(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    period_id: int,
+):
+    """Close a fiscal period (soft close)."""
+    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Fiscal period not found")
+
+    if period.status == FiscalPeriodStatus.HARD_CLOSED:
+        set_flash(response, "This period is permanently closed and cannot be modified.", "error")
+        return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
+
+    period.status = FiscalPeriodStatus.SOFT_CLOSED
+    period.closed_at = datetime.utcnow()
+    period.closed_by_id = user.id
+    db.commit()
+
+    set_flash(response, f"Period {period.period_name} has been closed.", "success")
+    return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
+
+
+@router.post("/fiscal-periods/{period_id}/reopen", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def fiscal_period_reopen(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    period_id: int,
+):
+    """Reopen a soft-closed fiscal period."""
+    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Fiscal period not found")
+
+    if period.status == FiscalPeriodStatus.HARD_CLOSED:
+        set_flash(response, "This period is permanently closed and cannot be reopened.", "error")
+        return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
+
+    if period.status == FiscalPeriodStatus.OPEN:
+        set_flash(response, "This period is already open.", "warning")
+        return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
+
+    period.status = FiscalPeriodStatus.OPEN
+    period.closed_at = None
+    period.closed_by_id = None
+    db.commit()
+
+    set_flash(response, f"Period {period.period_name} has been reopened.", "success")
+    return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
+
+
+# =============================================================================
+# AR/AP AGING
+# =============================================================================
+
+def calculate_aging_buckets(invoices, date_field: str = "due_date") -> dict:
+    """Calculate aging buckets for invoices."""
+    now = datetime.utcnow().date()
+    buckets = {
+        "current": {"count": 0, "amount": Decimal("0")},
+        "1_30": {"count": 0, "amount": Decimal("0")},
+        "31_60": {"count": 0, "amount": Decimal("0")},
+        "61_90": {"count": 0, "amount": Decimal("0")},
+        "over_90": {"count": 0, "amount": Decimal("0")},
+    }
+
+    for inv in invoices:
+        due_date = getattr(inv, date_field, None)
+        balance = getattr(inv, "balance", None) or getattr(inv, "outstanding_amount", None) or Decimal("0")
+
+        if not due_date or balance <= 0:
+            continue
+
+        if isinstance(due_date, datetime):
+            due_date = due_date.date()
+
+        days_overdue = (now - due_date).days
+
+        if days_overdue <= 0:
+            buckets["current"]["count"] += 1
+            buckets["current"]["amount"] += balance
+        elif days_overdue <= 30:
+            buckets["1_30"]["count"] += 1
+            buckets["1_30"]["amount"] += balance
+        elif days_overdue <= 60:
+            buckets["31_60"]["count"] += 1
+            buckets["31_60"]["amount"] += balance
+        elif days_overdue <= 90:
+            buckets["61_90"]["count"] += 1
+            buckets["61_90"]["amount"] += balance
+        else:
+            buckets["over_90"]["count"] += 1
+            buckets["over_90"]["amount"] += balance
+
+    return buckets
+
+
+@router.get("/receivables", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def ar_aging(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Accounts Receivable Aging dashboard."""
+    # Get outstanding invoices
+    outstanding_invoices = db.query(Invoice).filter(
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
+        Invoice.balance > 0,
+    ).order_by(Invoice.due_date).all()
+
+    buckets = calculate_aging_buckets(outstanding_invoices)
+
+    total_outstanding = sum(b["amount"] for b in buckets.values())
+    total_overdue = buckets["1_30"]["amount"] + buckets["31_60"]["amount"] + buckets["61_90"]["amount"] + buckets["over_90"]["amount"]
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Receivables Aging", "href": "/accounting/receivables", "current": True},
+    ])
+    context["invoices"] = outstanding_invoices
+    context["buckets"] = buckets
+    context["total_outstanding"] = total_outstanding
+    context["total_overdue"] = total_overdue
+
+    template = templates.get_template("modules/accounting/templates/aging/pages/ar_aging.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/payables", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def ap_aging(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Accounts Payable Aging dashboard."""
+    # Get outstanding purchase invoices
+    outstanding_bills = db.query(PurchaseInvoice).filter(
+        PurchaseInvoice.status.in_([PurchaseInvoiceStatus.SUBMITTED, PurchaseInvoiceStatus.UNPAID, PurchaseInvoiceStatus.OVERDUE]),
+        PurchaseInvoice.outstanding_amount > 0,
+    ).order_by(PurchaseInvoice.due_date).all()
+
+    buckets = calculate_aging_buckets(outstanding_bills)
+
+    total_outstanding = sum(b["amount"] for b in buckets.values())
+    total_overdue = buckets["1_30"]["amount"] + buckets["31_60"]["amount"] + buckets["61_90"]["amount"] + buckets["over_90"]["amount"]
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Payables Aging", "href": "/accounting/payables", "current": True},
+    ])
+    context["bills"] = outstanding_bills
+    context["buckets"] = buckets
+    context["total_outstanding"] = total_outstanding
+    context["total_overdue"] = total_overdue
+    context["today"] = date.today()
+    context["now_date"] = date.today()
+
+    template = templates.get_template("modules/accounting/templates/aging/pages/ap_aging.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# SUPPLIERS
+# =============================================================================
+
+@router.get("/suppliers", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def suppliers_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search query"),
+    group: Optional[str] = Query(None, description="Supplier group filter"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Suppliers list page."""
+    query = db.query(Supplier).filter(Supplier.disabled == False)
+
+    if q:
+        query = query.filter(
+            or_(
+                Supplier.supplier_name.ilike(f"%{q}%"),
+                Supplier.email_id.ilike(f"%{q}%"),
+                Supplier.tax_id.ilike(f"%{q}%"),
+            )
+        )
+
+    if group:
+        query = query.filter(Supplier.supplier_group == group)
+
+    total = query.count()
+    query = query.order_by(Supplier.supplier_name)
+    suppliers = query.offset((page - 1) * per_page).limit(per_page).all()
+
+    # Stats
+    total_suppliers = db.query(func.count(Supplier.id)).filter(Supplier.disabled == False).scalar() or 0
+    active_suppliers = db.query(func.count(Supplier.id)).filter(
+        Supplier.disabled == False,
+        Supplier.on_hold == False,
+    ).scalar() or 0
+
+    # Calculate total payables and overdue
+    total_payables = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
+        PurchaseInvoice.outstanding_amount > 0,
+    ).scalar() or Decimal("0")
+
+    now = datetime.utcnow().date()
+    total_overdue = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
+        PurchaseInvoice.outstanding_amount > 0,
+        PurchaseInvoice.due_date < now,
+    ).scalar() or Decimal("0")
+
+    # Get unique supplier groups for filter
+    groups = db.query(Supplier.supplier_group).filter(
+        Supplier.supplier_group.isnot(None),
+        Supplier.disabled == False,
+    ).distinct().all()
+    group_options = [{"value": g[0], "label": g[0]} for g in groups if g[0]]
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Suppliers", "href": "/accounting/suppliers", "current": True},
+    ])
+    context["suppliers"] = suppliers
+    context["current_search"] = q or ""
+    context["current_group"] = group or ""
+    context["group_options"] = group_options
+    context["stats"] = {
+        "total_suppliers": total_suppliers,
+        "active_suppliers": active_suppliers,
+        "total_payables": total_payables,
+        "total_overdue": total_overdue,
+    }
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/suppliers/partials/suppliers_table.html")
+    else:
+        template = templates.get_template("modules/accounting/templates/suppliers/pages/list.html")
+
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/suppliers/{supplier_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def supplier_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    supplier_id: int,
+):
+    """Supplier detail page."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    # Get purchase invoices for this supplier
+    invoices = db.query(PurchaseInvoice).filter(
+        PurchaseInvoice.supplier == supplier.supplier_name,
+        ).order_by(PurchaseInvoice.posting_date.desc()).limit(20).all()
+
+    # Calculate outstanding
+    outstanding = db.query(func.sum(PurchaseInvoice.outstanding_amount)).filter(
+        PurchaseInvoice.supplier == supplier.supplier_name,
+        PurchaseInvoice.outstanding_amount > 0,
+    ).scalar() or Decimal("0")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Suppliers", "href": "/accounting/suppliers"},
+        {"label": supplier.supplier_name, "href": f"/accounting/suppliers/{supplier_id}", "current": True},
+    ])
+    context["supplier"] = supplier
+    context["bills"] = invoices
+    context["stats"] = {
+        "total_bills": len(invoices),
+        "total_billed": sum((inv.grand_total or Decimal("0")) for inv in invoices),
+        "total_paid": sum(((inv.grand_total or Decimal("0")) - (inv.outstanding_amount or Decimal("0"))) for inv in invoices),
+        "outstanding": outstanding,
+    }
+
+    template = templates.get_template("modules/accounting/templates/suppliers/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# SUPPLIER MANAGEMENT - CREATE/EDIT
+# =============================================================================
+
+
+def get_supplier_group_options(db) -> list:
+    """Get unique supplier groups for filter dropdown."""
+    groups = db.query(Supplier.supplier_group).filter(
+        Supplier.supplier_group.isnot(None),
+        Supplier.disabled == False,
+    ).distinct().all()
+    return [{"value": g[0], "label": g[0]} for g in groups if g[0]]
+
+
+def get_currency_options() -> list:
+    """Get common currency options."""
+    return [
+        {"value": "USD", "label": "USD - US Dollar"},
+        {"value": "EUR", "label": "EUR - Euro"},
+        {"value": "GBP", "label": "GBP - British Pound"},
+        {"value": "CAD", "label": "CAD - Canadian Dollar"},
+        {"value": "AUD", "label": "AUD - Australian Dollar"},
+        {"value": "JPY", "label": "JPY - Japanese Yen"},
+        {"value": "CHF", "label": "CHF - Swiss Franc"},
+        {"value": "CNY", "label": "CNY - Chinese Yuan"},
+        {"value": "INR", "label": "INR - Indian Rupee"},
+        {"value": "PHP", "label": "PHP - Philippine Peso"},
+    ]
+
+
+@router.get("/suppliers/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def suppliers_table_partial(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    group: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Suppliers table HTMX partial."""
+    query = db.query(Supplier).filter(Supplier.disabled == False)
+
+    if q:
+        query = query.filter(
+            or_(
+                Supplier.supplier_name.ilike(f"%{q}%"),
+                Supplier.email_id.ilike(f"%{q}%"),
+                Supplier.tax_id.ilike(f"%{q}%"),
+            )
+        )
+
+    if group:
+        query = query.filter(Supplier.supplier_group == group)
+
+    total = query.count()
+    suppliers = query.order_by(Supplier.supplier_name).offset((page - 1) * per_page).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["suppliers"] = suppliers
+    context["current_search"] = q
+    context["current_group"] = group
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/suppliers/partials/suppliers_table.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/suppliers/new", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def supplier_new_form(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New supplier form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Suppliers", "href": "/accounting/suppliers"},
+        {"label": "New Supplier", "href": "/accounting/suppliers/new", "current": True},
+    ])
+    context["group_options"] = get_supplier_group_options(db)
+    context["currency_options"] = get_currency_options()
+
+    template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/suppliers", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def supplier_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create new supplier."""
+    form = await request.form()
+    validate_csrf(form.get("csrf_token"), csrf_token)
+
+    errors = {}
+    if not form.get("supplier_name"):
+        errors["supplier_name"] = "Supplier name is required"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/invoices"},
+            {"label": "Suppliers", "href": "/accounting/suppliers"},
+            {"label": "New Supplier", "href": "/accounting/suppliers/new", "current": True},
+        ])
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["group_options"] = get_supplier_group_options(db)
+        context["currency_options"] = get_currency_options()
+        template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    supplier = Supplier(
+        supplier_name=form.get("supplier_name"),
+        supplier_group=form.get("supplier_group") or None,
+        tax_id=form.get("tax_id") or None,
+        email_id=form.get("email_id") or None,
+        mobile_no=form.get("mobile_no") or None,
+        country=form.get("country") or None,
+        default_currency=form.get("default_currency") or None,
+        payment_terms=form.get("payment_terms") or None,
+    )
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+
+    set_flash(response, "Supplier created successfully", "success")
+    return RedirectResponse(url=f"/accounting/suppliers/{supplier.id}", status_code=303)
+
+
+@router.get("/suppliers/{supplier_id}/edit", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def supplier_edit_form(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    supplier_id: int,
+):
+    """Edit supplier form."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Suppliers", "href": "/accounting/suppliers"},
+        {"label": supplier.supplier_name, "href": f"/accounting/suppliers/{supplier_id}"},
+        {"label": "Edit", "href": f"/accounting/suppliers/{supplier_id}/edit", "current": True},
+    ])
+    context["supplier"] = supplier
+    context["group_options"] = get_supplier_group_options(db)
+    context["currency_options"] = get_currency_options()
+
+    template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/suppliers/{supplier_id}", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def supplier_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    supplier_id: int,
+):
+    """Update supplier."""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    form = await request.form()
+    validate_csrf(form.get("csrf_token"), csrf_token)
+
+    errors = {}
+    if not form.get("supplier_name"):
+        errors["supplier_name"] = "Supplier name is required"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/invoices"},
+            {"label": "Suppliers", "href": "/accounting/suppliers"},
+            {"label": supplier.supplier_name, "href": f"/accounting/suppliers/{supplier_id}"},
+            {"label": "Edit", "href": f"/accounting/suppliers/{supplier_id}/edit", "current": True},
+        ])
+        context["supplier"] = supplier
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["group_options"] = get_supplier_group_options(db)
+        context["currency_options"] = get_currency_options()
+        template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    supplier.supplier_name = form.get("supplier_name")
+    supplier.supplier_group = form.get("supplier_group") or None
+    supplier.tax_id = form.get("tax_id") or None
+    supplier.email_id = form.get("email_id") or None
+    supplier.mobile_no = form.get("mobile_no") or None
+    supplier.country = form.get("country") or None
+    supplier.default_currency = form.get("default_currency") or None
+    supplier.payment_terms = form.get("payment_terms") or None
+    db.commit()
+
+    set_flash(response, "Supplier updated successfully", "success")
+    return RedirectResponse(url=f"/accounting/suppliers/{supplier_id}", status_code=303)
+
+
+# =============================================================================
+# COST CENTERS
+# =============================================================================
+
+
+def get_cost_center_stats(db) -> dict:
+    """Calculate cost center statistics."""
+    total = db.query(func.count(CostCenter.id)).scalar() or 0
+    active = db.query(func.count(CostCenter.id)).filter(CostCenter.disabled == False).scalar() or 0
+    inactive = total - active
+    return {
+        "total": total,
+        "active": active,
+        "inactive": inactive,
+    }
+
+
+def get_parent_cost_center_options(db, exclude_id: Optional[int] = None) -> list:
+    """Get cost centers that can be parents (groups)."""
+    query = db.query(CostCenter).filter(
+        CostCenter.disabled == False,
+        CostCenter.is_group == True,
+    )
+    if exclude_id:
+        query = query.filter(CostCenter.id != exclude_id)
+    centers = query.order_by(CostCenter.cost_center_name).all()
+    return [{"value": str(cc.id), "label": cc.cost_center_name} for cc in centers]
+
+
+@router.get("/cost-centers", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def cost_centers_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Cost centers list page."""
+    query = db.query(CostCenter)
+
+    if q:
+        query = query.filter(
+            or_(
+                CostCenter.cost_center_name.ilike(f"%{q}%"),
+                CostCenter.cost_center_number.ilike(f"%{q}%"),
+            )
+        )
+
+    total = query.count()
+    cost_centers = query.order_by(CostCenter.cost_center_name).offset((page - 1) * per_page).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Cost Centers", "href": "/accounting/cost-centers", "current": True},
+    ])
+    context["cost_centers"] = cost_centers
+    context["stats"] = get_cost_center_stats(db)
+    context["current_search"] = q
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/cost_centers/partials/cost_centers_table.html")
+    else:
+        template = templates.get_template("modules/accounting/templates/cost_centers/pages/list.html")
+
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/cost-centers/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def cost_centers_table_partial(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Cost centers table HTMX partial."""
+    query = db.query(CostCenter)
+
+    if q:
+        query = query.filter(
+            or_(
+                CostCenter.cost_center_name.ilike(f"%{q}%"),
+                CostCenter.cost_center_number.ilike(f"%{q}%"),
+            )
+        )
+
+    total = query.count()
+    cost_centers = query.order_by(CostCenter.cost_center_name).offset((page - 1) * per_page).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["cost_centers"] = cost_centers
+    context["current_search"] = q
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/cost_centers/partials/cost_centers_table.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/cost-centers/new", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def cost_center_new_form(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New cost center form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Cost Centers", "href": "/accounting/cost-centers"},
+        {"label": "New Cost Center", "href": "/accounting/cost-centers/new", "current": True},
+    ])
+    context["parent_options"] = get_parent_cost_center_options(db)
+
+    template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/cost-centers", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def cost_center_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create new cost center."""
+    form = await request.form()
+    validate_csrf(form.get("csrf_token"), csrf_token)
+
+    errors = {}
+    if not form.get("cost_center_name"):
+        errors["cost_center_name"] = "Cost center name is required"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/invoices"},
+            {"label": "Cost Centers", "href": "/accounting/cost-centers"},
+            {"label": "New Cost Center", "href": "/accounting/cost-centers/new", "current": True},
+        ])
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["parent_options"] = get_parent_cost_center_options(db)
+        template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Get parent name if parent_id provided
+    parent_name = None
+    if form.get("parent_id"):
+        parent = db.query(CostCenter).filter(CostCenter.id == int(form.get("parent_id"))).first()
+        if parent:
+            parent_name = parent.cost_center_name
+
+    cost_center = CostCenter(
+        cost_center_name=form.get("cost_center_name"),
+        cost_center_number=form.get("cost_center_code") or None,
+        parent_cost_center=parent_name,
+        disabled=not bool(form.get("is_active")),
+    )
+    db.add(cost_center)
+    db.commit()
+    db.refresh(cost_center)
+
+    set_flash(response, "Cost center created successfully", "success")
+    return RedirectResponse(url="/accounting/cost-centers", status_code=303)
+
+
+@router.get("/cost-centers/{cc_id}/edit", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def cost_center_edit_form(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    cc_id: int,
+):
+    """Edit cost center form."""
+    cost_center = db.query(CostCenter).filter(CostCenter.id == cc_id).first()
+    if not cost_center:
+        raise HTTPException(status_code=404, detail="Cost center not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Cost Centers", "href": "/accounting/cost-centers"},
+        {"label": "Edit", "href": f"/accounting/cost-centers/{cc_id}/edit", "current": True},
+    ])
+    context["cost_center"] = cost_center
+    context["parent_options"] = get_parent_cost_center_options(db, exclude_id=cc_id)
+
+    template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/cost-centers/{cc_id}", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def cost_center_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    cc_id: int,
+):
+    """Update cost center."""
+    cost_center = db.query(CostCenter).filter(CostCenter.id == cc_id).first()
+    if not cost_center:
+        raise HTTPException(status_code=404, detail="Cost center not found")
+
+    form = await request.form()
+    validate_csrf(form.get("csrf_token"), csrf_token)
+
+    errors = {}
+    if not form.get("cost_center_name"):
+        errors["cost_center_name"] = "Cost center name is required"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Accounting", "href": "/accounting/invoices"},
+            {"label": "Cost Centers", "href": "/accounting/cost-centers"},
+            {"label": "Edit", "href": f"/accounting/cost-centers/{cc_id}/edit", "current": True},
+        ])
+        context["cost_center"] = cost_center
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        context["parent_options"] = get_parent_cost_center_options(db, exclude_id=cc_id)
+        template = templates.get_template("modules/accounting/templates/cost_centers/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Get parent name if parent_id provided
+    parent_name = None
+    if form.get("parent_id"):
+        parent = db.query(CostCenter).filter(CostCenter.id == int(form.get("parent_id"))).first()
+        if parent:
+            parent_name = parent.cost_center_name
+
+    cost_center.cost_center_name = form.get("cost_center_name")
+    cost_center.cost_center_number = form.get("cost_center_code") or None
+    cost_center.parent_cost_center = parent_name
+    cost_center.disabled = not bool(form.get("is_active"))
+    db.commit()
+
+    set_flash(response, "Cost center updated successfully", "success")
+    return RedirectResponse(url="/accounting/cost-centers", status_code=303)
+
+
+# =============================================================================
+# AUDIT LOG
+# =============================================================================
+
+
+def get_audit_doc_type_options() -> list:
+    """Get document type options for audit log filter."""
+    return [
+        {"value": "JournalEntry", "label": "Journal Entry"},
+        {"value": "Invoice", "label": "Invoice"},
+        {"value": "Payment", "label": "Payment"},
+        {"value": "PurchaseInvoice", "label": "Purchase Invoice"},
+        {"value": "BankTransaction", "label": "Bank Transaction"},
+        {"value": "BankReconciliation", "label": "Bank Reconciliation"},
+        {"value": "Account", "label": "Account"},
+        {"value": "FiscalPeriod", "label": "Fiscal Period"},
+    ]
+
+
+def get_audit_action_options() -> list:
+    """Get action options for audit log filter."""
+    return [
+        {"value": action.value, "label": action.value.replace("_", " ").title()}
+        for action in AuditAction
+    ]
+
+
+@router.get("/audit-log", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def audit_log_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    doc_type: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """Audit log list page."""
+    query = db.query(AuditLog)
+
+    if q:
+        query = query.filter(
+            or_(
+                AuditLog.document_name.ilike(f"%{q}%"),
+                AuditLog.user_name.ilike(f"%{q}%"),
+                AuditLog.user_email.ilike(f"%{q}%"),
+            )
+        )
+
+    if doc_type:
+        query = query.filter(AuditLog.doctype == doc_type)
+
+    if action:
+        query = query.filter(AuditLog.action == AuditAction(action))
+
+    if date_from:
+        try:
+            from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(AuditLog.timestamp >= from_dt)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+            to_dt = to_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(AuditLog.timestamp <= to_dt)
+        except ValueError:
+            pass
+
+    total = query.count()
+    entries = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * per_page).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting/invoices"},
+        {"label": "Audit Log", "href": "/accounting/audit-log", "current": True},
+    ])
+    context["entries"] = entries
+    context["current_search"] = q
+    context["current_doc_type"] = doc_type
+    context["current_action"] = action
+    context["current_date_from"] = date_from
+    context["current_date_to"] = date_to
+    context["doc_type_options"] = get_audit_doc_type_options()
+    context["action_options"] = get_audit_action_options()
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    if is_htmx_request(request):
+        template = templates.get_template("modules/accounting/templates/audit_log/partials/audit_log_table.html")
+    else:
+        template = templates.get_template("modules/accounting/templates/audit_log/pages/list.html")
+
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/audit-log/table", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+async def audit_log_table_partial(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    doc_type: Optional[str] = Query(None),
+    action: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """Audit log table HTMX partial."""
+    query = db.query(AuditLog)
+
+    if q:
+        query = query.filter(
+            or_(
+                AuditLog.document_name.ilike(f"%{q}%"),
+                AuditLog.user_name.ilike(f"%{q}%"),
+                AuditLog.user_email.ilike(f"%{q}%"),
+            )
+        )
+
+    if doc_type:
+        query = query.filter(AuditLog.doctype == doc_type)
+
+    if action:
+        query = query.filter(AuditLog.action == AuditAction(action))
+
+    if date_from:
+        try:
+            from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(AuditLog.timestamp >= from_dt)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+            to_dt = to_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(AuditLog.timestamp <= to_dt)
+        except ValueError:
+            pass
+
+    total = query.count()
+    entries = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * per_page).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["entries"] = entries
+    context["current_search"] = q
+    context["current_doc_type"] = doc_type
+    context["current_action"] = action
+    context["current_date_from"] = date_from
+    context["current_date_to"] = date_to
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/audit_log/partials/audit_log_table.html")
+    return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# PHASE 14: APPROVAL WORKFLOWS
+# =============================================================================
+
+def get_approval_doctype_options():
+    """Get document type options for approval workflows."""
+    return [
+        {"value": "journal_entry", "label": "Journal Entry"},
+        {"value": "expense", "label": "Expense"},
+        {"value": "payment", "label": "Payment"},
+        {"value": "supplier_payment", "label": "Supplier Payment"},
+        {"value": "invoice", "label": "Invoice"},
+        {"value": "purchase_invoice", "label": "Purchase Invoice"},
+        {"value": "credit_note", "label": "Credit Note"},
+        {"value": "debit_note", "label": "Debit Note"},
+        {"value": "bank_transaction", "label": "Bank Transaction"},
+    ]
+
+
+def get_approval_stats(db, user_id: int) -> dict:
+    """Get approval statistics for dashboard."""
+    from datetime import date
+    today = date.today()
+
+    pending = db.query(func.count(DocumentApproval.id)).filter(
+        DocumentApproval.status == ApprovalStatus.PENDING
+    ).scalar() or 0
+
+    approved_today = db.query(func.count(DocumentApproval.id)).filter(
+        DocumentApproval.status == ApprovalStatus.APPROVED,
+        func.date(DocumentApproval.approved_at) == today
+    ).scalar() or 0
+
+    rejected_today = db.query(func.count(DocumentApproval.id)).filter(
+        DocumentApproval.status == ApprovalStatus.REJECTED,
+        func.date(DocumentApproval.rejected_at) == today
+    ).scalar() or 0
+
+    overdue = db.query(func.count(DocumentApproval.id)).filter(
+        DocumentApproval.status == ApprovalStatus.PENDING,
+        DocumentApproval.submitted_at < datetime.utcnow() - timedelta(days=3)
+    ).scalar() or 0
+
+    return {
+        "pending": pending,
+        "approved_today": approved_today,
+        "rejected_today": rejected_today,
+        "overdue": overdue,
+    }
+
+
+# --- Pending Approvals ---
+
+@router.get("/approvals", response_class=HTMLResponse)
+async def approvals_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingRead,
+    doctype: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=10, le=100),
+):
+    """Pending approvals list page."""
+    query = db.query(DocumentApproval).filter(
+        DocumentApproval.status == ApprovalStatus.PENDING
+    )
+
+    if doctype:
+        query = query.filter(DocumentApproval.doctype == doctype)
+
+    total = query.count()
+    approvals = query.order_by(DocumentApproval.submitted_at.desc()).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["approvals"] = approvals
+    context["stats"] = get_approval_stats(db, user.id)
+    context["doctype_options"] = get_approval_doctype_options()
+    context["current_doctype"] = doctype
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/approvals/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/approvals/table", response_class=HTMLResponse)
+async def approvals_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingRead,
+    doctype: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=10, le=100),
+):
+    """Approvals table HTMX partial."""
+    query = db.query(DocumentApproval).filter(
+        DocumentApproval.status == ApprovalStatus.PENDING
+    )
+
+    if doctype:
+        query = query.filter(DocumentApproval.doctype == doctype)
+
+    total = query.count()
+    approvals = query.order_by(DocumentApproval.submitted_at.desc()).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["approvals"] = approvals
+    context["current_doctype"] = doctype
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/approvals/partials/approvals_table.html")
+    return HTMLResponse(template.render(context))
+
+
+def get_document_for_approval(db, doctype: str, document_id: int):
+    """Fetch the actual document for approval review."""
+    document = None
+    if doctype == "journal_entry":
+        document = db.query(JournalEntry).options(
+            selectinload(JournalEntry.items)
+        ).filter(JournalEntry.id == document_id).first()
+    elif doctype == "supplier_payment":
+        from app.models.accounting import SupplierPayment
+        document = db.query(SupplierPayment).filter(SupplierPayment.id == document_id).first()
+    elif doctype == "purchase_invoice":
+        document = db.query(PurchaseInvoice).filter(PurchaseInvoice.id == document_id).first()
+    elif doctype == "payment":
+        document = db.query(Payment).filter(Payment.id == document_id).first()
+    elif doctype == "invoice":
+        document = db.query(Invoice).filter(Invoice.id == document_id).first()
+    # Add more document types as needed
+    return document
+
+
+@router.get("/approvals/{doctype}/{document_id}", response_class=HTMLResponse)
+async def approval_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    doctype: str,
+    document_id: int,
+    _: None = RequireAccountingRead,
+):
+    """Document approval detail page."""
+    approval = db.query(DocumentApproval).options(
+        selectinload(DocumentApproval.approval_history)
+    ).filter(
+        DocumentApproval.doctype == doctype,
+        DocumentApproval.document_id == document_id
+    ).first()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    # Get the actual document
+    document = get_document_for_approval(db, doctype, document_id)
+
+    # Get workflow steps
+    workflow_steps = []
+    if approval.workflow_id:
+        workflow = db.query(ApprovalWorkflow).options(
+            selectinload(ApprovalWorkflow.steps)
+        ).filter(ApprovalWorkflow.id == approval.workflow_id).first()
+        if workflow:
+            workflow_steps = sorted(workflow.steps, key=lambda s: s.step_order)
+
+    # Check if current user can approve
+    can_approve = approval.status == ApprovalStatus.PENDING
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["approval"] = approval
+    context["document"] = document
+    context["doctype"] = doctype
+    context["document_id"] = document_id
+    context["workflow_steps"] = workflow_steps
+    context["approval_history"] = sorted(
+        approval.approval_history, key=lambda h: h.action_at
+    ) if approval.approval_history else []
+    context["can_approve"] = can_approve
+
+    template = templates.get_template("modules/accounting/templates/approvals/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/approvals/{doctype}/{document_id}/approve")
+async def approve_document(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    doctype: str,
+    document_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Approve a document."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    approval = db.query(DocumentApproval).filter(
+        DocumentApproval.doctype == doctype,
+        DocumentApproval.document_id == document_id,
+        DocumentApproval.status == ApprovalStatus.PENDING
+    ).first()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="Pending approval not found")
+
+    remarks = form_data.get("remarks", "")
+
+    # Record approval history
+    history = ApprovalHistory(
+        document_approval_id=approval.id,
+        step_order=approval.current_step,
+        action="APPROVED",
+        user_id=user.id,
+        remarks=remarks
+    )
+    db.add(history)
+
+    # Get workflow to check if more steps needed
+    workflow = db.query(ApprovalWorkflow).options(
+        selectinload(ApprovalWorkflow.steps)
+    ).filter(ApprovalWorkflow.id == approval.workflow_id).first()
+
+    next_step_exists = False
+    if workflow:
+        next_steps = [s for s in workflow.steps if s.step_order > approval.current_step]
+        next_step_exists = len(next_steps) > 0
+
+    if next_step_exists:
+        # Move to next step
+        approval.current_step += 1
+        approval.step_approved_at = datetime.utcnow()
+        approval.step_approved_by_id = user.id
+    else:
+        # Final approval
+        approval.status = ApprovalStatus.APPROVED
+        approval.approved_at = datetime.utcnow()
+        approval.approved_by_id = user.id
+
+    db.commit()
+
+    set_flash(request, "Document approved successfully", "success")
+    return RedirectResponse(url="/accounting/approvals", status_code=303)
+
+
+@router.post("/approvals/{doctype}/{document_id}/reject")
+async def reject_document(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    doctype: str,
+    document_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Reject a document."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    approval = db.query(DocumentApproval).filter(
+        DocumentApproval.doctype == doctype,
+        DocumentApproval.document_id == document_id,
+        DocumentApproval.status == ApprovalStatus.PENDING
+    ).first()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="Pending approval not found")
+
+    remarks = form_data.get("remarks", "")
+
+    # Record rejection history
+    history = ApprovalHistory(
+        document_approval_id=approval.id,
+        step_order=approval.current_step,
+        action="REJECTED",
+        user_id=user.id,
+        remarks=remarks
+    )
+    db.add(history)
+
+    # Update approval status
+    approval.status = ApprovalStatus.REJECTED
+    approval.rejected_at = datetime.utcnow()
+    approval.rejected_by_id = user.id
+    approval.rejection_reason = remarks
+
+    db.commit()
+
+    set_flash(request, "Document rejected", "warning")
+    return RedirectResponse(url="/accounting/approvals", status_code=303)
+
+
+# --- Workflow Configuration ---
+
+@router.get("/workflows", response_class=HTMLResponse)
+async def workflows_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingRead,
+    q: Optional[str] = None,
+    doctype: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=10, le=100),
+):
+    """Workflow configuration list page."""
+    query = db.query(ApprovalWorkflow).options(
+        selectinload(ApprovalWorkflow.steps)
+    )
+
+    if q:
+        query = query.filter(
+            or_(
+                ApprovalWorkflow.workflow_name.ilike(f"%{q}%"),
+                ApprovalWorkflow.description.ilike(f"%{q}%")
+            )
+        )
+
+    if doctype:
+        query = query.filter(ApprovalWorkflow.doctype == doctype)
+
+    if status == "active":
+        query = query.filter(ApprovalWorkflow.is_active == True)
+    elif status == "inactive":
+        query = query.filter(ApprovalWorkflow.is_active == False)
+
+    total = query.count()
+    workflows = query.order_by(ApprovalWorkflow.workflow_name).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["workflows"] = workflows
+    context["doctype_options"] = get_approval_doctype_options()
+    context["current_search"] = q
+    context["current_doctype"] = doctype
+    context["current_status"] = status
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/workflows/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/workflows/table", response_class=HTMLResponse)
+async def workflows_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingRead,
+    q: Optional[str] = None,
+    doctype: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=10, le=100),
+):
+    """Workflows table HTMX partial."""
+    query = db.query(ApprovalWorkflow).options(
+        selectinload(ApprovalWorkflow.steps)
+    )
+
+    if q:
+        query = query.filter(
+            or_(
+                ApprovalWorkflow.workflow_name.ilike(f"%{q}%"),
+                ApprovalWorkflow.description.ilike(f"%{q}%")
+            )
+        )
+
+    if doctype:
+        query = query.filter(ApprovalWorkflow.doctype == doctype)
+
+    if status == "active":
+        query = query.filter(ApprovalWorkflow.is_active == True)
+    elif status == "inactive":
+        query = query.filter(ApprovalWorkflow.is_active == False)
+
+    total = query.count()
+    workflows = query.order_by(ApprovalWorkflow.workflow_name).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["workflows"] = workflows
+    context["current_search"] = q
+    context["current_doctype"] = doctype
+    context["current_status"] = status
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/workflows/partials/workflows_table.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/workflows/new", response_class=HTMLResponse)
+async def workflow_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingWrite,
+):
+    """New workflow form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["workflow"] = None
+
+    template = templates.get_template("modules/accounting/templates/workflows/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/workflows")
+async def workflow_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    _: None = RequireAccountingWrite,
+):
+    """Create a new workflow."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    workflow = ApprovalWorkflow(
+        workflow_name=form_data.get("workflow_name"),
+        doctype=form_data.get("doctype"),
+        description=form_data.get("description"),
+        is_active=bool(form_data.get("is_active")),
+        is_mandatory=bool(form_data.get("is_mandatory")),
+        escalation_enabled=bool(form_data.get("escalation_enabled")),
+        escalation_hours=int(form_data.get("escalation_hours") or 24),
+        created_by_id=user.id
+    )
+    db.add(workflow)
+    db.commit()
+
+    set_flash(request, f"Workflow '{workflow.workflow_name}' created", "success")
+    return RedirectResponse(url=f"/accounting/workflows/{workflow.id}", status_code=303)
+
+
+@router.get("/workflows/{workflow_id}", response_class=HTMLResponse)
+async def workflow_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    workflow_id: int,
+    _: None = RequireAccountingRead,
+):
+    """Workflow detail page."""
+    workflow = db.query(ApprovalWorkflow).options(
+        selectinload(ApprovalWorkflow.steps)
+    ).filter(ApprovalWorkflow.id == workflow_id).first()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Get available roles and users for step configuration
+    users = db.query(User).filter(User.is_active == True).order_by(User.full_name).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["workflow"] = workflow
+    context["users"] = users
+    context["roles"] = [
+        {"name": "accounting:read", "label": "Accounting Reader"},
+        {"name": "accounting:write", "label": "Accounting Writer"},
+        {"name": "books:approve", "label": "Books Approver"},
+        {"name": "books:close", "label": "Books Closer"},
+        {"name": "admin", "label": "Administrator"},
+    ]
+
+    template = templates.get_template("modules/accounting/templates/workflows/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/workflows/{workflow_id}/edit", response_class=HTMLResponse)
+async def workflow_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    workflow_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Edit workflow form."""
+    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["workflow"] = workflow
+
+    template = templates.get_template("modules/accounting/templates/workflows/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/workflows/{workflow_id}")
+async def workflow_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    workflow_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Update a workflow."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    workflow.workflow_name = form_data.get("workflow_name")
+    workflow.doctype = form_data.get("doctype")
+    workflow.description = form_data.get("description")
+    workflow.is_active = bool(form_data.get("is_active"))
+    workflow.is_mandatory = bool(form_data.get("is_mandatory"))
+    workflow.escalation_enabled = bool(form_data.get("escalation_enabled"))
+    workflow.escalation_hours = int(form_data.get("escalation_hours") or 24)
+
+    db.commit()
+
+    set_flash(request, f"Workflow '{workflow.workflow_name}' updated", "success")
+    return RedirectResponse(url=f"/accounting/workflows/{workflow.id}", status_code=303)
+
+
+@router.post("/workflows/{workflow_id}/toggle")
+async def workflow_toggle(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    workflow_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Toggle workflow active status."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    workflow.is_active = not workflow.is_active
+    db.commit()
+
+    status = "activated" if workflow.is_active else "deactivated"
+    set_flash(request, f"Workflow {status}", "success")
+    return RedirectResponse(url=f"/accounting/workflows/{workflow.id}", status_code=303)
+
+
+@router.post("/workflows/{workflow_id}/steps")
+async def workflow_add_step(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    workflow_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Add a step to a workflow."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    workflow = db.query(ApprovalWorkflow).filter(ApprovalWorkflow.id == workflow_id).first()
+
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    step = ApprovalStep(
+        workflow_id=workflow_id,
+        step_order=int(form_data.get("step_order") or 1),
+        step_name=form_data.get("step_name"),
+        role_required=form_data.get("role_required") or None,
+        user_id=int(form_data.get("user_id")) if form_data.get("user_id") else None,
+        approval_mode=ApprovalMode(form_data.get("approval_mode", "any")),
+        amount_threshold_min=Decimal(form_data.get("amount_threshold_min")) if form_data.get("amount_threshold_min") else None,
+        amount_threshold_max=Decimal(form_data.get("amount_threshold_max")) if form_data.get("amount_threshold_max") else None,
+    )
+    db.add(step)
+    db.commit()
+
+    set_flash(request, f"Step '{step.step_name}' added", "success")
+    return RedirectResponse(url=f"/accounting/workflows/{workflow_id}", status_code=303)
+
+
+@router.post("/workflows/{workflow_id}/steps/{step_id}/delete")
+async def workflow_delete_step(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    workflow_id: int,
+    step_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Delete a step from a workflow."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    step = db.query(ApprovalStep).filter(
+        ApprovalStep.id == step_id,
+        ApprovalStep.workflow_id == workflow_id
+    ).first()
+
+    if not step:
+        raise HTTPException(status_code=404, detail="Step not found")
+
+    db.delete(step)
+    db.commit()
+
+    set_flash(request, "Step deleted", "success")
+    return RedirectResponse(url=f"/accounting/workflows/{workflow_id}", status_code=303)
+
+
+# --- Accounting Controls ---
+
+@router.get("/controls", response_class=HTMLResponse)
+async def controls_form(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingWrite,
+):
+    """Accounting controls configuration form."""
+    controls = db.query(AccountingControl).filter(
+        AccountingControl.company == None  # Global controls
+    ).first()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["controls"] = controls
+
+    template = templates.get_template("modules/accounting/templates/controls/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/controls")
+async def controls_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    _: None = RequireAccountingWrite,
+):
+    """Update accounting controls."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    controls = db.query(AccountingControl).filter(
+        AccountingControl.company == None
+    ).first()
+
+    if not controls:
+        controls = AccountingControl(company=None)
+        db.add(controls)
+
+    # Update controls based on form data
+    controls.require_approval_journal_entry = bool(form_data.get("require_je_approval"))
+    controls.require_approval_payment = bool(form_data.get("require_payment_approval"))
+    controls.backdating_days_allowed = int(form_data.get("max_backdate_days") or 30)
+    controls.updated_by_id = user.id
+
+    db.commit()
+
+    set_flash(request, "Accounting controls updated", "success")
+    return RedirectResponse(url="/accounting/controls", status_code=303)
+
+
+# =============================================================================
+# PHASE 12: AR PAYMENTS (Customer Receipts)
+# =============================================================================
+
+def get_ar_payment_stats(db) -> dict:
+    """Get AR payment statistics."""
+    now = datetime.utcnow()
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    this_month = db.query(func.sum(Payment.amount)).filter(
+        Payment.payment_date >= month_start,
+        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED])
+    ).scalar() or Decimal("0")
+
+    pending_amount = db.query(func.sum(Payment.amount)).filter(
+        Payment.status == PaymentStatus.PENDING
+    ).scalar() or Decimal("0")
+
+    unallocated = db.query(func.sum(Payment.unallocated_amount)).filter(
+        Payment.unallocated_amount > 0
+    ).scalar() or Decimal("0")
+
+    total_count = db.query(func.count(Payment.id)).scalar() or 0
+
+    return {
+        "this_month": this_month,
+        "pending_amount": pending_amount,
+        "unallocated": unallocated,
+        "total_count": total_count,
+    }
+
+
+@router.get("/ar-payments", response_class=HTMLResponse)
+async def ar_payments_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingRead,
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    method: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=10, le=100),
+):
+    """AR payments (customer receipts) list page."""
+    query = db.query(Payment).options(
+        selectinload(Payment.contact),
+        selectinload(Payment.customer)
+    )
+
+    if q:
+        query = query.filter(
+            or_(
+                Payment.receipt_number.ilike(f"%{q}%"),
+                Payment.transaction_reference.ilike(f"%{q}%")
+            )
+        )
+
+    if status:
+        query = query.filter(Payment.status == PaymentStatus(status))
+
+    if method:
+        query = query.filter(Payment.payment_method == PaymentMethod(method))
+
+    if date_from:
+        try:
+            from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(Payment.payment_date >= from_dt)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+            to_dt = to_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(Payment.payment_date <= to_dt)
+        except ValueError:
+            pass
+
+    total = query.count()
+    payments = query.order_by(Payment.payment_date.desc()).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["payments"] = payments
+    context["stats"] = get_ar_payment_stats(db)
+    context["status_options"] = get_invoice_status_options()
+    context["method_options"] = get_payment_method_options()
+    context["current_search"] = q
+    context["current_status"] = status
+    context["current_method"] = method
+    context["current_date_from"] = date_from
+    context["current_date_to"] = date_to
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/ar_payments/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/ar-payments/table", response_class=HTMLResponse)
+async def ar_payments_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingRead,
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    method: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=10, le=100),
+):
+    """AR payments table HTMX partial."""
+    query = db.query(Payment).options(
+        selectinload(Payment.contact),
+        selectinload(Payment.customer)
+    )
+
+    if q:
+        query = query.filter(
+            or_(
+                Payment.receipt_number.ilike(f"%{q}%"),
+                Payment.transaction_reference.ilike(f"%{q}%")
+            )
+        )
+
+    if status:
+        query = query.filter(Payment.status == PaymentStatus(status))
+
+    if method:
+        query = query.filter(Payment.payment_method == PaymentMethod(method))
+
+    if date_from:
+        try:
+            from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+            query = query.filter(Payment.payment_date >= from_dt)
+        except ValueError:
+            pass
+
+    if date_to:
+        try:
+            to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+            to_dt = to_dt.replace(hour=23, minute=59, second=59)
+            query = query.filter(Payment.payment_date <= to_dt)
+        except ValueError:
+            pass
+
+    total = query.count()
+    payments = query.order_by(Payment.payment_date.desc()).offset(
+        (page - 1) * per_page
+    ).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["payments"] = payments
+    context["current_search"] = q
+    context["current_status"] = status
+    context["current_method"] = method
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    template = templates.get_template("modules/accounting/templates/ar_payments/partials/payments_table.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/ar-payments/new", response_class=HTMLResponse)
+async def ar_payment_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: None = RequireAccountingWrite,
+):
+    """New AR payment form."""
+    from app.models.contact import Contact
+
+    contacts = db.query(Contact).filter(Contact.is_customer == True).order_by(Contact.name).all()
+    bank_accounts = db.query(BankAccount).filter(BankAccount.is_active == True).order_by(BankAccount.account_name).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["payment"] = None
+    context["contacts"] = contacts
+    context["bank_accounts"] = bank_accounts
+    context["method_options"] = get_payment_method_options()
+
+    template = templates.get_template("modules/accounting/templates/ar_payments/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/ar-payments")
+async def ar_payment_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    _: None = RequireAccountingWrite,
+):
+    """Create a new AR payment."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    from app.models.payment import PaymentSource
+
+    payment_date_str = form_data.get("payment_date")
+    payment_date = datetime.strptime(payment_date_str, "%Y-%m-%d") if payment_date_str else datetime.utcnow()
+
+    payment = Payment(
+        receipt_number=form_data.get("receipt_number") or None,
+        payment_date=payment_date,
+        contact_id=int(form_data.get("contact_id")) if form_data.get("contact_id") else None,
+        amount=Decimal(form_data.get("amount") or "0"),
+        currency=form_data.get("currency") or "NGN",
+        payment_method=PaymentMethod(form_data.get("payment_method")) if form_data.get("payment_method") else PaymentMethod.BANK_TRANSFER,
+        transaction_reference=form_data.get("transaction_reference") or None,
+        bank_account_id=int(form_data.get("bank_account_id")) if form_data.get("bank_account_id") else None,
+        notes=form_data.get("notes") or None,
+        source=PaymentSource.INTERNAL,
+        status=PaymentStatus.PENDING,
+        created_by_id=user.id,
+    )
+    payment.unallocated_amount = payment.amount
+    db.add(payment)
+    db.commit()
+
+    set_flash(request, f"Receipt created successfully", "success")
+    return RedirectResponse(url=f"/accounting/ar-payments/{payment.id}", status_code=303)
+
+
+@router.get("/ar-payments/{payment_id}", response_class=HTMLResponse)
+async def ar_payment_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingRead,
+):
+    """AR payment detail page."""
+    payment = db.query(Payment).options(
+        selectinload(Payment.contact),
+        selectinload(Payment.customer),
+        selectinload(Payment.allocations)
+    ).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["payment"] = payment
+
+    template = templates.get_template("modules/accounting/templates/ar_payments/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/ar-payments/{payment_id}/edit", response_class=HTMLResponse)
+async def ar_payment_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Edit AR payment form."""
+    from app.models.contact import Contact
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    contacts = db.query(Contact).filter(Contact.is_customer == True).order_by(Contact.name).all()
+    bank_accounts = db.query(BankAccount).filter(BankAccount.is_active == True).order_by(BankAccount.account_name).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["payment"] = payment
+    context["contacts"] = contacts
+    context["bank_accounts"] = bank_accounts
+    context["method_options"] = get_payment_method_options()
+
+    template = templates.get_template("modules/accounting/templates/ar_payments/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/ar-payments/{payment_id}")
+async def ar_payment_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Update an AR payment."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    payment_date_str = form_data.get("payment_date")
+    if payment_date_str:
+        payment.payment_date = datetime.strptime(payment_date_str, "%Y-%m-%d")
+
+    payment.receipt_number = form_data.get("receipt_number") or payment.receipt_number
+    payment.contact_id = int(form_data.get("contact_id")) if form_data.get("contact_id") else payment.contact_id
+    payment.amount = Decimal(form_data.get("amount") or payment.amount)
+    payment.currency = form_data.get("currency") or payment.currency
+    payment.payment_method = PaymentMethod(form_data.get("payment_method")) if form_data.get("payment_method") else payment.payment_method
+    payment.transaction_reference = form_data.get("transaction_reference") or payment.transaction_reference
+    payment.bank_account_id = int(form_data.get("bank_account_id")) if form_data.get("bank_account_id") else payment.bank_account_id
+    payment.notes = form_data.get("notes") or payment.notes
+    payment.updated_by_id = user.id
+
+    db.commit()
+
+    set_flash(request, "Receipt updated successfully", "success")
+    return RedirectResponse(url=f"/accounting/ar-payments/{payment.id}", status_code=303)
+
+
+@router.get("/ar-payments/{payment_id}/allocate", response_class=HTMLResponse)
+async def ar_payment_allocate_form(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """AR payment allocation form."""
+    payment = db.query(Payment).options(
+        selectinload(Payment.contact)
+    ).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    # Get outstanding invoices for this customer
+    outstanding_invoices = []
+    if payment.contact_id:
+        outstanding_invoices = db.query(Invoice).filter(
+            Invoice.contact_id == payment.contact_id,
+            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE]),
+            Invoice.balance > 0
+        ).order_by(Invoice.due_date).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context.update(get_navigation_context(request))
+    context["payment"] = payment
+    context["outstanding_invoices"] = outstanding_invoices
+    context["now"] = datetime.utcnow()
+
+    template = templates.get_template("modules/accounting/templates/ar_payments/pages/allocate.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/ar-payments/{payment_id}/allocate")
+async def ar_payment_allocate(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Process payment allocation."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    from app.models.payment_allocation import PaymentAllocation, AllocationType
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    total_allocated = Decimal("0")
+
+    # Process each invoice allocation
+    for key in form_data.keys():
+        if key.startswith("invoice_") and form_data.get(key):
+            invoice_id = int(key.replace("invoice_", ""))
+            amount = Decimal(form_data.get(f"amount_{invoice_id}") or "0")
+            discount = Decimal(form_data.get(f"discount_{invoice_id}") or "0")
+            writeoff = Decimal(form_data.get(f"writeoff_{invoice_id}") or "0")
+
+            if amount > 0:
+                allocation = PaymentAllocation(
+                    payment_id=payment.id,
+                    allocation_type=AllocationType.INVOICE,
+                    document_id=invoice_id,
+                    allocated_amount=amount,
+                    discount_amount=discount,
+                    write_off_amount=writeoff,
+                )
+                db.add(allocation)
+                total_allocated += amount
+
+                # Update invoice balance
+                invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+                if invoice:
+                    invoice.amount_paid = (invoice.amount_paid or Decimal("0")) + amount + discount + writeoff
+                    invoice.balance = invoice.total_amount - invoice.amount_paid
+                    if invoice.balance <= 0:
+                        invoice.status = InvoiceStatus.PAID
+                    else:
+                        invoice.status = InvoiceStatus.PARTIALLY_PAID
+
+    # Update payment allocation totals
+    payment.total_allocated = (payment.total_allocated or Decimal("0")) + total_allocated
+    payment.unallocated_amount = payment.amount - payment.total_allocated
+
+    db.commit()
+
+    set_flash(request, f"Allocated {total_allocated:.2f} to invoices", "success")
+    return RedirectResponse(url=f"/accounting/ar-payments/{payment.id}", status_code=303)
+
+
+@router.post("/ar-payments/{payment_id}/approve")
+async def ar_payment_approve(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Approve an AR payment."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    payment.status = PaymentStatus.APPROVED
+    db.commit()
+
+    set_flash(request, "Payment approved", "success")
+    return RedirectResponse(url=f"/accounting/ar-payments/{payment.id}", status_code=303)
+
+
+@router.post("/ar-payments/{payment_id}/post")
+async def ar_payment_post(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    payment_id: int,
+    _: None = RequireAccountingWrite,
+):
+    """Post an AR payment to General Ledger."""
+    form_data = await request.form()
+    validate_csrf(request, form_data)
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    payment.status = PaymentStatus.POSTED
+    db.commit()
+
+    set_flash(request, "Payment posted to General Ledger", "success")
+    return RedirectResponse(url=f"/accounting/ar-payments/{payment.id}", status_code=303)

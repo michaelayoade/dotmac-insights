@@ -1,0 +1,93 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col gap-2 mb-6">
+    <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900">Provisioning Logs</h1>
+    <p class="text-sm text-gray-500 font-body">Track provisioning actions and failures.</p>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/subscriptions/templates/partials/service_nav.html" %}
+
+<form class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <input type="text" name="action" value="{{ filters.action }}" class="rounded-xl border-gray-200 text-sm" placeholder="Action (create/update)">
+        <input type="text" name="status" value="{{ filters.status }}" class="rounded-xl border-gray-200 text-sm" placeholder="Status">
+        <input type="number" name="subscription_id" value="{{ filters.subscription_id or '' }}" class="rounded-xl border-gray-200 text-sm" placeholder="Subscription ID">
+        <input type="number" name="router_id" value="{{ filters.router_id or '' }}" class="rounded-xl border-gray-200 text-sm" placeholder="Router ID">
+        <label class="inline-flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" name="failed_only" value="true" {% if filters.failed_only %}checked{% endif %}>
+            Failed only
+        </label>
+    </div>
+    <div class="mt-4 flex items-center justify-end gap-2">
+        <a href="/subscriptions/provisioning" class="text-sm text-gray-500 hover:text-gray-700">Reset</a>
+        <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-primary-600 hover:bg-primary-500">Filter</button>
+    </div>
+</form>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+    <form method="POST" action="/subscriptions/provisioning/test-router" hx-post="/subscriptions/provisioning/test-router" hx-swap="none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="flex flex-col md:flex-row md:items-center gap-3">
+            <input type="number" name="router_id" class="flex-1 rounded-xl border-gray-200 text-sm" placeholder="Router ID to test">
+            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-semibold text-white rounded-xl bg-indigo-600 hover:bg-indigo-500">
+                Test Router Connection
+            </button>
+        </div>
+    </form>
+</div>
+
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <table class="min-w-full text-sm">
+        <thead class="bg-surface-50 text-gray-500 uppercase text-xs tracking-wide">
+            <tr>
+                <th class="px-4 py-3 text-left">Subscription</th>
+                <th class="px-4 py-3 text-left">Router</th>
+                <th class="px-4 py-3 text-left">Action</th>
+                <th class="px-4 py-3 text-left">Status</th>
+                <th class="px-4 py-3 text-left">Started</th>
+                <th class="px-4 py-3 text-right">Duration</th>
+                <th class="px-4 py-3 text-left">Retry</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% if logs %}
+            {% for log in logs %}
+            <tr class="hover:bg-surface-50">
+                <td class="px-4 py-3 text-gray-900">
+                    <a href="/subscriptions/{{ log.subscription_id }}" class="text-primary-600 hover:text-primary-500">#{{ log.subscription_id }}</a>
+                </td>
+                <td class="px-4 py-3 text-gray-700">
+                    {{ log.router.title if log.router else '#' ~ log.router_id }}
+                </td>
+                <td class="px-4 py-3 text-gray-700">{{ log.action.value }}</td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium
+                        {% if log.status.value == 'success' %}bg-emerald-50 text-emerald-700{% elif log.status.value == 'failed' %}bg-red-50 text-red-700{% elif log.status.value == 'retrying' %}bg-amber-50 text-amber-700{% else %}bg-gray-50 text-gray-700{% endif %}
+                    ">{{ log.status.value }}</span>
+                </td>
+                <td class="px-4 py-3 text-gray-700">{{ log.started_at }}</td>
+                <td class="px-4 py-3 text-right text-gray-700">{{ "{:.1f}s".format(log.duration_seconds) if log.duration_seconds else "-" }}</td>
+                <td class="px-4 py-3 text-left">
+                    {% if log.can_retry %}
+                    <form method="POST" action="/subscriptions/provisioning/retry/{{ log.id }}" hx-post="/subscriptions/provisioning/retry/{{ log.id }}" hx-swap="none">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="text-xs font-semibold text-amber-600 hover:text-amber-500">Retry</button>
+                    </form>
+                    {% else %}
+                    <span class="text-xs text-gray-400">-</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-4 py-10 text-center text-gray-500">No provisioning logs found.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

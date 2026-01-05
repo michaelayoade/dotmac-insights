@@ -1,0 +1,91 @@
+{# Single warehouse row - used in table and for HTMX row updates #}
+<tr id="warehouse-row-{{ warehouse.id }}" class="group hover:bg-surface-50 transition-colors" data-testid="warehouse-row-{{ warehouse.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 ring-1 ring-amber-200/50 group-hover:from-amber-100 group-hover:to-amber-200 transition-all">
+                    <svg class="w-5 h-5 text-amber-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                </span>
+            </div>
+            <div>
+                <a
+                    href="/inventory/{{ warehouse.id }}"
+                    class="font-medium text-gray-900 hover:text-primary-600 transition-colors font-body"
+                    data-testid="warehouse-name-{{ warehouse.id }}"
+                >
+                    {{ warehouse.warehouse_name }}
+                </a>
+                {% set issue_count = warehouse_issue_counts.get(warehouse.id, 0) if warehouse_issue_counts else 0 %}
+                {% if issue_count %}
+                <span class="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20" title="{{ issue_count }} validation warnings">
+                    {{ issue_count }} warning{% if issue_count != 1 %}s{% endif %}
+                </span>
+                {% endif %}
+                {% if warehouse.is_group %}
+                <span class="ml-2 inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                    GROUP
+                </span>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden sm:table-cell">
+        {% if warehouse.warehouse_type %}
+        <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset bg-amber-50 text-amber-700 ring-amber-600/20" data-testid="warehouse-type-{{ warehouse.id }}">
+            {{ warehouse.warehouse_type | title }}
+        </span>
+        {% else %}
+        <span class="text-gray-400">-</span>
+        {% endif %}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 font-body hidden md:table-cell" data-testid="warehouse-parent-{{ warehouse.id }}">
+        {{ warehouse.parent_warehouse or '-' }}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm">
+        <span class="inline-flex items-center gap-1.5 text-sm text-gray-700 font-body" data-testid="warehouse-status-{{ warehouse.id }}">
+            <span class="w-1.5 h-1.5 rounded-full {{ 'bg-red-500' if warehouse.disabled else 'bg-emerald-500' }}"></span>
+            {{ 'Disabled' if warehouse.disabled else 'Active' }}
+        </span>
+    </td>
+    <td class="relative whitespace-nowrap py-4 pl-3 pr-6 text-right text-sm">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/inventory/{{ warehouse.id }}"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 transition-colors"
+                title="View"
+                data-testid="warehouse-view-{{ warehouse.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+            </a>
+            <a
+                href="/inventory/{{ warehouse.id }}/edit"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+                title="Edit"
+                data-testid="warehouse-edit-{{ warehouse.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                </svg>
+            </a>
+            <button
+                type="button"
+                class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+                title="Delete"
+                hx-delete="/inventory/{{ warehouse.id }}"
+                hx-target="#warehouse-row-{{ warehouse.id }}"
+                hx-swap="outerHTML"
+                hx-confirm="Are you sure you want to delete '{{ warehouse.warehouse_name }}'? This cannot be undone."
+                data-testid="warehouse-delete-{{ warehouse.id }}"
+            >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        </div>
+    </td>
+</tr>

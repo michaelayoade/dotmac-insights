@@ -6,17 +6,26 @@ insurance tracking, and vehicle lifecycle management.
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from sqlalchemy import select, func, and_, or_, desc
-from sqlalchemy.orm import Session, joinedload
-from typing import Optional, List, Dict, Any
-from datetime import date, datetime, timedelta, timezone
+from sqlalchemy.orm import Session
+from typing import Optional, List, Dict
+from datetime import date, datetime
 from decimal import Decimal
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 from app.database import get_db
 from app.models.vehicle import Vehicle
-from app.models.employee import Employee
 from app.auth import Require
+from app.services.fleet import (
+    VehicleService,
+    FleetDashboardService,
+    VehicleFilters,
+    VehicleUpdateData,
+    InsuranceExpiryFilters,
+    VehicleNotFoundError,
+    DuplicateLicensePlateError,
+    DriverNotFoundError,
+)
+from app.services.types import PaginationParams
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 
@@ -112,55 +121,25 @@ async def list_vehicles(
     sort_order: str = Query("asc", regex="^(asc|desc)$"),
 ):
     """List all vehicles with filtering and pagination."""
-    query = select(Vehicle).options(joinedload(Vehicle.assigned_driver))
+    service = VehicleService(db)
 
-    # Apply filters
-    conditions = []
-    if search:
-        search_pattern = f"%{search}%"
-        conditions.append(
-            or_(
-                Vehicle.license_plate.ilike(search_pattern),
-                Vehicle.make.ilike(search_pattern),
-                Vehicle.model.ilike(search_pattern),
-                Vehicle.chassis_no.ilike(search_pattern),
-            )
-        )
-    if make:
-        conditions.append(Vehicle.make == make)
-    if model:
-        conditions.append(Vehicle.model == model)
-    if fuel_type:
-        conditions.append(Vehicle.fuel_type == fuel_type)
-    if employee_id is not None:
-        conditions.append(Vehicle.employee_id == employee_id)
-    if is_active is not None:
-        conditions.append(Vehicle.is_active == is_active)
+    filters = VehicleFilters(
+        search=search,
+        make=make,
+        model=model,
+        fuel_type=fuel_type,
+        employee_id=employee_id,
+        is_active=is_active,
+        sort_by=sort_by,
+        sort_order=sort_order,
+    )
+    pagination = PaginationParams(page=page, limit=page_size)
 
-    if conditions:
-        query = query.where(and_(*conditions))
-
-    # Count total
-    count_query = select(func.count()).select_from(Vehicle)
-    if conditions:
-        count_query = count_query.where(and_(*conditions))
-    total = db.execute(count_query).scalar() or 0
-
-    # Apply sorting
-    sort_col = getattr(Vehicle, sort_by)
-    if sort_order == "desc":
-        sort_col = desc(sort_col)
-    query = query.order_by(sort_col)
-
-    # Apply pagination
-    offset = (page - 1) * page_size
-    query = query.offset(offset).limit(page_size)
-
-    vehicles = db.execute(query).unique().scalars().all()
+    result = service.list_vehicles(filters, pagination)
 
     # Build response with driver names
     items = []
-    for v in vehicles:
+    for v in result.items:
         item = VehicleResponse.model_validate(v)
         if v.assigned_driver:
             item.driver_name = v.assigned_driver.name
@@ -168,76 +147,28 @@ async def list_vehicles(
 
     return VehicleListResponse(
         items=items,
-        total=total,
+        total=result.total,
         page=page,
         page_size=page_size,
-        pages=(total + page_size - 1) // page_size,
+        pages=(result.total + page_size - 1) // page_size,
     )
 
 
 @router.get("/summary", response_model=VehicleSummary, dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicle_summary(db: Session = Depends(get_db)):
     """Get fleet summary statistics."""
-    # Count totals
-    total = db.execute(select(func.count()).select_from(Vehicle)).scalar() or 0
-    active = db.execute(
-        select(func.count()).select_from(Vehicle).where(Vehicle.is_active == True)
-    ).scalar() or 0
-
-    # By fuel type
-    fuel_type_rows = db.execute(
-        select(Vehicle.fuel_type, func.count())
-        .where(Vehicle.fuel_type.isnot(None))
-        .group_by(Vehicle.fuel_type)
-    ).all()
-    by_fuel_type = {row[0]: row[1] for row in fuel_type_rows}
-
-    # By make
-    make_rows = db.execute(
-        select(Vehicle.make, func.count())
-        .where(Vehicle.make.isnot(None))
-        .group_by(Vehicle.make)
-        .order_by(desc(func.count()))
-        .limit(10)
-    ).all()
-    by_make = {row[0]: row[1] for row in make_rows}
-
-    # Insurance expiring in 30 days
-    expiry_threshold = date.today() + timedelta(days=30)
-    insurance_expiring = db.execute(
-        select(func.count())
-        .select_from(Vehicle)
-        .where(
-            and_(
-                Vehicle.is_active == True,
-                Vehicle.insurance_end_date.isnot(None),
-                Vehicle.insurance_end_date <= expiry_threshold,
-            )
-        )
-    ).scalar() or 0
-
-    # Total value and avg odometer
-    totals = db.execute(
-        select(
-            func.coalesce(func.sum(Vehicle.vehicle_value), 0),
-            func.coalesce(func.avg(Vehicle.odometer_value), 0),
-        )
-    ).one_or_none()
-    if totals is None:
-        total_value = 0
-        avg_odometer = 0
-    else:
-        total_value, avg_odometer = totals
+    service = FleetDashboardService(db)
+    summary = service.get_fleet_summary()
 
     return VehicleSummary(
-        total_vehicles=total,
-        active_vehicles=active,
-        inactive_vehicles=total - active,
-        by_fuel_type=by_fuel_type,
-        by_make=by_make,
-        insurance_expiring_soon=insurance_expiring,
-        total_value=Decimal(str(total_value)),
-        avg_odometer=Decimal(str(round(float(avg_odometer), 2))),
+        total_vehicles=summary.total_vehicles,
+        active_vehicles=summary.active_vehicles,
+        inactive_vehicles=summary.inactive_vehicles,
+        by_fuel_type=summary.by_fuel_type,
+        by_make=summary.by_make,
+        insurance_expiring_soon=summary.insurance_expiring_soon,
+        total_value=summary.total_value,
+        avg_odometer=summary.avg_odometer,
     )
 
 
@@ -247,23 +178,13 @@ async def get_vehicles_insurance_expiring(
     days: int = Query(30, ge=1, le=365, description="Days until expiry"),
 ):
     """Get vehicles with insurance expiring within specified days."""
-    expiry_threshold = date.today() + timedelta(days=days)
+    service = VehicleService(db)
 
-    query = (
-        select(Vehicle)
-        .options(joinedload(Vehicle.assigned_driver))
-        .where(
-            and_(
-                Vehicle.is_active == True,
-                Vehicle.insurance_end_date.isnot(None),
-                Vehicle.insurance_end_date <= expiry_threshold,
-                Vehicle.insurance_end_date >= date.today(),
-            )
-        )
-        .order_by(Vehicle.insurance_end_date)
+    filters = InsuranceExpiryFilters(
+        days_ahead=days,
+        include_expired=False,
     )
-
-    vehicles = db.execute(query).unique().scalars().all()
+    vehicles = service.get_vehicles_insurance_expiring(filters)
 
     items = []
     for v in vehicles:
@@ -278,38 +199,25 @@ async def get_vehicles_insurance_expiring(
 @router.get("/makes", response_model=List[str], dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicle_makes(db: Session = Depends(get_db)):
     """Get list of distinct vehicle makes."""
-    rows = db.execute(
-        select(Vehicle.make)
-        .where(Vehicle.make.isnot(None))
-        .distinct()
-        .order_by(Vehicle.make)
-    ).scalars().all()
-    return rows
+    service = VehicleService(db)
+    return service.get_distinct_makes()
 
 
 @router.get("/fuel-types", response_model=List[str], dependencies=[Depends(Require("fleet:read"))])
 async def get_fuel_types(db: Session = Depends(get_db)):
     """Get list of distinct fuel types."""
-    rows = db.execute(
-        select(Vehicle.fuel_type)
-        .where(Vehicle.fuel_type.isnot(None))
-        .distinct()
-        .order_by(Vehicle.fuel_type)
-    ).scalars().all()
-    return rows
+    service = VehicleService(db)
+    return service.get_distinct_fuel_types()
 
 
 @router.get("/{vehicle_id}", response_model=VehicleResponse, dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicle(vehicle_id: int, db: Session = Depends(get_db)):
     """Get a single vehicle by ID."""
-    query = (
-        select(Vehicle)
-        .options(joinedload(Vehicle.assigned_driver))
-        .where(Vehicle.id == vehicle_id)
-    )
-    vehicle = db.execute(query).unique().scalar_one_or_none()
+    service = VehicleService(db)
 
-    if not vehicle:
+    try:
+        vehicle = service.get_vehicle(vehicle_id)
+    except VehicleNotFoundError:
         raise HTTPException(status_code=404, detail="Vehicle not found")
 
     item = VehicleResponse.model_validate(vehicle)
@@ -326,26 +234,37 @@ async def update_vehicle(
     db: Session = Depends(get_db),
 ):
     """Update a vehicle."""
-    vehicle = db.query(Vehicle).filter(Vehicle.id == vehicle_id).first()
+    service = VehicleService(db)
 
-    if not vehicle:
+    # Convert payload to service DTO
+    data = VehicleUpdateData(
+        license_plate=payload.license_plate,
+        make=payload.make,
+        model=payload.model,
+        model_year=payload.model_year,
+        color=payload.color,
+        odometer_value=payload.odometer_value,
+        acquisition_date=payload.acquisition_date,
+        fuel_uom=payload.fuel_uom,
+        location=payload.location,
+        company=payload.company,
+        employee_id=payload.employee_id,
+        is_active=payload.is_active,
+        insurance_company=payload.insurance_company,
+        policy_no=payload.policy_no,
+        insurance_start_date=payload.insurance_start_date,
+        insurance_end_date=payload.insurance_end_date,
+    )
+
+    try:
+        vehicle = service.update_vehicle(vehicle_id, data)
+        db.commit()
+    except VehicleNotFoundError:
         raise HTTPException(status_code=404, detail="Vehicle not found")
-
-    update_data = payload.model_dump(exclude_unset=True)
-
-    # Update odometer date only if odometer value actually changed
-    if "odometer_value" in update_data and update_data["odometer_value"] != vehicle.odometer_value:
-        update_data["last_odometer_date"] = date.today()
-    elif "odometer_value" in update_data and update_data["odometer_value"] == vehicle.odometer_value:
-        # Remove odometer_value from update if unchanged to avoid unnecessary write
-        del update_data["odometer_value"]
-
-    for field, value in update_data.items():
-        setattr(vehicle, field, value)
-
-    vehicle.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(vehicle)
+    except DuplicateLicensePlateError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except DriverNotFoundError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     item = VehicleResponse.model_validate(vehicle)
     if vehicle.assigned_driver:
@@ -357,13 +276,8 @@ async def update_vehicle(
 @router.get("/by-driver/{employee_id}", response_model=List[VehicleResponse], dependencies=[Depends(Require("fleet:read"))])
 async def get_vehicles_by_driver(employee_id: int, db: Session = Depends(get_db)):
     """Get all vehicles assigned to a specific driver."""
-    query = (
-        select(Vehicle)
-        .options(joinedload(Vehicle.assigned_driver))
-        .where(Vehicle.employee_id == employee_id)
-        .order_by(Vehicle.license_plate)
-    )
-    vehicles = db.execute(query).unique().scalars().all()
+    service = VehicleService(db)
+    vehicles = service.get_vehicles_by_driver(employee_id)
 
     items = []
     for v in vehicles:

@@ -1,0 +1,103 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Journey Builder</h1>
+        <p class="mt-1 text-sm text-gray-500">Design multi-step journeys with branching and timing rules</p>
+    </div>
+    <div class="flex flex-wrap gap-3">
+        <button class="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Preview</button>
+        <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Publish Journey</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div class="lg:col-span-1 space-y-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <h2 class="text-sm font-semibold text-gray-900">Journey Settings</h2>
+            <div class="mt-4 space-y-3 text-sm">
+                <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wider">Name</p>
+                    <p class="text-gray-900 font-medium">{{ journey.name | default("Not set") }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wider">Audience</p>
+                    <p class="text-gray-900 font-medium">{{ journey.audience | default("Not set") }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 uppercase tracking-wider">Send Window</p>
+                    <p class="text-gray-900 font-medium">{{ journey.window | default("Not set") }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <h2 class="text-sm font-semibold text-gray-900">Add Steps</h2>
+            <div class="mt-4 space-y-2">
+                <button class="w-full text-left px-3 py-2 rounded-xl bg-surface-50 text-sm text-gray-700 hover:bg-surface-100">Email</button>
+                <button class="w-full text-left px-3 py-2 rounded-xl bg-surface-50 text-sm text-gray-700 hover:bg-surface-100">Wait</button>
+                <button class="w-full text-left px-3 py-2 rounded-xl bg-surface-50 text-sm text-gray-700 hover:bg-surface-100">Condition</button>
+                <button class="w-full text-left px-3 py-2 rounded-xl bg-surface-50 text-sm text-gray-700 hover:bg-surface-100">Webhook</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="lg:col-span-3 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Journey Canvas</h2>
+                <span class="text-xs text-gray-500">Drag and connect steps</span>
+            </div>
+            {% set steps = steps | default([]) %}
+            {% if steps %}
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {% for step in steps %}
+                    <div class="border border-gray-100 rounded-xl p-4 bg-surface-50">
+                        <div class="flex items-center justify-between">
+                            <p class="text-sm font-semibold text-gray-900">{{ step.title }}</p>
+                            <span class="text-xs px-2 py-1 rounded-full
+                                {% if step.status == 'active' %}bg-emerald-100 text-emerald-700
+                                {% elif step.status == 'draft' %}bg-gray-100 text-gray-600
+                                {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                {{ step.status | title }}
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">{{ step.type }} · {{ step.timing }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="mt-6 rounded-xl border border-dashed border-gray-200 p-6 text-sm text-gray-500">
+                    No steps added yet.
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Journey Analytics</h2>
+                <a href="/marketing" class="text-sm text-primary-600 hover:text-primary-700 font-medium">View report</a>
+            </div>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">Enrollments</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-2">{{ analytics.enrollments | default(0) }}</p>
+                </div>
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">Completion Rate</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-2">{{ analytics.completion_rate | default("0%") }}</p>
+                </div>
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">Avg. Time</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-2">{{ analytics.avg_time | default("--") }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

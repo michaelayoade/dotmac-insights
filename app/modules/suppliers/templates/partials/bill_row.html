@@ -1,0 +1,34 @@
+{# Single bill row #}
+<tr class="group hover:bg-surface-50" id="bill-row-{{ bill.id }}">
+    <td class="whitespace-nowrap py-4 pl-6 pr-3">
+        <a href="/suppliers/bills/{{ bill.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ bill.erpnext_id or 'BILL-' ~ bill.id }}</a>
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+        {{ bill.supplier_name or '-' }}
+    </td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ bill.posting_date.strftime('%b %d, %Y') if bill.posting_date else '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm hidden lg:table-cell {{ 'text-red-600 font-medium' if bill.is_overdue else 'text-gray-600' }}">{{ bill.due_date.strftime('%b %d, %Y') if bill.due_date else '-' }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-900 text-right hidden xl:table-cell">{{ (bill.grand_total or 0)|round(2) }} {{ bill.currency or base_currency }}</td>
+    <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-right {{ 'text-red-600' if bill.outstanding_amount and bill.outstanding_amount > 0 else 'text-green-600' }}">{{ (bill.outstanding_amount or 0)|round(2) }} {{ bill.currency or base_currency }}</td>
+    <td class="whitespace-nowrap px-3 py-4">
+        {% set status_colors = {
+            'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+            'submitted': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'unpaid': 'bg-yellow-50 text-yellow-700 ring-yellow-600/20',
+            'paid': 'bg-green-50 text-green-700 ring-green-600/20',
+            'partially_paid': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'overdue': 'bg-red-50 text-red-700 ring-red-600/20',
+            'cancelled': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+        } %}
+        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(bill.status.value.lower() if bill.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+            {{ bill.status.value.replace('_', ' ').title() if bill.status else 'Draft' }}
+        </span>
+    </td>
+    <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a href="/suppliers/bills/{{ bill.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            </a>
+        </div>
+    </td>
+</tr>

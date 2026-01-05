@@ -20,10 +20,8 @@ class ActivityBase(BaseModel):
     activity_type: str
     subject: str
     description: Optional[str] = None
-    lead_id: Optional[int] = None
-    customer_id: Optional[int] = None
     opportunity_id: Optional[int] = None
-    contact_id: Optional[int] = None
+    party_id: Optional[int] = None
     scheduled_at: Optional[datetime] = None
     duration_minutes: Optional[int] = None
     owner_id: Optional[int] = None
@@ -54,10 +52,8 @@ class ActivityResponse(BaseModel):
     subject: str
     description: Optional[str]
     status: str
-    lead_id: Optional[int]
-    customer_id: Optional[int]
     opportunity_id: Optional[int]
-    contact_id: Optional[int]
+    party_id: Optional[int]
     scheduled_at: Optional[datetime]
     duration_minutes: Optional[int]
     completed_at: Optional[datetime]
@@ -96,8 +92,7 @@ async def list_activities(
     page_size: int = Query(20, ge=1, le=100),
     activity_type: Optional[str] = None,
     status: Optional[str] = None,
-    lead_id: Optional[int] = None,
-    customer_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     opportunity_id: Optional[int] = None,
     owner_id: Optional[int] = None,
     assigned_to_id: Optional[int] = None,
@@ -122,11 +117,8 @@ async def list_activities(
         except ValueError:
             pass
 
-    if lead_id:
-        query = query.filter(Activity.lead_id == lead_id)
-
-    if customer_id:
-        query = query.filter(Activity.customer_id == customer_id)
+    if party_id:
+        query = query.filter(Activity.party_id == party_id)
 
     if opportunity_id:
         query = query.filter(Activity.opportunity_id == opportunity_id)
@@ -202,8 +194,7 @@ async def get_activities_summary(db: Session = Depends(get_db)):
 
 @router.get("/timeline", dependencies=[Depends(Require("crm:read"))])
 async def get_activity_timeline(
-    customer_id: Optional[int] = None,
-    lead_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     opportunity_id: Optional[int] = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -211,14 +202,12 @@ async def get_activity_timeline(
     """Get activity timeline for a customer, lead, or opportunity."""
     query = db.query(Activity)
 
-    if customer_id:
-        query = query.filter(Activity.customer_id == customer_id)
-    elif lead_id:
-        query = query.filter(Activity.lead_id == lead_id)
+    if party_id:
+        query = query.filter(Activity.party_id == party_id)
     elif opportunity_id:
         query = query.filter(Activity.opportunity_id == opportunity_id)
     else:
-        raise HTTPException(status_code=400, detail="Provide customer_id, lead_id, or opportunity_id")
+        raise HTTPException(status_code=400, detail="Provide party_id or opportunity_id")
 
     activities = query.order_by(Activity.created_at.desc()).limit(limit).all()
 
@@ -246,14 +235,15 @@ async def create_activity(payload: ActivityCreate, db: Session = Depends(get_db)
     except ValueError:
         raise HTTPException(status_code=400, detail=f"Invalid activity type: {payload.activity_type}")
 
+    if not payload.party_id and not payload.opportunity_id:
+        raise HTTPException(status_code=400, detail="Provide party_id or opportunity_id")
+
     activity = Activity(
         activity_type=activity_type,
         subject=payload.subject,
         description=payload.description,
-        lead_id=payload.lead_id,
-        customer_id=payload.customer_id,
         opportunity_id=payload.opportunity_id,
-        contact_id=payload.contact_id,
+        party_id=payload.party_id,
         scheduled_at=payload.scheduled_at,
         duration_minutes=payload.duration_minutes,
         owner_id=payload.owner_id,
@@ -347,10 +337,8 @@ def _activity_to_response(activity: Activity) -> ActivityResponse:
         subject=activity.subject,
         description=activity.description,
         status=activity.status.value,
-        lead_id=activity.lead_id,
-        customer_id=activity.customer_id,
         opportunity_id=activity.opportunity_id,
-        contact_id=activity.contact_id,
+        party_id=activity.party_id,
         scheduled_at=activity.scheduled_at,
         duration_minutes=activity.duration_minutes,
         completed_at=activity.completed_at,

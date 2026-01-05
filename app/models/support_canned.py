@@ -5,13 +5,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey
+from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.agent import Agent, Team
+    from app.models.agent import Team
+    from app.models.party import Party
 
 
 class CannedResponseScope(str, Enum):
@@ -51,9 +52,12 @@ class CannedResponse(Base):
         ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
-    # For PERSONAL scope - which agent owns it
-    agent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
+    # For PERSONAL scope - which party (agent) owns it
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Organization
@@ -66,6 +70,10 @@ class CannedResponse(Base):
     # Flags
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
+    # Chatwoot sync
+    chatwoot_id: Mapped[Optional[int]] = mapped_column(Integer, unique=True, nullable=True, index=True)
+    last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     # Audit
     created_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -74,7 +82,7 @@ class CannedResponse(Base):
 
     # Relationships
     team: Mapped[Optional["Team"]] = relationship()
-    agent: Mapped[Optional["Agent"]] = relationship()
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<CannedResponse {self.name} ({self.scope})>"

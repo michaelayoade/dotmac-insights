@@ -1,0 +1,203 @@
+{% extends "layouts/app.html" %}
+
+{% set status_colors = {
+    'open': 'text-emerald-700 bg-emerald-50 ring-emerald-600/20',
+    'soft_closed': 'text-amber-700 bg-amber-50 ring-amber-600/20',
+    'hard_closed': 'text-gray-700 bg-gray-50 ring-gray-600/20'
+} %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3">
+                <a
+                    href="/accounting/fiscal-periods"
+                    class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                        {{ period.period_name }}
+                    </h1>
+                    <p class="mt-1 text-sm text-gray-500 font-body">
+                        {{ period.start_date.strftime('%B %d, %Y') if period.start_date else '?' }} - {{ period.end_date.strftime('%B %d, %Y') if period.end_date else '?' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset {{ status_colors.get(period.status.value if period.status else 'open', status_colors['open']) }}">
+                {{ period.status.value.replace('_', ' ').title() if period.status else 'Open' }}
+            </span>
+            {% if period.status and period.status.value == 'open' %}
+            <form action="/accounting/fiscal-periods/{{ period.id }}/close" method="POST" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-amber-600/25 hover:from-amber-500 hover:to-amber-600 transition-all duration-200"
+                    onclick="return confirm('Close this period? New postings will not be allowed until reopened.')"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                    Close Period
+                </button>
+            </form>
+            {% elif period.status and period.status.value == 'soft_closed' %}
+            <form action="/accounting/fiscal-periods/{{ period.id }}/reopen" method="POST" class="inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-600 transition-all duration-200"
+                    onclick="return confirm('Reopen this period? This will allow new postings.')"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"/>
+                    </svg>
+                    Reopen Period
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">GL Entries</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900">{{ '{:,}'.format(gl_count) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Total Debits</p>
+            <p class="mt-1 text-2xl font-bold text-blue-600 font-mono">{{ '{:,.2f}'.format(period_debit) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Credits</p>
+            <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(period_credit) }}</p>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Period Type</p>
+            <p class="mt-1 text-2xl font-bold text-gray-900">{{ period.period_type.value.title() if period.period_type else '-' }}</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Period Details -->
+        <div class="lg:col-span-2">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Period Details</h2>
+                <dl class="grid grid-cols-2 gap-6">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Period Name</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ period.period_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Period Type</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ period.period_type.value.title() if period.period_type else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Start Date</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ period.start_date.strftime('%B %d, %Y') if period.start_date else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">End Date</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ period.end_date.strftime('%B %d, %Y') if period.end_date else '-' }}</dd>
+                    </div>
+                    {% if period.fiscal_year %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Fiscal Year</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{ period.fiscal_year.year }}</dd>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Status</dt>
+                        <dd class="mt-1">
+                            <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(period.status.value if period.status else 'open', status_colors['open']) }}">
+                                {{ period.status.value.replace('_', ' ').title() if period.status else 'Open' }}
+                            </span>
+                        </dd>
+                    </div>
+                </dl>
+
+                {% if period.closed_at %}
+                <div class="mt-6 pt-6 border-t border-gray-100">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Closure Information</h3>
+                    <dl class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wider">Closed At</dt>
+                            <dd class="mt-1 text-gray-900">{{ period.closed_at.strftime('%B %d, %Y %H:%M') }}</dd>
+                        </div>
+                    </dl>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="space-y-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h3>
+                <div class="space-y-2">
+                    <a
+                        href="/accounting/general-ledger?date_from={{ period.start_date.strftime('%Y-%m-%d') if period.start_date else '' }}&date_to={{ period.end_date.strftime('%Y-%m-%d') if period.end_date else '' }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">View GL for Period</span>
+                    </a>
+                    <a
+                        href="/accounting/reports/trial-balance?as_of={{ period.end_date.strftime('%Y-%m-%d') if period.end_date else '' }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">Trial Balance</span>
+                    </a>
+                    <a
+                        href="/accounting/reports/income-statement?start={{ period.start_date.strftime('%Y-%m-%d') if period.start_date else '' }}&end={{ period.end_date.strftime('%Y-%m-%d') if period.end_date else '' }}"
+                        class="flex items-center gap-3 p-3 rounded-lg hover:bg-surface-50 transition-colors group"
+                    >
+                        <span class="flex-shrink-0 w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-100">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                            </svg>
+                        </span>
+                        <span class="text-sm text-gray-700 group-hover:text-gray-900">Income Statement</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Period Status Help -->
+            <div class="bg-gray-50 rounded-xl p-6">
+                <h3 class="text-sm font-semibold text-gray-900 mb-3">Period Status Guide</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex items-start gap-2">
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700">Open</span>
+                        <span class="text-gray-600">Posting allowed</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700">Soft Closed</span>
+                        <span class="text-gray-600">Closed but can be reopened</span>
+                    </div>
+                    <div class="flex items-start gap-2">
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-gray-200 text-gray-700">Hard Closed</span>
+                        <span class="text-gray-600">Permanently closed</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,136 @@
+{# Individual subscription row - for table rendering and HTMX updates #}
+<tr class="group hover:bg-surface-50/50 transition-colors" data-testid="subscription-row-{{ subscription.id }}">
+    <!-- Plan Name & Speed -->
+    <td class="py-4 pl-6 pr-3">
+        <div class="flex items-center gap-3">
+            <div class="flex-shrink-0">
+                {% set type_colors = {
+                    'internet': 'from-blue-100 to-cyan-200 ring-blue-200/50 text-blue-600',
+                    'voice': 'from-violet-100 to-purple-200 ring-violet-200/50 text-violet-600',
+                    'bundle': 'from-amber-100 to-orange-200 ring-amber-200/50 text-amber-600',
+                    'custom': 'from-gray-100 to-slate-200 ring-gray-200/50 text-gray-600'
+                } %}
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br {{ type_colors.get(subscription.service_type.value, 'from-gray-100 to-slate-200 ring-gray-200/50 text-gray-600') }} ring-2">
+                    {% if subscription.service_type.value == 'internet' %}
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                    </svg>
+                    {% elif subscription.service_type.value == 'voice' %}
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    </svg>
+                    {% elif subscription.service_type.value == 'bundle' %}
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    {% else %}
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="min-w-0">
+                <a href="/subscriptions/{{ subscription.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block" data-testid="subscription-name">
+                    {{ subscription.plan_name }}
+                </a>
+                {% if subscription.download_speed or subscription.upload_speed %}
+                <p class="text-xs text-gray-500 mt-0.5 font-mono">
+                    {{ format_speed(subscription.download_speed) }} / {{ format_speed(subscription.upload_speed) }}
+                </p>
+                {% elif subscription.tariff %}
+                <p class="text-xs text-gray-500 mt-0.5">
+                    {{ subscription.tariff.title }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </td>
+
+    <!-- Customer -->
+    <td class="px-3 py-4 hidden md:table-cell">
+        {% if subscription.party %}
+        <a href="/parties/{{ subscription.party.id }}" class="group/customer">
+            <p class="text-sm text-gray-900 group-hover/customer:text-primary-600 transition-colors truncate max-w-[150px]" title="{{ subscription.party.name }}">
+                {{ subscription.party.name }}
+            </p>
+            <p class="text-xs text-gray-400 font-mono">#{{ subscription.party.id }}</p>
+        </a>
+        {% else %}
+        <span class="text-xs text-gray-400">-</span>
+        {% endif %}
+    </td>
+
+    <!-- Service Type -->
+    <td class="px-3 py-4 hidden sm:table-cell">
+        {% set type_badge_colors = {
+            'internet': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+            'voice': 'bg-violet-50 text-violet-700 ring-violet-600/20',
+            'bundle': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+            'custom': 'bg-gray-50 text-gray-700 ring-gray-600/20'
+        } %}
+        <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ type_badge_colors.get(subscription.service_type.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+            {{ subscription.service_type.value | title }}
+        </span>
+    </td>
+
+    <!-- Price -->
+    <td class="px-3 py-4">
+        <div>
+            <p class="text-sm font-semibold text-gray-900 font-display tabular-nums">
+                {{ subscription.currency }} {{ "{:,.0f}".format(subscription.price) }}
+            </p>
+            <p class="text-xs text-gray-400 capitalize">{{ subscription.billing_cycle }}</p>
+        </div>
+    </td>
+
+    <!-- Status -->
+    <td class="px-3 py-4">
+        {% set status_styles = {
+            'active': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+            'suspended': 'bg-amber-50 text-amber-700 ring-amber-600/20',
+            'cancelled': 'bg-red-50 text-red-700 ring-red-600/20',
+            'pending': 'bg-blue-50 text-blue-700 ring-blue-600/20'
+        } %}
+        {% set status_dots = {
+            'active': 'bg-emerald-500',
+            'suspended': 'bg-amber-500',
+            'cancelled': 'bg-red-500',
+            'pending': 'bg-blue-500'
+        } %}
+        <span class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ status_styles.get(subscription.status.value, 'bg-gray-50 text-gray-700 ring-gray-600/20') }}" data-testid="subscription-status" data-status="{{ subscription.status.value }}">
+            <span class="w-1.5 h-1.5 rounded-full {{ status_dots.get(subscription.status.value, 'bg-gray-500') }}"></span>
+            {{ subscription.status.value | title }}
+        </span>
+    </td>
+
+    <!-- Network -->
+    <td class="px-3 py-4 hidden lg:table-cell">
+        {% if subscription.ipv4_address %}
+        <div class="flex items-center gap-2">
+            <code class="text-xs font-mono text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">{{ subscription.ipv4_address }}</code>
+            {% if subscription.router %}
+            <span class="text-xs text-gray-400">{{ subscription.router.title }}</span>
+            {% endif %}
+        </div>
+        {% else %}
+        <span class="text-xs text-gray-400">Not assigned</span>
+        {% endif %}
+    </td>
+
+    <!-- Actions -->
+    <td class="py-4 pl-3 pr-6 text-right">
+        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <a
+                href="/subscriptions/{{ subscription.id }}"
+                class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all"
+                data-testid="view-subscription-btn"
+            >
+                View
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </td>
+</tr>

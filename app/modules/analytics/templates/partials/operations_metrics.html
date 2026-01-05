@@ -1,0 +1,20 @@
+{# Operations Metrics Partial - HTMX refreshable #}
+<div class="space-y-6">
+    {% if field_service %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {% if field_service.completion_rate is defined %}
+        <div class="text-center p-4 rounded-xl bg-green-50">
+            <div class="text-2xl font-bold text-green-700">{{ "{:.1f}%".format(field_service.completion_rate) }}</div>
+            <div class="text-sm text-green-600 mt-1">Completion Rate</div>
+        </div>
+        {% endif %}
+
+        {% if field_service.avg_rating is defined %}
+        <div class="text-center p-4 rounded-xl bg-yellow-50">
+            <div class="text-2xl font-bold text-yellow-700">{{ "{:.1f}".format(field_service.avg_rating) }}</div>
+            <div class="text-sm text-yellow-600 mt-1">Avg Rating</div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>

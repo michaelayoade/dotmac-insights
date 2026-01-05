@@ -1,0 +1,85 @@
+{% if credit_notes %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="credit-notes-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead><tr class="bg-surface-50">
+            <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Credit Note</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Customer</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Issue Date</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Invoice</th>
+            <th class="px-3 py-3.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Amount</th>
+            <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+            <th class="py-3.5 pl-3 pr-6 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Actions</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for cn in credit_notes %}
+            <tr class="group hover:bg-surface-50" id="cn-row-{{ cn.id }}">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3">
+                    <a href="/invoices/credit-notes/{{ cn.id }}" class="font-medium text-gray-900 hover:text-primary-600">{{ cn.credit_number or 'CN-' ~ cn.id }}</a>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden sm:table-cell">
+                    {{ cn.customer_account.party.name if cn.customer_account and cn.customer_account.party else '-' }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden md:table-cell">{{ cn.issue_date.strftime('%b %d, %Y') if cn.issue_date else '-' }}</td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600 hidden lg:table-cell">
+                    {% if cn.invoice %}
+                    <a href="/invoices/{{ cn.invoice.id }}" class="text-primary-600 hover:text-primary-700">{{ cn.invoice.invoice_number or 'INV-' ~ cn.invoice.id }}</a>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900 text-right">{{ cn.total_amount|round(2) }} {{ cn.currency }}</td>
+                <td class="whitespace-nowrap px-3 py-4">
+                    {% set status_colors = {
+                        'draft': 'bg-gray-50 text-gray-700 ring-gray-600/20',
+                        'issued': 'bg-blue-50 text-blue-700 ring-blue-600/20',
+                        'applied': 'bg-green-50 text-green-700 ring-green-600/20',
+                        'cancelled': 'bg-red-50 text-red-700 ring-red-600/20'
+                    } %}
+                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ring-1 ring-inset {{ status_colors.get(cn.status.value.lower() if cn.status else 'draft', 'bg-gray-50 text-gray-700 ring-gray-600/20') }}">
+                        {{ cn.status.value.title() if cn.status else 'Draft' }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap py-4 pl-3 pr-6 text-right">
+                    <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <a href="/invoices/credit-notes/{{ cn.id }}" class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg" title="View">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+{% set pagination = {
+    "page": page,
+    "per_page": per_page,
+    "total": total,
+    "total_pages": total_pages,
+    "has_prev": page > 1,
+    "has_next": page < total_pages,
+    "prev_page": (page - 1) if page > 1 else None,
+    "next_page": (page + 1) if page < total_pages else None,
+    "start_item": ((page - 1) * per_page) + 1,
+    "end_item": [page * per_page, total]|min
+} %}
+{% set query_params = [] %}
+{% if q %}
+{% set _ = query_params.append("q=" ~ q) %}
+{% endif %}
+{% if status_filter %}
+{% set _ = query_params.append("status=" ~ status_filter) %}
+{% endif %}
+{% set base_url = "/invoices/credit-notes" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with pagination=pagination, base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+{% endif %}
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="credit-notes-empty-state">
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No credit notes found</h3>
+    <p class="text-sm text-gray-500">{% if q or status_filter %}Try adjusting your search or filters.{% else %}Credit notes will appear here when created.{% endif %}</p>
+</div>
+{% endif %}

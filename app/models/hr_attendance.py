@@ -168,6 +168,7 @@ class Attendance(Base):
     # Audit fields
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    deleted_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     status_changed_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     status_changed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
@@ -179,6 +180,10 @@ class Attendance(Base):
     __table_args__ = (
         Index("ix_attendances_emp_date", "employee_id", "attendance_date", unique=True),
         Index("ix_attendances_date_status", "attendance_date", "status"),
+        # Audit column indexes
+        Index("ix_attendances_created_by_id", "created_by_id"),
+        Index("ix_attendances_updated_by_id", "updated_by_id"),
+        Index("ix_attendances_deleted_by_id", "deleted_by_id"),
     )
 
     def __repr__(self) -> str:

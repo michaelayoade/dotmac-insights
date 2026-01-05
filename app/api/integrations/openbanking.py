@@ -14,6 +14,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from app.database import get_db
 from app.auth import Require
@@ -35,7 +36,7 @@ router = APIRouter(prefix="/openbanking", tags=["openbanking"])
 
 class WidgetConfigRequest(BaseModel):
     """Request for widget configuration."""
-    customer_id: str
+    party_id: str
     redirect_url: str
     provider: Optional[str] = None  # mono or okra
     metadata: Optional[dict] = None
@@ -45,7 +46,7 @@ class WidgetConfigResponse(BaseModel):
     """Widget configuration response."""
     public_key: str
     provider: str
-    customer_id: str
+    party_id: str
     redirect_url: str
     widget_url: str
     metadata: Optional[dict] = None
@@ -55,7 +56,7 @@ class LinkAccountRequest(BaseModel):
     """Request to complete account linking."""
     code: str  # Authorization code from widget callback
     provider: str
-    customer_id: int
+    party_id: int
     customer_email: Optional[str] = None
 
 
@@ -125,7 +126,7 @@ async def get_widget_config(request: WidgetConfigRequest):
 
     try:
         config = await client.get_widget_token(
-            customer_id=request.customer_id,
+            customer_id=request.party_id,
             redirect_url=request.redirect_url,
             metadata=request.metadata,
         )
@@ -133,7 +134,7 @@ async def get_widget_config(request: WidgetConfigRequest):
         return WidgetConfigResponse(
             public_key=config["public_key"],
             provider=client.provider.value,
-            customer_id=request.customer_id,
+            party_id=request.party_id,
             redirect_url=request.redirect_url,
             widget_url=config["widget_url"],
             metadata=config.get("metadata"),
@@ -146,7 +147,7 @@ async def get_widget_config(request: WidgetConfigRequest):
 @router.post("/link-account", response_model=LinkedAccountResponse, dependencies=[Depends(Require("openbanking:write"))])
 async def link_account(
     request: LinkAccountRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """
     Complete account linking after widget authorization.
@@ -169,7 +170,7 @@ async def link_account(
         )
 
         # Check for existing connection
-        existing = await db.execute(
+        existing = db.execute(
             select(OpenBankingConnection).where(
                 OpenBankingConnection.provider == provider_enum,
                 OpenBankingConnection.account_id == provider_account_id,
@@ -187,7 +188,7 @@ async def link_account(
             connection = OpenBankingConnection(
                 provider=provider_enum,
                 account_id=provider_account_id,
-                customer_id=request.customer_id,
+                party_id=request.party_id,
                 email=request.customer_email,
                 account_number=account.account_number,
                 bank_code=account.bank_code,
@@ -202,8 +203,8 @@ async def link_account(
             )
             db.add(connection)
 
-        await db.commit()
-        await db.refresh(connection)
+        db.commit()
+        db.refresh(connection)
 
         return LinkedAccountResponse(
             id=connection.id,
@@ -218,10 +219,10 @@ async def link_account(
             status=connection.status.value,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to link account",
         )
     finally:
         await client.close()
@@ -229,7 +230,7 @@ async def link_account(
 
 @router.get("/accounts", response_model=List[LinkedAccountResponse], dependencies=[Depends(Require("openbanking:read"))])
 def list_linked_accounts(
-    customer_id: Optional[int] = None,
+    party_id: Optional[int] = None,
     provider: Optional[str] = None,
     connection_status: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -237,8 +238,8 @@ def list_linked_accounts(
     """List linked bank accounts."""
     query = db.query(OpenBankingConnection)
 
-    if customer_id:
-        query = query.filter(OpenBankingConnection.customer_id == customer_id)
+    if party_id:
+        query = query.filter(OpenBankingConnection.party_id == party_id)
     if provider:
         try:
             provider_enum = OBProvider(provider)
@@ -280,10 +281,10 @@ def list_linked_accounts(
 @router.get("/accounts/{account_id}", dependencies=[Depends(Require("openbanking:read"))])
 async def get_linked_account(
     account_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get linked account details."""
-    result = await db.execute(
+    result = db.execute(
         select(OpenBankingConnection).where(OpenBankingConnection.id == account_id)
     )
     connection = result.scalar_one_or_none()
@@ -298,7 +299,7 @@ async def get_linked_account(
         "id": connection.id,
         "provider": connection.provider.value,
         "provider_account_id": connection.account_id,
-        "customer_id": connection.customer_id,
+        "party_id": connection.party_id,
         "account_number": connection.account_number,
         "bank_code": connection.bank_code,
         "bank_name": connection.bank_name,
@@ -316,10 +317,10 @@ async def get_linked_account(
 @router.get("/accounts/{account_id}/balance", dependencies=[Depends(Require("openbanking:read"))])
 async def get_account_balance(
     account_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get current account balance (fetches from provider)."""
-    result = await db.execute(
+    result = db.execute(
         select(OpenBankingConnection).where(OpenBankingConnection.id == account_id)
     )
     connection = result.scalar_one_or_none()
@@ -338,7 +339,7 @@ async def get_account_balance(
         # Update stored balance
         connection.cached_balance = balance
         connection.balance_updated_at = datetime.now(timezone.utc)
-        await db.commit()
+        db.commit()
 
         return {
             "account_id": account_id,
@@ -347,10 +348,10 @@ async def get_account_balance(
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to fetch account balance",
         )
     finally:
         await client.close()
@@ -362,10 +363,10 @@ async def get_account_transactions(
     start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
     limit: int = Query(100, le=500),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get account transactions."""
-    result = await db.execute(
+    result = db.execute(
         select(OpenBankingConnection).where(OpenBankingConnection.id == account_id)
     )
     connection = result.scalar_one_or_none()
@@ -388,7 +389,7 @@ async def get_account_transactions(
 
         # Update last synced timestamp
         connection.last_synced_at = datetime.now(timezone.utc)
-        await db.commit()
+        db.commit()
 
         return [
             TransactionSchema(
@@ -403,10 +404,10 @@ async def get_account_transactions(
             for t in transactions
         ]
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to fetch transactions",
         )
     finally:
         await client.close()
@@ -415,10 +416,10 @@ async def get_account_transactions(
 @router.get("/accounts/{account_id}/identity", response_model=IdentityResponse, dependencies=[Depends(Require("openbanking:read"))])
 async def get_account_identity(
     account_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get customer identity from linked account."""
-    result = await db.execute(
+    result = db.execute(
         select(OpenBankingConnection).where(OpenBankingConnection.id == account_id)
     )
     connection = result.scalar_one_or_none()
@@ -437,7 +438,7 @@ async def get_account_identity(
         # Update BVN if available
         if identity.bvn and not connection.bvn:
             connection.bvn = identity.bvn
-            await db.commit()
+            db.commit()
 
         return IdentityResponse(
             bvn=identity.bvn,
@@ -449,10 +450,10 @@ async def get_account_identity(
             date_of_birth=identity.date_of_birth.isoformat() if identity.date_of_birth else None,
         )
 
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail="Failed to fetch identity",
         )
     finally:
         await client.close()
@@ -461,10 +462,10 @@ async def get_account_identity(
 @router.post("/accounts/{account_id}/reauthorize", dependencies=[Depends(Require("openbanking:write"))])
 async def reauthorize_account(
     account_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Get reauthorization URL for expired connection."""
-    result = await db.execute(
+    result = db.execute(
         select(OpenBankingConnection).where(OpenBankingConnection.id == account_id)
     )
     connection = result.scalar_one_or_none()
@@ -497,10 +498,10 @@ async def reauthorize_account(
 @router.delete("/accounts/{account_id}", dependencies=[Depends(Require("openbanking:write"))])
 async def unlink_account(
     account_id: int,
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ):
     """Unlink a connected bank account."""
-    result = await db.execute(
+    result = db.execute(
         select(OpenBankingConnection).where(OpenBankingConnection.id == account_id)
     )
     connection = result.scalar_one_or_none()
@@ -519,14 +520,14 @@ async def unlink_account(
 
         # Update local status
         connection.status = ConnectionStatus.DISCONNECTED
-        await db.commit()
+        db.commit()
 
         return {"status": "success", "message": "Account unlinked"}
 
     except Exception as e:
         # Even if provider fails, mark as disconnected locally
         connection.status = ConnectionStatus.DISCONNECTED
-        await db.commit()
+        db.commit()
 
         return {"status": "success", "message": "Account unlinked locally"}
     finally:

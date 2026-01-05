@@ -1,0 +1,57 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Fixed Assets</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Manage company assets and depreciation</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="/assets/categories" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            Categories
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="p-4 border-b border-gray-100">
+        <form hx-get="/assets/table" hx-target="#assets-table-container" hx-push-url="true" hx-trigger="input changed delay:300ms from:#search-input, change from:select" class="flex flex-col sm:flex-row gap-4">
+            <div class="flex-1">
+                <input type="search" name="q" id="search-input" value="{{ q or '' }}" placeholder="Search assets..." class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+            </div>
+            <div class="flex flex-wrap gap-3">
+                <select name="status" class="px-4 py-2.5 text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">All Status</option>
+                    <option value="draft" {{ 'selected' if status == 'draft' else '' }}>Draft</option>
+                    <option value="submitted" {{ 'selected' if status == 'submitted' else '' }}>Submitted</option>
+                    <option value="partially_depreciated" {{ 'selected' if status == 'partially_depreciated' else '' }}>Partially Depreciated</option>
+                    <option value="fully_depreciated" {{ 'selected' if status == 'fully_depreciated' else '' }}>Fully Depreciated</option>
+                    <option value="sold" {{ 'selected' if status == 'sold' else '' }}>Sold</option>
+                    <option value="scrapped" {{ 'selected' if status == 'scrapped' else '' }}>Scrapped</option>
+                </select>
+                <select name="category" class="px-4 py-2.5 text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">All Categories</option>
+                    {% for opt in category_options %}<option value="{{ opt.value }}" {{ 'selected' if category == opt.value else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+                <select name="location" class="px-4 py-2.5 text-gray-700 bg-surface-50 border-0 rounded-xl focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                    <option value="">All Locations</option>
+                    {% for opt in location_options %}<option value="{{ opt.value }}" {{ 'selected' if location == opt.value else '' }}>{{ opt.label }}</option>{% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="assets-table-container">
+    {% include "modules/assets/templates/partials/assets_table.html" %}
+</div>
+
+{% if pagination and pagination.total_pages > 1 %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" %}
+</div>
+{% endif %}
+{% endblock %}

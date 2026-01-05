@@ -1,0 +1,116 @@
+{# Service orders table partial - returned for HTMX updates #}
+<div id="orders-filter-state" hx-swap-oob="true" class="hidden">
+    {% include "modules/field_service/templates/partials/filter_state_inputs.html" %}
+</div>
+<div id="orders-active-filters" hx-swap-oob="true">
+    {% include "modules/field_service/templates/partials/active_filters.html" %}
+</div>
+<span id="field-service-map-count" hx-swap-oob="true">{{ orders_with_coords | length }}</span>
+<div id="field-service-map-data" hx-swap-oob="true" class="hidden" data-orders='{{ orders_with_coords | tojson | safe }}'></div>
+
+{% if orders %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="orders-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Order
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden sm:table-cell">
+                    Type
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
+                    Status
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden md:table-cell">
+                    Priority
+                </th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body hidden lg:table-cell">
+                    <a
+                        href="#"
+                        class="group inline-flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        hx-get="/field-service/table?sort=scheduled_date&dir={% if sort_key == 'scheduled_date' and sort_dir == 'desc' %}asc{% else %}desc{% endif %}"
+                        hx-target="#orders-table-container"
+                        hx-include="[name='q'], [name='status'], [name='priority'], [name='type']"
+                        hx-push-url="true"
+                    >
+                        Scheduled
+                        {% if sort_key == 'scheduled_date' %}
+                        <svg class="w-4 h-4 text-primary-500 {{ 'rotate-180' if sort_dir == 'asc' else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                        </svg>
+                        {% endif %}
+                    </a>
+                </th>
+                <th scope="col" class="relative py-3.5 pl-3 pr-6">
+                    <span class="sr-only">Actions</span>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100" id="orders-tbody">
+            {% for order in orders %}
+            {% include "modules/field_service/templates/partials/order_row.html" %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% set query_params = [] %}
+    {% if search_query %}
+    {% set _ = query_params.append("q=" ~ search_query) %}
+    {% endif %}
+    {% if current_status %}
+    {% set _ = query_params.append("status=" ~ current_status) %}
+    {% endif %}
+    {% if current_priority %}
+    {% set _ = query_params.append("priority=" ~ current_priority) %}
+    {% endif %}
+    {% if current_type %}
+    {% set _ = query_params.append("type=" ~ current_type) %}
+    {% endif %}
+    {% if sort_key %}
+    {% set _ = query_params.append("sort=" ~ sort_key) %}
+    {% endif %}
+    {% if sort_dir %}
+    {% set _ = query_params.append("dir=" ~ sort_dir) %}
+    {% endif %}
+    {% set base_url = "/field-service/table" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+    {% with pagination=pagination, base_url=base_url, htmx_target="#orders-table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
+</div>
+{% endif %}
+
+{% else %}
+<!-- Empty state -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="orders-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No service orders found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_status or current_priority or current_type %}
+        No service orders match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by creating your first service order to dispatch technicians.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_status or current_priority or current_type) %}
+    <a
+        href="/field-service/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+        data-testid="empty-add-order-btn"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Your First Order
+    </a>
+    {% endif %}
+</div>
+{% endif %}

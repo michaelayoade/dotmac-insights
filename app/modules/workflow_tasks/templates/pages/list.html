@@ -1,0 +1,222 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    {# Page Header with subtle accent line #}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
+        <div class="relative">
+            <div class="absolute -left-4 top-1 bottom-1 w-1 bg-gradient-to-b from-primary-500 to-primary-600 rounded-full"></div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-display">My Tasks</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Unified view of all your pending actions across modules</p>
+        </div>
+    </div>
+
+    {# Stats Cards - Distinctive design with gradient accents #}
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        {# Total Tasks #}
+        <div class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm hover:shadow-warm-md transition-all duration-300 animate-fade-up" style="animation-delay: 50ms">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-400 to-primary-600 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl flex items-center justify-center ring-1 ring-primary-200/50">
+                    <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.total_count }}</p>
+                    <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Total</p>
+                </div>
+            </div>
+        </div>
+
+        {# Pending #}
+        <div class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm hover:shadow-warm-md transition-all duration-300 animate-fade-up" style="animation-delay: 100ms">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-accent-400 to-accent-500 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-accent-50 to-accent-100 rounded-xl flex items-center justify-center ring-1 ring-accent-200/50">
+                    <svg class="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.pending_count }}</p>
+                    <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Pending</p>
+                </div>
+            </div>
+        </div>
+
+        {# In Progress #}
+        <div class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm hover:shadow-warm-md transition-all duration-300 animate-fade-up" style="animation-delay: 150ms">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 to-violet-500 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-indigo-50 to-violet-100 rounded-xl flex items-center justify-center ring-1 ring-indigo-200/50">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.in_progress_count }}</p>
+                    <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">In Progress</p>
+                </div>
+            </div>
+        </div>
+
+        {# Overdue - Warning emphasis #}
+        <div class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm hover:shadow-warm-md transition-all duration-300 animate-fade-up {% if stats.overdue_count > 0 %}ring-2 ring-red-100{% endif %}" style="animation-delay: 200ms">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-red-400 to-rose-500 rounded-t-2xl {% if stats.overdue_count > 0 %}opacity-100{% else %}opacity-0 group-hover:opacity-100{% endif %} transition-opacity"></div>
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-red-50 to-rose-100 rounded-xl flex items-center justify-center ring-1 ring-red-200/50 {% if stats.overdue_count > 0 %}animate-pulse{% endif %}">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold {% if stats.overdue_count > 0 %}text-red-600{% else %}text-gray-900{% endif %} font-display tabular-nums">{{ stats.overdue_count }}</p>
+                    <p class="text-xs {% if stats.overdue_count > 0 %}text-red-500{% else %}text-gray-500{% endif %} font-body font-medium uppercase tracking-wide">Overdue</p>
+                </div>
+            </div>
+        </div>
+
+        {# Completed #}
+        <div class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm hover:shadow-warm-md transition-all duration-300 animate-fade-up" style="animation-delay: 250ms">
+            <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div class="flex items-center gap-3">
+                <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-emerald-50 to-teal-100 rounded-xl flex items-center justify-center ring-1 ring-emerald-200/50">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 font-display tabular-nums">{{ stats.completed_count }}</p>
+                    <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Completed</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Filters and Table #}
+    <div class="bg-white rounded-2xl border border-gray-100 shadow-warm animate-fade-up" style="animation-delay: 300ms">
+        <div class="p-4 border-b border-gray-100 bg-gradient-to-r from-surface-50 to-white">
+            <div class="flex flex-col sm:flex-row gap-4">
+                {# Search #}
+                <div class="flex-1">
+                    <div class="relative group">
+                        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-primary-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <input
+                            type="text"
+                            name="q"
+                            value="{{ search_query }}"
+                            placeholder="Search tasks by title or description..."
+                            class="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 font-body placeholder:text-gray-400"
+                            hx-get="/tasks/table"
+                            hx-trigger="input changed delay:300ms, search"
+                            hx-target="#tasks-table-container"
+                            hx-include="[name='status'], [name='module'], [name='priority']"
+                            hx-push-url="true"
+                            data-testid="tasks-search"
+                        />
+                        {# HTMX Loading indicator #}
+                        <div class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2">
+                            <svg class="w-4 h-4 text-primary-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                {# Filters #}
+                <div class="flex gap-2 flex-wrap items-center">
+                    <span class="text-xs text-gray-400 font-medium uppercase tracking-wider hidden sm:inline">Filters:</span>
+
+                    {# Status Filter #}
+                    <div class="relative">
+                        <select
+                            name="status"
+                            class="appearance-none pl-3 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white cursor-pointer hover:border-gray-300 transition-colors"
+                            hx-get="/tasks/table"
+                            hx-trigger="change"
+                            hx-target="#tasks-table-container"
+                            hx-include="[name='q'], [name='module'], [name='priority']"
+                            hx-push-url="true"
+                            data-testid="tasks-status-filter"
+                        >
+                            <option value="">All Status</option>
+                            {% for opt in status_options %}
+                            <option value="{{ opt.value }}" {% if current_status == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+
+                    {# Module Filter #}
+                    <div class="relative">
+                        <select
+                            name="module"
+                            class="appearance-none pl-3 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white cursor-pointer hover:border-gray-300 transition-colors"
+                            hx-get="/tasks/table"
+                            hx-trigger="change"
+                            hx-target="#tasks-table-container"
+                            hx-include="[name='q'], [name='status'], [name='priority']"
+                            hx-push-url="true"
+                            data-testid="tasks-module-filter"
+                        >
+                            <option value="">All Modules</option>
+                            {% for opt in module_options %}
+                            <option value="{{ opt.value }}" {% if current_module == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+
+                    {# Priority Filter #}
+                    <div class="relative">
+                        <select
+                            name="priority"
+                            class="appearance-none pl-3 pr-8 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white cursor-pointer hover:border-gray-300 transition-colors"
+                            hx-get="/tasks/table"
+                            hx-trigger="change"
+                            hx-target="#tasks-table-container"
+                            hx-include="[name='q'], [name='status'], [name='module']"
+                            hx-push-url="true"
+                            data-testid="tasks-priority-filter"
+                        >
+                            <option value="">All Priority</option>
+                            {% for opt in priority_options %}
+                            <option value="{{ opt.value }}" {% if current_priority == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+
+                    {# Clear filters button (when filters active) #}
+                    {% if current_status or current_module or current_priority or search_query %}
+                    <a
+                        href="/tasks"
+                        class="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Clear
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# Table Container #}
+        <div id="tasks-table-container">
+            {% include "modules/workflow_tasks/templates/partials/tasks_table.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

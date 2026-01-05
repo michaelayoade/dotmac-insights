@@ -7,13 +7,15 @@ from decimal import Decimal
 from typing import Optional, List
 import enum
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 
 # ============= WAREHOUSE =============
-class Warehouse(Base):
+class Warehouse(SoftValidationMixin, Base):
     """Warehouses/storage locations from ERPNext."""
 
     __tablename__ = "warehouses"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -66,10 +68,11 @@ class StockEntryType(enum.Enum):
     SEND_TO_SUBCONTRACTOR = "Send to Subcontractor"
 
 
-class StockEntry(Base):
+class StockEntry(SoftValidationMixin, Base):
     """Stock entries (inventory transactions) from ERPNext."""
 
     __tablename__ = "stock_entries"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -135,10 +138,11 @@ class StockEntry(Base):
         return f"<StockEntry {self.erpnext_id} - {self.stock_entry_type}>"
 
 
-class StockEntryDetail(Base):
+class StockEntryDetail(SoftValidationMixin, Base):
     """Stock entry line items (individual item movements)."""
 
     __tablename__ = "stock_entry_details"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     stock_entry_id: Mapped[int] = mapped_column(ForeignKey("stock_entries.id"), nullable=False, index=True)
@@ -180,10 +184,11 @@ class StockEntryDetail(Base):
 
 
 # ============= STOCK LEDGER ENTRY =============
-class StockLedgerEntry(Base):
+class StockLedgerEntry(SoftValidationMixin, Base):
     """Stock ledger entries (audit trail of all inventory movements) from ERPNext."""
 
     __tablename__ = "stock_ledger_entries"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -232,10 +237,11 @@ class StockLedgerEntry(Base):
 
 
 # ============= LANDED COST VOUCHER =============
-class LandedCostVoucher(Base):
+class LandedCostVoucher(SoftValidationMixin, Base):
     """Landed cost voucher for allocating additional costs to inventory items."""
 
     __tablename__ = "landed_cost_vouchers"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -286,10 +292,11 @@ class LandedCostVoucher(Base):
         return f"<LandedCostVoucher {self.id} - {self.total_taxes_and_charges}>"
 
 
-class LandedCostItem(Base):
+class LandedCostItem(SoftValidationMixin, Base):
     """Items affected by landed cost allocation."""
 
     __tablename__ = "landed_cost_items"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     voucher_id: Mapped[int] = mapped_column(ForeignKey("landed_cost_vouchers.id"), nullable=False, index=True)
@@ -321,10 +328,11 @@ class LandedCostItem(Base):
         return f"<LandedCostItem {self.item_code} charges={self.applicable_charges}>"
 
 
-class LandedCostTax(Base):
+class LandedCostTax(SoftValidationMixin, Base):
     """Taxes/charges to be allocated in landed cost."""
 
     __tablename__ = "landed_cost_taxes"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     voucher_id: Mapped[int] = mapped_column(ForeignKey("landed_cost_vouchers.id"), nullable=False, index=True)
@@ -352,10 +360,11 @@ class StockReceiptStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class StockReceipt(Base):
+class StockReceipt(SoftValidationMixin, Base):
     """Stock receipt linked to purchase invoice for receiving goods."""
 
     __tablename__ = "stock_receipts"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -406,10 +415,11 @@ class StockReceipt(Base):
         return f"<StockReceipt {self.id} - {self.status.value}>"
 
 
-class StockReceiptItem(Base):
+class StockReceiptItem(SoftValidationMixin, Base):
     """Line items for stock receipt."""
 
     __tablename__ = "stock_receipt_items"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     receipt_id: Mapped[int] = mapped_column(ForeignKey("stock_receipts.id"), nullable=False, index=True)
@@ -449,10 +459,11 @@ class StockIssueStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class StockIssue(Base):
+class StockIssue(SoftValidationMixin, Base):
     """Stock issue linked to sales invoice for delivering goods."""
 
     __tablename__ = "stock_issues"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -503,10 +514,11 @@ class StockIssue(Base):
         return f"<StockIssue {self.id} - {self.status.value}>"
 
 
-class StockIssueItem(Base):
+class StockIssueItem(SoftValidationMixin, Base):
     """Line items for stock issue."""
 
     __tablename__ = "stock_issue_items"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     issue_id: Mapped[int] = mapped_column(ForeignKey("stock_issues.id"), nullable=False, index=True)
@@ -549,10 +561,11 @@ class TransferStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class TransferRequest(Base):
+class TransferRequest(SoftValidationMixin, Base):
     """Warehouse transfer request with approval workflow."""
 
     __tablename__ = "transfer_requests"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -606,10 +619,11 @@ class TransferRequest(Base):
         return f"<TransferRequest {self.id} {self.from_warehouse} → {self.to_warehouse}>"
 
 
-class TransferRequestItem(Base):
+class TransferRequestItem(SoftValidationMixin, Base):
     """Line items for transfer request."""
 
     __tablename__ = "transfer_request_items"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     transfer_id: Mapped[int] = mapped_column(ForeignKey("transfer_requests.id"), nullable=False, index=True)
@@ -642,10 +656,11 @@ class TransferRequestItem(Base):
 
 
 # ============= BATCH =============
-class Batch(Base):
+class Batch(SoftValidationMixin, Base):
     """Batch tracking for inventory items."""
 
     __tablename__ = "batches"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -685,15 +700,21 @@ class Batch(Base):
 # ============= SERIAL NUMBER =============
 class SerialStatus(enum.Enum):
     ACTIVE = "active"
+    AVAILABLE = "available"  # In stock, available for assignment
+    RESERVED = "reserved"    # Reserved for subscription, not yet issued
+    ISSUED = "issued"        # Issued to customer/subscription
     DELIVERED = "delivered"
     RETURNED = "returned"
+    DAMAGED = "damaged"
+    LOST = "lost"
     INACTIVE = "inactive"
 
 
-class SerialNumber(Base):
+class SerialNumber(SoftValidationMixin, Base):
     """Serial number tracking for inventory items."""
 
     __tablename__ = "serial_numbers"
+    __soft_validation_scope__ = "inventory"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
@@ -702,6 +723,9 @@ class SerialNumber(Base):
     serial_no: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
     item_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     item_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+
+    # Item FK for joins
+    item_id: Mapped[Optional[int]] = mapped_column(ForeignKey("items.id"), nullable=True, index=True)
 
     # Location
     warehouse: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
@@ -735,6 +759,22 @@ class SerialNumber(Base):
     # Maintenance
     maintenance_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
+    # Subscription/CPE Equipment Tracking
+    reserved_for_subscription_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("subscriptions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    issued_to_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    reserved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    issued_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    returned_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    return_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     # Remarks
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
@@ -742,6 +782,11 @@ class SerialNumber(Base):
     created_by_id: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    item = relationship("Item", backref="serial_numbers")
+    reserved_subscription = relationship("Subscription", backref="equipment_serials")
+    issued_to_party = relationship("Party", backref="equipment_serials")
 
     def __repr__(self) -> str:
         return f"<SerialNumber {self.serial_no} - {self.item_code}>"

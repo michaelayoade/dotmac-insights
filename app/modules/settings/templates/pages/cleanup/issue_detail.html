@@ -1,0 +1,133 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">{{ issue.title }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">{{ issue.record_count }} affected records</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="/settings/data-cleanup/issues"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back to Issues
+        </a>
+        {% if issue.status.value == 'open' %}
+        <button type="button"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-teal-600 rounded-xl hover:bg-teal-500 transition-colors"
+                disabled title="Coming in Phase 3">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Fix This Issue
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<!-- Issue Info Card -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Issue Details</h2>
+    </div>
+    <div class="p-6">
+        <dl class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Severity</dt>
+                <dd class="mt-1">
+                    <span class="inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium ring-1 ring-inset {{ severity_colors[issue.severity.value] }}">
+                        {{ issue.severity.value|title }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</dt>
+                <dd class="mt-1">
+                    <span class="inline-flex items-center rounded-md px-2.5 py-1 text-sm font-medium ring-1 ring-inset {{ issue_status_colors[issue.status.value] }}">
+                        {{ issue.status.value.replace('_', ' ')|title }}
+                    </span>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Entity Type</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ get_entity_display(issue.entity_type.value) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Issue Type</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ get_issue_type_display(issue.issue_type.value) }}</dd>
+            </div>
+            {% if issue.field_name %}
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Field</dt>
+                <dd class="mt-1 text-sm text-gray-900 font-mono">{{ issue.field_name }}</dd>
+            </div>
+            {% endif %}
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Affected Records</dt>
+                <dd class="mt-1 text-sm font-semibold text-gray-900 tabular-nums">{{ "{:,}".format(issue.record_count) }}</dd>
+            </div>
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Detected</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ issue.created_at.strftime('%b %d, %Y %H:%M') }}</dd>
+            </div>
+            {% if issue.resolved_at %}
+            <div>
+                <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide">Resolved</dt>
+                <dd class="mt-1 text-sm text-gray-900">{{ issue.resolved_at.strftime('%b %d, %Y %H:%M') }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+
+        {% if issue.description %}
+        <div class="mt-6 pt-6 border-t border-gray-100">
+            <dt class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Description</dt>
+            <dd class="text-sm text-gray-700">{{ issue.description }}</dd>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Sample Values -->
+{% if issue.sample_values %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Sample Values</h2>
+        <p class="text-sm text-gray-500 mt-0.5">Examples of problematic data</p>
+    </div>
+    <div class="p-6">
+        <div class="bg-gray-50 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+            <pre>{{ issue.sample_values|tojson(indent=2) }}</pre>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Affected Record IDs -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">Affected Records</h2>
+        <p class="text-sm text-gray-500 mt-0.5">List of record IDs with this issue</p>
+    </div>
+    <div class="p-6">
+        <div class="flex flex-wrap gap-2">
+            {% for record_id in issue.record_ids[:50] %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-800 font-mono">
+                #{{ record_id }}
+            </span>
+            {% endfor %}
+            {% if issue.record_ids|length > 50 %}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-500">
+                +{{ issue.record_ids|length - 50 }} more
+            </span>
+            {% endif %}
+        </div>
+        <p class="mt-4 text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
+            Record viewing and editing will be available in Phase 3.
+        </p>
+    </div>
+</div>
+{% endblock %}

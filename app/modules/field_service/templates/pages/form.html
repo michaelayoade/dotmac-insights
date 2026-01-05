@@ -1,0 +1,376 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <form
+        method="POST"
+        action="{% if order %}/field-service/{{ order.id }}{% else %}/field-service{% endif %}"
+        class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
+        data-testid="order-form"
+        x-data="{ submitting: false }"
+        @submit="submitting = true"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h3 class="text-lg font-display font-semibold text-gray-900">
+                {% if order %}Edit Service Order{% else %}New Service Order{% endif %}
+            </h3>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {% if order %}
+                Update the service order details below.
+                {% else %}
+                Fill in the details to create a new service order.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Form Fields -->
+        <div class="px-6 py-6 space-y-6">
+            <!-- Title -->
+            <div>
+                <label for="title" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Title <span class="text-red-500">*</span>
+                </label>
+                <input
+                    type="text"
+                    name="title"
+                    id="title"
+                    value="{{ order.title if order else (form_data.title if form_data else '') }}"
+                    required
+                    placeholder="Brief description of the service"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.title else '' }}"
+                    data-testid="title-input"
+                >
+                {% if errors.title %}
+                <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.title }}</p>
+                {% endif %}
+            </div>
+
+            <!-- Type, Status, Priority row -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <!-- Type -->
+                <div>
+                    <label for="order_type" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Type <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="order_type"
+                            id="order_type"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                        >
+                            {% for opt in type_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (order.order_type.value if order else (form_data.order_type if form_data else 'repair')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Status <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="status"
+                            id="status"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                        >
+                            {% for opt in status_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (order.status.value if order else (form_data.status if form_data else 'draft')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Priority -->
+                <div>
+                    <label for="priority" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Priority <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="priority"
+                            id="priority"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                        >
+                            {% for opt in priority_options %}
+                            <option
+                                value="{{ opt.value }}"
+                                {{ 'selected' if (order.priority.value if order else (form_data.priority if form_data else 'medium')) == opt.value else '' }}
+                            >{{ opt.label }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer and Scheduled Date -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Customer -->
+                <div>
+                    <label for="customer_account_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Customer <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="customer_account_id"
+                            id="customer_account_id"
+                            required
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.customer_account_id else '' }}"
+                        >
+                            <option value="">Select customer...</option>
+                            {% for customer in customers %}
+                            <option
+                                value="{{ customer.id }}"
+                                {{ 'selected' if (order.customer_account_id if order else (form_data.customer_account_id if form_data else '')) | string == customer.id | string else '' }}
+                            >{{ customer.party.name if customer.party else ("Account " ~ customer.id) }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                    {% if errors.customer_account_id %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.customer_account_id }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Scheduled Date -->
+                <div>
+                    <label for="scheduled_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Scheduled Date <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="date"
+                        name="scheduled_date"
+                        id="scheduled_date"
+                        value="{{ order.scheduled_date.strftime('%Y-%m-%d') if order and order.scheduled_date else (form_data.scheduled_date if form_data else '') }}"
+                        required
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    >
+                </div>
+            </div>
+
+            <!-- Service Address -->
+            <div>
+                <label for="service_address" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Service Address <span class="text-red-500">*</span>
+                </label>
+                <textarea
+                    name="service_address"
+                    id="service_address"
+                    rows="2"
+                    required
+                    placeholder="Full service address"
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm resize-none {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.service_address else '' }}"
+                >{{ order.service_address if order else (form_data.service_address if form_data else '') }}</textarea>
+                {% if errors.service_address %}
+                <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.service_address }}</p>
+                {% endif %}
+            </div>
+
+            <!-- City, State, Postal Code -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                    <label for="city" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        City
+                    </label>
+                    <input
+                        type="text"
+                        name="city"
+                        id="city"
+                        value="{{ order.city if order else (form_data.city if form_data else '') }}"
+                        placeholder="City"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="state" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        State
+                    </label>
+                    <input
+                        type="text"
+                        name="state"
+                        id="state"
+                        value="{{ order.state if order else (form_data.state if form_data else '') }}"
+                        placeholder="State"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="postal_code" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Postal Code
+                    </label>
+                    <input
+                        type="text"
+                        name="postal_code"
+                        id="postal_code"
+                        value="{{ order.postal_code if order else (form_data.postal_code if form_data else '') }}"
+                        placeholder="Postal code"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    >
+                </div>
+            </div>
+
+            <!-- Customer Contact -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="customer_contact_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Contact Name
+                    </label>
+                    <input
+                        type="text"
+                        name="customer_contact_name"
+                        id="customer_contact_name"
+                        value="{{ order.customer_contact_name if order else (form_data.customer_contact_name if form_data else '') }}"
+                        placeholder="On-site contact name"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="customer_contact_phone" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Contact Phone
+                    </label>
+                    <input
+                        type="tel"
+                        name="customer_contact_phone"
+                        id="customer_contact_phone"
+                        value="{{ order.customer_contact_phone if order else (form_data.customer_contact_phone if form_data else '') }}"
+                        placeholder="Contact phone number"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm"
+                    >
+                </div>
+            </div>
+
+            <!-- Assignment -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Technician -->
+                <div>
+                    <label for="assigned_technician_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Assign Technician
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="assigned_technician_id"
+                            id="assigned_technician_id"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                        >
+                            <option value="">Select technician...</option>
+                            {% for tech in technicians %}
+                            <option
+                                value="{{ tech.id }}"
+                                {{ 'selected' if (order.assigned_technician_id if order else (form_data.assigned_technician_id if form_data else '')) | string == tech.id | string else '' }}
+                            >{{ tech.employee_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team -->
+                <div>
+                    <label for="assigned_team_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Assign Team
+                    </label>
+                    <div class="relative">
+                        <select
+                            name="assigned_team_id"
+                            id="assigned_team_id"
+                            class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
+                        >
+                            <option value="">Select team...</option>
+                            {% for team in teams %}
+                            <option
+                                value="{{ team.id }}"
+                                {{ 'selected' if (order.assigned_team_id if order else (form_data.assigned_team_id if form_data else '')) | string == team.id | string else '' }}
+                            >{{ team.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+                <label for="description" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Description
+                </label>
+                <textarea
+                    name="description"
+                    id="description"
+                    rows="4"
+                    placeholder="Detailed description of the service to be performed..."
+                    class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:shadow-warm-md transition-all duration-200 font-body sm:text-sm resize-none"
+                >{{ order.description if order else (form_data.description if form_data else '') }}</textarea>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-between sm:justify-end gap-3">
+            <a
+                href="{% if order %}/field-service/{{ order.id }}{% else %}/field-service{% endif %}"
+                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 focus-visible:ring-2 focus-visible:ring-primary-100 transition-all duration-200"
+                data-testid="cancel-button"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200 disabled:opacity-50"
+                :class="{ 'pointer-events-none': submitting }"
+                data-testid="submit-button"
+            >
+                <span x-show="!submitting">
+                    {% if order %}Save Changes{% else %}Create Order{% endif %}
+                </span>
+                <svg x-show="!submitting" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                </svg>
+                <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

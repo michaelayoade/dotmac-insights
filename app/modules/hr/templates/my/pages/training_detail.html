@@ -1,0 +1,105 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900">{{ event.event_name }}</h1>
+            <p class="mt-1 text-sm text-gray-500">{{ event.training_program.program_name if event.training_program else 'Training Event' }}</p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/hr/my/training" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                Back to List
+            </a>
+        </div>
+    </div>
+
+    <!-- Event Card -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Event Details</h2>
+            {% if event.status %}
+            <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium {% if event.status == 'Scheduled' %}bg-blue-100 text-blue-700{% elif event.status == 'Completed' %}bg-emerald-100 text-emerald-700{% elif event.status == 'Cancelled' %}bg-red-100 text-red-700{% else %}bg-gray-100 text-gray-700{% endif %}">{{ event.status }}</span>
+            {% endif %}
+        </div>
+        <div class="p-6">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Start Date</dt>
+                    <dd class="mt-1 text-gray-900">{{ event.start_date.strftime('%B %d, %Y') if event.start_date else '-' }}</dd>
+                </div>
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">End Date</dt>
+                    <dd class="mt-1 text-gray-900">{{ event.end_date.strftime('%B %d, %Y') if event.end_date else '-' }}</dd>
+                </div>
+                {% if event.start_time %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Time</dt>
+                    <dd class="mt-1 text-gray-900">{{ event.start_time }} {% if event.end_time %} - {{ event.end_time }}{% endif %}</dd>
+                </div>
+                {% endif %}
+                {% if event.location %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Location</dt>
+                    <dd class="mt-1 text-gray-900">{{ event.location }}</dd>
+                </div>
+                {% endif %}
+                {% if event.trainer_name %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Trainer</dt>
+                    <dd class="mt-1 text-gray-900">{{ event.trainer_name }}</dd>
+                </div>
+                {% endif %}
+                {% if event.type %}
+                <div>
+                    <dt class="text-sm font-medium text-gray-500">Training Type</dt>
+                    <dd class="mt-1 text-gray-900">{{ event.type }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+
+            {% if event.introduction or event.description %}
+            <div class="mt-6 pt-6 border-t border-gray-100">
+                <dt class="text-sm font-medium text-gray-500 mb-2">Description</dt>
+                <dd class="text-gray-700 bg-surface-50 rounded-xl p-4">{{ event.introduction or event.description }}</dd>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Enrollment Info -->
+    {% if enrollment %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Your Enrollment</h2>
+        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Enrollment Status</dt>
+                <dd class="mt-1">
+                    <span class="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Enrolled</span>
+                </dd>
+            </div>
+            {% if enrollment.attendance %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Attendance</dt>
+                <dd class="mt-1 text-gray-900">{{ enrollment.attendance }}</dd>
+            </div>
+            {% endif %}
+            {% if enrollment.status %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Completion Status</dt>
+                <dd class="mt-1 text-gray-900">{{ enrollment.status }}</dd>
+            </div>
+            {% endif %}
+            {% if enrollment.score %}
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Score</dt>
+                <dd class="mt-1 text-gray-900">{{ enrollment.score }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import structlog
 from sqlalchemy import and_, case, func, or_
@@ -224,6 +224,7 @@ class WorkflowTaskService:
         module: Optional[str] = None,
         priority: Optional[str] = None,
         overdue_only: bool = False,
+        search: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
     ) -> List[WorkflowTask]:
@@ -236,6 +237,7 @@ class WorkflowTaskService:
             module: Filter by module
             priority: Filter by priority
             overdue_only: Only return overdue tasks
+            search: Search in title and description
             limit: Maximum number of tasks to return
             offset: Offset for pagination
 
@@ -249,6 +251,7 @@ class WorkflowTaskService:
             module=module,
             priority=priority,
             overdue_only=overdue_only,
+            search=search,
         )
 
         # Order by: urgent first, then by due date (soonest first), then by created
@@ -264,7 +267,8 @@ class WorkflowTaskService:
             WorkflowTask.created_at.desc(),
         )
 
-        return query.offset(offset).limit(limit).all()
+        tasks = cast(list[WorkflowTask], query.offset(offset).limit(limit).all())
+        return tasks
 
     def count_my_tasks(
         self,
@@ -273,6 +277,7 @@ class WorkflowTaskService:
         module: Optional[str] = None,
         priority: Optional[str] = None,
         overdue_only: bool = False,
+        search: Optional[str] = None,
     ) -> int:
         """Count tasks assigned to a user with optional filters."""
         query = self._apply_task_filters(
@@ -282,6 +287,7 @@ class WorkflowTaskService:
             module=module,
             priority=priority,
             overdue_only=overdue_only,
+            search=search,
         )
         return int(query.scalar() or 0)
 
@@ -293,6 +299,7 @@ class WorkflowTaskService:
         module: Optional[str] = None,
         priority: Optional[str] = None,
         overdue_only: bool = False,
+        search: Optional[str] = None,
     ):
         query = query.filter(WorkflowTask.assignee_user_id == user_id)
 
@@ -318,6 +325,13 @@ class WorkflowTaskService:
                 WorkflowTask.due_at < datetime.now(timezone.utc),
                 WorkflowTask.status == WorkflowTaskStatus.PENDING.value,
             )
+
+        if search:
+            search_filter = or_(
+                WorkflowTask.title.ilike(f"%{search}%"),
+                WorkflowTask.description.ilike(f"%{search}%"),
+            )
+            query = query.filter(search_filter)
 
         return query
 
@@ -487,3 +501,25 @@ class WorkflowTaskService:
         )
 
         return task
+
+    def get_task_by_id(
+        self,
+        task_id: int,
+        user_id: Optional[int] = None,
+    ) -> Optional[WorkflowTask]:
+        """
+        Get a single task by ID with optional ownership check.
+
+        Args:
+            task_id: ID of the task
+            user_id: If provided, only return task if assigned to this user
+
+        Returns:
+            WorkflowTask or None if not found
+        """
+        query = self.db.query(WorkflowTask).filter(WorkflowTask.id == task_id)
+
+        if user_id is not None:
+            query = query.filter(WorkflowTask.assignee_user_id == user_id)
+
+        return query.first()

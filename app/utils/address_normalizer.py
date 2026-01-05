@@ -426,6 +426,32 @@ def normalize_state(raw_state: Optional[str]) -> Optional[str]:
     return None
 
 
+class AddressNormalizer:
+    """Class wrapper for address normalization functions."""
+
+    def __init__(self):
+        """Initialize the address normalizer."""
+        pass
+
+    def normalize_city(self, raw_city: Optional[str]) -> Tuple[Optional[str], Optional[str], CityMetadata]:
+        """Normalize a city value and infer state."""
+        return normalize_city(raw_city)
+
+    def normalize_state(self, raw_state: Optional[str]) -> Optional[str]:
+        """Normalize a state value."""
+        return normalize_state(raw_state)
+
+    def normalize_address(
+        self,
+        raw_city: Optional[str],
+        raw_state: Optional[str] = None,
+        current_lat: Optional[float] = None,
+        current_lng: Optional[float] = None,
+    ) -> dict:
+        """Normalize city and state values together."""
+        return normalize_address(raw_city, raw_state, current_lat, current_lng)
+
+
 def normalize_address(
     raw_city: Optional[str],
     raw_state: Optional[str] = None,

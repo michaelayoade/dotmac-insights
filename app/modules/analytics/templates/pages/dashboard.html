@@ -1,0 +1,195 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Analytics Dashboard</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Business intelligence across all domains</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <!-- Period selector -->
+        <select
+            name="period"
+            class="rounded-xl border-gray-200 bg-white text-sm font-medium text-gray-700 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            hx-get="/analytics/stats"
+            hx-target="#stats-grid"
+            hx-trigger="change"
+            hx-indicator="#refresh-spinner"
+        >
+            <option value="7" {{ 'selected' if period == 7 else '' }}>Last 7 days</option>
+            <option value="30" {{ 'selected' if period == 30 else '' }}>Last 30 days</option>
+            <option value="90" {{ 'selected' if period == 90 else '' }}>Last 90 days</option>
+        </select>
+        <!-- Refresh button -->
+        <button
+            type="button"
+            hx-get="/analytics/stats"
+            hx-target="#stats-grid"
+            hx-indicator="#refresh-spinner"
+            class="inline-flex items-center justify-center p-2.5 rounded-xl bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-surface-50 shadow-sm transition-colors"
+            title="Refresh data"
+        >
+            <svg id="refresh-spinner" class="w-5 h-5 htmx-indicator animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <svg class="w-5 h-5 htmx-indicator-hide" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Overview Stats Grid -->
+<div id="stats-grid" class="mb-8">
+    {% include "modules/analytics/templates/partials/stats_grid.html" %}
+</div>
+
+<!-- Domain Cards with drill-down links -->
+<h2 class="text-lg font-semibold text-gray-900 mb-4">Explore by Domain</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <!-- Revenue Card -->
+    <a
+        href="/analytics/revenue"
+        class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-primary-100 transition-all"
+        data-testid="revenue-card"
+    >
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 p-3 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+                {% include "components/icons/dollar-sign.html" %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-gray-900">Revenue</h3>
+                <p class="text-sm text-gray-500">MRR, DSO, Invoice Aging</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="text-2xl font-bold text-gray-900">
+                {% if overview.revenue.currency %}{{ overview.revenue.currency }} {% endif %}{{ "{:,.0f}".format(overview.revenue.mrr | default(0)) }}
+            </div>
+            <div class="text-sm text-gray-500">Monthly Recurring Revenue</div>
+        </div>
+    </a>
+
+    <!-- Customers Card -->
+    <a
+        href="/analytics/customers"
+        class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-primary-100 transition-all"
+        data-testid="customers-card"
+    >
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 p-3 rounded-xl bg-blue-50 text-blue-600 group-hover:bg-blue-100 transition-colors">
+                {% include "components/icons/users.html" %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-gray-900">Customers</h3>
+                <p class="text-sm text-gray-500">Segments, Health, Churn</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="text-2xl font-bold text-gray-900">{{ "{:,}".format(overview.customers.active | default(0)) }}</div>
+            <div class="text-sm text-gray-500">Active Customers</div>
+        </div>
+    </a>
+
+    <!-- Support Card -->
+    <a
+        href="/analytics/support"
+        class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-primary-100 transition-all"
+        data-testid="support-card"
+    >
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 p-3 rounded-xl bg-yellow-50 text-yellow-600 group-hover:bg-yellow-100 transition-colors">
+                {% include "components/icons/life-buoy.html" %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-gray-900">Support</h3>
+                <p class="text-sm text-gray-500">SLA, Tickets, Agents</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="text-2xl font-bold text-gray-900">{{ overview.support.open_tickets | default(0) }}</div>
+            <div class="text-sm text-gray-500">Open Tickets</div>
+        </div>
+    </a>
+
+    <!-- HR Card -->
+    <a
+        href="/analytics/hr"
+        class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-primary-100 transition-all"
+        data-testid="hr-card"
+    >
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 p-3 rounded-xl bg-purple-50 text-purple-600 group-hover:bg-purple-100 transition-colors">
+                {% include "components/icons/calendar.html" %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-gray-900">HR</h3>
+                <p class="text-sm text-gray-500">Leave, Payroll, Recruitment</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="text-sm text-gray-500">Leave, Attendance, Payroll analytics</div>
+        </div>
+    </a>
+
+    <!-- Operations Card -->
+    <a
+        href="/analytics/operations"
+        class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-primary-100 transition-all"
+        data-testid="operations-card"
+    >
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 p-3 rounded-xl bg-orange-50 text-orange-600 group-hover:bg-orange-100 transition-colors">
+                {% include "components/icons/truck.html" %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-gray-900">Operations</h3>
+                <p class="text-sm text-gray-500">Field Service, Expenses</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="text-sm text-gray-500">Field service and expense analytics</div>
+        </div>
+    </a>
+
+    <!-- Insights Card -->
+    <a
+        href="/analytics/insights"
+        class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-primary-100 transition-all"
+        data-testid="insights-card"
+    >
+        <div class="flex items-center gap-4">
+            <div class="flex-shrink-0 p-3 rounded-xl bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 transition-colors">
+                {% include "components/icons/trending-up.html" %}
+            </div>
+            <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-gray-900">Insights</h3>
+                <p class="text-sm text-gray-500">Data Quality, Anomalies</p>
+            </div>
+            <svg class="w-5 h-5 text-gray-400 group-hover:text-primary-500 group-hover:translate-x-1 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </div>
+        <div class="mt-4 pt-4 border-t border-gray-100">
+            <div class="text-sm text-gray-500">Data completeness and anomaly detection</div>
+        </div>
+    </a>
+</div>
+{% endblock %}

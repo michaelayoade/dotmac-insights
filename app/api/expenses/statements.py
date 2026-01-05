@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
@@ -34,7 +34,7 @@ def compute_import_hash(card_id: int, transaction_date: datetime, amount: Decima
     return hashlib.sha256(data.encode()).hexdigest()
 
 
-@router.get("/", response_model=List[CorporateCardStatementRead], dependencies=[Depends(Require("expenses:read"))])
+@router.get("/", dependencies=[Depends(Require("expenses:read"))])
 async def list_statements(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -42,7 +42,7 @@ async def list_statements(
     status: Optional[str] = Query(default=None, description="Filter by status"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
-):
+) -> Dict[str, Any]:
     """List corporate card statements with optional filters."""
     query = db.query(CorporateCardStatement).join(CorporateCard).order_by(
         CorporateCardStatement.period_start.desc()
@@ -64,8 +64,40 @@ async def list_statements(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid status filter")
 
+    total = query.count()
     statements = query.offset(offset).limit(limit).all()
-    return statements
+
+    def serialize_statement(s: CorporateCardStatement) -> Dict[str, Any]:
+        return {
+            "id": s.id,
+            "card_id": s.card_id,
+            "period_start": s.period_start.isoformat() if s.period_start else None,
+            "period_end": s.period_end.isoformat() if s.period_end else None,
+            "statement_date": s.statement_date.isoformat() if s.statement_date else None,
+            "import_date": s.import_date.isoformat() if s.import_date else None,
+            "import_source": s.import_source,
+            "original_filename": s.original_filename,
+            "status": s.status.value if s.status else None,
+            "total_amount": float(s.total_amount) if s.total_amount is not None else 0.0,
+            "transaction_count": s.transaction_count,
+            "matched_amount": float(s.matched_amount) if s.matched_amount is not None else 0.0,
+            "matched_count": s.matched_count,
+            "unmatched_count": s.unmatched_count,
+            "reconciled_at": s.reconciled_at.isoformat() if s.reconciled_at else None,
+            "reconciled_by_id": s.reconciled_by_id,
+            "closed_at": s.closed_at.isoformat() if s.closed_at else None,
+            "closed_by_id": s.closed_by_id,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+            "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+            "created_by_id": s.created_by_id,
+        }
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [serialize_statement(s) for s in statements],
+    }
 
 
 @router.get("/{statement_id}", response_model=CorporateCardStatementRead, dependencies=[Depends(Require("expenses:read"))])
@@ -395,13 +427,15 @@ async def reopen_statement(
     return statement
 
 
-@router.get("/{statement_id}/transactions", response_model=List, dependencies=[Depends(Require("expenses:read"))])
+@router.get("/{statement_id}/transactions", dependencies=[Depends(Require("expenses:read"))])
 async def get_statement_transactions(
     statement_id: int,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     status: Optional[str] = Query(default=None, description="Filter by status"),
     db: Session = Depends(get_db),
     principal: Principal = Depends(get_current_principal),
-):
+) -> Dict[str, Any]:
     """Get all transactions for a statement."""
     statement_query = (
         db.query(CorporateCardStatement)
@@ -431,7 +465,38 @@ async def get_statement_transactions(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid status filter")
 
-    return query.all()
+    total = query.count()
+    transactions = query.offset(offset).limit(limit).all()
+
+    def serialize_transaction(t: CorporateCardTransaction) -> Dict[str, Any]:
+        return {
+            "id": t.id,
+            "card_id": t.card_id,
+            "statement_id": t.statement_id,
+            "transaction_date": t.transaction_date.isoformat() if t.transaction_date else None,
+            "posting_date": t.posting_date.isoformat() if t.posting_date else None,
+            "merchant_name": t.merchant_name,
+            "merchant_category_code": t.merchant_category_code,
+            "description": t.description,
+            "amount": float(t.amount) if t.amount is not None else 0.0,
+            "currency": t.currency,
+            "original_amount": float(t.original_amount) if t.original_amount is not None else None,
+            "original_currency": t.original_currency,
+            "conversion_rate": float(t.conversion_rate) if t.conversion_rate is not None else 1.0,
+            "transaction_reference": t.transaction_reference,
+            "authorization_code": t.authorization_code,
+            "status": t.status.value if t.status else None,
+            "expense_claim_line_id": t.expense_claim_line_id,
+            "match_confidence": float(t.match_confidence) if t.match_confidence is not None else None,
+            "disputed_at": t.disputed_at.isoformat() if t.disputed_at else None,
+        }
+
+    return {
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "data": [serialize_transaction(t) for t in transactions],
+    }
 
 
 @router.delete("/{statement_id}", status_code=204, dependencies=[Depends(Require("expenses:write"))])

@@ -85,7 +85,8 @@ def serialize_ticket_brief(ticket) -> dict:
         "status": ticket.status.value if ticket.status else None,
         "priority": ticket.priority.value if ticket.priority else None,
         "ticket_type": ticket.ticket_type,
-        "customer_id": ticket.customer_id,
+        "customer_account_id": ticket.customer_account_id,
+        "party_id": ticket.party_id,
         "customer_name": ticket.customer_name,
         "assigned_to": ticket.assigned_to,
         "resolution_by": ticket.resolution_by.isoformat() if ticket.resolution_by else None,
@@ -153,17 +154,16 @@ def serialize_dependency(dep) -> dict:
 
 
 def serialize_agent(agent, team_membership=None) -> dict:
-    """Serialize an agent."""
+    """Serialize an agent (Party with support_agent role)."""
     data = {
         "id": agent.id,
-        "employee_id": agent.employee_id,
-        "email": agent.email,
+        "email": agent.primary_email,
         "display_name": agent.display_name,
-        "domains": agent.domains,
-        "skills": agent.skills,
-        "channel_caps": agent.channel_caps,
-        "routing_weight": agent.routing_weight,
-        "capacity": agent.capacity,
+        "domains": agent.agent_domains,
+        "skills": agent.agent_skills,
+        "channel_caps": agent.agent_channel_caps,
+        "routing_weight": agent.agent_routing_weight,
+        "capacity": agent.agent_capacity,
         "is_active": agent.is_active,
     }
     if team_membership:
@@ -188,7 +188,8 @@ def serialize_team(team) -> dict:
         "members": [
             {
                 "id": m.id,
-                "agent_id": m.agent_id,
+                "party_id": m.party_id,
+                "agent_id": m.party_id,
                 "role": m.role,
                 "is_active": m.is_active,
             }

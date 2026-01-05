@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import structlog
 
 from app.models.customer_note import CustomerNote
-from app.models.customer import Customer
+from app.models.party import PartyExternalId
 from app.config import settings
 
 logger = structlog.get_logger()
@@ -17,10 +17,15 @@ async def sync_customer_notes(sync_client, client, full_sync: bool):
         notes = await sync_client._fetch_paginated(client, "/admin/customers/customer-notes")
         logger.info("splynx_customer_notes_fetched", count=len(notes))
 
-        # Pre-fetch customers for FK lookup
-        customers_by_splynx_id = {
-            c.splynx_id: c.id
-            for c in sync_client.db.query(Customer).filter(Customer.splynx_id.isnot(None)).all()
+        # Pre-fetch parties for FK lookup
+        parties_by_splynx_id = {
+            mapping.external_id: mapping.party_id
+            for mapping in sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "splynx",
+                PartyExternalId.external_key_type == "customer_id",
+            )
+            .all()
         }
 
         for i, note_data in enumerate(notes, 1):
@@ -31,7 +36,7 @@ async def sync_customer_notes(sync_client, client, full_sync: bool):
 
             # Find customer
             customer_splynx_id = note_data.get("customer_id")
-            customer_id = customers_by_splynx_id.get(customer_splynx_id) if customer_splynx_id else None
+            party_id = parties_by_splynx_id.get(str(customer_splynx_id)) if customer_splynx_id else None
 
             # Parse datetime
             note_datetime = None
@@ -63,7 +68,7 @@ async def sync_customer_notes(sync_client, client, full_sync: bool):
                     pass
 
             if existing:
-                existing.customer_id = customer_id
+                existing.party_id = party_id
                 existing.splynx_customer_id = customer_splynx_id
                 existing.administrator_id = note_data.get("administrator_id")
                 existing.note_type = note_data.get("type")
@@ -82,7 +87,7 @@ async def sync_customer_notes(sync_client, client, full_sync: bool):
             else:
                 note = CustomerNote(
                     splynx_id=splynx_id,
-                    customer_id=customer_id,
+                    party_id=party_id,
                     splynx_customer_id=customer_splynx_id,
                     administrator_id=note_data.get("administrator_id"),
                     note_type=note_data.get("type"),
