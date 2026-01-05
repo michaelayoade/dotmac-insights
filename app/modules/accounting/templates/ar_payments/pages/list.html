@@ -32,26 +32,30 @@
 {% block content %}
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-    <div class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4">
+    <a href="/accounting/ar-payments?status=posted" class="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-4 hover:from-emerald-100 hover:to-emerald-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-emerald-700 uppercase tracking-wider">This Month</p>
         <p class="mt-1 text-2xl font-bold text-emerald-800">{{ '{:,.2f}'.format(stats.this_month) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-emerald-600 mt-1 group-hover:underline">View posted →</p>
+    </a>
+    <a href="/accounting/ar-payments?status=pending" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</p>
         <p class="mt-1 text-2xl font-bold text-amber-600">{{ '{:,.2f}'.format(stats.pending_amount) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View pending →</p>
+    </a>
+    <a href="/accounting/ar-payments?unallocated=true" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-blue-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Unallocated</p>
         <p class="mt-1 text-2xl font-bold text-blue-600">{{ '{:,.2f}'.format(stats.unallocated) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-blue-600">View unallocated →</p>
+    </a>
+    <a href="/accounting/ar-payments" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Count</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_count }}</p>
-    </div>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
 </div>
 
 <!-- Filters -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
     <form method="GET" class="flex flex-wrap items-center gap-4">
         <div class="flex-1 min-w-[200px]">
             <div class="relative">

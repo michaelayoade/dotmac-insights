@@ -4,15 +4,17 @@ Sales Routes - Quotations and Sales Orders with SSR + HTMX.
 Permission Requirements:
 - sales:read - View quotations and orders
 - sales:write - Create, update quotations and orders
+
+Routes are thin wrappers around services - all business logic is in:
+- QuotationService: app/services/sales/quotations.py
+- SalesOrderService: app/services/sales/orders.py
 """
 from __future__ import annotations
 
 from typing import Optional
-from decimal import Decimal
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, or_
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import (
@@ -22,8 +24,13 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.sales import Quotation, QuotationStatus, SalesOrder, SalesOrderStatus
+from app.models.sales import QuotationStatus, SalesOrderStatus
 from app.core.security import is_htmx_request
+from app.services.sales import QuotationService, SalesOrderService
+from app.services.sales.quotation_types import QuotationFilters
+from app.services.sales.order_types import SalesOrderFilters
+from app.services.types import PaginationParams
+from app.services.errors import NotFoundError
 
 # Permission dependencies
 RequireSalesRead = Depends(require_scope("sales:read"))
@@ -43,40 +50,6 @@ def get_quotation_status_options():
     ]
 
 
-def get_quotation_stats(db) -> dict:
-    """Calculate quotation statistics."""
-    total_count = db.query(func.count(Quotation.id)).filter(
-        Quotation.is_deleted == False
-    ).scalar() or 0
-
-    total_value = db.query(func.sum(Quotation.grand_total)).filter(
-        Quotation.is_deleted == False
-    ).scalar() or Decimal("0")
-
-    open_count = db.query(func.count(Quotation.id)).filter(
-        Quotation.is_deleted == False,
-        Quotation.status == QuotationStatus.OPEN
-    ).scalar() or 0
-
-    ordered_count = db.query(func.count(Quotation.id)).filter(
-        Quotation.is_deleted == False,
-        Quotation.status == QuotationStatus.ORDERED
-    ).scalar() or 0
-
-    lost_count = db.query(func.count(Quotation.id)).filter(
-        Quotation.is_deleted == False,
-        Quotation.status == QuotationStatus.LOST
-    ).scalar() or 0
-
-    return {
-        "total_count": total_count,
-        "total_value": total_value,
-        "open_count": open_count,
-        "ordered_count": ordered_count,
-        "lost_count": lost_count,
-    }
-
-
 @router.get("/quotations", response_class=HTMLResponse, dependencies=[RequireSalesRead])
 async def quotations_list(
     request: Request,
@@ -90,43 +63,37 @@ async def quotations_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Quotations list page."""
-    # Build query
-    query = db.query(Quotation).filter(Quotation.is_deleted == False)
+    # Use service for all data access
+    service = QuotationService(db)
 
-    # Search
-    if q:
-        search_filter = or_(
-            Quotation.erpnext_id.ilike(f"%{q}%"),
-            Quotation.party_name.ilike(f"%{q}%"),
-            Quotation.customer_name.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
+    # Build filters
+    filters = QuotationFilters(search=q, status=status) if q or status else None
 
-    # Filters
-    if status:
-        query = query.filter(Quotation.status == status)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    query = query.order_by(Quotation.transaction_date.desc().nullsfirst(), Quotation.id.desc())
-
-    # Paginate
+    # Get paginated quotations
     offset = (page - 1) * per_page
-    quotations = query.offset(offset).limit(per_page).all()
+    pagination_params = PaginationParams(offset=offset, limit=per_page)
+    result = service.list_quotations(filters=filters, pagination=pagination_params)
 
-    # Get stats
-    stats = get_quotation_stats(db)
+    # Get summary stats from service
+    summary = service.get_summary()
+
+    # Map summary to template-friendly stats dict
+    stats = {
+        "total_count": summary.total_count,
+        "total_value": summary.total_value,
+        "open_count": summary.open_count,
+        "ordered_count": summary.ordered_count,
+        "lost_count": summary.lost_count,
+    }
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["quotations"] = quotations
+    context["quotations"] = result.items
     context["search_query"] = q or ""
     context["current_status"] = status
     context["status_options"] = get_quotation_status_options()
     context["stats"] = stats
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -174,12 +141,11 @@ async def quotation_detail(
     quotation_id: int,
 ):
     """Quotation detail page."""
-    quotation = db.query(Quotation).filter(
-        Quotation.id == quotation_id,
-        Quotation.is_deleted == False,
-    ).first()
+    service = QuotationService(db)
 
-    if not quotation:
+    try:
+        quotation = service.get_quotation(quotation_id, include_items=True)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Quotation not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -216,39 +182,6 @@ def get_order_status_options():
     ]
 
 
-def get_order_stats(db) -> dict:
-    """Calculate sales order statistics."""
-    total_count = db.query(func.count(SalesOrder.id)).scalar() or 0
-
-    total_value = db.query(func.sum(SalesOrder.grand_total)).scalar() or Decimal("0")
-
-    to_deliver_count = db.query(func.count(SalesOrder.id)).filter(
-        SalesOrder.status.in_([
-            SalesOrderStatus.TO_DELIVER,
-            SalesOrderStatus.TO_DELIVER_AND_BILL
-        ])
-    ).scalar() or 0
-
-    to_bill_count = db.query(func.count(SalesOrder.id)).filter(
-        SalesOrder.status.in_([
-            SalesOrderStatus.TO_BILL,
-            SalesOrderStatus.TO_DELIVER_AND_BILL
-        ])
-    ).scalar() or 0
-
-    completed_count = db.query(func.count(SalesOrder.id)).filter(
-        SalesOrder.status == SalesOrderStatus.COMPLETED
-    ).scalar() or 0
-
-    return {
-        "total_count": total_count,
-        "total_value": total_value,
-        "to_deliver_count": to_deliver_count,
-        "to_bill_count": to_bill_count,
-        "completed_count": completed_count,
-    }
-
-
 @router.get("/orders", response_class=HTMLResponse, dependencies=[RequireSalesRead])
 async def orders_list(
     request: Request,
@@ -262,43 +195,37 @@ async def orders_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Sales orders list page."""
-    # Build query
-    query = db.query(SalesOrder)
+    # Use service for all data access
+    service = SalesOrderService(db)
 
-    # Search
-    if q:
-        search_filter = or_(
-            SalesOrder.erpnext_id.ilike(f"%{q}%"),
-            SalesOrder.customer.ilike(f"%{q}%"),
-            SalesOrder.customer_name.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
+    # Build filters
+    filters = SalesOrderFilters(search=q, status=status) if q or status else None
 
-    # Filters
-    if status:
-        query = query.filter(SalesOrder.status == status)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    query = query.order_by(SalesOrder.transaction_date.desc().nullsfirst(), SalesOrder.id.desc())
-
-    # Paginate
+    # Get paginated orders
     offset = (page - 1) * per_page
-    orders = query.offset(offset).limit(per_page).all()
+    pagination_params = PaginationParams(offset=offset, limit=per_page)
+    result = service.list_orders(filters=filters, pagination=pagination_params)
 
-    # Get stats
-    stats = get_order_stats(db)
+    # Get summary stats from service
+    summary = service.get_summary()
+
+    # Map summary to template-friendly stats dict
+    stats = {
+        "total_count": summary.total_count,
+        "total_value": summary.total_value,
+        "to_deliver_count": summary.pending_delivery_count,
+        "to_bill_count": summary.pending_billing_count,
+        "completed_count": summary.completed_count,
+    }
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["orders"] = orders
+    context["orders"] = result.items
     context["search_query"] = q or ""
     context["current_status"] = status
     context["status_options"] = get_order_status_options()
     context["stats"] = stats
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -346,11 +273,11 @@ async def order_detail(
     order_id: int,
 ):
     """Sales order detail page."""
-    order = db.query(SalesOrder).filter(
-        SalesOrder.id == order_id
-    ).first()
+    service = SalesOrderService(db)
 
-    if not order:
+    try:
+        order = service.get_order(order_id, include_items=True)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Sales order not found")
 
     context = get_base_context(request, response, user, csrf_token)

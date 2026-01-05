@@ -26,6 +26,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Operations",
     order=80,
     scopes=["analytics:read"],
+    enabled=False,
     prefixes=["/analytics"],
 )
 

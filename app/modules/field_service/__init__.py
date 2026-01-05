@@ -26,6 +26,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Operations",
     order=55,
     scopes=["field_service:read"],
+    enabled=False,
     prefixes=["/field-service"],
 )
 

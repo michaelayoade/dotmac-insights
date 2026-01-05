@@ -19,6 +19,7 @@ from app.models.asset import Asset, AssetCategory, AssetStatus
 from app.models.accounting import Account, JournalEntry, JournalEntryItem
 
 from app.services.errors import NotFoundError, ValidationError
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     CapitalizationData,
@@ -133,6 +134,7 @@ class AssetCapitalizationService:
         asset.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
 
         return CapitalizationResult(
             asset_id=asset.id,

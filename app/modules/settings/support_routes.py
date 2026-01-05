@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request, Response, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Request, Response, Depends, UploadFile
 from fastapi.responses import HTMLResponse
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import get_base_context, get_navigation_context, build_breadcrumbs
 from app.templates.environment import get_template_env
-from app.core.security import is_htmx_request, set_flash
+from app.core.security import set_flash
+from app.services.settings_support_service import SettingsSupportService
 
 # Permission dependencies
 RequireSupportSettingsRead = Depends(require_scope("support:settings:read"))
@@ -71,20 +72,14 @@ async def support_settings_index(
     db: DB,
 ):
     """Support settings - general configuration."""
-    from app.services.support.settings import SettingsService
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "support")
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "general"
 
-    service = SettingsService(db, principal=user)
-    if not service.exists():
-        settings = service.get()
-        db.commit()
-    else:
-        settings = service.get()
+    service = SettingsSupportService(db, principal=user)
+    settings = service.get_general_settings()
 
     context["page_title"] = "Support Settings"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -110,12 +105,11 @@ async def save_support_settings(
     _csrf: CSRFProtect,
 ):
     """Save support settings."""
-    from app.services.support.settings import SettingsService
     from app.services.support.types import SupportSettingsUpdate
 
     form = await request.form()
 
-    service = SettingsService(db, principal=user)
+    service = SettingsSupportService(db, principal=user)
     update_data = SupportSettingsUpdate(
         sla_warning_threshold_percent=_form_int(form, "sla_warning_threshold_percent", 80),
         default_first_response_hours=_form_int(form, "default_first_response_hours", 4),
@@ -140,9 +134,7 @@ async def save_support_settings(
         kb_public_access=_form_bool(form, "kb_public_access"),
         kb_suggest_articles_on_create=_form_bool(form, "kb_suggest_articles_on_create"),
     )
-    service.update(update_data)
-
-    db.commit()
+    service.save_general_settings(update_data)
 
     set_flash(response, "Support settings saved successfully.", "success")
 
@@ -159,18 +151,14 @@ async def escalations_list(
     db: DB,
 ):
     """Escalation policies."""
-    from app.services.support.escalation import EscalationService
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "support")
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "escalations"
 
-    service = EscalationService(db, principal=user)
-    policies = service.list_policies(active_only=False)
-    for policy in policies:
-        _ = policy.levels
+    service = SettingsSupportService(db, principal=user)
+    policies = service.list_escalation_policies()
 
     context["page_title"] = "Escalation Policies"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -195,16 +183,14 @@ async def queues_list(
     db: DB,
 ):
     """Support queues."""
-    from app.services.support.queues import QueueService
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "support")
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "queues"
 
-    service = QueueService(db, principal=user)
-    queues = service.list(active_only=False, include_all=True)
+    service = SettingsSupportService(db, principal=user)
+    queues = service.list_queues()
 
     context["page_title"] = "Support Queues"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -229,16 +215,14 @@ async def fields_list(
     db: DB,
 ):
     """Custom ticket fields."""
-    from app.services.support.custom_fields import CustomFieldService
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "support")
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "fields"
 
-    service = CustomFieldService(db, principal=user)
-    fields = service.list(active_only=False)
+    service = SettingsSupportService(db, principal=user)
+    fields = service.list_custom_fields()
 
     context["page_title"] = "Custom Fields"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -263,18 +247,14 @@ async def templates_list(
     db: DB,
 ):
     """Email templates."""
-    from app.services.support.email_templates import EmailTemplateService
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "support")
     context["support_tabs"] = SUPPORT_TABS
     context["current_tab"] = "templates"
 
-    service = EmailTemplateService(db, principal=user)
-    service.ensure_default_templates()
-    db.commit()
-    email_templates = service.list(active_only=False)
+    service = SettingsSupportService(db, principal=user)
+    email_templates = service.list_email_templates()
 
     context["page_title"] = "Email Templates"
     context["breadcrumbs"] = build_breadcrumbs([

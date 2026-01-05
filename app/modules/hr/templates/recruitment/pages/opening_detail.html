@@ -18,7 +18,7 @@
         </a>
         {% if opening.status == 'Open' %}
         <form method="POST" action="/hr/recruitment/{{ opening.id }}/close" class="inline">
-            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 Close Position

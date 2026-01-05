@@ -25,8 +25,8 @@ from app.models.unified_ticket import (
     TicketChannel,
     TicketSource,
 )
-from app.models.agent import Agent, Team, TeamMember
-from app.models.party import Party
+from app.models.agent import Team, TeamMember
+from app.models.party import Party, PartyRole
 from app.models.support_canned import CannedResponse
 from app.models.support_kb import KBArticle, KBCategory
 from app.models.support_sla import SLAPolicy
@@ -243,36 +243,38 @@ class SupportWebService:
         """Get agent workload statistics.
 
         Uses a single aggregate query instead of N+1 queries.
+        After Agent → Party unification, agents are Party records
+        with PartyRole(role="support_agent").
         """
-        # Get agents with their ticket counts in a single query
-        from sqlalchemy import outerjoin
-        from sqlalchemy.orm import aliased
-
-        # Subquery for open ticket counts per agent
+        # Subquery for open ticket counts per party (agent)
         open_tickets_subq = (
             self.db.query(
-                UnifiedTicket.assigned_to_id,
+                UnifiedTicket.assigned_to_party_id,
                 func.count(UnifiedTicket.id).label("open_count")
             )
             .filter(
                 UnifiedTicket.is_deleted == False,
                 UnifiedTicket.status.notin_([TicketStatus.CLOSED.value, TicketStatus.RESOLVED.value])
             )
-            .group_by(UnifiedTicket.assigned_to_id)
+            .group_by(UnifiedTicket.assigned_to_party_id)
             .subquery()
         )
 
-        # Join agents with their ticket counts
+        # Join parties (with support_agent role) with their ticket counts
         agents_with_counts = (
             self.db.query(
-                Agent.id,
-                Agent.display_name,
-                Agent.email,
-                Agent.employee_id,
+                Party.id,
+                Party.name,
+                Party.primary_email,
                 func.coalesce(open_tickets_subq.c.open_count, 0).label("open_tickets")
             )
-            .outerjoin(open_tickets_subq, Agent.employee_id == open_tickets_subq.c.assigned_to_id)
-            .filter(Agent.is_active == True)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+                PartyRole.until.is_(None),
+            )
+            .outerjoin(open_tickets_subq, Party.id == open_tickets_subq.c.assigned_to_party_id)
             .order_by(func.coalesce(open_tickets_subq.c.open_count, 0).desc())
             .limit(limit)
             .all()
@@ -281,8 +283,8 @@ class SupportWebService:
         return [
             {
                 "id": row.id,
-                "name": row.display_name or row.email or f"Agent {row.id}",
-                "email": row.email,
+                "name": row.name or row.primary_email or f"Agent {row.id}",
+                "email": row.primary_email,
                 "open_tickets": row.open_tickets,
             }
             for row in agents_with_counts
@@ -299,7 +301,7 @@ class SupportWebService:
         priority: Optional[str] = None,
         type: Optional[str] = None,
         channel: Optional[str] = None,
-        assigned_to_id: Optional[int] = None,
+        assigned_to_party_id: Optional[int] = None,
         unassigned_only: bool = False,
         page: int = 1,
         per_page: int = 25,
@@ -310,6 +312,7 @@ class SupportWebService:
         List tickets with filtering, search, and pagination.
 
         Args:
+            assigned_to_party_id: Filter by assigned party (support agent).
             unassigned_only: If True, only return tickets with no assigned agent.
 
         Returns:
@@ -339,9 +342,9 @@ class SupportWebService:
         if channel:
             query = query.filter(UnifiedTicket.channel == channel)
         if unassigned_only:
-            query = query.filter(UnifiedTicket.assigned_to_id.is_(None))
-        elif assigned_to_id:
-            query = query.filter(UnifiedTicket.assigned_to_id == assigned_to_id)
+            query = query.filter(UnifiedTicket.assigned_to_party_id.is_(None))
+        elif assigned_to_party_id:
+            query = query.filter(UnifiedTicket.assigned_to_party_id == assigned_to_party_id)
 
         # Count total
         total = query.count()
@@ -462,33 +465,36 @@ class SupportWebService:
         status = data.pop("status", missing)
         resolution = data.pop("resolution", missing)
         resolution_type = data.pop("resolution_type", missing)
-        assigned_to_id = data.pop("assigned_to_id", missing)
+        # Support both old (assigned_to_id) and new (assigned_to_party_id) field names
+        assigned_to_party_id = data.pop("assigned_to_party_id", missing)
+        if assigned_to_party_id is missing:
+            assigned_to_party_id = data.pop("assigned_to_id", missing)
         assigned_team_id = data.pop("assigned_team_id", missing)
         assigned_team = data.pop("assigned_team", missing)
 
-        if any(value is not missing for value in [assigned_to_id, assigned_team_id, assigned_team]):
+        if any(value is not missing for value in [assigned_to_party_id, assigned_team_id, assigned_team]):
             explicit_unassign = (
-                assigned_to_id is not missing and assigned_to_id is None and
+                assigned_to_party_id is not missing and assigned_to_party_id is None and
                 assigned_team_id is not missing and assigned_team_id is None and
                 (assigned_team is missing or not assigned_team)
             )
             if explicit_unassign:
-                ticket.assigned_to_id = None
+                ticket.assigned_to_party_id = None
                 ticket.assigned_team_id = None
                 ticket.assigned_team = None
                 ticket.assigned_at = None
             else:
-                new_assigned_to_id = ticket.assigned_to_id if assigned_to_id is missing else assigned_to_id
+                new_assigned_to_party_id = ticket.assigned_to_party_id if assigned_to_party_id is missing else assigned_to_party_id
                 new_assigned_team_id = ticket.assigned_team_id if assigned_team_id is missing else assigned_team_id
                 new_assigned_team = ticket.assigned_team if assigned_team is missing else assigned_team
-                if new_assigned_to_id is None and new_assigned_team_id is None and not new_assigned_team:
-                    ticket.assigned_to_id = None
+                if new_assigned_to_party_id is None and new_assigned_team_id is None and not new_assigned_team:
+                    ticket.assigned_to_party_id = None
                     ticket.assigned_team_id = None
                     ticket.assigned_team = None
                     ticket.assigned_at = None
                 else:
-                    if new_assigned_to_id is not None:
-                        ticket.assigned_to_id = new_assigned_to_id
+                    if new_assigned_to_party_id is not None:
+                        ticket.assigned_to_party_id = new_assigned_to_party_id
                     if new_assigned_team_id is not None:
                         ticket.assigned_team_id = new_assigned_team_id
                     ticket.assigned_team = new_assigned_team or None
@@ -701,8 +707,97 @@ class SupportWebService:
             UnifiedTicket.is_deleted == False
         ).order_by(UnifiedTicket.created_at.desc()).limit(limit).all()
 
+    def list_tickets_for_export(self, ids: Optional[List[int]] = None) -> List[UnifiedTicket]:
+        """List tickets for CSV export."""
+        query = self.db.query(UnifiedTicket)
+        if ids:
+            query = query.filter(UnifiedTicket.id.in_(ids))
+        return query.order_by(UnifiedTicket.created_at.desc()).all()
+
+    def list_open_tickets_for_party(
+        self,
+        party_id: int,
+        limit: int = 10,
+    ) -> List[UnifiedTicket]:
+        """List open tickets assigned to a party (support agent)."""
+        open_statuses = [
+            TicketStatus.OPEN.value,
+            TicketStatus.IN_PROGRESS.value,
+            TicketStatus.WAITING.value,
+            TicketStatus.ON_HOLD.value,
+            TicketStatus.REOPENED.value,
+        ]
+        return (
+            self.db.query(UnifiedTicket)
+            .filter(
+                UnifiedTicket.assigned_to_party_id == party_id,
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.status.in_(open_statuses),
+            )
+            .order_by(UnifiedTicket.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def list_sla_breaches(
+        self,
+        start_dt: datetime,
+        offset: int = 0,
+        limit: int = 25,
+    ) -> Dict[str, Any]:
+        """List tickets that breached SLA within a period."""
+        breached_query = self.db.query(UnifiedTicket).filter(
+            UnifiedTicket.created_at >= start_dt,
+            or_(
+                UnifiedTicket.response_sla_breached.is_(True),
+                UnifiedTicket.resolution_sla_breached.is_(True),
+            ),
+        )
+
+        total = breached_query.count()
+        tickets = (
+            breached_query.order_by(UnifiedTicket.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
+        first_response_breaches = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.response_sla_breached == True,
+            UnifiedTicket.created_at >= start_dt,
+        ).scalar() or 0
+
+        resolution_breaches = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.resolution_sla_breached == True,
+            UnifiedTicket.created_at >= start_dt,
+        ).scalar() or 0
+
+        total_tickets = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.created_at >= start_dt
+        ).scalar() or 1
+
+        by_priority = self.db.query(
+            UnifiedTicket.priority,
+            func.count(UnifiedTicket.id).label("count"),
+        ).filter(
+            UnifiedTicket.created_at >= start_dt,
+            or_(
+                UnifiedTicket.response_sla_breached.is_(True),
+                UnifiedTicket.resolution_sla_breached.is_(True),
+            ),
+        ).group_by(UnifiedTicket.priority).all()
+
+        return {
+            "items": tickets,
+            "total": total,
+            "first_response_breaches": first_response_breaches,
+            "resolution_breaches": resolution_breaches,
+            "total_tickets": total_tickets,
+            "by_priority": by_priority,
+        }
+
     # =========================================================================
-    # AGENTS
+    # AGENTS (Party with support_agent role)
     # =========================================================================
 
     def list_agents(
@@ -711,15 +806,22 @@ class SupportWebService:
         page: int = 1,
         per_page: int = 25,
     ) -> Dict[str, Any]:
-        """List agents with pagination."""
-        query = self.db.query(Agent)
+        """List support agents (Party with support_agent role) with pagination."""
+        query = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                PartyRole.role == "support_agent",
+                PartyRole.until.is_(None),
+            )
+        )
 
         if active_only:
-            query = query.filter(Agent.is_active == True)
+            query = query.filter(PartyRole.status == "active")
 
         total = query.count()
         offset = (page - 1) * per_page
-        items = query.order_by(Agent.display_name).offset(offset).limit(per_page).all()
+        items = query.order_by(Party.name).offset(offset).limit(per_page).all()
         pages = (total + per_page - 1) // per_page
 
         return {
@@ -730,9 +832,17 @@ class SupportWebService:
             "pages": pages,
         }
 
-    def get_agent(self, agent_id: int) -> Optional[Agent]:
-        """Get an agent by ID."""
-        return self.db.query(Agent).filter(Agent.id == agent_id).first()
+    def get_agent(self, party_id: int) -> Optional[Party]:
+        """Get a support agent (Party) by ID."""
+        return (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                Party.id == party_id,
+                PartyRole.role == "support_agent",
+            )
+            .first()
+        )
 
     # =========================================================================
     # CANNED RESPONSES

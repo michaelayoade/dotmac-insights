@@ -1,37 +1,30 @@
 {#
 Pagination Component
 
-Usage:
-{% include "components/ui/pagination.html" with {
-    pagination: {
-        page: 1,
-        per_page: 25,
-        total: 150,
-        total_pages: 6,
-        has_prev: false,
-        has_next: true,
-        prev_page: null,
-        next_page: 2,
-        start_item: 1,
-        end_item: 25
-    },
-    base_url: "/parties",
-    htmx_target: "#parties-table",
-} %}
+Usage (pagination from build_pagination_context includes base_url and htmx_target):
+{% include "components/ui/pagination.html" %}
+
+Or with overrides:
+{% with base_url="/custom", htmx_target="#custom-table" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 #}
 
 {% set p = pagination %}
+{% set _base_url = base_url if base_url is defined else (p.base_url if p.base_url is defined else "") %}
+{% set _htmx_target = htmx_target if htmx_target is defined else (p.htmx_target if p.htmx_target is defined else "") %}
+{% set joiner = '&' if '?' in _base_url else '?' %}
 
 <nav class="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6" aria-label="Pagination" data-testid="pagination">
     <!-- Mobile view -->
     <div class="flex flex-1 justify-between sm:hidden">
         {% if p.has_prev %}
         <a
-            href="{{ base_url }}?page={{ p.prev_page }}"
+            href="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
             class="relative inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            {% if htmx_target %}
-            hx-get="{{ base_url }}?page={{ p.prev_page }}"
-            hx-target="{{ htmx_target }}"
+            {% if _htmx_target %}
+            hx-get="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
+            hx-target="{{ _htmx_target }}"
             hx-push-url="true"
             {% endif %}
             data-testid="pagination-prev-mobile"
@@ -46,11 +39,11 @@ Usage:
 
         {% if p.has_next %}
         <a
-            href="{{ base_url }}?page={{ p.next_page }}"
+            href="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
             class="relative ml-3 inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            {% if htmx_target %}
-            hx-get="{{ base_url }}?page={{ p.next_page }}"
-            hx-target="{{ htmx_target }}"
+            {% if _htmx_target %}
+            hx-get="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
+            hx-target="{{ _htmx_target }}"
             hx-push-url="true"
             {% endif %}
             data-testid="pagination-next-mobile"
@@ -82,11 +75,11 @@ Usage:
                 <!-- Previous -->
                 {% if p.has_prev %}
                 <a
-                    href="{{ base_url }}?page={{ p.prev_page }}"
+                    href="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
                     class="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                    {% if htmx_target %}
-                    hx-get="{{ base_url }}?page={{ p.prev_page }}"
-                    hx-target="{{ htmx_target }}"
+                    {% if _htmx_target %}
+                    hx-get="{{ _base_url }}{{ joiner }}page={{ p.prev_page }}"
+                    hx-target="{{ _htmx_target }}"
                     hx-push-url="true"
                     {% endif %}
                     data-testid="pagination-prev"
@@ -117,11 +110,11 @@ Usage:
                     </span>
                     {% elif page_num == 1 or page_num == p.total_pages or (page_num >= p.page - 1 and page_num <= p.page + 1) %}
                     <a
-                        href="{{ base_url }}?page={{ page_num }}"
+                        href="{{ _base_url }}{{ joiner }}page={{ page_num }}"
                         class="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                        {% if htmx_target %}
-                        hx-get="{{ base_url }}?page={{ page_num }}"
-                        hx-target="{{ htmx_target }}"
+                        {% if _htmx_target %}
+                        hx-get="{{ _base_url }}{{ joiner }}page={{ page_num }}"
+                        hx-target="{{ _htmx_target }}"
                         hx-push-url="true"
                         {% endif %}
                         data-testid="pagination-page-{{ page_num }}"
@@ -138,11 +131,11 @@ Usage:
                 <!-- Next -->
                 {% if p.has_next %}
                 <a
-                    href="{{ base_url }}?page={{ p.next_page }}"
+                    href="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
                     class="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0"
-                    {% if htmx_target %}
-                    hx-get="{{ base_url }}?page={{ p.next_page }}"
-                    hx-target="{{ htmx_target }}"
+                    {% if _htmx_target %}
+                    hx-get="{{ _base_url }}{{ joiner }}page={{ p.next_page }}"
+                    hx-target="{{ _htmx_target }}"
                     hx-push-url="true"
                     {% endif %}
                     data-testid="pagination-next"

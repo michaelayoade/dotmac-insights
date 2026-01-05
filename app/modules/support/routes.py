@@ -28,7 +28,7 @@ from ._deps import (
     is_htmx_request, htmx_toast, set_flash,
     # Models
     UnifiedTicket, TicketStatus, TicketPriority, TicketType, TicketChannel, TicketSource,
-    Agent, Team, TeamMember,
+    Team, TeamMember, PartyRole,
     CannedResponse, CannedResponseScope,
     SLAPolicy, SLATarget, BusinessCalendar,
     Employee, EmploymentStatus,
@@ -85,7 +85,10 @@ def _set_cached_analytics(company_id: int, data: dict) -> None:
     _analytics_cache[company_id] = (time.time(), data)
 
 # Routers
-router = APIRouter(prefix="/support/tickets", tags=["support"])
+# Base router for the support module - all other routers are included into this
+# No prefix here since all sub-routers have their full /support/... paths
+router = APIRouter(tags=["support"])
+tickets_router = APIRouter(prefix="/support/tickets", tags=["support-tickets"])
 dashboard_router = APIRouter(prefix="/support", tags=["support-dashboard"])
 agents_router = APIRouter(prefix="/support/agents", tags=["support-agents"])
 canned_router = APIRouter(prefix="/support/canned-responses", tags=["support-canned"])
@@ -110,13 +113,32 @@ async def support_dashboard(
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
     # Get basic stats from web service (for ticket lists)
-    basic_stats = service.get_dashboard_stats()
-    recent_tickets = service.get_recent_tickets(limit=10)
-    unassigned_tickets = service.list_tickets(
-        status="open",
-        page=1,
-        per_page=5,
-    )["items"]
+    try:
+        basic_stats = service.get_dashboard_stats()
+    except Exception:
+        basic_stats = {
+            "total_open": 0,
+            "urgent_tickets": 0,
+            "created_today": 0,
+            "resolved_today": 0,
+            "response_overdue": 0,
+            "resolution_overdue": 0,
+            "status_distribution": {},
+        }
+
+    try:
+        recent_tickets = service.get_recent_tickets(limit=10)
+    except Exception:
+        recent_tickets = []
+
+    try:
+        unassigned_tickets = service.list_tickets(
+            status="open",
+            page=1,
+            per_page=5,
+        )["items"]
+    except Exception:
+        unassigned_tickets = []
 
     # Get rich analytics from SupportAnalyticsService with graceful degradation
     # Check cache first for performance (60 second TTL per company)
@@ -383,7 +405,7 @@ async def support_dashboard(
 # TICKET LIST
 # =============================================================================
 
-@router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def tickets_list(
     request: Request,
     response: Response,
@@ -465,7 +487,7 @@ async def tickets_list(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/table", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/table", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def tickets_table(
     request: Request,
     response: Response,
@@ -488,7 +510,7 @@ async def tickets_table(
     )
 
 
-@router.get("/new", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.get("/new", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_new(
     request: Request,
     response: Response,
@@ -518,7 +540,7 @@ async def ticket_new(
     return HTMLResponse(template.render(context))
 
 
-@router.post("", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_create(
     request: Request,
     response: Response,
@@ -554,9 +576,9 @@ async def ticket_create(
         errors["subject"] = "Subject is required"
     if len(subject) > 500:
         errors["subject"] = "Subject must be 500 characters or less"
-    if not party and not party_id and not contact_email:
-        errors["party_id"] = "Party or contact email is required"
-    elif party_id and not party:
+    if not description:
+        errors["description"] = "Description is required"
+    if party_id and not party:
         errors["party_id"] = "Party not found"
 
     if errors:
@@ -582,7 +604,7 @@ async def ticket_create(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Handle FK fields
-    assigned_to_id = _form_str(form, "assigned_to_id")
+    assigned_to_party_id = _form_str(form, "assigned_to_party_id") or _form_str(form, "assigned_to_id")
     assigned_team = _form_str(form, "assigned_team")
 
     # Create ticket using service (service already created above for party resolution)
@@ -598,17 +620,17 @@ async def ticket_create(
         "contact_name": contact_name or (party.name if party else None),
         "contact_email": contact_email or (party.primary_email if party else None),
         "contact_phone": contact_phone or (party.primary_phone if party else None),
-        "assigned_to_id": int(assigned_to_id) if assigned_to_id else None,
+        "assigned_to_party_id": int(assigned_to_party_id) if assigned_to_party_id else None,
         "assigned_team": assigned_team or None,
     }
     ticket = service.create_ticket(ticket_data)
     db.commit()
+    redirect = RedirectResponse(url=f"/support/tickets/{ticket.id}", status_code=303)
+    set_flash(redirect, f"Ticket '{ticket.ticket_number}' created successfully.", "success")
+    return redirect
 
-    set_flash(response, f"Ticket '{ticket.ticket_number}' created successfully.", "success")
-    return RedirectResponse(url=f"/support/tickets/{ticket.id}", status_code=303)
 
-
-@router.get("/parties/search", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/parties/search", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def party_search(
     user: SessionUser,
     db: DB,
@@ -625,7 +647,7 @@ async def party_search(
     return HTMLResponse(template.render({"parties": parties, "query": query}))
 
 
-@router.get("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def ticket_detail(
     request: Request,
     response: Response,
@@ -642,21 +664,25 @@ async def ticket_detail(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     # Load related project
-    from app.models.project import Project
+    from app.services.projects import ProjectService
+    from app.services.projects.errors import ProjectNotFoundError
+
     related_project = None
     project_id = getattr(ticket, "project_id", None)
     if project_id:
-        related_project = db.query(Project).filter(
-            Project.id == project_id,
-            Project.is_deleted == False,
-        ).first()
+        project_service = ProjectService(db, principal=user)
+        try:
+            related_project = project_service.get_project(project_id)
+        except ProjectNotFoundError:
+            related_project = None
 
-    # Load assigned employee
-    assigned_employee = None
-    if ticket.assigned_to_id:
-        assigned_employee = db.query(Employee).filter(
-            Employee.id == ticket.assigned_to_id
-        ).first()
+    # Load assigned party (support agent)
+    assigned_party = None
+    if ticket.assigned_to_party_id:
+        from app.services.identity import PartyService
+
+        party_service = PartyService(db)
+        assigned_party = party_service.get_party(ticket.assigned_to_party_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -668,15 +694,17 @@ async def ticket_detail(
     ])
     context["ticket"] = ticket
     context["related_project"] = related_project
-    context["assigned_employee"] = assigned_employee
+    context["assigned_party"] = assigned_party
+    context["agents"] = get_agents(db)
     context["status_options"] = get_status_options()
     context["priority_options"] = get_priority_options()
+    context["timeline"] = service.get_activity_timeline(ticket_id)
 
     template = templates.get_template("modules/support/templates/pages/detail.html")
     return HTMLResponse(template.render(context))
 
 
-@router.get("/{ticket_id}/edit", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.get("/{ticket_id}/edit", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_edit(
     request: Request,
     response: Response,
@@ -715,7 +743,7 @@ async def ticket_edit(
     return HTMLResponse(template.render(context))
 
 
-@router.post("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_update(
     request: Request,
     response: Response,
@@ -740,7 +768,14 @@ async def ticket_update(
     party_id = _form_int(form, "party_id")
     party = None
     if party_id:
-        party = db.query(Party).filter(Party.id == party_id).first()
+        from app.services.identity import PartyService
+        from app.services.errors import NotFoundError as PartyNotFoundError
+
+        party_service = PartyService(db, principal=user)
+        try:
+            party = party_service.get_party(party_id)
+        except PartyNotFoundError:
+            party = None
 
     if not subject:
         errors["subject"] = "Subject is required"
@@ -773,7 +808,7 @@ async def ticket_update(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Handle FK fields
-    assigned_to_id = _form_str(form, "assigned_to_id")
+    assigned_to_party_id = _form_str(form, "assigned_to_party_id") or _form_str(form, "assigned_to_id")
     assigned_team = _form_str(form, "assigned_team")
 
     # Update ticket using service
@@ -789,7 +824,7 @@ async def ticket_update(
         "contact_email": _form_str(form, "contact_email") or (party.primary_email if party else None),
         "contact_phone": _form_str(form, "contact_phone") or (party.primary_phone if party else None),
         "resolution": _form_str(form, "resolution") or None,
-        "assigned_to_id": int(assigned_to_id) if assigned_to_id else None,
+        "assigned_to_party_id": int(assigned_to_party_id) if assigned_to_party_id else None,
         "assigned_team": assigned_team or None,
     }
     ticket = service.update_ticket(ticket_id, update_data)
@@ -799,7 +834,7 @@ async def ticket_update(
     return RedirectResponse(url=f"/support/tickets/{ticket.id}", status_code=303)
 
 
-@router.delete("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.delete("/{ticket_id}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_delete(
     request: Request,
     response: Response,
@@ -828,7 +863,7 @@ async def ticket_delete(
     return RedirectResponse(url="/support/tickets", status_code=303)
 
 
-@router.post("/{ticket_id}/status", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/status", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_update_status(
     request: Request,
     response: Response,
@@ -846,6 +881,7 @@ async def ticket_update_status(
 
     form = await request.form()
     new_status = _form_str(form, "status")
+    return_type = _form_str(form, "return")
 
     if new_status:
         # Validate status value
@@ -858,6 +894,12 @@ async def ticket_update_status(
         db.commit()
         htmx_toast(response, f"Status updated to {new_status.replace('_', ' ').title()}", "success")
 
+    if return_type == "badge":
+        context = get_base_context(request, response, user, "")
+        context["ticket"] = ticket
+        template = templates.get_template("modules/support/templates/partials/status_badge.html")
+        return HTMLResponse(template.render(context), headers=dict(response.headers))
+
     # Return updated ticket row
     context = get_base_context(request, response, user, "")
     context["ticket"] = ticket
@@ -868,7 +910,7 @@ async def ticket_update_status(
     return HTMLResponse(template.render(context), headers=dict(response.headers))
 
 
-@router.get("/{ticket_id}/row", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/{ticket_id}/row", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def ticket_row(
     request: Request,
     response: Response,
@@ -893,7 +935,7 @@ async def ticket_row(
     return HTMLResponse(template.render(context))
 
 
-@router.patch("/{ticket_id}/inline/{field}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.patch("/{ticket_id}/inline/{field}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_inline_update(
     request: Request,
     response: Response,
@@ -939,7 +981,7 @@ async def ticket_inline_update(
 # BULK OPERATIONS
 # =============================================================================
 
-@router.post("/bulk-status", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/bulk-status", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def tickets_bulk_status(
     request: Request,
     response: Response,
@@ -974,7 +1016,7 @@ async def tickets_bulk_status(
     return HTMLResponse("", headers=dict(response.headers))
 
 
-@router.delete("/bulk", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.delete("/bulk", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def tickets_bulk_delete(
     request: Request,
     response: Response,
@@ -1002,7 +1044,7 @@ async def tickets_bulk_delete(
     return HTMLResponse("", headers=dict(response.headers))
 
 
-@router.get("/export", dependencies=[RequireSupportRead])
+@tickets_router.get("/export", dependencies=[RequireSupportRead])
 async def tickets_export(
     request: Request,
     db: DB,
@@ -1013,11 +1055,8 @@ async def tickets_export(
     import csv
     import io
 
-    # Build query
-    query = db.query(UnifiedTicket)
-    if ids:
-        query = query.filter(UnifiedTicket.id.in_(ids))
-    tickets = query.order_by(UnifiedTicket.created_at.desc()).all()
+    service = SupportWebService(db)
+    tickets = service.list_tickets_for_export(ids=ids)
 
     # Generate CSV
     output = io.StringIO()
@@ -1049,7 +1088,7 @@ async def tickets_export(
 # =============================================================================
 
 
-@router.get("/{ticket_id}/assign-modal", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.get("/{ticket_id}/assign-modal", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_assign_modal(
     request: Request,
     response: Response,
@@ -1078,7 +1117,7 @@ async def ticket_assign_modal(
     return HTMLResponse(template.render(context))
 
 
-@router.post("/{ticket_id}/assign", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/assign", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_assign(
     request: Request,
     response: Response,
@@ -1095,13 +1134,16 @@ async def ticket_assign(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     form = await request.form()
-    agent_id = _form_int(form, "agent_id")
+    # Accept party_id (new) or agent_id (legacy) from form
+    party_id = _form_int(form, "party_id") or _form_int(form, "agent_id")
+    if party_id is None:
+        party_id = _form_int(form, "assigned_to")
     team_id = _form_int(form, "team_id")
 
     # Update assignment
     update_data = {}
-    if agent_id is not None:
-        update_data["assigned_to_id"] = agent_id if agent_id > 0 else None
+    if party_id is not None:
+        update_data["assigned_to_party_id"] = party_id if party_id > 0 else None
     if team_id is not None:
         update_data["assigned_team_id"] = team_id if team_id > 0 else None
 
@@ -1109,9 +1151,9 @@ async def ticket_assign(
         ticket = service.update_ticket(ticket_id, update_data)
         db.commit()
 
-        # Get agent name for toast message
-        if agent_id and agent_id > 0:
-            agent = service.get_agent(agent_id)
+        # Get agent name for toast message (get_agent returns Party now)
+        if party_id and party_id > 0:
+            agent = service.get_agent(party_id)
             name = agent.display_name if agent else "an agent"
         else:
             name = "a team" if team_id else "unassigned"
@@ -1127,7 +1169,7 @@ async def ticket_assign(
     return HTMLResponse(template.render(context), headers=dict(response.headers))
 
 
-@router.post("/{ticket_id}/unassign", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/unassign", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_unassign(
     request: Request,
     response: Response,
@@ -1144,7 +1186,7 @@ async def ticket_unassign(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     ticket = service.update_ticket(ticket_id, {
-        "assigned_to_id": None,
+        "assigned_to_party_id": None,
         "assigned_team_id": None,
     })
     db.commit()
@@ -1166,7 +1208,9 @@ async def ticket_unassign(
 # =============================================================================
 
 
-@router.post("/{ticket_id}/comment", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/comment", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/comments", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/reply", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_add_comment(
     request: Request,
     response: Response,
@@ -1183,8 +1227,13 @@ async def ticket_add_comment(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     form = await request.form()
-    body = _form_str(form, "body")
-    is_public = _form_str(form, "is_public") == "true"
+    body = _form_str(form, "body") or _form_str(form, "message")
+    is_internal = _form_str(form, "is_internal") in ["1", "true", "yes", "on"]
+    if is_internal:
+        is_public = False
+    else:
+        is_public_raw = _form_str(form, "is_public")
+        is_public = True if is_public_raw in [None, ""] else is_public_raw == "true"
 
     if not body or not body.strip():
         htmx_toast(response, "Comment body is required", "error")
@@ -1200,7 +1249,7 @@ async def ticket_add_comment(
     return await ticket_activity(request, response, user, "", db, ticket_id)
 
 
-@router.get("/{ticket_id}/comments", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/{ticket_id}/comments", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def ticket_comments(
     request: Request,
     response: Response,
@@ -1231,7 +1280,7 @@ async def ticket_comments(
 # =============================================================================
 
 
-@router.get("/{ticket_id}/activity", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/{ticket_id}/activity", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def ticket_activity(
     request: Request,
     response: Response,
@@ -1263,7 +1312,7 @@ async def ticket_activity(
 # =============================================================================
 
 
-@router.post("/bulk-priority", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/bulk-priority", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def tickets_bulk_priority(
     request: Request,
     response: Response,
@@ -1303,7 +1352,7 @@ async def tickets_bulk_priority(
 # =============================================================================
 
 
-@router.get("/{ticket_id}/tags", response_class=HTMLResponse, dependencies=[RequireSupportRead])
+@tickets_router.get("/{ticket_id}/tags", response_class=HTMLResponse, dependencies=[RequireSupportRead])
 async def ticket_tags(
     request: Request,
     response: Response,
@@ -1327,7 +1376,7 @@ async def ticket_tags(
     return HTMLResponse(template.render(context))
 
 
-@router.post("/{ticket_id}/tags", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/tags", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_add_tag(
     request: Request,
     response: Response,
@@ -1368,7 +1417,7 @@ async def ticket_add_tag(
     return HTMLResponse(template.render(context), headers=dict(response.headers))
 
 
-@router.delete("/{ticket_id}/tags/{tag_name}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.delete("/{ticket_id}/tags/{tag_name}", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_remove_tag(
     request: Request,
     response: Response,
@@ -1406,7 +1455,7 @@ async def ticket_remove_tag(
 # =============================================================================
 
 
-@router.get("/{ticket_id}/sla-modal", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.get("/{ticket_id}/sla-modal", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_sla_modal(
     request: Request,
     response: Response,
@@ -1429,7 +1478,7 @@ async def ticket_sla_modal(
     return HTMLResponse(template.render(context))
 
 
-@router.post("/{ticket_id}/sla", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
+@tickets_router.post("/{ticket_id}/sla", response_class=HTMLResponse, dependencies=[RequireSupportWrite])
 async def ticket_update_sla(
     request: Request,
     response: Response,
@@ -1481,6 +1530,8 @@ async def ticket_update_sla(
 # =============================================================================
 
 from app.models.support_kb import KBArticle, KBCategory, ArticleStatus, ArticleVisibility
+from app.services.support import KnowledgeBaseService, KBArticleFilters
+from app.services.base import PaginationParams
 
 kb_router = APIRouter(prefix="/support/kb", tags=["support-kb"])
 
@@ -1503,9 +1554,8 @@ def get_visibility_options():
 
 def get_kb_categories(db):
     """Get active KB categories for select dropdown."""
-    return db.query(KBCategory).filter(
-        KBCategory.is_active == True
-    ).order_by(KBCategory.display_order, KBCategory.name).all()
+    service = KnowledgeBaseService(db)
+    return service.list_categories_flat(active_only=True)
 
 
 @kb_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
@@ -1524,62 +1574,37 @@ async def kb_list(
     dir: str = Query("desc", description="Sort direction"),
 ):
     """Knowledge base articles list page."""
-    query = db.query(KBArticle)
+    # Use service for filtering, pagination, and stats (single optimized query)
+    service = KnowledgeBaseService(db, user)
+    filters = KBArticleFilters(search=q, status=status, category_id=category_id)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    # Search
-    if q:
-        search_filter = or_(
-            KBArticle.title.ilike(f"%{q}%"),
-            KBArticle.content.ilike(f"%{q}%"),
-            KBArticle.search_keywords.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
+    result = service.list_articles_with_stats(
+        filters=filters,
+        pagination=pagination,
+        sort_by=sort,
+        sort_dir=dir,
+    )
 
-    # Filters
-    if status:
-        query = query.filter(KBArticle.status == status)
-    if category_id:
-        query = query.filter(KBArticle.category_id == category_id)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_column = getattr(KBArticle, sort, KBArticle.updated_at)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    articles = query.offset(offset).limit(per_page).all()
-
-    # Get categories for filter
-    categories = get_kb_categories(db)
-
-    # Stats
+    # Map stats to template format
     stats = {
-        "published": db.query(func.count(KBArticle.id)).filter(
-            KBArticle.status == ArticleStatus.PUBLISHED.value
-        ).scalar() or 0,
-        "draft": db.query(func.count(KBArticle.id)).filter(
-            KBArticle.status == ArticleStatus.DRAFT.value
-        ).scalar() or 0,
-        "total_views": db.query(func.sum(KBArticle.view_count)).scalar() or 0,
+        "published": result.stats.published_count,
+        "draft": result.stats.draft_count,
+        "total_views": result.stats.total_views,
     }
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["articles"] = articles
+    context["articles"] = result.items
     context["stats"] = stats
-    context["categories"] = categories
+    context["categories"] = result.categories
     context["search_query"] = q or ""
     context["current_status"] = status
     context["current_category_id"] = category_id
     context["status_options"] = get_article_status_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -1677,7 +1702,8 @@ async def kb_create(
         errors["content"] = "Content is required"
 
     # Check for duplicate slug
-    existing = db.query(KBArticle).filter(KBArticle.slug == slug).first()
+    service = KnowledgeBaseService(db, user)
+    existing = service.get_article_by_slug(slug)
     if existing:
         errors["slug"] = "An article with this slug already exists"
 
@@ -1704,26 +1730,27 @@ async def kb_create(
     # Get category
     category_id = _form_str(form, "category_id")
 
-    # Create article
-    article = KBArticle(
+    # Create article via service
+    from app.services.support import KBArticleCreate
+
+    article = service.create_article(KBArticleCreate(
         title=name,
         slug=slug,
         content=content,
         excerpt=_form_str(form, "excerpt") or None,
         category_id=int(category_id) if category_id else None,
-        status=_form_str(form, "status", ArticleStatus.DRAFT.value),
         visibility=_form_str(form, "visibility", ArticleVisibility.PUBLIC.value),
         search_keywords=_form_str(form, "search_keywords") or None,
-        created_by_id=user.id,
-        updated_by_id=user.id,
-    )
+    ))
+
+    article.status = _form_str(form, "status", ArticleStatus.DRAFT.value)
+    article.updated_by_id = user.id
 
     # Set published_at if publishing
     if article.status == ArticleStatus.PUBLISHED.value:
         from datetime import datetime
         article.published_at = datetime.utcnow()
 
-    db.add(article)
     db.commit()
     db.refresh(article)
 
@@ -1742,17 +1769,13 @@ async def kb_categories(
     db: DB,
 ):
     """KB categories management page."""
-    categories = db.query(KBCategory).order_by(
-        KBCategory.display_order, KBCategory.name
-    ).all()
+    # Use service to get categories with counts in single query (avoids N+1)
+    service = KnowledgeBaseService(db, user)
+    categories_with_counts = service.get_categories_with_counts()
 
-    # Get article counts per category
-    category_counts = {}
-    for cat in categories:
-        count = db.query(func.count(KBArticle.id)).filter(
-            KBArticle.category_id == cat.id
-        ).scalar() or 0
-        category_counts[cat.id] = count
+    # Separate for template compatibility
+    categories = [cat for cat, _ in categories_with_counts]
+    category_counts = {cat.id: count for cat, count in categories_with_counts}
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -1780,24 +1803,17 @@ async def kb_detail(
     article_id: int,
 ):
     """KB article detail page."""
-    article = db.query(KBArticle).options(
-        joinedload(KBArticle.category)
-    ).filter(KBArticle.id == article_id).first()
+    from app.services.support import KBArticleNotFoundError
 
-    if not article:
+    service = KnowledgeBaseService(db, user)
+
+    try:
+        article, related_articles = service.get_article_with_related(
+            article_id, increment_view=True
+        )
+        db.commit()
+    except KBArticleNotFoundError:
         raise HTTPException(status_code=404, detail="Article not found")
-
-    # Increment view count
-    article.view_count += 1
-    db.commit()
-
-    # Get related articles
-    related_articles = []
-    if article.related_article_ids:
-        related_articles = db.query(KBArticle).filter(
-            KBArticle.id.in_(article.related_article_ids),
-            KBArticle.status == ArticleStatus.PUBLISHED.value
-        ).all()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -1824,9 +1840,11 @@ async def kb_edit(
     article_id: int,
 ):
     """KB article edit form page."""
-    article = db.query(KBArticle).filter(KBArticle.id == article_id).first()
-
-    if not article:
+    service = KnowledgeBaseService(db, user)
+    from app.services.support import KBArticleNotFoundError
+    try:
+        article = service.get_article(article_id)
+    except KBArticleNotFoundError:
         raise HTTPException(status_code=404, detail="Article not found")
 
     categories = get_kb_categories(db)
@@ -1861,9 +1879,11 @@ async def kb_update(
     article_id: int,
 ):
     """Update a KB article."""
-    article = db.query(KBArticle).filter(KBArticle.id == article_id).first()
-
-    if not article:
+    service = KnowledgeBaseService(db, user)
+    from app.services.support import KBArticleNotFoundError, KBArticleUpdate
+    try:
+        article = service.get_article(article_id)
+    except KBArticleNotFoundError:
         raise HTTPException(status_code=404, detail="Article not found")
 
     form = await request.form()
@@ -1881,11 +1901,8 @@ async def kb_update(
 
     # Check for duplicate slug (excluding current)
     if slug and slug != article.slug:
-        existing = db.query(KBArticle).filter(
-            KBArticle.slug == slug,
-            KBArticle.id != article_id
-        ).first()
-        if existing:
+        existing = service.get_article_by_slug(slug)
+        if existing and existing.id != article_id:
             errors["slug"] = "An article with this slug already exists"
 
     if errors:
@@ -1915,16 +1932,18 @@ async def kb_update(
     # Get category
     category_id = _form_str(form, "category_id")
 
-    # Update article
-    article.title = name
-    if slug:
-        article.slug = slug
-    article.content = content
-    article.excerpt = _form_str(form, "excerpt") or None
-    article.category_id = int(category_id) if category_id else None
+    # Update article via service
+    service.update_article(article_id, KBArticleUpdate(
+        title=name,
+        slug=slug or None,
+        content=content,
+        excerpt=_form_str(form, "excerpt") or None,
+        category_id=int(category_id) if category_id else None,
+        visibility=_form_str(form, "visibility", article.visibility),
+        search_keywords=_form_str(form, "search_keywords") or None,
+    ))
+
     article.status = new_status
-    article.visibility = _form_str(form, "visibility", article.visibility)
-    article.search_keywords = _form_str(form, "search_keywords") or None
     article.updated_by_id = user.id
     article.version += 1
 
@@ -1951,13 +1970,15 @@ async def kb_delete(
     article_id: int,
 ):
     """Delete a KB article."""
-    article = db.query(KBArticle).filter(KBArticle.id == article_id).first()
-
-    if not article:
+    service = KnowledgeBaseService(db, user)
+    from app.services.support import KBArticleNotFoundError
+    try:
+        article = service.get_article(article_id)
+    except KBArticleNotFoundError:
         raise HTTPException(status_code=404, detail="Article not found")
 
     name = article.title
-    db.delete(article)
+    service.delete_article(article_id)
     db.commit()
 
     # For HTMX, return empty response with toast trigger
@@ -1980,11 +2001,13 @@ async def kb_article_row(
     article_id: int,
 ):
     """Single KB article row partial for HTMX updates."""
-    article = db.query(KBArticle).options(
-        joinedload(KBArticle.category)
-    ).filter(KBArticle.id == article_id).first()
-
-    if not article:
+    service = KnowledgeBaseService(db, user)
+    from app.services.support import KBArticleNotFoundError
+    try:
+        article, _ = service.get_article_with_related(
+            article_id, increment_view=False
+        )
+    except KBArticleNotFoundError:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -2010,7 +2033,7 @@ async def agents_list(
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
-    """Support agents list page."""
+    """Support agents list page with comprehensive analytics."""
     service = SupportWebService(db, user_id=user.id, principal=user)
 
     # Use service to list agents
@@ -2042,10 +2065,68 @@ async def agents_list(
     # Stats
     all_agents = service.list_agents(active_only=False, page=1, per_page=1000)
     active_count = sum(1 for a in all_agents["items"] if a.is_active)
+    available_count = sum(1 for a in all_agents["items"] if a.is_active and a.is_available)
+
+    # Get agent performance analytics (30 days)
+    analytics = SupportAnalyticsService(db, principal=user)
+    filters = AnalyticsFilters(days=30)
+    agent_performance = analytics.get_agent_performance(filters, limit=100)
+
+    # Build performance lookup by agent_id for table enhancement
+    perf_by_agent = {p.agent_id: p for p in agent_performance}
+
+    # Calculate aggregate stats from performance data
+    avg_resolution_hours = 0.0
+    avg_sla_pct = 0.0
+    avg_csat = 0.0
+    csat_count = 0
+
+    if agent_performance:
+        total_resolution = sum(p.avg_resolution_hours for p in agent_performance)
+        avg_resolution_hours = total_resolution / len(agent_performance) if agent_performance else 0
+
+        total_sla = sum(p.sla_attainment_pct for p in agent_performance)
+        avg_sla_pct = total_sla / len(agent_performance) if agent_performance else 0
+
+        csat_scores = [p.csat_score for p in agent_performance if p.csat_score is not None]
+        if csat_scores:
+            avg_csat = sum(csat_scores) / len(csat_scores)
+            csat_count = len(csat_scores)
+
+    # Top performers (top 10 by resolution rate, min 5 tickets)
+    top_performers = sorted(
+        [p for p in agent_performance if p.total_tickets >= 5],
+        key=lambda x: (x.sla_attainment_pct, x.resolution_rate, -x.avg_resolution_hours),
+        reverse=True
+    )[:10]
+
+    # Workload distribution (by utilization tier)
+    workload_tiers = {
+        "available": {"label": "Available (<50%)", "agents": [], "color": "emerald"},
+        "moderate": {"label": "Moderate (50-75%)", "agents": [], "color": "amber"},
+        "high": {"label": "High Load (75-100%)", "agents": [], "color": "orange"},
+        "overloaded": {"label": "Overloaded (>100%)", "agents": [], "color": "red"},
+    }
+    for p in agent_performance:
+        if p.utilization_pct < 50:
+            workload_tiers["available"]["agents"].append(p)
+        elif p.utilization_pct < 75:
+            workload_tiers["moderate"]["agents"].append(p)
+        elif p.utilization_pct <= 100:
+            workload_tiers["high"]["agents"].append(p)
+        else:
+            workload_tiers["overloaded"]["agents"].append(p)
+
+    # Agents at capacity (utilization >= 90%)
+    at_capacity = [p for p in agent_performance if p.utilization_pct >= 90]
+
     stats = {
         "total": all_agents["total"],
         "active": active_count,
-        "online": active_count,
+        "available": available_count,
+        "avg_resolution_hours": round(avg_resolution_hours, 1),
+        "avg_sla_pct": round(avg_sla_pct, 1),
+        "avg_csat": round(avg_csat, 1) if csat_count > 0 else None,
     }
 
     context = get_base_context(request, response, user, csrf_token)
@@ -2055,6 +2136,11 @@ async def agents_list(
     context["search_query"] = q or ""
     context["current_status"] = status
     context["pagination"] = build_pagination_context(page, per_page, total)
+    # Enhanced analytics context
+    context["agent_performance"] = perf_by_agent
+    context["top_performers"] = top_performers
+    context["workload_tiers"] = workload_tiers
+    context["at_capacity"] = at_capacity
 
     if is_htmx_request(request):
         template = templates.get_template("modules/support/templates/partials/agents_table.html")
@@ -2080,60 +2166,53 @@ async def agent_detail(
     db: DB,
     agent_id: int,
 ):
-    """Agent detail page."""
-    service = SupportWebService(db, user_id=user.id, principal=user)
-    agent = service.get_agent(agent_id)
+    """Agent detail page with comprehensive performance metrics."""
+    from app.services.support import AgentService, AgentNotFoundError
 
-    if not agent:
+    service = AgentService(db, user)
+
+    try:
+        result = service.get_agent_detail(agent_id, recent_ticket_limit=10)
+    except AgentNotFoundError:
         raise HTTPException(status_code=404, detail="Agent not found")
 
-    # Get agent's tickets using service
-    open_tickets_result = service.list_tickets(
-        assigned_to_id=agent.employee_id,
-        page=1,
-        per_page=10,
-        sort="created_at",
-        dir="desc",
-    )
-    # Filter out closed/resolved tickets
-    open_tickets = [t for t in open_tickets_result["items"]
-                    if t.status not in ["closed", "resolved"]]
+    # Get agent performance analytics (30 days)
+    analytics = SupportAnalyticsService(db, principal=user)
+    filters = AnalyticsFilters(days=30, agent_id=agent_id)
+    agent_perf_list = analytics.get_agent_performance(filters, limit=1)
+    agent_perf = agent_perf_list[0] if agent_perf_list else None
 
-    # Get agent's team memberships (still using db for now - relationship data)
-    team_memberships = db.query(TeamMember).options(
-        joinedload(TeamMember.team)
-    ).filter(TeamMember.agent_id == agent_id).all()
-
-    # Stats
-    open_count = len([t for t in service.list_tickets(
-        assigned_to_id=agent.employee_id, page=1, per_page=1000
-    )["items"] if t.status not in ["closed", "resolved"]])
-
-    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    all_tickets = service.list_tickets(
-        assigned_to_id=agent.employee_id, page=1, per_page=1000
-    )["items"]
-    resolved_today = len([t for t in all_tickets
-                          if t.status == "resolved" and t.updated_at and t.updated_at >= today])
-
+    # Map stats to template format with enhanced metrics
     stats = {
-        "open_tickets": open_count,
-        "resolved_today": resolved_today,
-        "teams": len(team_memberships),
+        "open_tickets": result.stats.open_tickets,
+        "resolved_today": result.stats.resolved_today,
+        "teams": result.stats.team_count,
+        # Enhanced stats from performance analytics
+        "total_30d": agent_perf.total_tickets if agent_perf else 0,
+        "resolved_30d": agent_perf.resolved_tickets if agent_perf else 0,
+        "resolution_rate": agent_perf.resolution_rate if agent_perf else 0,
+        "avg_resolution_hours": agent_perf.avg_resolution_hours if agent_perf else 0,
+        "avg_first_response_hours": agent_perf.avg_first_response_hours if agent_perf else 0,
+        "sla_attainment_pct": agent_perf.sla_attainment_pct if agent_perf else 0,
+        "csat_score": agent_perf.csat_score if agent_perf else None,
+        "csat_responses": agent_perf.csat_responses if agent_perf else 0,
+        "capacity": agent_perf.capacity if agent_perf else (result.agent.agent_capacity or 10),
+        "utilization_pct": agent_perf.utilization_pct if agent_perf else 0,
     }
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = agent.display_name or f"Agent {agent.id}"
+    context["page_title"] = result.agent.display_name or f"Agent {result.agent.id}"
     context["breadcrumbs"] = build_breadcrumbs([
         {"label": "Support", "href": "/support/dashboard"},
         {"label": "Agents", "href": "/support/agents"},
-        {"label": agent.display_name or f"Agent {agent.id}"},
+        {"label": result.agent.display_name or f"Agent {result.agent.id}"},
     ])
-    context["agent"] = agent
-    context["open_tickets"] = open_tickets
-    context["team_memberships"] = team_memberships
+    context["agent"] = result.agent
+    context["open_tickets"] = result.recent_tickets
+    context["team_memberships"] = result.team_memberships
     context["stats"] = stats
+    context["performance"] = agent_perf
 
     template = templates.get_template("modules/support/templates/pages/agent_detail.html")
     return HTMLResponse(template.render(context))
@@ -2164,49 +2243,30 @@ async def canned_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Canned responses list page."""
-    service = SupportWebService(db, user_id=user.id, principal=user)
+    from app.services.support import CannedResponseService, CannedResponseFilters
 
-    # Use service to list canned responses
-    result = service.list_canned_responses(
-        active_only=True,
-        page=page,
-        per_page=per_page,
-    )
+    # Use CannedResponseService for filtering, pagination, and stats (single optimized query)
+    service = CannedResponseService(db, user)
+    filters = CannedResponseFilters(search=q, scope=scope, active_only=True)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    responses = result["items"]
-    total = result["total"]
+    result = service.list_with_stats(filters=filters, pagination=pagination)
 
-    # Apply search filter (service doesn't support search yet)
-    if q:
-        q_lower = q.lower()
-        responses = [r for r in responses if (
-            (r.name and q_lower in r.name.lower()) or
-            (r.shortcode and q_lower in r.shortcode.lower()) or
-            (r.content and q_lower in r.content.lower())
-        )]
-        total = len(responses)
-
-    # Apply scope filter (service doesn't support scope filter yet)
-    if scope:
-        responses = [r for r in responses if r.scope == scope]
-        total = len(responses)
-
-    # Stats - get all canned responses for counting
-    all_responses = service.list_canned_responses(active_only=True, page=1, per_page=1000)["items"]
+    # Map stats to template format
     stats = {
-        "total": len(all_responses),
-        "personal": len([r for r in all_responses if r.scope == CannedResponseScope.PERSONAL.value]),
-        "team": len([r for r in all_responses if r.scope == CannedResponseScope.TEAM.value]),
-        "global": len([r for r in all_responses if r.scope == CannedResponseScope.GLOBAL.value]),
+        "total": result.stats.total,
+        "personal": result.stats.personal_count,
+        "team": result.stats.team_count,
+        "global": result.stats.global_count,
     }
 
     context = get_base_context(request, response, user, csrf_token)
-    context["responses"] = responses
+    context["responses"] = result.items
     context["stats"] = stats
     context["search_query"] = q or ""
     context["current_scope"] = scope
     context["scope_options"] = get_canned_scope_options()
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/support/templates/partials/canned_table.html")
@@ -2233,7 +2293,8 @@ async def canned_new(
 ):
     """New canned response form page."""
     # Get teams for scope selection
-    teams = db.query(Team).filter(Team.is_active == True).all()
+    from app.services.support import AgentService
+    teams = AgentService(db, user).list_teams(active_only=True)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -2263,7 +2324,8 @@ async def canned_create(
 ):
     """Create a new canned response."""
     form = await request.form()
-    teams = db.query(Team).filter(Team.is_active == True).all()
+    from app.services.support import AgentService, CannedResponseService, CannedResponseCreate, DuplicateShortcodeError
+    teams = AgentService(db, user).list_teams(active_only=True)
 
     # Validation
     errors = {}
@@ -2277,11 +2339,9 @@ async def canned_create(
         errors["content"] = "Content is required"
 
     # Check for duplicate shortcode
+    service = CannedResponseService(db, user)
     if shortcode:
-        existing = db.query(CannedResponse).filter(
-            CannedResponse.shortcode == shortcode,
-            CannedResponse.is_active == True
-        ).first()
+        existing = service.get_by_shortcode(shortcode)
         if existing:
             errors["shortcode"] = "This shortcode is already in use"
 
@@ -2307,19 +2367,32 @@ async def canned_create(
     scope = _form_str(form, "scope") or CannedResponseScope.PERSONAL.value
     team_id = _form_str(form, "team_id")
 
-    canned = CannedResponse(
-        name=name,
-        content=content,
-        shortcode=shortcode or None,
-        scope=scope,
-        team_id=int(team_id) if team_id else None,
-        created_by_id=user.id,
-        is_active=True,
-    )
+    try:
+        canned = service.create(CannedResponseCreate(
+            name=name,
+            content=content,
+            shortcode=shortcode or None,
+            scope=scope,
+            team_id=int(team_id) if team_id else None,
+        ))
+        db.commit()
+    except DuplicateShortcodeError:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Canned Response"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Support", "href": "/support/dashboard"},
+            {"label": "Canned Responses", "href": "/support/canned-responses"},
+            {"label": "New"},
+        ])
+        context["canned"] = None
+        context["teams"] = teams
+        context["scope_options"] = get_canned_scope_options()
+        context["errors"] = {"shortcode": "This shortcode is already in use"}
+        context["form_data"] = dict(form)
 
-    db.add(canned)
-    db.commit()
-    db.refresh(canned)
+        template = templates.get_template("modules/support/templates/pages/canned_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, f"Canned response '{canned.name}' created successfully.", "success")
 
@@ -2337,12 +2410,14 @@ async def canned_edit(
     canned_id: int,
 ):
     """Edit canned response form page."""
-    canned = db.query(CannedResponse).filter(CannedResponse.id == canned_id).first()
-
-    if not canned:
+    from app.services.support import AgentService, CannedResponseService, CannedResponseNotFoundError
+    service = CannedResponseService(db, user)
+    try:
+        canned = service.get(canned_id)
+    except CannedResponseNotFoundError:
         raise HTTPException(status_code=404, detail="Canned response not found")
 
-    teams = db.query(Team).filter(Team.is_active == True).all()
+    teams = AgentService(db, user).list_teams(active_only=True)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -2372,13 +2447,15 @@ async def canned_update(
     canned_id: int,
 ):
     """Update a canned response."""
-    canned = db.query(CannedResponse).filter(CannedResponse.id == canned_id).first()
-
-    if not canned:
+    from app.services.support import AgentService, CannedResponseService, CannedResponseUpdate, CannedResponseNotFoundError, DuplicateShortcodeError
+    service = CannedResponseService(db, user)
+    try:
+        canned = service.get(canned_id)
+    except CannedResponseNotFoundError:
         raise HTTPException(status_code=404, detail="Canned response not found")
 
     form = await request.form()
-    teams = db.query(Team).filter(Team.is_active == True).all()
+    teams = AgentService(db, user).list_teams(active_only=True)
 
     # Validation
     errors = {}
@@ -2393,12 +2470,8 @@ async def canned_update(
 
     # Check for duplicate shortcode (excluding current)
     if shortcode and shortcode != canned.shortcode:
-        existing = db.query(CannedResponse).filter(
-            CannedResponse.shortcode == shortcode,
-            CannedResponse.is_active == True,
-            CannedResponse.id != canned_id
-        ).first()
-        if existing:
+        existing = service.get_by_shortcode(shortcode)
+        if existing and existing.id != canned_id:
             errors["shortcode"] = "This shortcode is already in use"
 
     if errors:
@@ -2421,13 +2494,31 @@ async def canned_update(
     # Update canned response
     team_id = _form_str(form, "team_id")
 
-    canned.name = name
-    canned.content = content
-    canned.shortcode = shortcode or None
-    canned.scope = _form_str(form, "scope") or canned.scope
-    canned.team_id = int(team_id) if team_id else None
+    try:
+        canned = service.update(canned_id, CannedResponseUpdate(
+            name=name,
+            content=content,
+            shortcode=shortcode or None,
+            scope=_form_str(form, "scope") or canned.scope,
+            team_id=int(team_id) if team_id else None,
+        ))
+        db.commit()
+    except DuplicateShortcodeError:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit: {canned.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Support", "href": "/support/dashboard"},
+            {"label": "Canned Responses", "href": "/support/canned-responses"},
+            {"label": "Edit"},
+        ])
+        context["canned"] = canned
+        context["teams"] = teams
+        context["scope_options"] = get_canned_scope_options()
+        context["errors"] = {"shortcode": "This shortcode is already in use"}
 
-    db.commit()
+        template = templates.get_template("modules/support/templates/pages/canned_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
     set_flash(response, f"Canned response '{canned.name}' updated successfully.", "success")
 
@@ -2445,13 +2536,15 @@ async def canned_delete(
     canned_id: int,
 ):
     """Delete a canned response (soft delete)."""
-    canned = db.query(CannedResponse).filter(CannedResponse.id == canned_id).first()
-
-    if not canned:
+    from app.services.support import CannedResponseService, CannedResponseUpdate, CannedResponseNotFoundError
+    service = CannedResponseService(db, user)
+    try:
+        canned = service.get(canned_id)
+    except CannedResponseNotFoundError:
         raise HTTPException(status_code=404, detail="Canned response not found")
 
     name = canned.name
-    canned.is_active = False
+    service.update(canned_id, CannedResponseUpdate(is_active=False))
     db.commit()
 
     if is_htmx_request(request):
@@ -2479,17 +2572,15 @@ async def sla_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """SLA policies list page."""
-    service = SupportWebService(db, user_id=user.id, principal=user)
+    from app.services.support import SLAService
+    service = SLAService(db, user)
 
-    # Use service to list SLA policies
-    result = service.list_sla_policies(
-        active_only=False,  # Show all policies
-        page=page,
-        per_page=per_page,
+    offset = (page - 1) * per_page
+    policies, total = service.list_policies(
+        is_active=None,
+        skip=offset,
+        limit=per_page,
     )
-
-    policies = result["items"]
-    total = result["total"]
 
     # Apply search filter (service doesn't support search yet)
     if q:
@@ -2503,14 +2594,11 @@ async def sla_list(
     # Sort by priority desc, name
     policies = sorted(policies, key=lambda p: (-getattr(p, 'priority', 0), p.name or ""))
 
-    # Get targets per policy (still using db for relationship data)
-    policy_targets = {}
-    for policy in policies:
-        targets = db.query(SLATarget).filter(SLATarget.policy_id == policy.id).all()
-        policy_targets[policy.id] = targets
+    # Get targets per policy
+    policy_targets = service.list_targets_for_policies([p.id for p in policies])
 
     # Stats - get all policies for counting
-    all_policies = service.list_sla_policies(active_only=False, page=1, per_page=1000)["items"]
+    all_policies, _ = service.list_policies(is_active=None, skip=0, limit=1000)
     stats = {
         "total": len(all_policies),
         "active": len([p for p in all_policies if p.is_active]),
@@ -2548,20 +2636,18 @@ async def sla_detail(
     policy_id: int,
 ):
     """SLA policy detail page."""
-    policy = db.query(SLAPolicy).filter(SLAPolicy.id == policy_id).first()
+    from app.services.support import SLAService
+    service = SLAService(db, user)
 
+    policy = service.get_policy(policy_id)
     if not policy:
         raise HTTPException(status_code=404, detail="SLA policy not found")
 
-    # Get targets
-    targets = db.query(SLATarget).filter(SLATarget.policy_id == policy_id).order_by(SLATarget.priority).all()
+    targets = service.list_targets(policy_id)
 
-    # Get business calendar if assigned
     calendar = None
     if policy.calendar_id:
-        calendar = db.query(BusinessCalendar).filter(
-            BusinessCalendar.id == policy.calendar_id
-        ).first()
+        calendar = service.get_calendar(policy.calendar_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -2588,15 +2674,11 @@ async def sla_calendars(
     db: DB,
 ):
     """Business calendars list page."""
-    calendars = db.query(BusinessCalendar).order_by(BusinessCalendar.name).all()
+    from app.services.support import SLAService
+    service = SLAService(db, user)
+    calendars, _ = service.list_calendars()
 
-    # Get policy counts per calendar
-    calendar_usage = {}
-    for cal in calendars:
-        count = db.query(func.count(SLAPolicy.id)).filter(
-            SLAPolicy.calendar_id == cal.id
-        ).scalar() or 0
-        calendar_usage[cal.id] = count
+    calendar_usage = service.get_calendar_usage([c.id for c in calendars])
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -2632,36 +2714,21 @@ async def automation_list(
 ):
     """Automation rules list page."""
     from app.models.support_automation import (
-        AutomationRule,
-        AutomationLog,
         AutomationTrigger,
         AutomationActionType,
     )
+    from app.services.support import AutomationService
 
-    # Build query
-    query = db.query(AutomationRule)
+    service = AutomationService(db, principal=user)
+    rules, _ = service.list_db_rules(
+        trigger=trigger,
+        is_active=True if active_only else None,
+        skip=0,
+        limit=1000,
+    )
 
-    if trigger:
-        query = query.filter(AutomationRule.trigger == trigger)
-    if active_only:
-        query = query.filter(AutomationRule.is_active == True)
-
-    rules = query.order_by(AutomationRule.priority, AutomationRule.name).all()
-
-    # Get execution stats
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    execution_stats = db.query(
-        AutomationLog.rule_id,
-        func.count(AutomationLog.id).label("total"),
-        func.sum(func.cast(AutomationLog.success, func.literal(1).type)).label("success"),
-    ).filter(
-        AutomationLog.created_at >= thirty_days_ago
-    ).group_by(AutomationLog.rule_id).all()
-
-    stats_map = {
-        row.rule_id: {"total": row.total, "success": row.success or 0}
-        for row in execution_stats
-    }
+    stats_map = service.get_rule_execution_stats(thirty_days_ago)
 
     # Summary stats
     total_rules = len(rules)
@@ -2708,13 +2775,14 @@ async def automation_detail(
 ):
     """Automation rule detail page."""
     from app.models.support_automation import (
-        AutomationRule,
-        AutomationLog,
         AutomationTrigger,
         AutomationActionType,
     )
+    from app.services.support import AutomationService
+    from app.services.support.types import AutomationLogFilters
 
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
+    service = AutomationService(db, principal=user)
+    rule = service.get_db_rule(rule_id)
 
     if not rule:
         template = templates.get_template("errors/404.html")
@@ -2722,21 +2790,14 @@ async def automation_detail(
         context["message"] = "Automation rule not found"
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get recent logs
-    recent_logs = db.query(AutomationLog).filter(
-        AutomationLog.rule_id == rule_id
-    ).order_by(AutomationLog.created_at.desc()).limit(20).all()
+    recent_logs, _ = service.list_logs(
+        filters=AutomationLogFilters(rule_id=rule_id),
+        skip=0,
+        limit=20,
+    )
 
-    # Get execution stats for last 30 days
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    stats = db.query(
-        func.count(AutomationLog.id).label("total"),
-        func.sum(func.cast(AutomationLog.success, func.literal(1).type)).label("success"),
-        func.avg(AutomationLog.execution_time_ms).label("avg_time"),
-    ).filter(
-        AutomationLog.rule_id == rule_id,
-        AutomationLog.created_at >= thirty_days_ago,
-    ).first()
+    stats = service.get_rule_log_stats(rule_id, start_date=thirty_days_ago)
 
     # Reference data for display
     trigger_labels = {t.value: t.value.replace("_", " ").title() for t in AutomationTrigger}
@@ -2753,11 +2814,14 @@ async def automation_detail(
 
     context["rule"] = rule
     context["recent_logs"] = recent_logs
+    total = stats.get("total", 0)
+    success = stats.get("success", 0)
+    avg_time_ms = stats.get("avg_time_ms", 0)
     context["stats"] = {
-        "total": stats.total if stats else 0,
-        "success": stats.success or 0 if stats else 0,
-        "success_rate": round((stats.success or 0) / stats.total * 100, 1) if stats and stats.total > 0 else 0,
-        "avg_time_ms": round(float(stats.avg_time or 0), 1) if stats else 0,
+        "total": total,
+        "success": success,
+        "success_rate": round(success / total * 100, 1) if total > 0 else 0,
+        "avg_time_ms": round(float(avg_time_ms or 0), 1),
     }
     context["trigger_labels"] = trigger_labels
     context["action_labels"] = action_labels
@@ -2776,9 +2840,10 @@ async def automation_toggle(
     db: DB,
 ):
     """Toggle automation rule active status."""
-    from app.models.support_automation import AutomationRule
+    from app.services.support import AutomationService
 
-    rule = db.query(AutomationRule).filter(AutomationRule.id == rule_id).first()
+    service = AutomationService(db, principal=user)
+    rule = service.toggle_db_rule(rule_id)
 
     if not rule:
         htmx_toast(response, "Rule not found", "error")
@@ -2788,7 +2853,6 @@ async def automation_toggle(
             headers={"HX-Reswap": "none", **dict(response.headers)},
         )
 
-    rule.is_active = not rule.is_active
     db.commit()
 
     status_text = "enabled" if rule.is_active else "disabled"
@@ -2820,52 +2884,16 @@ async def csat_list(
     active_only: bool = Query(True),
 ):
     """CSAT surveys list page."""
-    from app.models.support_csat import CSATSurvey, CSATResponse, SurveyType, SurveyTrigger
+    from app.models.support_csat import SurveyType, SurveyTrigger
+    from app.services.support import CSATService
 
-    # Build query
-    query = db.query(CSATSurvey)
-    if active_only:
-        query = query.filter(CSATSurvey.is_active == True)
+    service = CSATService(db, principal=user)
+    surveys = service.list_surveys(active_only=active_only)
 
-    surveys = query.order_by(CSATSurvey.name).all()
-
-    # Get response stats for each survey
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    stats_query = db.query(
-        CSATResponse.survey_id,
-        func.count(CSATResponse.id).label("total"),
-        func.avg(CSATResponse.rating).label("avg_rating"),
-        func.sum(func.cast(CSATResponse.rating >= 4, func.literal(1).type)).label("positive"),
-    ).filter(
-        CSATResponse.responded_at >= thirty_days_ago,
-        CSATResponse.rating.isnot(None),
-    ).group_by(CSATResponse.survey_id).all()
-
-    stats_map = {
-        row.survey_id: {
-            "total": row.total,
-            "avg_rating": round(float(row.avg_rating or 0), 2),
-            "positive": row.positive or 0,
-        }
-        for row in stats_query
-    }
-
-    # Overall stats
-    overall_stats = db.query(
-        func.count(CSATResponse.id).label("total"),
-        func.avg(CSATResponse.rating).label("avg_rating"),
-    ).filter(
-        CSATResponse.responded_at >= thirty_days_ago,
-        CSATResponse.rating.isnot(None),
-    ).first()
-
-    # Sent vs responded (response rate)
-    sent_count = db.query(func.count(CSATResponse.id)).filter(
-        CSATResponse.sent_at >= thirty_days_ago
-    ).scalar() or 0
-    responded_count = db.query(func.count(CSATResponse.id)).filter(
-        CSATResponse.responded_at >= thirty_days_ago
-    ).scalar() or 0
+    stats_map = service.get_survey_stats(thirty_days_ago)
+    overall_stats = service.get_overall_stats(thirty_days_ago)
+    response_counts = service.get_response_counts(thirty_days_ago)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -2877,11 +2905,13 @@ async def csat_list(
 
     context["surveys"] = surveys
     context["stats_map"] = stats_map
+    sent_count = response_counts.get("sent", 0)
+    responded_count = response_counts.get("responded", 0)
     context["summary"] = {
         "total_surveys": len(surveys),
         "active_surveys": sum(1 for s in surveys if s.is_active),
-        "total_responses": overall_stats.total if overall_stats else 0,
-        "avg_rating": round(float(overall_stats.avg_rating or 0), 2) if overall_stats else 0,
+        "total_responses": overall_stats.get("total", 0),
+        "avg_rating": overall_stats.get("avg_rating", 0),
         "response_rate": round(responded_count / sent_count * 100, 1) if sent_count > 0 else 0,
     }
     context["active_only"] = active_only
@@ -2904,46 +2934,28 @@ async def csat_detail(
     db: DB,
 ):
     """CSAT survey detail page with responses."""
-    from app.models.support_csat import CSATSurvey, CSATResponse, SurveyType, SurveyTrigger
+    from app.models.support_csat import SurveyType, SurveyTrigger
+    from app.services.support import CSATService, CSATSurveyNotFoundError
 
-    survey = db.query(CSATSurvey).filter(CSATSurvey.id == survey_id).first()
-
-    if not survey:
+    service = CSATService(db, principal=user)
+    try:
+        survey = service.get_survey(survey_id)
+    except CSATSurveyNotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Survey not found"
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get responses
-    responses = db.query(CSATResponse).filter(
-        CSATResponse.survey_id == survey_id,
-        CSATResponse.responded_at.isnot(None),
-    ).order_by(CSATResponse.responded_at.desc()).limit(50).all()
+    responses = service.list_responses(
+        survey_id=survey_id,
+        responded_only=True,
+        limit=50,
+        offset=0,
+    )
 
-    # Get stats
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    stats = db.query(
-        func.count(CSATResponse.id).label("total"),
-        func.avg(CSATResponse.rating).label("avg_rating"),
-        func.sum(func.cast(CSATResponse.rating >= 4, func.literal(1).type)).label("positive"),
-        func.sum(func.cast(CSATResponse.rating <= 2, func.literal(1).type)).label("negative"),
-    ).filter(
-        CSATResponse.survey_id == survey_id,
-        CSATResponse.responded_at >= thirty_days_ago,
-        CSATResponse.rating.isnot(None),
-    ).first()
-
-    # Rating distribution
-    rating_dist = db.query(
-        CSATResponse.rating,
-        func.count(CSATResponse.id).label("count"),
-    ).filter(
-        CSATResponse.survey_id == survey_id,
-        CSATResponse.responded_at >= thirty_days_ago,
-        CSATResponse.rating.isnot(None),
-    ).group_by(CSATResponse.rating).all()
-
-    rating_distribution = {row.rating: row.count for row in rating_dist}
+    stats = service.get_survey_period_stats(survey_id, thirty_days_ago)
+    rating_distribution = stats.get("rating_distribution", {})
 
     # Reference labels
     type_labels = {t.value: t.value.upper() for t in SurveyType}
@@ -2960,12 +2972,14 @@ async def csat_detail(
 
     context["survey"] = survey
     context["responses"] = responses
+    total = stats.get("total", 0)
+    positive = stats.get("positive", 0)
     context["stats"] = {
-        "total": stats.total if stats else 0,
-        "avg_rating": round(float(stats.avg_rating or 0), 2) if stats else 0,
-        "positive": stats.positive or 0 if stats else 0,
-        "negative": stats.negative or 0 if stats else 0,
-        "satisfaction_pct": round((stats.positive or 0) / stats.total * 100, 1) if stats and stats.total > 0 else 0,
+        "total": total,
+        "avg_rating": stats.get("avg_rating", 0),
+        "positive": positive,
+        "negative": stats.get("negative", 0),
+        "satisfaction_pct": round(positive / total * 100, 1) if total > 0 else 0,
     }
     context["rating_distribution"] = rating_distribution
     context["type_labels"] = type_labels
@@ -2985,11 +2999,12 @@ async def csat_toggle(
     db: DB,
 ):
     """Toggle CSAT survey active status."""
-    from app.models.support_csat import CSATSurvey
+    from app.services.support import CSATService, CSATSurveyNotFoundError, CSATSurveyUpdate
 
-    survey = db.query(CSATSurvey).filter(CSATSurvey.id == survey_id).first()
-
-    if not survey:
+    service = CSATService(db, principal=user)
+    try:
+        survey = service.get_survey(survey_id)
+    except CSATSurveyNotFoundError:
         htmx_toast(response, "Survey not found", "error")
         return HTMLResponse(
             "",
@@ -2997,7 +3012,7 @@ async def csat_toggle(
             headers={"HX-Reswap": "none", **dict(response.headers)},
         )
 
-    survey.is_active = not survey.is_active
+    service.update_survey(survey_id, CSATSurveyUpdate(is_active=not survey.is_active))
     db.commit()
 
     status_text = "enabled" if survey.is_active else "disabled"
@@ -3029,77 +3044,19 @@ async def routing_list(
     team_id: Optional[int] = Query(None),
 ):
     """Routing configuration page with rules, workload, and queue health."""
-    from app.models.support_sla import RoutingRule, RoutingStrategy
-    from app.models.agent import Agent, Team, TeamMember
-    from app.models.unified_ticket import UnifiedTicket
+    from app.models.support_sla import RoutingStrategy
+    from app.services.support import AgentService, RoutingService
 
-    # Get routing rules
-    query = db.query(RoutingRule)
-    if active_only:
-        query = query.filter(RoutingRule.is_active == True)
-    if team_id:
-        query = query.filter(RoutingRule.team_id == team_id)
+    routing_service = RoutingService(db, principal=user)
+    rules = routing_service.list_ticket_routing_rules(
+        team_id=team_id,
+        active_only=active_only,
+    )
 
-    rules = query.order_by(RoutingRule.priority, RoutingRule.name).all()
+    teams = AgentService(db, user).list_teams(active_only=True)
 
-    # Get teams for filter
-    teams = db.query(Team).filter(Team.is_active == True).order_by(Team.name).all()
-
-    # Get agent workload
-    open_statuses = [
-        TicketStatus.OPEN.value,
-        TicketStatus.IN_PROGRESS.value,
-        TicketStatus.WAITING.value,
-        TicketStatus.ON_HOLD.value,
-        TicketStatus.REOPENED.value,
-    ]
-    agents = db.query(Agent).filter(Agent.is_active == True).all()
-    agent_workload: list[dict[str, Any]] = []
-    for agent in agents:
-        name = agent.display_name or agent.email
-        capacity = agent.capacity or 10
-        if agent.employee_id:
-            open_count = db.query(func.count(UnifiedTicket.id)).filter(
-                UnifiedTicket.is_deleted == False,
-                UnifiedTicket.assigned_to_id == agent.employee_id,
-                UnifiedTicket.status.in_(open_statuses),
-            ).scalar() or 0
-        else:
-            open_count = 0
-        agent_workload.append({
-            "id": agent.id,
-            "name": agent.display_name or agent.email,
-            "email": agent.email,
-            "capacity": capacity,
-            "load": open_count,
-            "utilization": round(open_count / capacity * 100, 1) if capacity > 0 else 0,
-            "available": max(0, capacity - open_count),
-        })
-    agent_workload.sort(key=lambda x: -float(x.get("utilization") or 0))
-
-    # Queue health
-    unassigned = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.assigned_to_id.is_(None),
-        UnifiedTicket.status.in_(open_statuses),
-    ).scalar() or 0
-
-    total_open = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.status.in_(open_statuses),
-    ).scalar() or 0
-
-    total_capacity = sum(float(a.get("capacity") or 0) for a in agent_workload)
-    total_load = sum(float(a.get("load") or 0) for a in agent_workload)
-
-    queue_health = {
-        "unassigned": unassigned,
-        "total_open": total_open,
-        "total_agents": len(agents),
-        "total_capacity": total_capacity,
-        "total_load": total_load,
-        "utilization": round(total_load / total_capacity * 100, 1) if total_capacity > 0 else 0,
-    }
+    agent_workload = routing_service.get_unified_agent_workloads()
+    queue_health = routing_service.get_ticket_queue_health()
 
     # Strategy labels
     strategy_options = [
@@ -3141,11 +3098,13 @@ async def routing_detail(
     db: DB,
 ):
     """Routing rule detail page."""
-    from app.models.support_sla import RoutingRule, RoutingStrategy
+    from app.models.support_sla import RoutingStrategy
+    from app.services.support import RoutingService, RoutingRuleNotFoundError
 
-    rule = db.query(RoutingRule).filter(RoutingRule.id == rule_id).first()
-
-    if not rule:
+    service = RoutingService(db, principal=user)
+    try:
+        rule = service.get_ticket_routing_rule(rule_id)
+    except RoutingRuleNotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Routing rule not found"
@@ -3180,11 +3139,12 @@ async def routing_toggle(
     db: DB,
 ):
     """Toggle routing rule active status."""
-    from app.models.support_sla import RoutingRule
+    from app.services.support import RoutingService, RoutingRuleNotFoundError, TicketRoutingRuleUpdate
 
-    rule = db.query(RoutingRule).filter(RoutingRule.id == rule_id).first()
-
-    if not rule:
+    service = RoutingService(db, principal=user)
+    try:
+        rule = service.get_ticket_routing_rule(rule_id)
+    except RoutingRuleNotFoundError:
         htmx_toast(response, "Rule not found", "error")
         return HTMLResponse(
             "",
@@ -3192,7 +3152,7 @@ async def routing_toggle(
             headers={"HX-Reswap": "none", **dict(response.headers)},
         )
 
-    rule.is_active = not rule.is_active
+    service.update_ticket_routing_rule(rule_id, TicketRoutingRuleUpdate(is_active=not rule.is_active))
     db.commit()
 
     status_text = "enabled" if rule.is_active else "disabled"
@@ -3227,47 +3187,26 @@ async def conversations_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Conversations list page."""
-    from app.models.conversation import Conversation, ConversationStatus, ConversationPriority
+    from app.models.conversation import ConversationStatus, ConversationPriority
+    from app.services.support import LegacyConversationService
 
     offset = (page - 1) * per_page
+    service = LegacyConversationService(db)
 
-    # Build query
-    query = db.query(Conversation)
-
-    if status:
-        try:
-            status_enum = ConversationStatus(status)
-            query = query.filter(Conversation.status == status_enum)
-        except ValueError:
-            pass
-
-    if channel:
-        query = query.filter(Conversation.channel == channel)
-
-    if q:
-        search = f"%{q}%"
-        query = query.filter(Conversation.subject.ilike(search))
-
-    total = query.count()
-    conversations = query.order_by(Conversation.last_activity_at.desc().nullslast()).offset(offset).limit(per_page).all()
+    conversations, total = service.list_conversations(
+        status=status,
+        channel=channel,
+        search=q,
+        offset=offset,
+        limit=per_page,
+    )
 
     ticket_ids = [c.unified_ticket_id for c in conversations if c.unified_ticket_id]
-    ticket_map = {}
-    if ticket_ids:
-        tickets = db.query(UnifiedTicket).filter(UnifiedTicket.id.in_(ticket_ids)).all()
-        ticket_map = {t.id: t for t in tickets}
+    ticket_map = service.get_ticket_map(ticket_ids)
 
     total_pages = (total + per_page - 1) // per_page
-
-    # Get stats
-    status_counts = {}
-    for s in ConversationStatus:
-        count = db.query(func.count(Conversation.id)).filter(Conversation.status == s).scalar() or 0
-        status_counts[s.value] = count
-
-    # Channel options
-    channels = db.query(Conversation.channel).distinct().filter(Conversation.channel.isnot(None)).all()
-    channel_options = [c[0] for c in channels if c[0]]
+    status_counts = service.get_status_counts()
+    channel_options = service.list_channels()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -3314,10 +3253,11 @@ async def conversation_detail(
     db: DB,
 ):
     """Conversation detail page."""
-    from app.models.conversation import Conversation, ConversationStatus
-    from app.models.party import CustomerAccount, Party
+    from app.models.conversation import ConversationStatus
+    from app.services.support import LegacyConversationService
 
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()
+    service = LegacyConversationService(db)
+    conversation = service.get_conversation(conversation_id)
 
     if not conversation:
         template = templates.get_template("errors/404.html")
@@ -3325,21 +3265,11 @@ async def conversation_detail(
         context["message"] = "Conversation not found"
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get customer if linked
-    customer = None
-    if conversation.customer_account_id:
-        customer = (
-            db.query(CustomerAccount)
-            .join(Party, CustomerAccount.party_id == Party.id)
-            .filter(CustomerAccount.id == conversation.customer_account_id)
-            .first()
-        )
-
+    customer = service.get_customer_for_conversation(conversation.customer_account_id)
     ticket = None
     if conversation.unified_ticket_id:
-        ticket = db.query(UnifiedTicket).filter(
-            UnifiedTicket.id == conversation.unified_ticket_id
-        ).first()
+        ticket_map = service.get_ticket_map([conversation.unified_ticket_id])
+        ticket = ticket_map.get(conversation.unified_ticket_id)
 
     # Status labels
     status_labels = {s.value: s.value.title() for s in ConversationStatus}
@@ -3376,80 +3306,19 @@ async def csat_analytics(
     days: int = Query(30, ge=7, le=90),
 ):
     """CSAT Analytics - trends, by agent, satisfaction metrics."""
-    from app.models.support_csat import CSATSurvey, CSATResponse, SurveyType
-    from app.models.agent import Agent
-    from sqlalchemy import extract
+    from app.models.support_csat import SurveyType
+    from app.services.support import CSATService
 
     start_dt = datetime.utcnow() - timedelta(days=days)
     six_months_ago = datetime.utcnow() - timedelta(days=180)
 
-    # Overall stats
-    overall = db.query(
-        func.count(CSATResponse.id).label("total"),
-        func.avg(CSATResponse.rating).label("avg_rating"),
-        func.sum(func.cast(CSATResponse.rating >= 4, func.literal(1).type)).label("positive"),
-        func.sum(func.cast(CSATResponse.rating <= 2, func.literal(1).type)).label("negative"),
-    ).filter(
-        CSATResponse.responded_at >= start_dt,
-        CSATResponse.rating.isnot(None),
-    ).first()
-
-    # Response rate
-    sent_count = db.query(func.count(CSATResponse.id)).filter(
-        CSATResponse.sent_at >= start_dt
-    ).scalar() or 0
-    responded_count = db.query(func.count(CSATResponse.id)).filter(
-        CSATResponse.responded_at >= start_dt
-    ).scalar() or 0
-
-    # Trends - monthly for last 6 months
-    trends = db.query(
-        extract('year', CSATResponse.responded_at).label('year'),
-        extract('month', CSATResponse.responded_at).label('month'),
-        func.count(CSATResponse.id).label('count'),
-        func.avg(CSATResponse.rating).label('avg_rating'),
-    ).filter(
-        CSATResponse.responded_at >= six_months_ago,
-        CSATResponse.rating.isnot(None),
-    ).group_by(
-        extract('year', CSATResponse.responded_at),
-        extract('month', CSATResponse.responded_at)
-    ).order_by(
-        extract('year', CSATResponse.responded_at),
-        extract('month', CSATResponse.responded_at)
-    ).all()
-
-    # By agent
-    by_agent = db.query(
-        CSATResponse.agent_id,
-        Agent.display_name,
-        func.count(CSATResponse.id).label("count"),
-        func.avg(CSATResponse.rating).label("avg_rating"),
-        func.sum(func.cast(CSATResponse.rating >= 4, func.literal(1).type)).label("positive"),
-    ).join(Agent, Agent.id == CSATResponse.agent_id, isouter=True).filter(
-        CSATResponse.responded_at >= start_dt,
-        CSATResponse.rating.isnot(None),
-        CSATResponse.agent_id.isnot(None),
-    ).group_by(CSATResponse.agent_id, Agent.display_name).order_by(
-        func.avg(CSATResponse.rating).desc()
-    ).all()
-
-    # By survey type
-    by_type = db.query(
-        CSATSurvey.survey_type,
-        func.count(CSATResponse.id).label("count"),
-        func.avg(CSATResponse.rating).label("avg_rating"),
-    ).join(CSATSurvey, CSATSurvey.id == CSATResponse.survey_id).filter(
-        CSATResponse.responded_at >= start_dt,
-        CSATResponse.rating.isnot(None),
-    ).group_by(CSATSurvey.survey_type).all()
-
-    # Recent feedback with comments
-    recent_feedback = db.query(CSATResponse).filter(
-        CSATResponse.responded_at >= start_dt,
-        CSATResponse.feedback_text.isnot(None),
-        CSATResponse.feedback_text != "",
-    ).order_by(CSATResponse.responded_at.desc()).limit(20).all()
+    service = CSATService(db, principal=user)
+    overall = service.get_overall_stats(start_dt)
+    response_counts = service.get_response_counts(start_dt)
+    trends = service.get_trends(six_months_ago)
+    by_agent = service.get_agent_stats(start_dt)
+    by_type = service.get_type_stats(start_dt)
+    recent_feedback = service.list_recent_feedback(start_dt, limit=20)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -3461,40 +3330,44 @@ async def csat_analytics(
     ])
 
     context["period_days"] = days
+    sent_count = response_counts.get("sent", 0)
+    responded_count = response_counts.get("responded", 0)
+    total = overall.get("total", 0)
+    positive = overall.get("positive", 0)
     context["stats"] = {
-        "total_responses": overall.total if overall else 0,
-        "avg_rating": round(float(overall.avg_rating or 0), 2) if overall else 0,
-        "positive": overall.positive or 0 if overall else 0,
-        "negative": overall.negative or 0 if overall else 0,
-        "satisfaction_pct": round((overall.positive or 0) / overall.total * 100, 1) if overall and overall.total > 0 else 0,
+        "total_responses": total,
+        "avg_rating": overall.get("avg_rating", 0),
+        "positive": positive,
+        "negative": overall.get("negative", 0),
+        "satisfaction_pct": round(positive / total * 100, 1) if total > 0 else 0,
         "response_rate": round(responded_count / sent_count * 100, 1) if sent_count > 0 else 0,
     }
 
     context["trends"] = [
         {
-            "period": f"{int(t.year)}-{int(t.month):02d}",
-            "count": t.count,
-            "avg_rating": round(float(t.avg_rating or 0), 2),
+            "period": f"{t['year']}-{t['month']:02d}",
+            "count": t["count"],
+            "avg_rating": t["avg_rating"],
         }
         for t in trends
     ]
 
     context["by_agent"] = [
         {
-            "agent_id": a.agent_id,
-            "agent_name": a.display_name or "Unknown",
-            "count": a.count,
-            "avg_rating": round(float(a.avg_rating or 0), 2),
-            "satisfaction_pct": round((a.positive or 0) / a.count * 100, 1) if a.count > 0 else 0,
+            "agent_id": a["agent_id"],
+            "agent_name": a["agent_name"],
+            "count": a["count"],
+            "avg_rating": a["avg_rating"],
+            "satisfaction_pct": round(a["positive"] / a["count"] * 100, 1) if a["count"] > 0 else 0,
         }
         for a in by_agent
     ]
 
     context["by_type"] = [
         {
-            "type": t.survey_type.upper() if t.survey_type else "Unknown",
-            "count": t.count,
-            "avg_rating": round(float(t.avg_rating or 0), 2),
+            "type": t["type"].upper() if t["type"] else "Unknown",
+            "count": t["count"],
+            "avg_rating": t["avg_rating"],
         }
         for t in by_type
     ]
@@ -3521,50 +3394,21 @@ async def sla_breaches(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """SLA breaches list - tickets that breached SLA targets."""
-    from app.models.ticket import Ticket, TicketStatus
-
     start_dt = datetime.utcnow() - timedelta(days=days)
     offset = (page - 1) * per_page
 
-    # Get tickets that breached SLA (first response or resolution)
-    breached_query = db.query(UnifiedTicket).filter(
-        UnifiedTicket.created_at >= start_dt,
-        or_(
-            UnifiedTicket.response_sla_breached.is_(True),
-            UnifiedTicket.resolution_sla_breached.is_(True),
-        ),
+    service = SupportWebService(db, user_id=user.id, principal=user)
+    result = service.list_sla_breaches(
+        start_dt=start_dt,
+        offset=offset,
+        limit=per_page,
     )
-
-    total = breached_query.count()
-    breached_tickets = breached_query.order_by(UnifiedTicket.created_at.desc()).offset(offset).limit(per_page).all()
-
-    # Breach stats
-    first_response_breaches = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.response_sla_breached == True,
-        UnifiedTicket.created_at >= start_dt,
-    ).scalar() or 0
-
-    resolution_breaches = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.resolution_sla_breached == True,
-        UnifiedTicket.created_at >= start_dt,
-    ).scalar() or 0
-
-    # Total tickets in period
-    total_tickets = db.query(func.count(UnifiedTicket.id)).filter(
-        UnifiedTicket.created_at >= start_dt
-    ).scalar() or 1
-
-    # By priority (if available)
-    by_priority = db.query(
-        UnifiedTicket.priority,
-        func.count(UnifiedTicket.id).label("count"),
-    ).filter(
-        UnifiedTicket.created_at >= start_dt,
-        or_(
-            UnifiedTicket.response_sla_breached.is_(True),
-            UnifiedTicket.resolution_sla_breached.is_(True),
-        ),
-    ).group_by(UnifiedTicket.priority).all()
+    breached_tickets = result["items"]
+    total = result["total"]
+    first_response_breaches = result["first_response_breaches"]
+    resolution_breaches = result["resolution_breaches"]
+    total_tickets = result["total_tickets"]
+    by_priority = result["by_priority"]
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -3610,25 +3454,48 @@ async def teams_list(
     csrf_token: CSRFToken,
     db: DB,
 ):
-    """Support teams list."""
-    from app.models.agent import Agent, Team, TeamMember
+    """Support teams list with comprehensive analytics."""
+    from app.services.support import AgentService
 
-    teams = db.query(Team).order_by(Team.name).all()
+    service = AgentService(db, user)
+    teams, team_stats = service.list_teams_with_stats(active_only=None)
 
-    # Get member counts and stats
-    team_stats: dict[int, dict[str, Any]] = {}
-    for team in teams:
-        members = db.query(TeamMember).filter(TeamMember.team_id == team.id).all()
-        member_count = len(members)
-        agent_ids = [m.agent_id for m in members]
-        agents = db.query(Agent).filter(Agent.id.in_(agent_ids)).all() if agent_ids else []
-        active_agents = sum(1 for a in agents if a.is_active)
-        total_capacity = sum(a.capacity or 0 for a in agents if a.is_active)
-        team_stats[team.id] = {
-            "member_count": member_count,
-            "active_agents": active_agents,
-            "total_capacity": total_capacity,
-        }
+    # Get team performance analytics (30 days)
+    analytics = SupportAnalyticsService(db, principal=user)
+    filters = AnalyticsFilters(days=30)
+    team_performance = analytics.get_team_performance(filters)
+
+    # Build performance lookup by team_id
+    perf_by_team = {p.team_id: p for p in team_performance}
+
+    # Calculate aggregate stats
+    total_capacity = sum(s["total_capacity"] for s in team_stats.values())
+    avg_sla_pct = 0.0
+    avg_csat = 0.0
+    csat_count = 0
+
+    if team_performance:
+        total_sla = sum(p.sla_attainment_pct for p in team_performance)
+        avg_sla_pct = total_sla / len(team_performance) if team_performance else 0
+
+        csat_scores = [p.csat_score for p in team_performance if p.csat_score is not None]
+        if csat_scores:
+            avg_csat = sum(csat_scores) / len(csat_scores)
+            csat_count = len(csat_scores)
+
+    # Team rankings by SLA
+    teams_by_sla = sorted(
+        [p for p in team_performance if p.total_tickets >= 5],
+        key=lambda x: x.sla_attainment_pct,
+        reverse=True
+    )
+
+    # Team rankings by utilization
+    teams_by_util = sorted(
+        team_performance,
+        key=lambda x: x.utilization_pct,
+        reverse=True
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -3640,9 +3507,15 @@ async def teams_list(
 
     context["teams"] = teams
     context["team_stats"] = team_stats
+    context["team_performance"] = perf_by_team
+    context["teams_by_sla"] = teams_by_sla[:5]
+    context["teams_by_util"] = teams_by_util[:5]
     context["summary"] = {
         "total_teams": len(teams),
         "active_teams": sum(1 for t in teams if t.is_active),
+        "total_capacity": total_capacity,
+        "avg_sla_pct": round(avg_sla_pct, 1),
+        "avg_csat": round(avg_csat, 1) if csat_count > 0 else None,
     }
 
     template = templates.get_template("modules/support/templates/pages/teams_list.html")
@@ -3658,44 +3531,62 @@ async def team_detail(
     csrf_token: CSRFToken,
     db: DB,
 ):
-    """Team detail page with members."""
-    from app.models.agent import Agent, Team, TeamMember
-    from app.models.unified_ticket import UnifiedTicket
+    """Team detail page with comprehensive performance metrics."""
+    from app.services.support import AgentService, TeamNotFoundError
 
-    team = db.query(Team).filter(Team.id == team_id).first()
-    if not team:
+    service = AgentService(db, user)
+    try:
+        result = service.get_team_detail(team_id)
+    except TeamNotFoundError:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    # Get members with agent details
-    members = db.query(TeamMember).filter(TeamMember.team_id == team_id).all()
-    agent_ids = [m.agent_id for m in members]
-    agents = db.query(Agent).filter(Agent.id.in_(agent_ids)).all() if agent_ids else []
+    team = result["team"]
+    agent_workload = result["agents"]
+    stats = result["stats"]
 
-    # Agent workload
-    open_statuses = [
-        TicketStatus.OPEN.value,
-        TicketStatus.IN_PROGRESS.value,
-        TicketStatus.WAITING.value,
-        TicketStatus.ON_HOLD.value,
-        TicketStatus.REOPENED.value,
-    ]
-    agent_workload: list[dict[str, Any]] = []
-    for agent in agents:
-        name = agent.display_name or agent.email
-        if agent.employee_id:
-            open_tickets = db.query(func.count(UnifiedTicket.id)).filter(
-                UnifiedTicket.is_deleted == False,
-                UnifiedTicket.assigned_to_id == agent.employee_id,
-                UnifiedTicket.status.in_(open_statuses),
-            ).scalar() or 0
-        else:
-            open_tickets = 0
-        agent_workload.append({
-            "agent": agent,
-            "open_tickets": open_tickets,
-            "capacity": agent.capacity or 10,
-            "utilization": round(open_tickets / (agent.capacity or 10) * 100, 1) if agent.capacity else 0,
-        })
+    # Get team performance analytics (30 days)
+    analytics = SupportAnalyticsService(db, principal=user)
+    filters = AnalyticsFilters(days=30, team_id=team_id)
+    team_perf_list = analytics.get_team_performance(filters)
+    team_perf = team_perf_list[0] if team_perf_list else None
+
+    # Get agent performance for this team
+    agent_filters = AnalyticsFilters(days=30, team_id=team_id)
+    agent_performance = analytics.get_agent_performance(agent_filters, limit=50)
+    agent_perf_by_id = {p.agent_id: p for p in agent_performance}
+
+    # Get organization-wide averages for comparison
+    org_filters = AnalyticsFilters(days=30)
+    all_teams = analytics.get_team_performance(org_filters)
+    org_avg_sla = sum(t.sla_attainment_pct for t in all_teams) / len(all_teams) if all_teams else 0
+    org_avg_resolution = sum(t.avg_resolution_hours for t in all_teams) / len(all_teams) if all_teams else 0
+    csat_scores = [t.csat_score for t in all_teams if t.csat_score is not None]
+    org_avg_csat = sum(csat_scores) / len(csat_scores) if csat_scores else None
+
+    # Enhanced stats with performance metrics
+    enhanced_stats = {
+        **stats,
+        "total_30d": team_perf.total_tickets if team_perf else 0,
+        "resolved_30d": team_perf.resolved_tickets if team_perf else 0,
+        "resolution_rate": team_perf.resolution_rate if team_perf else 0,
+        "avg_resolution_hours": team_perf.avg_resolution_hours if team_perf else 0,
+        "avg_first_response_hours": team_perf.avg_first_response_hours if team_perf else 0,
+        "sla_attainment_pct": team_perf.sla_attainment_pct if team_perf else 0,
+        "csat_score": team_perf.csat_score if team_perf else None,
+        "utilization_pct": team_perf.utilization_pct if team_perf else 0,
+        "current_open": team_perf.current_open if team_perf else 0,
+        # Organization comparison
+        "org_avg_sla": round(org_avg_sla, 1),
+        "org_avg_resolution": round(org_avg_resolution, 1),
+        "org_avg_csat": round(org_avg_csat, 1) if org_avg_csat else None,
+    }
+
+    # Top 3 performers in this team
+    top_performers = sorted(
+        [p for p in agent_performance if p.total_tickets >= 3],
+        key=lambda x: (x.sla_attainment_pct, x.resolution_rate),
+        reverse=True
+    )[:3]
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -3708,11 +3599,10 @@ async def team_detail(
 
     context["team"] = team
     context["agents"] = agent_workload
-    context["stats"] = {
-        "member_count": len(members),
-        "active_agents": sum(1 for a in agents if a.is_active),
-        "total_capacity": sum(a.capacity or 0 for a in agents if a.is_active),
-    }
+    context["stats"] = enhanced_stats
+    context["agent_performance"] = agent_perf_by_id
+    context["top_performers"] = top_performers
+    context["team_perf"] = team_perf
 
     template = templates.get_template("modules/support/templates/pages/team_detail.html")
     return HTMLResponse(template.render(context))
@@ -3826,64 +3716,12 @@ async def escalations_list(
     db: DB,
 ):
     """Escalation policies overview."""
-    from app.services.support.escalation import EscalationService
-    from app.models.unified_ticket import UnifiedTicket
-    from sqlalchemy import or_, and_
-
-    def _apply_conditions(query, conditions):
-        for condition in conditions or []:
-            field = condition.get("field")
-            operator = condition.get("operator", "equals")
-            value = condition.get("value")
-
-            if not field or not hasattr(UnifiedTicket, field):
-                continue
-            column = getattr(UnifiedTicket, field)
-
-            if operator == "equals":
-                query = query.filter(column == value)
-            elif operator == "not_equals":
-                query = query.filter(column != value)
-            elif operator == "in":
-                if isinstance(value, list):
-                    query = query.filter(column.in_(value))
-            elif operator == "not_in":
-                if isinstance(value, list):
-                    query = query.filter(~column.in_(value))
-            elif operator == "is_empty":
-                query = query.filter(or_(column.is_(None), column == ""))
-            elif operator == "is_not_empty":
-                query = query.filter(and_(column.isnot(None), column != ""))
-
-        return query
-
     service = EscalationService(db, principal=user)
     policies = service.list_policies(active_only=False)
     for policy in policies:
         _ = policy.levels
 
-    now = datetime.utcnow()
-    overdue_filter = or_(
-        and_(
-            UnifiedTicket.response_by.isnot(None),
-            UnifiedTicket.first_response_at.is_(None),
-            UnifiedTicket.response_by < now,
-        ),
-        and_(
-            UnifiedTicket.resolution_by.isnot(None),
-            UnifiedTicket.resolved_at.is_(None),
-            UnifiedTicket.resolution_by < now,
-        ),
-    )
-
-    candidate_counts: dict[int, int] = {}
-    for policy in policies:
-        query = db.query(UnifiedTicket).filter(
-            UnifiedTicket.is_deleted == False,
-        )
-        query = _apply_conditions(query, policy.conditions)
-        count = query.filter(overdue_filter).count()
-        candidate_counts[policy.id] = count
+    candidate_counts = service.get_candidate_counts(policies)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -4312,36 +4150,27 @@ async def automation_logs(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """Automation execution logs."""
-    from app.models.support_automation import AutomationRule, AutomationLog
+    from app.services.support import AutomationService
+    from app.services.support.types import AutomationLogFilters
 
     offset = (page - 1) * per_page
+    service = AutomationService(db, principal=user)
 
-    query = db.query(AutomationLog)
+    logs, total = service.list_logs(
+        filters=AutomationLogFilters(
+            rule_id=rule_id,
+            success=success,
+            trigger=trigger,
+        ),
+        skip=offset,
+        limit=per_page,
+    )
 
-    if rule_id:
-        query = query.filter(AutomationLog.rule_id == rule_id)
-    if success is not None:
-        query = query.filter(AutomationLog.success == success)
-    if trigger:
-        query = query.filter(AutomationLog.trigger == trigger)
+    rules, _ = service.list_db_rules(skip=0, limit=1000)
+    trigger_options = service.list_distinct_triggers()
 
-    total = query.count()
-    logs = query.order_by(AutomationLog.created_at.desc()).offset(offset).limit(per_page).all()
-
-    # Get rules for filter dropdown
-    rules = db.query(AutomationRule).order_by(AutomationRule.name).all()
-    trigger_rows = db.query(AutomationLog.trigger).distinct().order_by(AutomationLog.trigger).all()
-    trigger_options = [row[0] for row in trigger_rows if row[0]]
-
-    # Stats
     thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-    stats_query = db.query(
-        func.count(AutomationLog.id).label("total"),
-        func.sum(func.cast(AutomationLog.success, func.literal(1).type)).label("success"),
-        func.avg(AutomationLog.execution_time_ms).label("avg_time"),
-    ).filter(AutomationLog.created_at >= thirty_days_ago)
-
-    stats = stats_query.first()
+    stats = service.get_logs_stats(start_date=thirty_days_ago)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -4360,12 +4189,38 @@ async def automation_logs(
     context["trigger_options"] = trigger_options
     context["pagination"] = build_pagination_context(page, per_page, total)
 
+    total_30d = stats.get("total", 0)
+    success_30d = stats.get("success", 0)
     context["stats"] = {
-        "total_30d": stats.total if stats else 0,
-        "success_30d": stats.success or 0 if stats else 0,
-        "success_rate": round((stats.success or 0) / stats.total * 100, 1) if stats and stats.total > 0 else 0,
-        "avg_time_ms": round(float(stats.avg_time or 0), 1) if stats else 0,
+        "total_30d": total_30d,
+        "success_30d": success_30d,
+        "success_rate": round(success_30d / total_30d * 100, 1) if total_30d > 0 else 0,
+        "avg_time_ms": round(float(stats.get("avg_time_ms", 0) or 0), 1),
     }
 
     template = templates.get_template("modules/support/templates/pages/automation_logs.html")
     return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# ROUTER CONSOLIDATION
+# =============================================================================
+# Include all sub-routers into the main router for module discovery
+# Main router has no prefix; sub-routers have their full /support/xxx paths
+
+router.include_router(dashboard_router)
+router.include_router(tickets_router)
+router.include_router(agents_router)
+router.include_router(canned_router)
+router.include_router(sla_router)
+router.include_router(kb_router)
+router.include_router(automation_router)
+router.include_router(csat_router)
+router.include_router(routing_router)
+router.include_router(conversations_router)
+router.include_router(teams_router)
+router.include_router(tags_router)
+router.include_router(queues_router)
+router.include_router(escalations_router)
+router.include_router(channels_router)
+router.include_router(webhooks_router)

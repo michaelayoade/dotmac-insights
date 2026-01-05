@@ -16,32 +16,57 @@ from app.web.module_types import ModuleConfig
 # =============================================================================
 
 MODULE_CONFIG = ModuleConfig(
-    id="network",
-    name="Network",
-    description="ISP infrastructure, POPs, routers, and IP management",
+    id="isp",
+    name="ISP",
+    description="Subscriptions, network operations, and monitoring",
     icon="globe",
-    prefix="/network",
-    group="Infrastructure",
-    order=10,
-    scopes=["network:read"],
-    prefixes=["/network"],
+    prefix="/subscriptions",
+    group="ISP",
+    order=15,
+    scopes=["subscriptions:read", "network:read", "noc:read"],
+    prefixes=["/subscriptions", "/network"],
 )
 
 NAVIGATION = [
     {
+        "section": "Subscriptions",
+        "module": "isp",
+        "href": "/subscriptions",
+        "icon": "repeat",
+        "scope": "subscriptions:read",
+        "order": 10,
+        "links": [
+            {"label": "Subscriptions", "href": "/subscriptions", "icon": "repeat", "scope": "subscriptions:read"},
+            {"label": "Tariffs", "href": "/subscriptions/tariffs", "icon": "list", "scope": "subscriptions:read"},
+            {"label": "Payments", "href": "/subscriptions/payments", "icon": "credit-card", "scope": "subscriptions:read"},
+        ],
+    },
+    {
         "section": "Network",
-        "module": "network",
+        "module": "isp",
         "href": "/network",
         "icon": "globe",
         "scope": "network:read",
-        "order": 10,
+        "order": 20,
         "links": [
-            {"label": "Dashboard", "href": "/network", "icon": "home"},
-            {"label": "POPs", "href": "/network/pops", "icon": "map-pin"},
-            {"label": "Routers", "href": "/network/routers", "icon": "server"},
-            {"label": "IP Management", "href": "/network/ip", "icon": "globe"},
-            {"label": "Networks", "href": "/network/ip/networks", "icon": "globe"},
-            {"label": "Addresses", "href": "/network/ip/addresses", "icon": "list"},
+            {"label": "POPs", "href": "/network/pops", "icon": "map-pin", "scope": "network:read"},
+            {"label": "Routers", "href": "/network/routers", "icon": "server", "scope": "network:read"},
+            {"label": "IP Management", "href": "/network/ip", "icon": "globe", "scope": "network:read"},
+            {"label": "Networks", "href": "/network/ip/networks", "icon": "globe", "scope": "network:read"},
+            {"label": "Addresses", "href": "/network/ip/addresses", "icon": "list", "scope": "network:read"},
+        ],
+    },
+    {
+        "section": "Monitoring",
+        "module": "isp",
+        "href": "/network/noc",
+        "icon": "activity",
+        "scope": "noc:read",
+        "order": 30,
+        "links": [
+            {"label": "Alerts", "href": "/network/noc/alerts", "icon": "alert-circle", "scope": "noc:read"},
+            {"label": "Uptime", "href": "/network/noc", "icon": "activity", "scope": "noc:read"},
+            {"label": "Performance", "href": "/network/traffic", "icon": "bar-chart-2", "scope": "noc:read"},
         ],
     },
 ]
@@ -51,5 +76,7 @@ NAVIGATION = [
 # =============================================================================
 
 from .routes import router
+from .noc_routes import router as noc_router
+from .traffic_routes import router as traffic_router
 
-__all__ = ["MODULE_CONFIG", "NAVIGATION", "router"]
+__all__ = ["MODULE_CONFIG", "NAVIGATION", "router", "noc_router", "traffic_router"]

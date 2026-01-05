@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.inventory import SerialNumber, SerialStatus
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import SerialFilters, SerialCreateData
 
@@ -98,7 +99,12 @@ class SerialService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_serial(self, serial_id: int) -> SerialNumber:
         """Get a serial number by ID.
@@ -256,6 +262,7 @@ class SerialService:
 
         self.db.add(serial)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(serial)
         return serial
 
     def create_serials_bulk(
@@ -304,6 +311,9 @@ class SerialService:
             serials.append(serial)
 
         self.db.flush()
+        validator = SoftValidationService(self.db)
+        for serial in serials:
+            validator.validate_and_store(serial)
         return serials
 
     def update_serial(
@@ -346,6 +356,7 @@ class SerialService:
 
         serial.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(serial)
         return serial
 
     def deliver_serial(
@@ -388,6 +399,7 @@ class SerialService:
         serial.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(serial)
         return serial
 
     def return_serial(
@@ -420,6 +432,7 @@ class SerialService:
         serial.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(serial)
         return serial
 
     def reactivate_serial(self, serial_id: int) -> SerialNumber:
@@ -446,6 +459,7 @@ class SerialService:
         serial.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(serial)
         return serial
 
     def deactivate_serial(self, serial_id: int) -> SerialNumber:
@@ -464,4 +478,5 @@ class SerialService:
         serial.status = SerialStatus.INACTIVE
         serial.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(serial)
         return serial

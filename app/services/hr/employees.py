@@ -20,6 +20,7 @@ from app.models.employee import Employee, EmploymentStatus
 from app.models.hr import Department, Designation
 from app.services.base import paginate
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
 
 from .errors import (
     EmployeeAlreadyExistsError,
@@ -419,6 +420,16 @@ class EmployeeService:
         self.db.add(employee)
         self.db.flush()
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.employee.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="employee",
+            entity_id=str(employee.id),
+            summary=f"Created employee {employee.name}",
+            metadata={"status": employee.status},
+        )
         return employee
 
     def update_employee(self, employee_id: int, data: EmployeeUpdateData) -> Employee:
@@ -494,6 +505,16 @@ class EmployeeService:
 
         employee.updated_at = datetime.now(timezone.utc)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.employee.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="employee",
+            entity_id=str(employee.id),
+            summary=f"Updated employee {employee.name}",
+            metadata={"status": employee.status},
+        )
         return employee
 
     def delete_employee(self, employee_id: int) -> None:
@@ -511,6 +532,16 @@ class EmployeeService:
         employee.deleted_at = datetime.now(timezone.utc)
         employee.deleted_by_id = self.principal.id if self.principal else None
         employee.updated_at = datetime.now(timezone.utc)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.employee.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="employee",
+            entity_id=str(employee.id),
+            summary=f"Deleted employee {employee.name}",
+        )
 
     # =========================================================================
     # Status Management
@@ -531,6 +562,15 @@ class EmployeeService:
         employee = self.get_employee(employee_id)
         employee.status = EmploymentStatus.ACTIVE
         employee.updated_at = datetime.now(timezone.utc)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.employee.status.activate",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="employee",
+            entity_id=str(employee.id),
+            summary=f"Activated employee {employee.name}",
+        )
         return employee
 
     def deactivate_employee(
@@ -551,6 +591,16 @@ class EmployeeService:
         employee = self.get_employee(employee_id)
         employee.status = EmploymentStatus.INACTIVE
         employee.updated_at = datetime.now(timezone.utc)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.employee.status.deactivate",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="employee",
+            entity_id=str(employee.id),
+            summary=f"Deactivated employee {employee.name}",
+            metadata={"reason": reason},
+        )
         return employee
 
     def terminate_employee(
@@ -580,6 +630,16 @@ class EmployeeService:
         employee.status = EmploymentStatus.TERMINATED
         employee.date_of_leaving = data.date_of_leaving
         employee.updated_at = datetime.now(timezone.utc)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.employee.status.terminate",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="employee",
+            entity_id=str(employee.id),
+            summary=f"Terminated employee {employee.name}",
+            metadata={"date_of_leaving": data.date_of_leaving.isoformat() if data.date_of_leaving else None},
+        )
 
         return employee
 

@@ -14,7 +14,6 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -25,7 +24,6 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.omni import (
-    OmniChannel,
     OmniConversation,
     OmniMessage,
     OmniParticipant,
@@ -40,6 +38,7 @@ from app.services.support import (
     OutboundMessageData,
     ConversationNotFoundError,
 )
+from app.services.omnichannel import OmniChannelService
 from app.services.types import PaginationParams
 
 # Permission dependencies
@@ -101,6 +100,7 @@ async def inbox_list(
 ):
     """Inbox page - conversations list."""
     service = get_conversation_service(db, user)
+    channel_service = OmniChannelService(db, principal=user)
 
     # Build filters
     filters = ConversationFilters(
@@ -123,7 +123,7 @@ async def inbox_list(
     total = result.total
 
     # Get all channels for filter dropdown
-    channels = db.query(OmniChannel).filter(OmniChannel.is_active == True).all()
+    channels = channel_service.list_active_channels()
 
     # Get stats using service
     inbox_stats = service.get_stats()

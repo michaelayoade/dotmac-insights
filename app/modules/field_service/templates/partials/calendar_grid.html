@@ -21,7 +21,7 @@
 <!-- Time Grid -->
 <div class="grid grid-cols-7 divide-x divide-gray-100" style="min-height: 600px;">
     {% for day in date_range %}
-    <div class="relative p-2 space-y-1 {% if day.is_today %}bg-primary-50/30{% endif %}">
+    <div class="group relative p-2 space-y-1 {% if day.is_today %}bg-primary-50/30{% endif %}">
         {% if day.orders %}
             {% for order in day.orders %}
             <a

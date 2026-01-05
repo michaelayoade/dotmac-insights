@@ -44,6 +44,7 @@ NAVIGATION = [
             {"label": "Data Sync", "href": "/settings/sync", "icon": "refresh-cw"},
             {"label": "Data Migration", "href": "/settings/migration", "icon": "upload"},
             {"label": "Data Cleanup", "href": "/settings/data-cleanup", "icon": "check-circle"},
+            {"label": "Data Cleaner", "href": "/settings/data-cleaner", "icon": "edit-3"},
         ],
     },
     {
@@ -62,6 +63,7 @@ NAVIGATION = [
             {"label": "API Tokens", "href": "/settings/admin/tokens", "icon": "key"},
             {"label": "Webhooks", "href": "/settings/admin/webhooks", "icon": "link"},
             {"label": "Audit Log", "href": "/settings/admin/audit", "icon": "activity"},
+            {"label": "Activity Log", "href": "/settings/admin/activity", "icon": "activity"},
         ],
     },
 ]

@@ -2,29 +2,1113 @@
 CRM Module Routes - Leads, Opportunities, Activities, Campaigns.
 
 HTMX-powered routes for CRM management.
+All routes delegate to services for business logic.
 """
-from __future__ import annotations
-
-from datetime import datetime, date
-from decimal import Decimal
+from datetime import datetime, date, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Request, Response, Query, Form
-from fastapi.responses import HTMLResponse
-from sqlalchemy import func, and_, or_, desc
-from sqlalchemy.orm import joinedload
+from fastapi import APIRouter, Request, Response, Query, HTTPException
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from sqlalchemy.orm import Session
 
 from app.web.dependencies import SessionUser, CSRFToken, DB
-from app.web.context import get_base_context, get_navigation_context
+from app.web.context import (
+    get_base_context,
+    get_navigation_context,
+    build_breadcrumbs,
+    build_pagination_context,
+)
 from app.templates.environment import get_template_env
+from app.core.security import validate_csrf, set_flash
 
-# Import models
-from app.models.party import Party, PartyRole
-from app.models.crm import Opportunity, OpportunityStage, Activity, Campaign
+# Services
+from app.services.crm import (
+    LeadService,
+    OpportunityService,
+    ActivityService,
+    CampaignService,
+)
+from app.services.crm.lead_types import LeadCreateData, LeadFilters
+from app.services.crm.opportunity_types import OpportunityFilters
+from app.services.crm.activity_types import ActivityFilters
+from app.services.crm.campaign_types import CampaignFilters
+from app.services.types import PaginationParams
+from app.services.errors import NotFoundError, ValidationError, ConflictError
+from app.services.identity import PartyService
+from app.services.identity.party_types import (
+    PartyFilters,
+    PartyCreateData,
+    PartyUpdateData,
+    PartyRoleCreateData,
+)
 
 router = APIRouter()
 templates = get_template_env()
 
+
+# =============================================================================
+# Service Providers
+# =============================================================================
+
+def get_lead_service(db: Session) -> LeadService:
+    return LeadService(db)
+
+
+def get_opportunity_service(db: Session) -> OpportunityService:
+    return OpportunityService(db)
+
+
+def get_activity_service(db: Session) -> ActivityService:
+    return ActivityService(db)
+
+
+def get_campaign_service(db: Session) -> CampaignService:
+    return CampaignService(db)
+
+
+# =============================================================================
+# Contacts Helpers
+# =============================================================================
+
+CONTACT_TYPE_OPTIONS = [
+    {"value": "lead", "label": "Lead"},
+    {"value": "prospect", "label": "Prospect"},
+    {"value": "customer", "label": "Customer"},
+    {"value": "churned", "label": "Churned"},
+]
+
+CONTACT_STATUS_OPTIONS = [
+    {"value": "active", "label": "Active"},
+    {"value": "inactive", "label": "Inactive"},
+    {"value": "suspended", "label": "Suspended"},
+]
+
+CONTACT_CATEGORY_OPTIONS = [
+    {"value": "business", "label": "Business"},
+    {"value": "personal", "label": "Personal"},
+    {"value": "partner", "label": "Partner"},
+]
+
+
+def get_party_service(db: Session, user: SessionUser) -> PartyService:
+    return PartyService(db, principal=user)
+
+
+def _status_filter(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return None
+    if value == "suspended":
+        return "blocked"
+    return value
+
+
+def _get_contact_type(party) -> str:
+    for role in party.roles or []:
+        if role.until is None and role.role:
+            return role.role
+    if party.custom_fields and isinstance(party.custom_fields, dict):
+        return party.custom_fields.get("contact_type", "") or ""
+    return ""
+
+
+def _get_contact_category(party) -> str:
+    if party.custom_fields and isinstance(party.custom_fields, dict):
+        return party.custom_fields.get("category", "") or ""
+    return ""
+
+
+# =============================================================================
+# Accounts Routes (Organizations)
+# =============================================================================
+
+ACCOUNT_TYPE_OPTIONS = [
+    {"value": "customer", "label": "Customer"},
+    {"value": "prospect", "label": "Prospect"},
+    {"value": "partner", "label": "Partner"},
+    {"value": "vendor", "label": "Vendor"},
+]
+
+
+@router.get("/crm/accounts", response_class=HTMLResponse)
+async def accounts_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    account_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """List accounts (organizations) using PartyService."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Accounts"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Accounts"},
+    ])
+
+    if status is None:
+        status_filter = "active"
+        current_status = "active"
+    elif status == "":
+        status_filter = None
+        current_status = ""
+    else:
+        status_filter = status
+        current_status = status
+
+    filters = PartyFilters(
+        party_type="organization",
+        status=_status_filter(status_filter) if status_filter else None,
+        search=q,
+        has_role=account_type,
+    )
+    pagination = PaginationParams(
+        offset=(page - 1) * per_page,
+        limit=per_page,
+    )
+    service = get_party_service(db, user)
+    result = service.list_parties(filters, pagination, include_roles=True)
+
+    accounts = result.items
+    for account in accounts:
+        account.account_type = _get_contact_type(account)
+
+    context["accounts"] = accounts
+    context["search_query"] = q or ""
+    context["current_type"] = account_type or ""
+    context["current_status"] = current_status
+    context["type_options"] = ACCOUNT_TYPE_OPTIONS
+    context["status_options"] = CONTACT_STATUS_OPTIONS
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
+
+    if request.headers.get("HX-Request"):
+        template = templates.get_template("modules/crm/templates/accounts/partials/accounts_table.html")
+        return HTMLResponse(template.render(context))
+
+    template = templates.get_template("modules/crm/templates/accounts/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/crm/accounts/new", response_class=HTMLResponse)
+async def accounts_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New account form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Account"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Accounts", "href": "/crm/accounts"},
+        {"label": "New"},
+    ])
+    context["type_options"] = ACCOUNT_TYPE_OPTIONS
+    context["form_data"] = {}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/crm/accounts/{account_id}", response_class=HTMLResponse)
+async def account_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+):
+    """View account details."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+
+    service = get_party_service(db, user)
+    try:
+        account = service.get_party(account_id, include_roles=True)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if account.type != "organization":
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    context["page_title"] = account.name or f"Account #{account_id}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Accounts", "href": "/crm/accounts"},
+        {"label": account.name or f"#{account_id}"},
+    ])
+    context["account"] = account
+
+    template = templates.get_template("modules/crm/templates/accounts/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/accounts", response_class=HTMLResponse)
+async def accounts_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create a new account."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    legal_name = (form.get("legal_name") or "").strip()
+    trading_name = (form.get("trading_name") or "").strip()
+    email = (form.get("email") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    account_type = (form.get("account_type") or "").strip()
+    tax_id = (form.get("tax_id") or "").strip()
+    registration_number = (form.get("registration_number") or "").strip()
+    website = (form.get("website") or "").strip()
+    industry = (form.get("industry") or "").strip()
+    notes = (form.get("notes") or "").strip()
+
+    errors: dict[str, str] = {}
+    if not name and not legal_name:
+        errors["name"] = "Name or Legal Name is required"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Account"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Accounts", "href": "/crm/accounts"},
+            {"label": "New"},
+        ])
+        context["type_options"] = ACCOUNT_TYPE_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "legal_name": legal_name,
+            "trading_name": trading_name,
+            "email": email,
+            "phone": phone,
+            "account_type": account_type,
+            "tax_id": tax_id,
+            "registration_number": registration_number,
+            "website": website,
+            "industry": industry,
+            "notes": notes,
+        }
+        context["errors"] = errors
+        template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
+        return HTMLResponse(template.render(context))
+
+    service = get_party_service(db, user)
+    create_data = PartyCreateData(
+        type="organization",
+        name=name or legal_name,
+        legal_name=legal_name or None,
+        trading_name=trading_name or None,
+        primary_email=email or None,
+        primary_phone=phone or None,
+        tax_id=tax_id or None,
+        registration_number=registration_number or None,
+        website=website or None,
+        industry=industry or None,
+        notes=notes or None,
+    )
+
+    try:
+        account = service.create_party(create_data)
+        if account_type:
+            service.add_party_role(account.id, PartyRoleCreateData(role=account_type))
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        errors["general"] = str(exc)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Account"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Accounts", "href": "/crm/accounts"},
+            {"label": "New"},
+        ])
+        context["type_options"] = ACCOUNT_TYPE_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "legal_name": legal_name,
+            "trading_name": trading_name,
+            "email": email,
+            "phone": phone,
+            "account_type": account_type,
+            "tax_id": tax_id,
+            "registration_number": registration_number,
+            "website": website,
+            "industry": industry,
+            "notes": notes,
+        }
+        context["errors"] = errors
+        template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
+        return HTMLResponse(template.render(context))
+
+    redirect = RedirectResponse(url=f"/crm/accounts/{account.id}", status_code=303)
+    set_flash(redirect, "Account created successfully.", "success")
+    return redirect
+
+
+@router.get("/crm/accounts/{account_id}/edit", response_class=HTMLResponse)
+async def accounts_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+):
+    """Edit account form."""
+    service = get_party_service(db, user)
+    try:
+        account = service.get_party(account_id, include_roles=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+
+    if account.type != "organization":
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    account_type = _get_contact_type(account)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Edit Account"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Accounts", "href": "/crm/accounts"},
+        {"label": account.name or f"Account {account.id}", "href": f"/crm/accounts/{account.id}"},
+        {"label": "Edit"},
+    ])
+    context["type_options"] = ACCOUNT_TYPE_OPTIONS
+    context["form_data"] = {
+        "name": account.name or "",
+        "legal_name": account.legal_name or "",
+        "trading_name": account.trading_name or "",
+        "email": account.primary_email or "",
+        "phone": account.primary_phone or "",
+        "account_type": account_type,
+        "tax_id": account.tax_id or "",
+        "registration_number": account.registration_number or "",
+        "website": account.website or "",
+        "industry": account.industry or "",
+        "notes": account.notes or "",
+    }
+    context["errors"] = {}
+    context["account"] = account
+
+    template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/accounts/{account_id}", response_class=HTMLResponse)
+async def accounts_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+):
+    """Update an account."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    legal_name = (form.get("legal_name") or "").strip()
+    trading_name = (form.get("trading_name") or "").strip()
+    email = (form.get("email") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    account_type = (form.get("account_type") or "").strip()
+    tax_id = (form.get("tax_id") or "").strip()
+    registration_number = (form.get("registration_number") or "").strip()
+    website = (form.get("website") or "").strip()
+    industry = (form.get("industry") or "").strip()
+    notes = (form.get("notes") or "").strip()
+
+    errors: dict[str, str] = {}
+    if not name and not legal_name:
+        errors["name"] = "Name or Legal Name is required"
+
+    service = get_party_service(db, user)
+    try:
+        account = service.get_party(account_id, include_roles=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Account not found") from exc
+
+    if account.type != "organization":
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Account"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Accounts", "href": "/crm/accounts"},
+            {"label": account.name or f"Account {account.id}", "href": f"/crm/accounts/{account.id}"},
+            {"label": "Edit"},
+        ])
+        context["type_options"] = ACCOUNT_TYPE_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "legal_name": legal_name,
+            "trading_name": trading_name,
+            "email": email,
+            "phone": phone,
+            "account_type": account_type,
+            "tax_id": tax_id,
+            "registration_number": registration_number,
+            "website": website,
+            "industry": industry,
+            "notes": notes,
+        }
+        context["errors"] = errors
+        context["account"] = account
+        template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
+        return HTMLResponse(template.render(context))
+
+    update_data = PartyUpdateData(
+        name=name or legal_name,
+        legal_name=legal_name or None,
+        trading_name=trading_name or None,
+        primary_email=email or None,
+        primary_phone=phone or None,
+        tax_id=tax_id or None,
+        registration_number=registration_number or None,
+        website=website or None,
+        industry=industry or None,
+        notes=notes or None,
+    )
+
+    try:
+        service.update_party(account_id, update_data)
+        if account_type:
+            existing_role = None
+            for role in account.roles or []:
+                if role.until is None:
+                    existing_role = role
+                    break
+            if existing_role and existing_role.role != account_type:
+                service.remove_party_role(account_id, existing_role.id)
+                service.add_party_role(account_id, PartyRoleCreateData(role=account_type))
+            elif not existing_role:
+                service.add_party_role(account_id, PartyRoleCreateData(role=account_type))
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        errors["general"] = str(exc)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Account"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Accounts", "href": "/crm/accounts"},
+            {"label": account.name or f"Account {account.id}", "href": f"/crm/accounts/{account.id}"},
+            {"label": "Edit"},
+        ])
+        context["type_options"] = ACCOUNT_TYPE_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "legal_name": legal_name,
+            "trading_name": trading_name,
+            "email": email,
+            "phone": phone,
+            "account_type": account_type,
+            "tax_id": tax_id,
+            "registration_number": registration_number,
+            "website": website,
+            "industry": industry,
+            "notes": notes,
+        }
+        context["errors"] = errors
+        context["account"] = account
+        template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
+        return HTMLResponse(template.render(context))
+
+    redirect = RedirectResponse(url=f"/crm/accounts/{account_id}", status_code=303)
+    set_flash(redirect, "Account updated successfully.", "success")
+    return redirect
+
+
+@router.post("/crm/accounts/{account_id}/delete", response_class=HTMLResponse)
+async def accounts_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    account_id: int,
+):
+    """Delete an account (soft delete)."""
+    await validate_csrf(request)
+    service = get_party_service(db, user)
+    try:
+        account = service.get_party(account_id)
+        if account.type != "organization":
+            raise HTTPException(status_code=404, detail="Account not found")
+        service.delete_party(account_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    redirect = RedirectResponse(url="/crm/accounts", status_code=303)
+    set_flash(redirect, "Account deleted successfully.", "success")
+    return redirect
+
+
+@router.delete("/crm/accounts/bulk-delete", response_class=JSONResponse)
+async def accounts_bulk_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Bulk delete accounts (soft delete)."""
+    await validate_csrf(request)
+    payload = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    ids = payload.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    service = get_party_service(db, user)
+    deleted = 0
+    for account_id in ids:
+        try:
+            account = service.get_party(int(account_id))
+            if account.type == "organization":
+                service.delete_party(int(account_id))
+                deleted += 1
+        except (ValueError, NotFoundError):
+            continue
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    db.commit()
+    return JSONResponse({"deleted": deleted})
+
+
+# =============================================================================
+# Contacts Routes (People)
+# =============================================================================
+
+@router.get("/crm/contacts", response_class=HTMLResponse)
+async def contacts_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    contact_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """List contacts (people) using PartyService."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Contacts"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Contacts"},
+    ])
+
+    if status is None:
+        status_filter = "active"
+        current_status = "active"
+    elif status == "":
+        status_filter = None
+        current_status = ""
+    else:
+        status_filter = status
+        current_status = status
+
+    filters = PartyFilters(
+        party_type="person",
+        status=_status_filter(status_filter) if status_filter else None,
+        search=q,
+        has_role=contact_type,
+    )
+    pagination = PaginationParams(
+        offset=(page - 1) * per_page,
+        limit=per_page,
+    )
+    service = get_party_service(db, user)
+    result = service.list_parties(filters, pagination, include_roles=True)
+
+    contacts = result.items
+    for contact in contacts:
+        contact.contact_type = _get_contact_type(contact)
+        contact.contact_category = _get_contact_category(contact)
+
+    context["contacts"] = contacts
+    context["search_query"] = q or ""
+    context["current_type"] = contact_type or ""
+    context["current_status"] = current_status
+    context["type_options"] = CONTACT_TYPE_OPTIONS
+    context["status_options"] = CONTACT_STATUS_OPTIONS
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
+
+    if request.headers.get("HX-Request"):
+        template = templates.get_template("modules/crm/templates/contacts/partials/contacts_table.html")
+        return HTMLResponse(template.render(context))
+
+    template = templates.get_template("modules/crm/templates/contacts/pages/list.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/crm/contacts/table", response_class=HTMLResponse)
+async def contacts_table(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    contact_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Contacts table partial for HTMX updates."""
+    return await contacts_list(
+        request,
+        response,
+        user,
+        csrf_token,
+        db,
+        q,
+        contact_type,
+        status,
+        page,
+        per_page,
+    )
+
+
+@router.get("/crm/contacts/new", response_class=HTMLResponse)
+async def contacts_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New contact form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Contact"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Contacts", "href": "/crm/contacts"},
+        {"label": "New"},
+    ])
+    context["type_options"] = CONTACT_TYPE_OPTIONS
+    context["category_options"] = CONTACT_CATEGORY_OPTIONS
+    context["form_data"] = {}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/crm/templates/contacts/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/contacts", response_class=HTMLResponse)
+async def contacts_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create a new contact."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    email = (form.get("email") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    contact_type = (form.get("contact_type") or "").strip()
+    category = (form.get("category") or "").strip()
+    company_name = (form.get("company_name") or "").strip()
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Name is required"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Contact"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Contacts", "href": "/crm/contacts"},
+            {"label": "New"},
+        ])
+        context["type_options"] = CONTACT_TYPE_OPTIONS
+        context["category_options"] = CONTACT_CATEGORY_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "contact_type": contact_type,
+            "category": category,
+            "company_name": company_name,
+        }
+        context["errors"] = errors
+        template = templates.get_template("modules/crm/templates/contacts/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    service = get_party_service(db, user)
+
+    emails = [{"address": email, "is_primary": True}] if email else []
+    phones = [{"number": phone, "is_primary": True}] if phone else []
+    custom_fields = {
+        "category": category or None,
+        "company_name": company_name or None,
+        "contact_type": contact_type or None,
+    }
+
+    try:
+        party = service.create_party(PartyCreateData(
+            type="person",
+            name=name,
+            status="active",
+            emails=emails,
+            phones=phones,
+            custom_fields=custom_fields,
+        ))
+        if contact_type:
+            try:
+                service.add_role(party.id, PartyRoleCreateData(role=contact_type))
+            except ConflictError:
+                pass
+        db.commit()
+    except (ValidationError, ConflictError) as exc:
+        db.rollback()
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Contact"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Contacts", "href": "/crm/contacts"},
+            {"label": "New"},
+        ])
+        context["type_options"] = CONTACT_TYPE_OPTIONS
+        context["category_options"] = CONTACT_CATEGORY_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "contact_type": contact_type,
+            "category": category,
+            "company_name": company_name,
+        }
+        context["errors"] = {"form": str(exc)}
+        template = templates.get_template("modules/crm/templates/contacts/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    redirect = RedirectResponse(url=f"/crm/contacts/{party.id}", status_code=303)
+    set_flash(redirect, "Contact created successfully.", "success")
+    return redirect
+
+
+@router.get("/crm/contacts/{contact_id}", response_class=HTMLResponse)
+async def contacts_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    contact_id: int,
+):
+    """Contact detail page."""
+    service = get_party_service(db, user)
+    try:
+        contact = service.get_party(contact_id, include_roles=True)
+    except NotFoundError:
+        context = get_base_context(request, response, user, csrf_token)
+        context["error"] = "Contact not found"
+        template = templates.get_template("modules/crm/templates/contacts/pages/detail.html")
+        return HTMLResponse(template.render(context), status_code=404)
+
+    contact.contact_type = _get_contact_type(contact)
+    contact.contact_category = _get_contact_category(contact)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = contact.name or "Contact"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Contacts", "href": "/crm/contacts"},
+        {"label": contact.name or f"Contact {contact.id}"},
+    ])
+    context["contact"] = contact
+
+    template = templates.get_template("modules/crm/templates/contacts/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/crm/contacts/{contact_id}/edit", response_class=HTMLResponse)
+async def contacts_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    contact_id: int,
+):
+    """Edit contact form."""
+    service = get_party_service(db, user)
+    try:
+        contact = service.get_party(contact_id, include_roles=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Contact not found") from exc
+
+    contact_type = _get_contact_type(contact)
+    category = _get_contact_category(contact)
+    company_name = ""
+    if contact.custom_fields and isinstance(contact.custom_fields, dict):
+        company_name = contact.custom_fields.get("company_name", "") or ""
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Edit Contact"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Contacts", "href": "/crm/contacts"},
+        {"label": contact.name or f"Contact {contact.id}", "href": f"/crm/contacts/{contact.id}"},
+        {"label": "Edit"},
+    ])
+    context["type_options"] = CONTACT_TYPE_OPTIONS
+    context["category_options"] = CONTACT_CATEGORY_OPTIONS
+    context["form_data"] = {
+        "name": contact.name or "",
+        "email": contact.primary_email or "",
+        "phone": contact.primary_phone or "",
+        "contact_type": contact_type,
+        "category": category,
+        "company_name": company_name,
+    }
+    context["errors"] = {}
+    context["contact"] = contact
+
+    template = templates.get_template("modules/crm/templates/contacts/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/contacts/{contact_id}", response_class=HTMLResponse)
+async def contacts_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    contact_id: int,
+):
+    """Update a contact."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    email = (form.get("email") or "").strip()
+    phone = (form.get("phone") or "").strip()
+    contact_type = (form.get("contact_type") or "").strip()
+    category = (form.get("category") or "").strip()
+    company_name = (form.get("company_name") or "").strip()
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Name is required"
+
+    service = get_party_service(db, user)
+    try:
+        contact = service.get_party(contact_id, include_roles=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Contact not found") from exc
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Contact"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Contacts", "href": "/crm/contacts"},
+            {"label": contact.name or f"Contact {contact.id}", "href": f"/crm/contacts/{contact.id}"},
+            {"label": "Edit"},
+        ])
+        context["type_options"] = CONTACT_TYPE_OPTIONS
+        context["category_options"] = CONTACT_CATEGORY_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "contact_type": contact_type,
+            "category": category,
+            "company_name": company_name,
+        }
+        context["errors"] = errors
+        context["contact"] = contact
+        template = templates.get_template("modules/crm/templates/contacts/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    emails = [{"address": email, "is_primary": True}] if email else []
+    phones = [{"number": phone, "is_primary": True}] if phone else []
+    custom_fields = {
+        "category": category or None,
+        "company_name": company_name or None,
+        "contact_type": contact_type or None,
+    }
+
+    try:
+        service.update_party(contact_id, PartyUpdateData(
+            name=name,
+            emails=emails,
+            phones=phones,
+            custom_fields=custom_fields,
+        ))
+        if contact_type and contact_type != _get_contact_type(contact):
+            try:
+                service.add_role(contact_id, PartyRoleCreateData(role=contact_type))
+            except ConflictError:
+                pass
+        db.commit()
+    except (ValidationError, ConflictError) as exc:
+        db.rollback()
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Contact"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Contacts", "href": "/crm/contacts"},
+            {"label": contact.name or f"Contact {contact.id}", "href": f"/crm/contacts/{contact.id}"},
+            {"label": "Edit"},
+        ])
+        context["type_options"] = CONTACT_TYPE_OPTIONS
+        context["category_options"] = CONTACT_CATEGORY_OPTIONS
+        context["form_data"] = {
+            "name": name,
+            "email": email,
+            "phone": phone,
+            "contact_type": contact_type,
+            "category": category,
+            "company_name": company_name,
+        }
+        context["errors"] = {"form": str(exc)}
+        context["contact"] = contact
+        template = templates.get_template("modules/crm/templates/contacts/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    redirect = RedirectResponse(url=f"/crm/contacts/{contact_id}", status_code=303)
+    set_flash(redirect, "Contact updated successfully.", "success")
+    return redirect
+
+
+@router.post("/crm/contacts/{contact_id}/delete", response_class=HTMLResponse)
+async def contacts_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    contact_id: int,
+):
+    """Delete a contact (soft delete)."""
+    await validate_csrf(request)
+    service = get_party_service(db, user)
+    try:
+        service.delete_party(contact_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    redirect = RedirectResponse(url="/crm/contacts", status_code=303)
+    set_flash(redirect, "Contact deleted successfully.", "success")
+    return redirect
+
+
+@router.delete("/crm/contacts/bulk-delete", response_class=JSONResponse)
+async def contacts_bulk_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Bulk delete contacts (soft delete)."""
+    await validate_csrf(request)
+    payload = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    ids = payload.get("ids", [])
+    if not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    service = get_party_service(db, user)
+    deleted = 0
+    for contact_id in ids:
+        try:
+            service.delete_party(int(contact_id))
+            deleted += 1
+        except (ValueError, NotFoundError):
+            continue
+        except Exception as exc:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    db.commit()
+    return JSONResponse({"deleted": deleted})
+
+
+@router.get("/crm/contacts/{contact_id}/tabs/{tab_name}", response_class=HTMLResponse)
+async def contacts_tab(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    contact_id: int,
+    tab_name: str,
+):
+    """Contact tab content partial."""
+    service = get_party_service(db, user)
+    try:
+        contact = service.get_party(contact_id, include_roles=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Contact not found") from exc
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["contact"] = contact
+
+    if tab_name == "activity":
+        template = templates.get_template("modules/crm/templates/contacts/partials/tab_activity.html")
+    else:
+        template = templates.get_template("modules/crm/templates/contacts/partials/tab_overview.html")
+
+    return HTMLResponse(template.render(context))
 
 # =============================================================================
 # Leads Routes
@@ -42,54 +1126,36 @@ async def leads_list(
     qualification: Optional[str] = None,
     page: int = Query(1, ge=1),
 ):
-    """List leads (Party + PartyRole)."""
+    """List leads using LeadService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Leads"
     context["now"] = datetime.utcnow()
 
-    company_id = user.company_id
     per_page = 25
+    lead_service = get_lead_service(db)
 
-    # Base query - leads are parties with "lead" role
-    query = db.query(Party).join(
-        PartyRole, and_(
-            PartyRole.party_id == Party.id,
-            PartyRole.role == "lead",
-        )
-    ).filter(Party.company_id == company_id)
+    filters = LeadFilters(
+        search=search,
+        status=status,
+        qualification=qualification,
+    )
+    pagination = PaginationParams(
+        offset=(page - 1) * per_page,
+        limit=per_page,
+    )
 
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Party.name.ilike(search_term),
-                Party.email.ilike(search_term),
-                Party.phone.ilike(search_term),
-            )
-        )
+    result = lead_service.list_leads(filters, pagination)
 
-    if status:
-        query = query.filter(PartyRole.status == status)
-
-    # Get stats for filters
-    total_leads = query.count()
-
-    # Paginate
-    leads = query.order_by(Party.created_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
-
-    context["leads"] = leads
-    context["total"] = total_leads
+    context["leads"] = result.items
+    context["total"] = result.total
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total_leads + per_page - 1) // per_page
+    context["total_pages"] = (result.total + per_page - 1) // per_page
     context["search"] = search or ""
     context["status_filter"] = status
     context["qualification_filter"] = qualification
 
-    # Status options for filter
     context["status_options"] = [
         {"value": "active", "label": "Active"},
         {"value": "qualified", "label": "Qualified"},
@@ -97,7 +1163,6 @@ async def leads_list(
         {"value": "converted", "label": "Converted"},
     ]
 
-    # Qualification options
     context["qualification_options"] = [
         {"value": "hot", "label": "Hot"},
         {"value": "warm", "label": "Warm"},
@@ -119,43 +1184,173 @@ async def leads_table(
     status: Optional[str] = None,
     page: int = Query(1, ge=1),
 ):
-    """HTMX partial - leads table."""
+    """HTMX partial - leads table using LeadService."""
     context = get_base_context(request, response, user, csrf_token)
-    company_id = user.company_id
     per_page = 25
 
-    query = db.query(Party).join(
-        PartyRole, and_(
-            PartyRole.party_id == Party.id,
-            PartyRole.role == "lead",
-        )
-    ).filter(Party.company_id == company_id)
+    lead_service = get_lead_service(db)
+    filters = LeadFilters(search=search, status=status)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Party.name.ilike(search_term),
-                Party.email.ilike(search_term),
-            )
-        )
+    result = lead_service.list_leads(filters, pagination)
 
-    if status:
-        query = query.filter(PartyRole.status == status)
-
-    total = query.count()
-    leads = query.order_by(Party.created_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
-
-    context["leads"] = leads
-    context["total"] = total
+    context["leads"] = result.items
+    context["total"] = result.total
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (result.total + per_page - 1) // per_page
 
     template = templates.get_template("modules/crm/templates/leads/partials/leads_table.html")
     return HTMLResponse(template.render(context))
+
+
+LEAD_SOURCE_OPTIONS = [
+    {"value": "website", "label": "Website"},
+    {"value": "referral", "label": "Referral"},
+    {"value": "advertisement", "label": "Advertisement"},
+    {"value": "cold_call", "label": "Cold Call"},
+    {"value": "email_campaign", "label": "Email Campaign"},
+    {"value": "social_media", "label": "Social Media"},
+    {"value": "trade_show", "label": "Trade Show"},
+    {"value": "partner", "label": "Partner"},
+    {"value": "other", "label": "Other"},
+]
+
+LEAD_QUALIFICATION_OPTIONS = [
+    {"value": "hot", "label": "Hot"},
+    {"value": "warm", "label": "Warm"},
+    {"value": "cold", "label": "Cold"},
+]
+
+
+@router.get("/crm/leads/new", response_class=HTMLResponse)
+async def leads_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New lead form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Lead"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Leads", "href": "/crm/leads"},
+        {"label": "New"},
+    ])
+    context["source_options"] = LEAD_SOURCE_OPTIONS
+    context["qualification_options"] = LEAD_QUALIFICATION_OPTIONS
+    context["form_data"] = {"type": "person"}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/crm/templates/leads/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/leads", response_class=HTMLResponse)
+async def leads_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create a new lead."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    # Extract form data
+    lead_type = (form.get("type") or "person").strip()
+    name = (form.get("name") or "").strip()
+    first_name = (form.get("first_name") or "").strip() or None
+    last_name = (form.get("last_name") or "").strip() or None
+    primary_email = (form.get("primary_email") or "").strip() or None
+    primary_phone = (form.get("primary_phone") or "").strip() or None
+    source = (form.get("source") or "").strip() or None
+    source_campaign = (form.get("source_campaign") or "").strip() or None
+    qualification = (form.get("qualification") or "").strip() or None
+    lead_score_str = (form.get("lead_score") or "").strip()
+    notes = (form.get("notes") or "").strip() or None
+
+    lead_score = int(lead_score_str) if lead_score_str else None
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Name is required"
+
+    form_data = {
+        "type": lead_type,
+        "name": name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "primary_email": primary_email,
+        "primary_phone": primary_phone,
+        "source": source,
+        "source_campaign": source_campaign,
+        "qualification": qualification,
+        "lead_score": lead_score,
+        "notes": notes,
+    }
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Lead"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Leads", "href": "/crm/leads"},
+            {"label": "New"},
+        ])
+        context["source_options"] = LEAD_SOURCE_OPTIONS
+        context["qualification_options"] = LEAD_QUALIFICATION_OPTIONS
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/leads/pages/form.html")
+        return HTMLResponse(template.render(context))
+
+    # Create the lead
+    lead_service = get_lead_service(db)
+    try:
+        lead_data = LeadCreateData(
+            name=name,
+            type=lead_type,
+            first_name=first_name,
+            last_name=last_name,
+            primary_email=primary_email,
+            primary_phone=primary_phone,
+            source=source,
+            source_campaign=source_campaign,
+            qualification=qualification,
+            lead_score=lead_score,
+            notes=notes,
+        )
+        lead = lead_service.create_lead(lead_data)
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/crm/leads/{lead.party_id}",
+            status_code=303,
+        )
+    except ValidationError as e:
+        errors["form"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Lead"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Leads", "href": "/crm/leads"},
+            {"label": "New"},
+        ])
+        context["source_options"] = LEAD_SOURCE_OPTIONS
+        context["qualification_options"] = LEAD_QUALIFICATION_OPTIONS
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/leads/pages/form.html")
+        return HTMLResponse(template.render(context))
 
 
 @router.get("/crm/leads/{lead_id}", response_class=HTMLResponse)
@@ -167,36 +1362,30 @@ async def lead_detail(
     db: DB,
     lead_id: int,
 ):
-    """Lead detail page."""
+    """Lead detail page using LeadService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    company_id = user.company_id
 
-    lead = db.query(Party).filter(
-        Party.id == lead_id,
-        Party.company_id == company_id,
-    ).first()
+    lead_service = get_lead_service(db)
+    activity_service = get_activity_service(db)
 
-    if not lead:
+    try:
+        lead = lead_service.get_lead(lead_id)
+    except NotFoundError:
         context["error"] = "Lead not found"
         template = templates.get_template("modules/crm/templates/leads/pages/detail.html")
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get lead role
-    lead_role = db.query(PartyRole).filter(
-        PartyRole.party_id == lead_id,
-        PartyRole.role == "lead",
-    ).first()
-
     # Get activities for this lead
-    activities = db.query(Activity).filter(
-        Activity.party_id == lead_id,
-    ).order_by(Activity.scheduled_at.desc()).limit(10).all()
+    activity_filters = ActivityFilters(party_id=lead_id)
+    activity_result = activity_service.list_activities(
+        activity_filters,
+        PaginationParams(limit=10),
+    )
 
     context["lead"] = lead
-    context["lead_role"] = lead_role
-    context["activities"] = activities
-    context["page_title"] = f"Lead: {lead.display_name or lead.name}"
+    context["activities"] = activity_result.data
+    context["page_title"] = f"Lead: {lead.name}"
 
     template = templates.get_template("modules/crm/templates/leads/pages/detail.html")
     return HTMLResponse(template.render(context))
@@ -216,58 +1405,45 @@ async def opportunities_list(
     search: Optional[str] = None,
     status: Optional[str] = None,
     stage_id: Optional[int] = None,
-    view: str = "list",  # list or kanban
+    view: str = "list",
     page: int = Query(1, ge=1),
 ):
-    """List opportunities."""
+    """List opportunities using OpportunityService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Opportunities"
     context["now"] = datetime.utcnow()
 
-    company_id = user.company_id
     per_page = 25
+    opp_service = get_opportunity_service(db)
 
     # Get stages for kanban/filter
-    stages = db.query(OpportunityStage).filter(
-        OpportunityStage.company_id == company_id,
-    ).order_by(OpportunityStage.order).all()
+    stages = opp_service.list_stages(active_only=True)
     context["stages"] = stages
 
-    # Base query
-    query = db.query(Opportunity).filter(
-        Opportunity.company_id == company_id,
+    filters = OpportunityFilters(
+        search=search,
+        status=status,
+        stage_id=stage_id,
     )
-
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(Opportunity.name.ilike(search_term))
-
-    if status:
-        query = query.filter(Opportunity.status == status)
-
-    if stage_id:
-        query = query.filter(Opportunity.stage_id == stage_id)
-
-    total = query.count()
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     if view == "kanban":
-        # For kanban, get all open opportunities grouped by stage
+        # For kanban, get opportunities grouped by stage
         opportunities_by_stage = {}
         for stage in stages:
-            stage_opps = db.query(Opportunity).filter(
-                Opportunity.company_id == company_id,
-                Opportunity.stage_id == stage.id,
-                Opportunity.status == "open",
-            ).order_by(Opportunity.updated_at.desc()).all()
-            opportunities_by_stage[stage.id] = stage_opps
+            stage_filters = OpportunityFilters(stage_id=stage.id, status="open")
+            stage_result = opp_service.list_opportunities(
+                stage_filters,
+                PaginationParams(limit=100),
+            )
+            opportunities_by_stage[stage.id] = stage_result.data
         context["opportunities_by_stage"] = opportunities_by_stage
+        total = sum(len(opps) for opps in opportunities_by_stage.values())
     else:
-        # List view with pagination
-        opportunities = query.order_by(Opportunity.updated_at.desc()).offset(
-            (page - 1) * per_page
-        ).limit(per_page).all()
-        context["opportunities"] = opportunities
+        result = opp_service.list_opportunities(filters, pagination)
+        context["opportunities"] = result.data
+        total = result.total
 
     context["total"] = total
     context["page"] = page
@@ -284,7 +1460,11 @@ async def opportunities_list(
         {"value": "lost", "label": "Lost"},
     ]
 
-    template_name = "modules/crm/templates/opportunities/pages/kanban.html" if view == "kanban" else "modules/crm/templates/opportunities/pages/list.html"
+    template_name = (
+        "modules/crm/templates/opportunities/pages/kanban.html"
+        if view == "kanban"
+        else "modules/crm/templates/opportunities/pages/list.html"
+    )
     template = templates.get_template(template_name)
     return HTMLResponse(template.render(context))
 
@@ -300,31 +1480,21 @@ async def opportunities_table(
     status: Optional[str] = None,
     page: int = Query(1, ge=1),
 ):
-    """HTMX partial - opportunities table."""
+    """HTMX partial - opportunities table using OpportunityService."""
     context = get_base_context(request, response, user, csrf_token)
-    company_id = user.company_id
     per_page = 25
 
-    query = db.query(Opportunity).filter(
-        Opportunity.company_id == company_id,
-    )
+    opp_service = get_opportunity_service(db)
+    filters = OpportunityFilters(search=search, status=status)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    if search:
-        query = query.filter(Opportunity.name.ilike(f"%{search}%"))
+    result = opp_service.list_opportunities(filters, pagination)
 
-    if status:
-        query = query.filter(Opportunity.status == status)
-
-    total = query.count()
-    opportunities = query.order_by(Opportunity.updated_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
-
-    context["opportunities"] = opportunities
-    context["total"] = total
+    context["opportunities"] = result.data
+    context["total"] = result.total
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (result.total + per_page - 1) // per_page
 
     template = templates.get_template("modules/crm/templates/opportunities/partials/opportunities_table.html")
     return HTMLResponse(template.render(context))
@@ -339,46 +1509,35 @@ async def opportunity_detail(
     db: DB,
     opp_id: int,
 ):
-    """Opportunity detail page."""
+    """Opportunity detail page using OpportunityService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    company_id = user.company_id
 
-    opportunity = db.query(Opportunity).filter(
-        Opportunity.id == opp_id,
-        Opportunity.company_id == company_id,
-    ).first()
+    opp_service = get_opportunity_service(db)
+    activity_service = get_activity_service(db)
 
-    if not opportunity:
+    try:
+        opportunity = opp_service.get_opportunity(opp_id)
+    except NotFoundError:
         context["error"] = "Opportunity not found"
         template = templates.get_template("modules/crm/templates/opportunities/pages/detail.html")
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get stage
-    stage = db.query(OpportunityStage).filter(
-        OpportunityStage.id == opportunity.stage_id,
-    ).first()
-
     # Get all stages for stage selector
-    stages = db.query(OpportunityStage).filter(
-        OpportunityStage.company_id == company_id,
-    ).order_by(OpportunityStage.order).all()
+    stages = opp_service.list_stages(active_only=True)
 
-    # Get party
-    party = None
-    if opportunity.party_id:
-        party = db.query(Party).filter(Party.id == opportunity.party_id).first()
-
-    # Get activities
-    activities = db.query(Activity).filter(
-        Activity.opportunity_id == opp_id,
-    ).order_by(Activity.scheduled_at.desc()).limit(10).all()
+    # Get activities for this opportunity
+    activity_filters = ActivityFilters(opportunity_id=opp_id)
+    activity_result = activity_service.list_activities(
+        activity_filters,
+        PaginationParams(limit=10),
+    )
 
     context["opportunity"] = opportunity
-    context["stage"] = stage
+    context["stage"] = opportunity.stage_rel
     context["stages"] = stages
-    context["party"] = party
-    context["activities"] = activities
+    context["party"] = opportunity.party
+    context["activities"] = activity_result.data
     context["page_title"] = f"Opportunity: {opportunity.name}"
 
     template = templates.get_template("modules/crm/templates/opportunities/pages/detail.html")
@@ -399,56 +1558,47 @@ async def activities_list(
     search: Optional[str] = None,
     activity_type: Optional[str] = None,
     status: Optional[str] = None,
-    date_filter: Optional[str] = None,  # today, week, overdue
+    date_filter: Optional[str] = None,
     page: int = Query(1, ge=1),
 ):
-    """List activities."""
+    """List activities using ActivityService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Activities"
     context["now"] = datetime.utcnow()
 
-    company_id = user.company_id
     per_page = 25
+    activity_service = get_activity_service(db)
 
-    query = db.query(Activity).filter(
-        Activity.company_id == company_id,
-    )
-
-    if search:
-        query = query.filter(Activity.subject.ilike(f"%{search}%"))
-
-    if activity_type:
-        query = query.filter(Activity.activity_type == activity_type)
-
-    if status:
-        query = query.filter(Activity.status == status)
-
+    # Build filters
+    scheduled_after = None
+    scheduled_before = None
     today = date.today()
+
     if date_filter == "today":
-        query = query.filter(func.date(Activity.scheduled_at) == today)
+        scheduled_after = datetime.combine(today, datetime.min.time())
+        scheduled_before = datetime.combine(today, datetime.max.time())
     elif date_filter == "week":
+        scheduled_after = datetime.combine(today, datetime.min.time())
         week_end = today + timedelta(days=7)
-        query = query.filter(
-            func.date(Activity.scheduled_at) >= today,
-            func.date(Activity.scheduled_at) <= week_end,
-        )
-    elif date_filter == "overdue":
-        query = query.filter(
-            Activity.scheduled_at < datetime.utcnow(),
-            Activity.status.in_(["scheduled", "pending"]),
-        )
+        scheduled_before = datetime.combine(week_end, datetime.max.time())
 
-    total = query.count()
-    activities = query.order_by(Activity.scheduled_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
+    filters = ActivityFilters(
+        search=search,
+        activity_type=activity_type,
+        status=status,
+        scheduled_after=scheduled_after,
+        scheduled_before=scheduled_before,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    context["activities"] = activities
-    context["total"] = total
+    result = activity_service.list_activities(filters, pagination)
+
+    context["activities"] = result.data
+    context["total"] = result.total
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (result.total + per_page - 1) // per_page
     context["search"] = search or ""
     context["type_filter"] = activity_type
     context["status_filter"] = status
@@ -484,31 +1634,21 @@ async def activities_table(
     activity_type: Optional[str] = None,
     page: int = Query(1, ge=1),
 ):
-    """HTMX partial - activities table."""
+    """HTMX partial - activities table using ActivityService."""
     context = get_base_context(request, response, user, csrf_token)
-    company_id = user.company_id
     per_page = 25
 
-    query = db.query(Activity).filter(
-        Activity.company_id == company_id,
-    )
+    activity_service = get_activity_service(db)
+    filters = ActivityFilters(search=search, activity_type=activity_type)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    if search:
-        query = query.filter(Activity.subject.ilike(f"%{search}%"))
+    result = activity_service.list_activities(filters, pagination)
 
-    if activity_type:
-        query = query.filter(Activity.activity_type == activity_type)
-
-    total = query.count()
-    activities = query.order_by(Activity.scheduled_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
-
-    context["activities"] = activities
-    context["total"] = total
+    context["activities"] = result.data
+    context["total"] = result.total
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (result.total + per_page - 1) // per_page
 
     template = templates.get_template("modules/crm/templates/activities/partials/activities_table.html")
     return HTMLResponse(template.render(context))
@@ -523,36 +1663,22 @@ async def activity_detail(
     db: DB,
     activity_id: int,
 ):
-    """Activity detail page."""
+    """Activity detail page using ActivityService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    company_id = user.company_id
 
-    activity = db.query(Activity).filter(
-        Activity.id == activity_id,
-        Activity.company_id == company_id,
-    ).first()
+    activity_service = get_activity_service(db)
 
-    if not activity:
+    try:
+        activity = activity_service.get_activity(activity_id, include_relations=True)
+    except NotFoundError:
         context["error"] = "Activity not found"
         template = templates.get_template("modules/crm/templates/activities/pages/detail.html")
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get related party
-    party = None
-    if activity.party_id:
-        party = db.query(Party).filter(Party.id == activity.party_id).first()
-
-    # Get related opportunity
-    opportunity = None
-    if activity.opportunity_id:
-        opportunity = db.query(Opportunity).filter(
-            Opportunity.id == activity.opportunity_id
-        ).first()
-
     context["activity"] = activity
-    context["party"] = party
-    context["opportunity"] = opportunity
+    context["party"] = activity.party
+    context["opportunity"] = activity.opportunity
     context["page_title"] = f"Activity: {activity.subject}"
 
     template = templates.get_template("modules/crm/templates/activities/pages/detail.html")
@@ -574,35 +1700,35 @@ async def campaigns_list(
     status: Optional[str] = None,
     page: int = Query(1, ge=1),
 ):
-    """List campaigns."""
+    """List campaigns using CampaignService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Campaigns"
     context["now"] = datetime.utcnow()
 
-    company_id = user.company_id
     per_page = 25
+    campaign_service = get_campaign_service(db)
 
-    query = db.query(Campaign).filter(
-        Campaign.company_id == company_id,
+    # Map status filter to is_active
+    is_active = None
+    if status == "active":
+        is_active = True
+    elif status == "paused":
+        is_active = False
+
+    filters = CampaignFilters(
+        search=search,
+        is_active=is_active,
     )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    if search:
-        query = query.filter(Campaign.name.ilike(f"%{search}%"))
+    result = campaign_service.list_campaigns(filters, pagination)
 
-    if status:
-        query = query.filter(Campaign.status == status)
-
-    total = query.count()
-    campaigns = query.order_by(Campaign.created_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
-
-    context["campaigns"] = campaigns
-    context["total"] = total
+    context["campaigns"] = result.data
+    context["total"] = result.total
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (result.total + per_page - 1) // per_page
     context["search"] = search or ""
     context["status_filter"] = status
 
@@ -626,17 +1752,15 @@ async def campaign_detail(
     db: DB,
     campaign_id: int,
 ):
-    """Campaign detail page."""
+    """Campaign detail page using CampaignService."""
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    company_id = user.company_id
 
-    campaign = db.query(Campaign).filter(
-        Campaign.id == campaign_id,
-        Campaign.company_id == company_id,
-    ).first()
+    campaign_service = get_campaign_service(db)
 
-    if not campaign:
+    try:
+        campaign = campaign_service.get_campaign(campaign_id)
+    except NotFoundError:
         context["error"] = "Campaign not found"
         template = templates.get_template("modules/crm/templates/campaigns/pages/detail.html")
         return HTMLResponse(template.render(context), status_code=404)

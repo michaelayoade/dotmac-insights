@@ -19,6 +19,7 @@ from app.templates.environment import get_template_env
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.credit_note import CreditNote, CreditNoteStatus
 from app.models.document_lines import InvoiceLine
+from app.models.party import CustomerAccount, Party
 from app.core.security import validate_csrf, set_flash
 
 router = APIRouter(prefix="/invoices", tags=["invoices-web"])
@@ -46,8 +47,7 @@ async def invoices_list(
 ):
     """Invoices list page."""
     query = select(Invoice).options(
-        selectinload(Invoice.contact),
-        selectinload(Invoice.customer)
+        selectinload(Invoice.customer_account).selectinload(CustomerAccount.party)
     )
 
     # Search
@@ -56,7 +56,9 @@ async def invoices_list(
         query = query.where(
             or_(
                 Invoice.invoice_number.ilike(search),
-                Invoice.contact.has(func.lower(func.coalesce(Invoice.contact.property.mapper.class_.name, '')).contains(q.lower())),
+                Invoice.customer_account.has(
+                    CustomerAccount.party.has(Party.name.ilike(search))
+                ),
             )
         )
 
@@ -224,8 +226,7 @@ async def invoice_detail(
             selectinload(Invoice.lines),
             selectinload(Invoice.payments),
             selectinload(Invoice.credit_notes),
-            selectinload(Invoice.contact),
-            selectinload(Invoice.customer),
+            selectinload(Invoice.customer_account).selectinload(CustomerAccount.party),
             selectinload(Invoice.allocations),
         )
         .where(Invoice.id == invoice_id)

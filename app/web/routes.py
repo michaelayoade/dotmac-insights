@@ -15,7 +15,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Response, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from app.web.dependencies import (
     SessionUser,
@@ -33,6 +33,8 @@ from app.services.identity import party_service
 from app.services.support.tickets import TicketService
 from app.services.accounting.receivables import ReceivablesService
 from app.services.accounting.settings import AccountingSettingsService
+from app.services.accounting.approvals import ApprovalsService
+from app.services.workflow_task_service import WorkflowTaskService
 
 logger = logging.getLogger(__name__)
 
@@ -73,51 +75,61 @@ async def dashboard(
     context["now"] = now
 
     # Build dashboard stats using services
-    stats = _build_dashboard_stats(db)
+    try:
+        stats = _build_dashboard_stats(db)
+    except Exception:
+        logger.exception("dashboard_stats_failed")
+        stats = []
     context["stats"] = stats
 
     # Fetch recent activities (mix of invoices, tickets)
     activities = []
 
     # Recent invoices
-    recent_invoices = db.query(Invoice).order_by(
-        Invoice.created_at.desc()
-    ).limit(3).all()
-    for inv in recent_invoices:
-        # Get customer name from contact or customer relationship
-        cust_name = None
-        if inv.customer_account and inv.customer_account.party:
-            cust_name = inv.customer_account.party.name
-        activities.append({
-            "user_name": cust_name or "Customer",
-            "user_initials": (cust_name or "C")[:2].upper(),
-            "color_from": "from-emerald-100",
-            "color_to": "to-emerald-200",
-            "text_color": "text-emerald-600",
-            "action": "was invoiced",
-            "description": f"Invoice {inv.invoice_number} for ${inv.total_amount:,.2f}" if inv.total_amount else f"Invoice {inv.invoice_number}",
-            "timestamp": inv.created_at,
-            "badge": inv.status.value.replace("_", " ").title() if inv.status else None,
-            "badge_color": "bg-emerald-100 text-emerald-600" if inv.status == InvoiceStatus.PAID else "bg-amber-100 text-amber-600",
-        })
+    try:
+        recent_invoices = db.query(Invoice).order_by(
+            Invoice.created_at.desc()
+        ).limit(3).all()
+        for inv in recent_invoices:
+            # Get customer name from contact or customer relationship
+            cust_name = None
+            if inv.customer_account and inv.customer_account.party:
+                cust_name = inv.customer_account.party.name
+            activities.append({
+                "user_name": cust_name or "Customer",
+                "user_initials": (cust_name or "C")[:2].upper(),
+                "color_from": "from-emerald-100",
+                "color_to": "to-emerald-200",
+                "text_color": "text-emerald-600",
+                "action": "was invoiced",
+                "description": f"Invoice {inv.invoice_number} for ${inv.total_amount:,.2f}" if inv.total_amount else f"Invoice {inv.invoice_number}",
+                "timestamp": inv.created_at,
+                "badge": inv.status.value.replace("_", " ").title() if inv.status else None,
+                "badge_color": "bg-emerald-100 text-emerald-600" if inv.status == InvoiceStatus.PAID else "bg-amber-100 text-amber-600",
+            })
+    except Exception:
+        logger.exception("dashboard_recent_invoices_failed")
 
     # Recent tickets
-    recent_tickets = db.query(UnifiedTicket).order_by(
-        UnifiedTicket.created_at.desc()
-    ).limit(3).all()
-    for ticket in recent_tickets:
-        activities.append({
-            "user_name": ticket.contact_name or "Customer",
-            "user_initials": (ticket.contact_name or "C")[:2].upper(),
-            "color_from": "from-amber-100",
-            "color_to": "to-amber-200",
-            "text_color": "text-amber-600",
-            "action": "opened a ticket",
-            "description": f"#{ticket.ticket_number}: {ticket.subject[:50]}..." if len(ticket.subject or "") > 50 else f"#{ticket.ticket_number}: {ticket.subject}",
-            "timestamp": ticket.created_at,
-            "badge": ticket.priority.value.title() if ticket.priority else None,
-            "badge_color": "bg-red-100 text-red-600" if ticket.priority and ticket.priority.value in ("urgent", "critical") else "bg-gray-100 text-gray-600",
-        })
+    try:
+        recent_tickets = db.query(UnifiedTicket).order_by(
+            UnifiedTicket.created_at.desc()
+        ).limit(3).all()
+        for ticket in recent_tickets:
+            activities.append({
+                "user_name": ticket.contact_name or "Customer",
+                "user_initials": (ticket.contact_name or "C")[:2].upper(),
+                "color_from": "from-amber-100",
+                "color_to": "to-amber-200",
+                "text_color": "text-amber-600",
+                "action": "opened a ticket",
+                "description": f"#{ticket.ticket_number}: {ticket.subject[:50]}..." if len(ticket.subject or "") > 50 else f"#{ticket.ticket_number}: {ticket.subject}",
+                "timestamp": ticket.created_at,
+                "badge": ticket.priority.value.title() if ticket.priority else None,
+                "badge_color": "bg-red-100 text-red-600" if ticket.priority and ticket.priority.value in ("urgent", "critical") else "bg-gray-100 text-gray-600",
+            })
+    except Exception:
+        logger.exception("dashboard_recent_tickets_failed")
 
     # Sort by timestamp and take top 6
     activities.sort(key=lambda x: x["timestamp"] or datetime.min, reverse=True)
@@ -194,6 +206,64 @@ def _build_dashboard_stats(db):
     return stats
 
 
+def _build_attention_summary(db, user: SessionUser) -> dict:
+    approvals_count = 0
+    tasks_count = 0
+    overdue_count = 0
+
+    if user.has_scope("tasks:read"):
+        tasks_service = WorkflowTaskService(db)
+        tasks_count = tasks_service.count_my_tasks(user.id)
+
+    if user.has_scope("accounting:read"):
+        approvals_service = ApprovalsService(db, user)
+        approvals_count = approvals_service.get_stats().get("pending", 0)
+
+        from app.models.invoice import Invoice, InvoiceStatus
+
+        overdue_count = db.query(func.count(Invoice.id)).filter(
+            Invoice.status == InvoiceStatus.OVERDUE
+        ).scalar() or 0
+
+    total = approvals_count + tasks_count + overdue_count
+    if total == 0:
+        return {"total": 0}
+
+    details = []
+    if approvals_count:
+        details.append(f"Approvals: {approvals_count}")
+    if tasks_count:
+        details.append(f"Tasks: {tasks_count}")
+    if overdue_count:
+        details.append(f"Overdue: {overdue_count}")
+
+    if tasks_count:
+        attention_href = "/tasks"
+    elif approvals_count:
+        attention_href = "/accounting/approvals"
+    else:
+        attention_href = "/accounting/invoices?status=overdue"
+
+    return {
+        "total": total,
+        "details": ", ".join(details),
+        "href": attention_href,
+    }
+
+
+@web_router.get("/ui/attention", response_class=HTMLResponse)
+async def attention_badge(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+):
+    """Render the global attention badge for the top bar."""
+    summary = _build_attention_summary(db, user)
+    template = templates.get_template("components/ui/attention_badge.html")
+    return HTMLResponse(template.render({"attention": summary}))
+
+
 @web_router.get("/dashboard/stats", response_class=HTMLResponse)
 async def dashboard_stats(
     request: Request,
@@ -265,12 +335,34 @@ async def party_detail(
     party_id: int,
 ):
     """Party detail page."""
-    from sqlalchemy.orm import joinedload
+    from sqlalchemy.orm import joinedload, load_only
     from app.models.party import Party
 
-    party = db.query(Party).options(joinedload(Party.roles)).filter(
-        Party.id == party_id
-    ).first()
+    party = (
+        db.query(Party)
+        .options(
+            load_only(
+                Party.id,
+                Party.type,
+                Party.status,
+                Party.name,
+                Party.first_name,
+                Party.last_name,
+                Party.legal_name,
+                Party.trading_name,
+                Party.primary_email,
+                Party.primary_phone,
+                Party.timezone,
+                Party.locale,
+                Party.tax_id,
+                Party.tags,
+                Party.created_at,
+            ),
+            joinedload(Party.roles),
+        )
+        .filter(Party.id == party_id)
+        .first()
+    )
     if not party:
         return HTMLResponse("Party not found", status_code=404)
 
@@ -299,8 +391,27 @@ async def parties_list(
     """Party list page."""
     from app.models.party import Party
     from sqlalchemy import func
+    from sqlalchemy.orm import load_only
 
-    query = db.query(Party)
+    query = db.query(Party).options(
+        load_only(
+            Party.id,
+            Party.type,
+            Party.status,
+            Party.name,
+            Party.first_name,
+            Party.last_name,
+            Party.legal_name,
+            Party.trading_name,
+            Party.primary_email,
+            Party.primary_phone,
+            Party.timezone,
+            Party.locale,
+            Party.tax_id,
+            Party.tags,
+            Party.created_at,
+        )
+    )
     if type in {"person", "organization"}:
         query = query.filter(Party.type == type)
     if status in {"active", "inactive", "blocked"}:
@@ -325,6 +436,71 @@ async def parties_list(
     context["parties"] = parties
     context["pagination"] = build_pagination_context(page, per_page, total)
     context["filters"] = {"q": q or "", "type": type or "", "status": status or ""}
+
+    template = templates.get_template("pages/parties_list.html")
+    return HTMLResponse(template.render(context))
+
+
+@web_router.get("/crm/contacts-legacy", response_class=HTMLResponse)
+async def crm_contacts_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 25,
+):
+    """Legacy contact list page (deprecated)."""
+    from app.models.party import Party
+    from sqlalchemy.orm import load_only
+
+    query = db.query(Party).options(
+        load_only(
+            Party.id,
+            Party.type,
+            Party.status,
+            Party.name,
+            Party.first_name,
+            Party.last_name,
+            Party.legal_name,
+            Party.trading_name,
+            Party.primary_email,
+            Party.primary_phone,
+            Party.timezone,
+            Party.locale,
+            Party.tax_id,
+            Party.tags,
+            Party.created_at,
+        )
+    ).filter(Party.type == "person")
+    if status in {"active", "inactive", "blocked"}:
+        query = query.filter(Party.status == status)
+    if q:
+        search = f"%{q.strip()}%"
+        query = query.filter(
+            or_(
+                Party.name.ilike(search),
+                Party.primary_email.ilike(search),
+                Party.primary_phone.ilike(search),
+            )
+        )
+
+    total = query.with_entities(func.count(Party.id)).scalar() or 0
+    offset = max(page - 1, 0) * per_page
+    parties = query.order_by(Party.name.asc()).offset(offset).limit(per_page).all()
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Contacts (Legacy)"
+    context["parties"] = parties
+    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["filters"] = {"q": q or "", "type": "person", "status": status or ""}
+    context["base_url"] = "/crm/contacts-legacy"
+    context["detail_base_url"] = "/crm/contacts-legacy"
+    context["contacts_view"] = True
 
     template = templates.get_template("pages/parties_list.html")
     return HTMLResponse(template.render(context))
@@ -362,6 +538,10 @@ async def login_submit(
     Most deployments use SSO via /auth/sso instead.
     """
     from app.core.security import set_flash, validate_csrf
+    from app.config import settings
+    from app.auth import AUTH_COOKIE_NAME
+    from jose import jwt
+    import time
 
     # Validate CSRF
     await validate_csrf(request)
@@ -371,6 +551,32 @@ async def login_submit(
     email = raw_email.strip() if isinstance(raw_email, str) else ""
     password = form.get("password", "")
     next_url = form.get("next", "/")
+
+    if settings.e2e_auth_enabled and settings.e2e_jwt_secret:
+        if not email:
+            set_flash(response, "Email is required.", "error")
+        else:
+            now = int(time.time())
+            payload = {
+                "sub": f"e2e-{email.replace('@', '-at-')}",
+                "email": email,
+                "name": email.split("@")[0] if "@" in email else email,
+                "scopes": ["*"],
+                "iat": now,
+                "exp": now + 86400,
+            }
+            token = jwt.encode(payload, settings.e2e_jwt_secret, algorithm="HS256")
+            redirect = RedirectResponse(url=next_url, status_code=303)
+            redirect.set_cookie(
+                key=AUTH_COOKIE_NAME,
+                value=token,
+                httponly=True,
+                secure=request.url.scheme == "https",
+                samesite="lax",
+                path="/",
+                max_age=86400,
+            )
+            return redirect
 
     # For now, direct login is not supported - redirect to SSO
     # In production, this would be handled by the external auth provider
@@ -463,14 +669,14 @@ async def health_check():
     return {"status": "ok"}
 
 
-@web_router.get("/crm", response_class=HTMLResponse)
-@web_router.get("/crm/{path:path}", response_class=HTMLResponse)
+@web_router.get("/crm-legacy", response_class=HTMLResponse)
+@web_router.get("/crm-legacy/{path:path}", response_class=HTMLResponse)
 async def crm_deprecated(request: Request):
-    """CRM UI is deprecated; direct users to the Party-based API."""
+    """CRM legacy placeholder; direct users to the current CRM UI."""
     return HTMLResponse(
         "<html><body><h1>CRM UI Deprecated</h1>"
         "<p>The legacy CRM web UI has been removed.</p>"
-        "<p>Use the Party-based API: <code>/v1/crm/parties</code>.</p>"
+        "<p>Use the current CRM UI at <code>/crm</code>.</p>"
         "</body></html>",
         status_code=410,
     )
@@ -521,6 +727,9 @@ from app.modules.network.routes import router as network_router
 # Analytics module
 from app.modules.analytics.routes import router as analytics_router
 
+# CRM module (contacts and CRM workflows)
+from app.modules.crm import router as crm_router
+
 # Settings module (includes workflow tasks redirect)
 from app.modules.settings.routes import router as settings_router
 
@@ -565,6 +774,7 @@ web_router.include_router(purchasing_router)
 web_router.include_router(operations_router)
 web_router.include_router(network_router)
 web_router.include_router(analytics_router)
+web_router.include_router(crm_router)
 web_router.include_router(settings_router)
 
 # Support module with all sub-routers

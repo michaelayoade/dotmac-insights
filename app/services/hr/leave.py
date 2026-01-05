@@ -330,6 +330,36 @@ class LeaveService:
         stmt = stmt.order_by(LeaveAllocation.from_date.desc())
         return paginate(self.db, stmt, pagination)
 
+    def get_current_allocations(
+        self,
+        employee_id: int,
+        as_of: Optional[date] = None,
+    ) -> List[LeaveAllocation]:
+        """Get leave allocations valid on a specific date.
+
+        Returns allocations where from_date <= as_of AND to_date >= as_of.
+
+        Args:
+            employee_id: The employee ID.
+            as_of: Date to check validity (defaults to today).
+
+        Returns:
+            List of LeaveAllocation objects valid on the given date.
+        """
+        check_date = as_of or date.today()
+
+        stmt = (
+            select(LeaveAllocation)
+            .where(
+                LeaveAllocation.employee_id == employee_id,
+                LeaveAllocation.from_date <= check_date,
+                LeaveAllocation.to_date >= check_date,
+            )
+            .order_by(LeaveAllocation.leave_type_id)
+        )
+
+        return list(self.db.scalars(stmt).all())
+
     def get_allocation(self, allocation_id: int) -> LeaveAllocation:
         """Get a leave allocation by ID."""
         allocation = self.db.get(LeaveAllocation, allocation_id)

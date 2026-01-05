@@ -1,5 +1,257 @@
 # Frontend Design Reference
 
+## Global Layout Standard
+
+All pages must follow this block ordering inside the page content area:
+
+1. **Page header** - Title (`page_title`) and optional description, optional breadcrumbs
+2. **Primary actions** - Right-aligned CTA(s); keep to 1-3
+3. **Summary/Stats** - If applicable
+4. **Filters/Search** - If applicable
+5. **Main content** - Primary data area
+6. **Empty state** - Inside main content block when no data
+7. **Pagination** - If list/table
+8. **Modals/overlays** - End of page
+9. **Scripts** - Last
+
+---
+
+## Page Type Layouts
+
+### Dashboard
+1. Page header + timeframe selector
+2. KPI stats grid (2-6 cards)
+3. Primary charts (1-3 max)
+4. Secondary insights (tables/mini charts)
+5. Recent activity list
+6. Quick actions
+
+### List/Table
+1. Header + primary action
+2. Stats (optional)
+3. Filters/search bar
+4. Table/list container
+5. Empty state (if no data)
+6. Pagination
+7. Bulk actions bar (if selection enabled)
+
+### Detail/View
+1. Header with title + status badge + actions
+2. Summary cards (key fields)
+3. Sections or tabs (Overview, Related lists/tables, Activity/history)
+4. Side panel (optional)
+
+### Form
+1. Header + subtitle
+2. Sectioned fields (required then optional)
+3. Inline validation
+4. Footer actions (Cancel, Submit)
+
+### Charts/Graphs
+1. Chart container with title + subtitle
+2. Time filter in header (if applicable)
+3. Legend placement consistent (right or bottom)
+4. Empty state for no data
+
+---
+
+## Data-testid Standards
+
+### Naming Rules
+- Use **kebab-case**
+- Prefer **nouns over verbs**
+- Use **stable identifiers**, not dynamic text
+- Use short, consistent prefixes
+
+### Required Hooks (Every Page)
+| Element | data-testid |
+|---------|-------------|
+| Page header | `page-title` |
+| Main content area | `main-content` (set in layout) |
+| Table/list wrapper | `<entity>-table` |
+| Empty state container | `empty-state` or `<entity>-empty-state` |
+| Primary action button | `<action>-button` |
+
+### Naming Patterns
+| Element Type | Pattern | Example |
+|--------------|---------|---------|
+| Table | `<entity>-table` | `invoice-table` |
+| Search input | `<entity>-search` | `invoice-search` |
+| Filter button | `<filter>-filter-button` | `status-filter-button` |
+| Filter option | `<filter>-option-<value>` | `status-option-paid` |
+| Action button | `<action>-button` | `new-invoice-button` |
+| Empty state | `empty-state` | `empty-state` |
+
+### Component Patterns
+
+#### Stat Cards
+```html
+<div data-testid="stats-grid">
+    <div data-testid="stat-card-revenue">...</div>
+    <div data-testid="stat-card-orders">...</div>
+</div>
+```
+
+#### Tables
+```html
+<table data-testid="invoice-table">
+    <tr data-testid="invoice-row-123">
+        <td data-testid="invoice-number">INV-001</td>
+    </tr>
+</table>
+```
+
+#### Bulk Actions
+```html
+<div data-testid="bulk-actions-bar">...</div>
+<input data-testid="select-all-invoices" type="checkbox">
+<input data-testid="select-invoice-123" type="checkbox">
+```
+
+#### Empty States
+```html
+<div data-testid="empty-state">
+    <h4>No items found</h4>
+    <p>Short description</p>
+    <button>CTA (optional)</button>
+</div>
+```
+
+### Implementation Checklist
+- [ ] Page header includes `data-testid="page-title"`
+- [ ] Main content block follows Global Layout Standard order
+- [ ] Filters use data-testid hooks
+- [ ] Tables and empty states use data-testid hooks
+- [ ] Actions use data-testid hooks
+- [ ] Charts include title + empty state
+
+---
+
+## Visual System
+
+### Spacing Scale
+- Base unit: **4px**
+- Layout spacing: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48 / 64
+- Section spacing: 24-32px
+
+### Typography Scale
+| Element | Size | Weight |
+|---------|------|--------|
+| Title | 24-32px | 600-700 |
+| Section heading | 16-18px | 600 |
+| Body | 14-16px | 400-500 |
+| Muted | 12-14px | 400 (gray-500) |
+
+### Color Tokens
+- **Primary**: Brand color (buttons, links, highlights)
+- **Neutral**: gray-50 to gray-900
+- **Semantic**: Success, Warning, Error, Info states
+- **Contrast**: Must meet WCAG AA for text
+
+### Radii and Shadows
+| Element | Radius |
+|---------|--------|
+| Cards, panels | 12-16px |
+| Buttons, inputs | 10-12px |
+
+- Subtle elevation: cards
+- Strong elevation: modals
+
+---
+
+## Grid and Layout
+
+- **Max content width**: 1280px (or existing app layout)
+- **Complex layouts**: 12-column grid
+- **Simple pages**: 1-2 columns
+- **Sidebar layouts**: Preserve main content width, avoid horizontal scroll
+
+---
+
+## Component Standards
+
+### Buttons
+| Type | Usage |
+|------|-------|
+| Primary | Solid primary color, main action |
+| Secondary | Neutral outline or soft fill |
+| Destructive | Red tone with confirmation |
+| Loading | Spinner + disabled state |
+
+### Inputs
+- Consistent height and padding across forms
+- Visible focus ring
+- Inline error text below field with `data-error`
+
+### Tabs
+- Tab list uses `role="tablist"`
+- Active tab has clear visual state
+- HTMX tabs update content region with id
+
+### Cards
+- Title + optional subtitle
+- Content aligned with spacing scale
+
+### Tables
+- Sticky header optional for long lists
+- **Always** show empty state when no rows
+- Row hover state required for affordance
+
+### Badges
+- Consistent color mapping for statuses
+- Always provide text label
+
+---
+
+## Interaction and State
+
+### Hover/Focus/Active
+- Buttons and links must have hover and focus states
+- Focus ring visible for keyboard users
+
+### Loading
+- Use skeletons or `htmx-indicator` for async content
+- Disable actions while loading
+
+### Errors
+| Type | Pattern |
+|------|---------|
+| Global | Banner at top of page |
+| Field | Inline message under field |
+| Empty | Distinct from error states |
+
+---
+
+## Accessibility
+
+- All form inputs have labels
+- All interactive elements keyboard reachable
+- Use `aria-label` where text is not visible
+- Avoid color-only indicators
+
+---
+
+## Data Formatting
+
+| Data Type | Rule |
+|-----------|------|
+| Currency | Use `currency_symbol` where possible |
+| Dates | Single format across the app |
+| Percentages | Include % sign, consistent precision |
+
+---
+
+## Review Checklist
+
+- [ ] Title and description match the page content
+- [ ] Primary action is clear and singular
+- [ ] Filters do not wrap awkwardly on mobile
+- [ ] Tables render with empty state and pagination
+- [ ] Buttons and links have focus states
+- [ ] All data-testid hooks match naming rules
+
+---
+
 ## Layout Architecture
 
 ### Main App Layout (`app/templates/layouts/app.html`)

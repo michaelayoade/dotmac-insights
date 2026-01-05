@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 from app.models.gateway_transaction import GatewayProvider
 from app.utils.datetime_utils import utc_now
 
@@ -46,7 +47,7 @@ class PaymentSubscriptionInterval(str, enum.Enum):
     ANNUALLY = "annually"
 
 
-class PaymentSubscription(Base):
+class PaymentSubscription(SoftValidationMixin, Base):
     """
     Recurring payment subscriptions via payment gateways.
 

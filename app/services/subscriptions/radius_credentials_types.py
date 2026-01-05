@@ -2,12 +2,10 @@
 
 Type definitions for the RADIUS credential generation system.
 """
-from __future__ import annotations
-
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from app.services.errors import ValidationError
 
@@ -57,13 +55,24 @@ class PasswordComplexityConfig:
                 f"Password min_length ({min_length}) cannot exceed max_length ({max_length})"
             )
 
+        include_lowercase = data.get("include_lowercase", True)
+        include_uppercase = data.get("include_uppercase", True)
+        include_digits = data.get("include_digits", True)
+        include_special = data.get("include_special", True)
+
+        if not any([include_lowercase, include_uppercase, include_digits, include_special]):
+            raise ValidationError(
+                "Password configuration requires at least one character type "
+                "(lowercase, uppercase, digits, or special characters)"
+            )
+
         return cls(
             min_length=min_length,
             max_length=max_length,
-            include_lowercase=data.get("include_lowercase", True),
-            include_uppercase=data.get("include_uppercase", True),
-            include_digits=data.get("include_digits", True),
-            include_special=data.get("include_special", True),
+            include_lowercase=include_lowercase,
+            include_uppercase=include_uppercase,
+            include_digits=include_digits,
+            include_special=include_special,
             special_chars=data.get("special_chars", "!@#$%^&*"),
             exclude_ambiguous=data.get("exclude_ambiguous", True),
         )

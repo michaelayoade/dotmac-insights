@@ -36,6 +36,7 @@ from app.services.hr.attendance_types import (
     CheckInData,
     CheckOutData,
     DepartmentAttendanceSummary,
+    EmployeeAttendanceStats,
     LateArrivalRecord,
     ShiftAssignmentCreateData,
     ShiftAssignmentFilters,
@@ -473,6 +474,60 @@ class AttendanceService:
                     Attendance.attendance_date == attendance_date,
                 )
             )
+        )
+
+    def get_employee_stats(
+        self,
+        employee_id: int,
+        from_date: date,
+        to_date: date,
+    ) -> EmployeeAttendanceStats:
+        """Get attendance statistics for an employee in a date range.
+
+        Uses a single query with conditional aggregation for efficiency.
+
+        Args:
+            employee_id: The employee ID.
+            from_date: Start date (inclusive).
+            to_date: End date (inclusive).
+
+        Returns:
+            EmployeeAttendanceStats with counts for each status.
+        """
+        result = self.db.execute(
+            select(
+                func.count(Attendance.id).filter(
+                    Attendance.status == AttendanceStatus.PRESENT
+                ).label("present"),
+                func.count(Attendance.id).filter(
+                    Attendance.status == AttendanceStatus.ABSENT
+                ).label("absent"),
+                func.count(Attendance.id).filter(
+                    Attendance.status == AttendanceStatus.HALF_DAY
+                ).label("half_day"),
+                func.count(Attendance.id).filter(
+                    Attendance.status == AttendanceStatus.ON_LEAVE
+                ).label("on_leave"),
+                func.count(Attendance.id).filter(
+                    Attendance.late_entry == True
+                ).label("late_entry"),
+                func.count(Attendance.id).filter(
+                    Attendance.early_exit == True
+                ).label("early_exit"),
+            ).where(
+                Attendance.employee_id == employee_id,
+                Attendance.attendance_date >= from_date,
+                Attendance.attendance_date <= to_date,
+            )
+        ).one()
+
+        return EmployeeAttendanceStats(
+            present_count=result.present or 0,
+            absent_count=result.absent or 0,
+            half_day_count=result.half_day or 0,
+            on_leave_count=result.on_leave or 0,
+            late_entry_count=result.late_entry or 0,
+            early_exit_count=result.early_exit or 0,
         )
 
     def create_attendance(self, data: AttendanceCreateData) -> Attendance:

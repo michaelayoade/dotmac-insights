@@ -13,6 +13,7 @@ from ._deps import (
     Account, AccountType,
 )
 from app.services.accounting import LedgerService
+from app.services.accounting.web_services import AccountingAccountsWebService
 from app.services.accounting.ledger_types import AccountCreateData, AccountFilters, AccountUpdateData, GLEntryFilters
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginationParams
@@ -60,6 +61,10 @@ def get_account_type_options():
 
 def _get_ledger_service(db: DB, user: SessionUser) -> LedgerService:
     return LedgerService(db, user)
+
+
+def _get_accounts_web_service(db: DB, user: SessionUser) -> AccountingAccountsWebService:
+    return AccountingAccountsWebService(db, _get_ledger_service(db, user))
 
 
 def get_parent_account_options(service: LedgerService, exclude_id: Optional[int] = None):
@@ -290,7 +295,8 @@ async def account_create(
             parent_account_name = None
 
     # Create account
-    account = service.create_account(
+    web_service = _get_accounts_web_service(db, user)
+    account = web_service.create_account(
         AccountCreateData(
             account_name=account_name,
             account_number=account_number,
@@ -301,8 +307,6 @@ async def account_create(
             disabled=False,
         )
     )
-    db.commit()
-
     set_flash(response, f"Account '{account_name}' created successfully.", "success")
     return RedirectResponse(url=f"/accounting/accounts/{account.id}", status_code=303)
 
@@ -463,7 +467,8 @@ async def account_update(
             parent_account_name = None
 
     # Update account
-    service.update_account(
+    web_service = _get_accounts_web_service(db, user)
+    web_service.update_account(
         account_id,
         AccountUpdateData(
             account_name=account_name,
@@ -475,7 +480,5 @@ async def account_update(
             disabled=disabled,
         ),
     )
-    db.commit()
-
     set_flash(response, f"Account '{account_name}' updated successfully.", "success")
     return RedirectResponse(url=f"/accounting/accounts/{account.id}", status_code=303)

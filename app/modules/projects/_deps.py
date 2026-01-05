@@ -12,8 +12,6 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_, and_
-from sqlalchemy.orm import joinedload
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -35,8 +33,19 @@ from app.models.project import (
 from app.models.task import Task, TaskStatus, TaskPriority
 
 # Models - Related
-from app.models.party import CustomerAccount, Party
-from app.models.employee import Employee
+from app.services.projects import (
+    ActivityService,
+    AttachmentService,
+    CommentCreateData,
+    CommentService,
+    MilestoneFilters,
+    MilestoneService,
+    ProjectService,
+    ProjectsLookupService,
+    TaskFilters,
+    TaskService,
+)
+from app.services.types import PaginationParams
 
 # Permission dependencies
 RequireProjectsRead = Depends(require_scope("projects:read"))
@@ -152,53 +161,26 @@ def get_milestone_status_options():
 
 def get_customer_options(db):
     """Get customer accounts for project assignment dropdown."""
-    customers = (
-        db.query(CustomerAccount)
-        .join(Party, CustomerAccount.party_id == Party.id)
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
-    return [
-        {"value": str(c.id), "label": c.party.name if c.party else f"Account {c.id}"}
-        for c in customers
-    ]
+    lookup = ProjectsLookupService(db)
+    return lookup.list_customer_options()
 
 
 def get_manager_options(db):
     """Get active employees for project manager dropdown."""
-    employees = db.query(Employee).filter(
-        Employee.is_deleted == False,
-        Employee.status == "active"
-    ).order_by(Employee.first_name).all()
-    return [
-        {"value": str(e.id), "label": f"{e.first_name} {e.last_name}".strip() or e.email}
-        for e in employees
-    ]
+    lookup = ProjectsLookupService(db)
+    return lookup.list_manager_options()
 
 
 def get_project_options(db):
     """Get active projects for parent project or linking dropdown."""
-    projects = db.query(Project).filter(
-        Project.is_deleted == False,
-        Project.status.notin_(["completed", "cancelled"])
-    ).order_by(Project.name).limit(100).all()
-    return [
-        {"value": str(p.id), "label": p.name}
-        for p in projects
-    ]
+    lookup = ProjectsLookupService(db)
+    return lookup.list_project_options()
 
 
 def get_milestone_options(db, project_id: int):
     """Get milestones for a specific project."""
-    milestones = db.query(Milestone).filter(
-        Milestone.project_id == project_id,
-        Milestone.is_deleted == False
-    ).order_by(Milestone.planned_end_date).all()
-    return [
-        {"value": str(m.id), "label": m.name}
-        for m in milestones
-    ]
+    lookup = ProjectsLookupService(db)
+    return lookup.list_milestone_options(project_id)
 
 
 # =============================================================================
@@ -208,7 +190,6 @@ def get_milestone_options(db, project_id: int):
 from app.models.project import (
     ProjectComment,
     ProjectActivity,
-    ProjectActivityType,
 )
 from app.models.task import TaskDependency
 from app.models.document_attachment import DocumentAttachment
@@ -226,9 +207,57 @@ class ProjectsWebService:
     Encapsulates operations for Gantt, comments, and attachments.
     """
 
-    def __init__(self, db, user_id: Optional[int] = None):
+    def __init__(
+        self,
+        db,
+        user_id: Optional[int] = None,
+        principal: Optional[Any] = None,
+    ):
         self.db = db
         self.user_id = user_id
+        self.principal = principal
+        self._project_service: Optional[ProjectService] = None
+        self._task_service: Optional[TaskService] = None
+        self._milestone_service: Optional[MilestoneService] = None
+        self._comment_service: Optional[CommentService] = None
+        self._attachment_service: Optional[AttachmentService] = None
+        self._activity_service: Optional[ActivityService] = None
+
+    @property
+    def project_service(self) -> ProjectService:
+        if self._project_service is None:
+            self._project_service = ProjectService(self.db, self.principal)
+        return self._project_service
+
+    @property
+    def task_service(self) -> TaskService:
+        if self._task_service is None:
+            self._task_service = TaskService(self.db, self.principal)
+        return self._task_service
+
+    @property
+    def milestone_service(self) -> MilestoneService:
+        if self._milestone_service is None:
+            self._milestone_service = MilestoneService(self.db, self.principal)
+        return self._milestone_service
+
+    @property
+    def comment_service(self) -> CommentService:
+        if self._comment_service is None:
+            self._comment_service = CommentService(self.db, self.principal)
+        return self._comment_service
+
+    @property
+    def attachment_service(self) -> AttachmentService:
+        if self._attachment_service is None:
+            self._attachment_service = AttachmentService(self.db, self.principal)
+        return self._attachment_service
+
+    @property
+    def activity_service(self) -> ActivityService:
+        if self._activity_service is None:
+            self._activity_service = ActivityService(self.db, self.principal)
+        return self._activity_service
 
     # =========================================================================
     # GANTT DATA
@@ -236,16 +265,16 @@ class ProjectsWebService:
 
     def get_gantt_data(self, project_id: int) -> Optional[Dict[str, Any]]:
         """Get all tasks with dependencies for Gantt chart visualization."""
-        project = self.db.query(Project).filter(
-            Project.id == project_id,
-            Project.is_deleted == False
-        ).first()
+        try:
+            project = self.project_service.get_project(project_id)
+        except Exception:
+            return None
 
         if not project:
             return None
 
         # Get all tasks for this project
-        tasks = self.db.query(Task).filter(Task.project_id == project_id).all()
+        tasks = self.task_service.list_tasks_with_dependencies(project_id)
 
         task_list = []
         min_date = None
@@ -283,10 +312,10 @@ class ProjectsWebService:
                     max_date = task.exp_end_date
 
         # Get milestones
-        milestones = self.db.query(Milestone).filter(
-            Milestone.project_id == project_id,
-            Milestone.is_deleted == False
-        ).all()
+        milestones = self.milestone_service.list_project_milestones(
+            project_id,
+            MilestoneFilters(),
+        )
 
         milestone_list = [
             {
@@ -301,9 +330,29 @@ class ProjectsWebService:
         return {
             "project": {
                 "id": project.id,
-                "name": project.name,
-                "start_date": project.start_date.isoformat() if project.start_date else None,
-                "end_date": project.end_date.isoformat() if project.end_date else None,
+                "name": (
+                    getattr(project, "project_name", None)
+                    or getattr(project, "name", None)
+                    or f"Project {project.id}"
+                ),
+                "start_date": (
+                    project.start_date.isoformat()
+                    if getattr(project, "start_date", None)
+                    else (
+                        project.expected_start_date.isoformat()
+                        if getattr(project, "expected_start_date", None)
+                        else None
+                    )
+                ),
+                "end_date": (
+                    project.end_date.isoformat()
+                    if getattr(project, "end_date", None)
+                    else (
+                        project.expected_end_date.isoformat()
+                        if getattr(project, "expected_end_date", None)
+                        else None
+                    )
+                ),
             },
             "tasks": task_list,
             "milestones": milestone_list,
@@ -325,20 +374,15 @@ class ProjectsWebService:
         offset: int = 0,
     ) -> Dict[str, Any]:
         """List comments for an entity (project, task, or milestone)."""
-        query = self.db.query(ProjectComment).filter(
-            ProjectComment.entity_type == entity_type,
-            ProjectComment.entity_id == entity_id,
-            ProjectComment.is_deleted == False,
+        pagination = PaginationParams(offset=offset, limit=limit)
+        result = self.comment_service.list_entity_comments(
+            entity_type, entity_id, pagination
         )
-
-        total = query.count()
-        comments = query.order_by(ProjectComment.created_at.desc()).offset(offset).limit(limit).all()
-
         return {
-            "items": comments,
-            "total": total,
-            "limit": limit,
-            "offset": offset,
+            "items": result.items,
+            "total": result.total,
+            "limit": result.limit,
+            "offset": result.offset,
         }
 
     def create_comment(
@@ -346,35 +390,27 @@ class ProjectsWebService:
         entity_type: str,
         entity_id: int,
         content: str,
-        author_name: str,
-        author_email: str,
     ) -> ProjectComment:
         """Create a new comment."""
-        comment = ProjectComment(
-            entity_type=entity_type,
-            entity_id=entity_id,
-            content=content,
-            author_id=self.user_id,
-            author_name=author_name,
-            author_email=author_email,
-            created_at=datetime.utcnow(),
+        comment = self.comment_service.create_comment(
+            CommentCreateData(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                content=content,
+            )
         )
-        self.db.add(comment)
         self.db.commit()
         self.db.refresh(comment)
         return comment
 
     def delete_comment(self, comment_id: int) -> bool:
         """Soft delete a comment."""
-        comment = self.db.query(ProjectComment).filter(
-            ProjectComment.id == comment_id
-        ).first()
-        if not comment:
+        try:
+            self.comment_service.delete_comment(comment_id)
+            self.db.commit()
+            return True
+        except Exception:
             return False
-
-        comment.is_deleted = True
-        self.db.commit()
-        return True
 
     # =========================================================================
     # ATTACHMENTS
@@ -386,15 +422,7 @@ class ProjectsWebService:
         entity_id: int,
     ) -> List[DocumentAttachment]:
         """List attachments for an entity."""
-        doctype = f"project_{entity_type}"
-        attachments: list[DocumentAttachment] = []
-        if entity_type in ("project", "task", "milestone"):
-            attachments = self.db.query(DocumentAttachment).filter(
-                DocumentAttachment.doctype == doctype,
-                DocumentAttachment.document_id == entity_id,
-            ).order_by(DocumentAttachment.uploaded_at.desc()).all()
-
-        return attachments
+        return self.attachment_service.list_entity_attachments(entity_type, entity_id)
 
     # =========================================================================
     # ACTIVITY LOG
@@ -404,10 +432,9 @@ class ProjectsWebService:
         self,
         project_id: int,
         limit: int = 50,
+        offset: int = 0,
     ) -> List[ProjectActivity]:
         """List activity log for a project."""
-        activities: list[ProjectActivity] = self.db.query(ProjectActivity).filter(
-            ProjectActivity.entity_type == "project",
-            ProjectActivity.entity_id == project_id,
-        ).order_by(ProjectActivity.created_at.desc()).limit(limit).all()
-        return activities
+        return self.activity_service.get_project_timeline(
+            project_id, limit=limit, offset=offset
+        )

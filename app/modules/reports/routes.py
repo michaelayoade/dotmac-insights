@@ -466,7 +466,10 @@ async def vat_report(
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "VAT Report"
     context["period"] = period
-    context["periods"] = get_previous_periods(12)
+    periods = get_previous_periods(12)
+    if period not in periods:
+        periods = [period] + periods
+    context["periods"] = periods
     context["report_type"] = "vat"
 
     # Parse period for display
@@ -517,7 +520,10 @@ async def paye_report(
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "PAYE Report"
     context["period"] = period
-    context["periods"] = get_previous_periods(12)
+    periods = get_previous_periods(12)
+    if period not in periods:
+        periods = [period] + periods
+    context["periods"] = periods
     context["report_type"] = "paye"
 
     # Parse period for display

@@ -28,6 +28,7 @@ from app.models.accounting_ext import (
 from app.models.auth import User, Role, UserRole
 from app.models.notification import NotificationEventType
 from app.services.audit_logger import AuditLogger, serialize_for_audit
+from app.services.activity_logger import ActivityLogger
 from app.services.notification_service import NotificationService
 
 
@@ -62,6 +63,7 @@ class ApprovalEngine:
     def __init__(self, db: Session):
         self.db = db
         self.audit_logger = AuditLogger(db)
+        self.activity_logger = ActivityLogger(db)
         self.notification_service = NotificationService(db)
 
     # =========================================================================
@@ -380,6 +382,19 @@ class ApprovalEngine:
             old_values=old_values,
             new_values=new_values,
         )
+        self.activity_logger.log(
+            action="approval.submit",
+            user_id=user_id,
+            entity_type="approval",
+            entity_id=f"{doctype}:{document_id}",
+            summary=f"Submitted {doctype} #{document_id} for approval",
+            metadata={
+                "doctype": doctype,
+                "document_id": document_id,
+                "amount": float(amount) if amount else None,
+                "document_name": document_name,
+            },
+        )
 
         # Emit notification to approvers if pending
         if approval.status == ApprovalStatus.PENDING:
@@ -493,6 +508,14 @@ class ApprovalEngine:
             new_values=new_values,
             remarks=remarks,
         )
+        self.activity_logger.log(
+            action="approval.approve",
+            user_id=user_id,
+            entity_type="approval",
+            entity_id=f"{doctype}:{document_id}",
+            summary=f"Approved {doctype} #{document_id}",
+            metadata={"doctype": doctype, "document_id": document_id, "remarks": remarks},
+        )
 
         # Emit notifications
         if approval.status == ApprovalStatus.APPROVED:
@@ -602,6 +625,14 @@ class ApprovalEngine:
             new_values=new_values,
             remarks=reason,
         )
+        self.activity_logger.log(
+            action="approval.reject",
+            user_id=user_id,
+            entity_type="approval",
+            entity_id=f"{doctype}:{document_id}",
+            summary=f"Rejected {doctype} #{document_id}",
+            metadata={"doctype": doctype, "document_id": document_id, "reason": reason},
+        )
 
         # Notify submitter of rejection
         if approval.submitted_by_id:
@@ -677,6 +708,14 @@ class ApprovalEngine:
             new_values=new_values,
             remarks=remarks,
         )
+        self.activity_logger.log(
+            action="approval.post",
+            user_id=user_id,
+            entity_type="approval",
+            entity_id=f"{doctype}:{document_id}",
+            summary=f"Posted {doctype} #{document_id}",
+            metadata={"doctype": doctype, "document_id": document_id, "remarks": remarks},
+        )
 
         return approval
 
@@ -730,6 +769,14 @@ class ApprovalEngine:
             old_values=old_values,
             new_values=new_values,
             remarks=reason,
+        )
+        self.activity_logger.log(
+            action="approval.cancel",
+            user_id=user_id,
+            entity_type="approval",
+            entity_id=f"{doctype}:{document_id}",
+            summary=f"Cancelled {doctype} #{document_id}",
+            metadata={"doctype": doctype, "document_id": document_id, "reason": reason},
         )
 
         return approval

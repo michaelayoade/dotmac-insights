@@ -1,5 +1,5 @@
 <!-- Training Events List Partial -->
-<div class="space-y-4">
+<div class="space-y-4" data-testid="training-table">
     {% if events %}
         {% for event in events %}
         <a href="/hr/my/training/{{ event.id }}" class="block bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:ring-primary-200 transition-all">
@@ -44,7 +44,7 @@
         </a>
         {% endfor %}
     {% else %}
-        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center" data-testid="training-empty-state">
             <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
             <h3 class="text-lg font-semibold text-gray-900 mb-2">No Training Events</h3>
             <p class="text-gray-500">You haven't been enrolled in any training events yet.</p>
@@ -53,14 +53,9 @@
 </div>
 
 <!-- Pagination -->
-{% if pagination.pages > 1 %}
-<div class="flex items-center justify-center gap-2 mt-6">
-    {% if pagination.page > 1 %}
-    <a href="?page={{ pagination.page - 1 }}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Previous</a>
-    {% endif %}
-    <span class="px-4 py-2 text-sm text-gray-500">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-    {% if pagination.page < pagination.pages %}
-    <a href="?page={{ pagination.page + 1 }}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Next</a>
-    {% endif %}
-</div>
+{% set total_pages = pagination.total_pages if pagination.total_pages is defined else pagination.pages %}
+{% if total_pages > 1 %}
+{% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": total_pages, "has_prev": pagination.page > 1, "has_next": pagination.page < total_pages, "prev_page": pagination.page - 1 if pagination.page > 1 else None, "next_page": pagination.page + 1 if pagination.page < total_pages else None, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url="/hr/my/training" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 {% endif %}

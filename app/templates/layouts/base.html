@@ -14,6 +14,72 @@
     <!-- Tailwind CSS (compiled) -->
     <link href="/static/css/styles.css" rel="stylesheet">
 
+    <style>
+        /* Alpine.js x-cloak: hide elements until Alpine initializes */
+        [x-cloak] { display: none !important; }
+
+        .htmx-indicator { opacity: 0; visibility: hidden; }
+        .htmx-request .htmx-indicator,
+        .htmx-request.htmx-indicator { opacity: 1; visibility: visible; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.25rem;
+            padding: 0.625rem 1.25rem;
+        }
+
+        .btn-sm {
+            font-size: 0.75rem;
+            padding: 0.375rem 0.75rem;
+        }
+
+        .btn-primary {
+            color: #fff;
+            background: linear-gradient(90deg, #0d7377, #0a5f62);
+            box-shadow: 0 10px 15px -3px rgba(13, 115, 119, 0.25),
+                        0 4px 6px -4px rgba(13, 115, 119, 0.25);
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.05);
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px 0 rgba(26, 29, 33, 0.08),
+                        0 1px 2px -1px rgba(26, 29, 33, 0.08);
+        }
+
+        .btn-secondary:hover {
+            background: #f5f3f0;
+        }
+
+        .btn-success {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+        }
+
+        .btn-warning {
+            background: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .btn-danger {
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+    </style>
+
     {% block head %}{% endblock %}
 </head>
 <body
@@ -30,6 +96,7 @@
         class="fixed top-4 right-4 z-50 flex flex-col gap-3 pointer-events-none"
         x-data="toastManager()"
         @show-toast.window="show($event.detail)"
+        aria-live="polite"
     >
         <template x-for="toast in toasts" :key="toast.id">
             <div
@@ -122,6 +189,7 @@
         role="dialog"
         aria-modal="true"
     >
+        <h2 id="modal-title" class="sr-only">Dialog</h2>
         <!-- Backdrop -->
         <div
             class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm"
@@ -155,18 +223,23 @@
     </div>
 
     <!-- Flash Message (from server) -->
-    {% if flash %}
+{% if flash %}
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        const dispatchFlashToast = () => {
             window.dispatchEvent(new CustomEvent('show-toast', {
                 detail: {
                     message: {{ flash.message | tojson }},
                     type: {{ flash.category | tojson }}
                 }
             }));
-        });
+        };
+        if (document.readyState === "loading") {
+            document.addEventListener('DOMContentLoaded', dispatchFlashToast);
+        } else {
+            dispatchFlashToast();
+        }
     </script>
-    {% endif %}
+{% endif %}
 
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
@@ -176,7 +249,7 @@
     <script src="/static/js/table-actions.js"></script>
 
     <!-- Alpine.js -->
-    <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <script defer src="/static/js/vendor/alpine.min.js"></script>
 
     {% block scripts %}{% endblock %}
 </body>

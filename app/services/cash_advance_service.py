@@ -108,7 +108,12 @@ class CashAdvanceService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_advance(self, advance_id: int) -> CashAdvance:
         """Get a single cash advance by ID.

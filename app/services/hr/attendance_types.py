@@ -31,6 +31,7 @@ __all__ = [
     "AttendanceRequestFilters",
     "AttendanceRequestCreateData",
     # Reports
+    "EmployeeAttendanceStats",
     "AttendanceSummary",
     "DepartmentAttendanceSummary",
     "WorkingHoursSummary",
@@ -248,6 +249,18 @@ class AttendanceRequestCreateData:
 # ==============================================================================
 # Reports
 # ==============================================================================
+
+
+@dataclass
+class EmployeeAttendanceStats:
+    """Simple attendance statistics for a date range."""
+
+    present_count: int = 0
+    absent_count: int = 0
+    half_day_count: int = 0
+    on_leave_count: int = 0
+    late_entry_count: int = 0
+    early_exit_count: int = 0
 
 
 @dataclass

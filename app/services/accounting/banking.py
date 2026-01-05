@@ -25,6 +25,7 @@ from app.models.bank_transaction_split import BankTransactionSplit
 from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .banking_types import (
     BankAccountBalanceInfo,
@@ -504,6 +505,7 @@ class BankingService:
 
         self.db.add(txn)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(txn)
 
         # Add splits if provided
         for idx, split_data in enumerate(data.splits):
@@ -523,6 +525,7 @@ class BankingService:
             self.db.add(split)
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(txn)
         return txn
 
     def update_transaction(

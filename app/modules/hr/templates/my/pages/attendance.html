@@ -139,20 +139,16 @@
         </div>
 
         <!-- Pagination -->
-        {% if pagination.pages > 1 %}
-        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-            <p class="text-sm text-gray-500">
-                Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }} records
-            </p>
-            <div class="flex gap-2">
-                {% if pagination.page > 1 %}
-                <a href="?page={{ pagination.page - 1 }}&month={{ current_month }}" class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Previous</a>
-                {% endif %}
-                {% if pagination.page < pagination.pages %}
-                <a href="?page={{ pagination.page + 1 }}&month={{ current_month }}" class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Next</a>
-                {% endif %}
-            </div>
-        </div>
+        {% set total_pages = pagination.total_pages if pagination.total_pages is defined else pagination.pages %}
+        {% if total_pages > 1 %}
+        {% set query_params = [] %}
+        {% if current_month %}
+        {% set _ = query_params.append("month=" ~ current_month) %}
+        {% endif %}
+        {% set base_url = "/hr/my/attendance" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+        {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": total_pages, "has_prev": pagination.page > 1, "has_next": pagination.page < total_pages, "prev_page": pagination.page - 1 if pagination.page > 1 else None, "next_page": pagination.page + 1 if pagination.page < total_pages else None, "start_item": ((pagination.page - 1) * pagination.per_page) + 1, "end_item": [pagination.page * pagination.per_page, pagination.total]|min }, base_url=base_url %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
         {% endif %}
     </div>
 </div>

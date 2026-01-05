@@ -17,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.party import CustomerAccount
@@ -50,7 +51,7 @@ class GatewayTransactionStatus(str, enum.Enum):
     REFUNDED = "refunded"
 
 
-class GatewayTransaction(Base):
+class GatewayTransaction(SoftValidationMixin, Base):
     """
     Transactions processed through payment gateways.
 

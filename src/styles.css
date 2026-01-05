@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+[x-cloak] {
+  display: none !important;
+}
+
+.sidebar-transition {
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  will-change: transform;
+}
+
 /* Base styles */
 [x-cloak] { display: none !important; }
 

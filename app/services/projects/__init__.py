@@ -17,6 +17,7 @@ from .milestones import MilestoneService
 from .tasks import TaskService
 from .projects import ProjectService
 from .analytics import ProjectsAnalyticsService
+from .lookups import ProjectsLookupService
 from .templates import ProjectTemplateService
 
 from .activity_types import (
@@ -51,18 +52,24 @@ from .project_types import (
     ProjectTaskStats,
 )
 from .analytics_types import (
+    AnalyticsFilters,
+    DashboardData,
     DashboardStats,
     StatusDistribution,
     StatusTrendPoint,
+    AssigneeTaskStats,
     TaskDistribution,
     BudgetPerformance,
     TimelinePerformance,
-    ProjectPerformance,
+    TopProject,
+    ProfitabilityMetrics,
+    PerformanceMetrics,
     DepartmentSummary,
 )
 from .template_types import (
     TaskTemplateData,
     MilestoneTemplateData,
+    TemplateFilters,
     TemplateCreateData,
     TemplateUpdateData,
     CreateFromTemplateData,
@@ -85,6 +92,7 @@ __all__ = [
     "TaskService",
     "ProjectService",
     "ProjectsAnalyticsService",
+    "ProjectsLookupService",
     "ProjectTemplateService",
     # Activity types
     "ActivityFilters",
@@ -112,17 +120,23 @@ __all__ = [
     "ProjectUpdateData",
     "ProjectTaskStats",
     # Analytics types
+    "AnalyticsFilters",
+    "DashboardData",
     "DashboardStats",
     "StatusDistribution",
     "StatusTrendPoint",
+    "AssigneeTaskStats",
     "TaskDistribution",
     "BudgetPerformance",
     "TimelinePerformance",
-    "ProjectPerformance",
+    "TopProject",
+    "ProfitabilityMetrics",
+    "PerformanceMetrics",
     "DepartmentSummary",
     # Template types
     "TaskTemplateData",
     "MilestoneTemplateData",
+    "TemplateFilters",
     "TemplateCreateData",
     "TemplateUpdateData",
     "CreateFromTemplateData",

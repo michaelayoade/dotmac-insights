@@ -6,6 +6,7 @@ used across all subscription route modules.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Optional, Any, List, Dict
 from datetime import datetime, timedelta, date
 from decimal import Decimal
@@ -95,6 +96,7 @@ from app.services.subscriptions import (
     DowngradeResult,
     RenewalResult,
 )
+from app.services.identity.parties import PartyService
 
 # Access method configuration
 from app.integrations.mikrotik.access_methods import ACCESS_METHODS, get_access_method_options
@@ -115,6 +117,38 @@ RequireBillingWrite = Depends(require_scope("billing:write"))
 # =============================================================================
 
 templates = get_template_env()
+
+# =============================================================================
+# BREADCRUMBS / CONTEXT HELPERS
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class BreadcrumbItem:
+    label: str
+    url: Optional[str] = None
+
+
+def get_context(
+    request: Request,
+    title: str,
+    breadcrumbs: Optional[List[BreadcrumbItem]] = None,
+    user: Optional[SessionUser] = None,
+    csrf_token: str = "",
+    response: Optional[Response] = None,
+) -> Dict[str, Any]:
+    """Build template context for subscription bundle pages."""
+    response = response or Response()
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = title
+    if breadcrumbs:
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": item.label, "href": item.url} for item in breadcrumbs
+        ])
+    else:
+        context["breadcrumbs"] = []
+    return context
 
 
 # =============================================================================
@@ -270,67 +304,26 @@ def get_status_style(status: str) -> Dict[str, str]:
 
 def get_router_options(db: Session) -> List[Dict[str, str]]:
     """Get active routers for dropdown."""
-    routers = db.query(Router).filter(
-        Router.is_active == True
-    ).order_by(Router.title).all()
-    return [
-        {"value": str(r.id), "label": f"{r.title} ({r.ip})"}
-        for r in routers
-    ]
+    from app.services.subscriptions.web_helpers import SubscriptionWebHelpers
+    return SubscriptionWebHelpers(db).get_router_options()
 
 
 def get_pop_options(db: Session) -> List[Dict[str, str]]:
     """Get POPs for dropdown."""
-    pops = db.query(Pop).filter(
-        Pop.is_active == True
-    ).order_by(Pop.name).all()
-    return [
-        {"value": str(p.id), "label": p.name}
-        for p in pops
-    ]
+    from app.services.subscriptions.web_helpers import SubscriptionWebHelpers
+    return SubscriptionWebHelpers(db).get_pop_options()
 
 
 def get_tariff_options(db: Session, tariff_type: Optional[str] = None) -> List[Dict[str, Any]]:
     """Get active tariffs for dropdown."""
-    query = db.query(Tariff).filter(Tariff.enabled == True)
-    if tariff_type:
-        query = query.filter(Tariff.tariff_type == TariffType(tariff_type))
-    tariffs = query.order_by(Tariff.title).all()
-    return [
-        {
-            "value": str(t.id),
-            "label": f"{t.title} - {t.price:,.0f} {t.currency}",
-            "price": float(t.price),
-            "download_speed": t.download_speed,
-            "upload_speed": t.upload_speed,
-        }
-        for t in tariffs
-    ]
+    from app.services.subscriptions.web_helpers import SubscriptionWebHelpers
+    return SubscriptionWebHelpers(db).get_tariff_options(tariff_type)
 
 
 def get_party_options(db: Session, search: Optional[str] = None, limit: int = 20) -> List[Dict[str, Any]]:
     """Get parties for dropdown with optional search."""
-    query = db.query(Party).filter(Party.status == PartyStatus.ACTIVE)
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Party.name.ilike(search_term),
-                Party.primary_email.ilike(search_term),
-                Party.primary_phone.ilike(search_term),
-            )
-        )
-    parties = query.order_by(Party.name).limit(limit).all()
-    return [
-        {
-            "value": str(p.id),
-            "label": p.name or p.primary_email or f"Party {p.id}",
-            "email": p.primary_email,
-            "phone": p.primary_phone,
-            "type": p.type,
-        }
-        for p in parties
-    ]
+    from app.services.subscriptions.web_helpers import SubscriptionWebHelpers
+    return SubscriptionWebHelpers(db).get_party_options(search=search, limit=limit)
 
 
 # =============================================================================
@@ -399,63 +392,8 @@ def format_currency(amount: Optional[Decimal], currency: str = "NGN") -> str:
 
 def compute_subscription_stats(db: Session) -> Dict[str, Any]:
     """Compute subscription stats for dashboard cards."""
-    active = db.query(func.count(Subscription.id)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).scalar() or 0
-
-    suspended = db.query(func.count(Subscription.id)).filter(
-        Subscription.status == SubscriptionStatus.SUSPENDED
-    ).scalar() or 0
-
-    pending = db.query(func.count(Subscription.id)).filter(
-        Subscription.status == SubscriptionStatus.PENDING
-    ).scalar() or 0
-
-    cancelled = db.query(func.count(Subscription.id)).filter(
-        Subscription.status == SubscriptionStatus.CANCELLED
-    ).scalar() or 0
-
-    total = active + suspended + pending + cancelled
-
-    # MRR calculation
-    mrr_monthly = db.query(func.sum(Subscription.price)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "monthly"
-    ).scalar() or Decimal("0")
-
-    mrr_quarterly = db.query(func.sum(Subscription.price / 3)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "quarterly"
-    ).scalar() or Decimal("0")
-
-    mrr_yearly = db.query(func.sum(Subscription.price / 12)).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE,
-        Subscription.billing_cycle == "yearly"
-    ).scalar() or Decimal("0")
-
-    total_mrr = float(mrr_monthly) + float(mrr_quarterly) + float(mrr_yearly)
-
-    # New this month
-    start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    new_this_month = db.query(func.count(Subscription.id)).filter(
-        Subscription.created_at >= start_of_month
-    ).scalar() or 0
-
-    # Failed provisioning
-    failed_provisioning = db.query(func.count(Subscription.id)).filter(
-        Subscription.provisioning_error.isnot(None)
-    ).scalar() or 0
-
-    return {
-        "active": active,
-        "suspended": suspended,
-        "pending": pending,
-        "cancelled": cancelled,
-        "total": total,
-        "mrr": total_mrr,
-        "new_this_month": new_this_month,
-        "failed_provisioning": failed_provisioning,
-    }
+    from app.services.subscriptions.web_helpers import SubscriptionWebHelpers
+    return SubscriptionWebHelpers(db).compute_subscription_stats()
 
 
 # =============================================================================

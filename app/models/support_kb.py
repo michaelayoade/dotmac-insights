@@ -11,7 +11,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.agent import Agent
     from app.models.party import Party
 
 
@@ -207,8 +206,11 @@ class KBArticleFeedback(Base):
         nullable=True,
         index=True,
     )
-    agent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
+    agent_party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, index=True)

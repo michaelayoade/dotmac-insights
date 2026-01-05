@@ -68,19 +68,19 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">GL Entries</p>
             <p class="mt-1 text-2xl font-bold text-gray-900">{{ '{:,}'.format(gl_count) }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Total Debits</p>
             <p class="mt-1 text-2xl font-bold text-blue-600 font-mono">{{ '{:,.2f}'.format(period_debit) }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Credits</p>
             <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(period_credit) }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Period Type</p>
             <p class="mt-1 text-2xl font-bold text-gray-900">{{ period.period_type.value.title() if period.period_type else '-' }}</p>
         </div>
@@ -89,7 +89,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <!-- Period Details -->
         <div class="lg:col-span-2">
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Period Details</h2>
                 <dl class="grid grid-cols-2 gap-6">
                     <div>
@@ -140,7 +140,7 @@
 
         <!-- Quick Actions -->
         <div class="space-y-6">
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div class="space-y-2">
                     <a

@@ -7,10 +7,11 @@
         action="{% if ticket %}/support/tickets/{{ ticket.id }}{% else %}/support/tickets{% endif %}"
         class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
         data-testid="ticket-form"
+        novalidate
         x-data="{ submitting: false }"
         @submit="submitting = true"
     >
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <!-- Header -->
         <div class="px-6 py-5 border-b border-gray-100">
@@ -44,7 +45,7 @@
                     data-testid="ticket-subject-input"
                 >
                 {% if errors.subject %}
-                <p class="mt-1.5 text-sm text-red-600 font-body" data-testid="subject-error">{{ errors.subject }}</p>
+                <p class="mt-1.5 text-sm text-red-600 font-body field-error" data-testid="subject-error" data-error="subject">{{ errors.subject }}</p>
                 {% endif %}
             </div>
 
@@ -122,6 +123,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </div>
+                    </div>
+                    <div class="mt-2">
+                        <span class="priority-preview inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-600/20" data-priority-preview>
+                            {{ (ticket.priority.value if ticket else (form_data.priority if form_data else 'medium')) | title }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -314,13 +320,13 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <!-- Assigned To -->
                     <div>
-                        <label for="assigned_to_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        <label for="assigned_to_party_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
                             Assign to Agent
                         </label>
                         <div class="relative">
                             <select
-                                name="assigned_to_id"
-                                id="assigned_to_id"
+                                name="assigned_to_party_id"
+                                id="assigned_to_party_id"
                                 class="block w-full px-4 py-2.5 pr-10 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all duration-200 font-body sm:text-sm appearance-none cursor-pointer"
                                 data-testid="assigned-to-select"
                             >
@@ -328,8 +334,8 @@
                                 {% for agent in agents %}
                                 <option
                                     value="{{ agent.id }}"
-                                    {{ 'selected' if ticket and ticket.assigned_to_id == agent.id else '' }}
-                                >{{ agent.first_name }} {{ agent.last_name | default('') }}</option>
+                                    {{ 'selected' if ticket and ticket.assigned_to_party_id == agent.id else '' }}
+                                >{{ agent.display_name or agent.name or agent.primary_email }}</option>
                                 {% endfor %}
                             </select>
                             <div class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none">
@@ -416,4 +422,27 @@
         </div>
     </form>
 </div>
+
+<script>
+    const initPriorityPreview = () => {
+        const prioritySelect = document.getElementById("priority");
+        const preview = document.querySelector("[data-priority-preview]");
+        if (!prioritySelect || !preview) {
+            return;
+        }
+        const labelFor = (value) => (value || "medium").replace(/_/g, " ");
+        const updatePreview = () => {
+            preview.textContent = labelFor(prioritySelect.value).replace(/\b\w/g, (c) => c.toUpperCase());
+        };
+        prioritySelect.addEventListener("change", updatePreview);
+        prioritySelect.addEventListener("input", updatePreview);
+        updatePreview();
+    };
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initPriorityPreview);
+    } else {
+        initPriorityPreview();
+    }
+</script>
 {% endblock %}

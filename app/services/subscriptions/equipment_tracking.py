@@ -12,7 +12,8 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.inventory import Item, SerialNumber, StockEntry
+from app.models.inventory import SerialNumber
+from app.models.sales import Item
 from app.utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -93,21 +94,23 @@ class SubscriptionEquipmentService:
                     serial_number=None,
                     message="Serial number not found or doesn't match item",
                 )
-            if serial.status != "available":
+            serial_status = serial.status.value if hasattr(serial.status, 'value') else str(serial.status)
+            if serial_status not in ("available", "active"):
                 return EquipmentReservation(
                     success=False,
                     subscription_id=subscription_id,
                     item_id=item_id,
                     serial_id=serial_id,
-                    serial_number=serial.serial_number,
-                    message=f"Serial number not available, status: {serial.status}",
+                    serial_number=serial.serial_no,
+                    message=f"Serial number not available, status: {serial_status}",
                 )
         else:
             # Find an available serial number
+            from app.models.inventory import SerialStatus
             q = select(SerialNumber).where(
                 and_(
                     SerialNumber.item_id == item_id,
-                    SerialNumber.status == "available",
+                    SerialNumber.status.in_([SerialStatus.AVAILABLE, SerialStatus.ACTIVE]),
                 )
             ).limit(1)
 
@@ -125,15 +128,14 @@ class SubscriptionEquipmentService:
                 )
 
         # Reserve the serial number
-        serial.status = "reserved"
+        from app.models.inventory import SerialStatus
+        serial.status = SerialStatus.RESERVED
         serial.reserved_for_subscription_id = subscription_id
         serial.reserved_at = utc_now()
 
         # Update subscription with equipment reference
-        # Note: These fields need to be added to the Subscription model
-        # For now, store in description or custom fields
         subscription.description = (subscription.description or "") + \
-            f"\nEquipment: {item.name} (S/N: {serial.serial_number})"
+            f"\nEquipment: {item.item_name} (S/N: {serial.serial_no})"
 
         await self.session.flush()
 
@@ -142,7 +144,7 @@ class SubscriptionEquipmentService:
             extra={
                 "subscription_id": subscription_id,
                 "item_id": item_id,
-                "serial_number": serial.serial_number,
+                "serial_number": serial.serial_no,
             },
         )
 
@@ -151,7 +153,7 @@ class SubscriptionEquipmentService:
             subscription_id=subscription_id,
             item_id=item_id,
             serial_id=serial.id,
-            serial_number=serial.serial_number,
+            serial_number=serial.serial_no,
             message="Equipment reserved successfully",
         )
 
@@ -170,17 +172,18 @@ class SubscriptionEquipmentService:
             return False
 
         # Find reserved serial numbers for this subscription
+        from app.models.inventory import SerialStatus
         q = select(SerialNumber).where(
             and_(
                 SerialNumber.reserved_for_subscription_id == subscription_id,
-                SerialNumber.status == "reserved",
+                SerialNumber.status == SerialStatus.RESERVED,
             )
         )
         result = await self.session.execute(q)
         serials = list(result.scalars().all())
 
         for serial in serials:
-            serial.status = "issued"
+            serial.status = SerialStatus.ISSUED
             serial.issued_at = utc_now()
             serial.issued_to_party_id = subscription.party_id
 
@@ -220,14 +223,15 @@ class SubscriptionEquipmentService:
             return False
 
         # Update serial status based on condition
+        from app.models.inventory import SerialStatus
         if condition == "good":
-            serial.status = "available"
+            serial.status = SerialStatus.AVAILABLE
         elif condition == "damaged":
-            serial.status = "damaged"
+            serial.status = SerialStatus.DAMAGED
         elif condition == "lost":
-            serial.status = "lost"
+            serial.status = SerialStatus.LOST
         else:
-            serial.status = "returned"
+            serial.status = SerialStatus.RETURNED
 
         serial.returned_at = utc_now()
         serial.return_notes = notes
@@ -259,17 +263,17 @@ class SubscriptionEquipmentService:
 
         assignments = []
         for serial in serials:
-            item = await self.session.get(Item, serial.item_id)
-            item_name = item.name if item else "Unknown"
+            item = await self.session.get(Item, serial.item_id) if serial.item_id else None
+            item_name = item.item_name if item else (serial.item_name or "Unknown")
 
             assignments.append(EquipmentAssignment(
                 subscription_id=subscription_id,
-                item_id=serial.item_id,
+                item_id=serial.item_id or 0,
                 item_name=item_name,
-                serial_number=serial.serial_number,
+                serial_number=serial.serial_no,
                 serial_id=serial.id,
                 assigned_at=serial.reserved_at or serial.issued_at or utc_now(),
-                status=serial.status,
+                status=serial.status.value if hasattr(serial.status, 'value') else str(serial.status),
             ))
 
         return assignments
@@ -279,10 +283,11 @@ class SubscriptionEquipmentService:
         item_id: int,
     ) -> List[SerialNumber]:
         """Get available serial numbers for an item."""
+        from app.models.inventory import SerialStatus
         q = select(SerialNumber).where(
             and_(
                 SerialNumber.item_id == item_id,
-                SerialNumber.status == "available",
+                SerialNumber.status.in_([SerialStatus.AVAILABLE, SerialStatus.ACTIVE]),
             )
         )
         result = await self.session.execute(q)

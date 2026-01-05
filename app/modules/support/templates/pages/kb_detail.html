@@ -80,7 +80,7 @@
         <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
             <!-- Article Content -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <div class="prose prose-gray max-w-none">
                     {# Render markdown content - for now just display as preformatted #}
                     {{ article.content | safe }}
@@ -88,7 +88,7 @@
             </div>
 
             <!-- Helpfulness -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <div class="flex items-center justify-between">
                     <span class="text-sm font-medium text-gray-700">Was this article helpful?</span>
                     <div class="flex items-center gap-4">
@@ -105,7 +105,7 @@
         <!-- Sidebar -->
         <div class="space-y-6">
             <!-- Article Info -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-4">Article Info</h3>
                 <dl class="space-y-3 text-sm">
                     <div class="flex justify-between">
@@ -131,7 +131,7 @@
 
             <!-- Search Keywords -->
             {% if article.search_keywords %}
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-4">Search Keywords</h3>
                 <div class="flex flex-wrap gap-2">
                     {% for keyword in article.search_keywords.split(',') %}
@@ -145,7 +145,7 @@
 
             <!-- Related Articles -->
             {% if related_articles %}
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-4">Related Articles</h3>
                 <ul class="space-y-3">
                     {% for related in related_articles %}

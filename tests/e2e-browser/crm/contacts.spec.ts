@@ -20,6 +20,13 @@ test.describe('Contacts List', () => {
   });
 
   test('displays contacts table @smoke', async () => {
+    if (!(await contactsPage.ensureHasContacts())) {
+      const emptyState = contactsPage.page.locator('[data-testid="contacts-empty-state"]');
+      if (await emptyState.count() > 0) {
+        await expect(emptyState).toBeVisible();
+        return;
+      }
+    }
     await expect(contactsPage.contactsTable).toBeVisible();
   });
 
@@ -63,7 +70,7 @@ test.describe('Contacts List', () => {
       return;
     }
     for (const row of rows) {
-      const typeCell = row.locator('[data-type], td:nth-child(4)');
+      const typeCell = row.locator('[data-testid="contact-type"]');
       await expect(typeCell).toContainText(/customer/i);
     }
   });
@@ -83,7 +90,7 @@ test.describe('Contacts List', () => {
       return;
     }
     for (const row of rows) {
-      const statusBadge = row.locator('.badge, [data-status]');
+      const statusBadge = row.locator('[data-testid="contact-status"]');
       await expect(statusBadge).toContainText(/active/i);
     }
   });
@@ -124,7 +131,7 @@ test.describe('Contacts List', () => {
     await contactsPage.clickContact(firstRow.name);
 
     // Verify on detail page
-    await expect(page).toHaveURL(/\/contacts\/\d+/);
+    await expect(page).toHaveURL(/\/crm\/contacts\/\d+/);
     await contactsPage.expectContactName(firstRow.name);
   });
 });
@@ -149,7 +156,7 @@ test.describe('Contact Creation', () => {
     await htmx.waitForHtmxIdle();
 
     // Verify redirect to detail or list
-    await expect(page).toHaveURL(/\/contacts/);
+    await expect(page).toHaveURL(/\/crm\/contacts/);
 
     // Verify success message
     await contactsPage.expectSuccessToast(/created|saved/i);

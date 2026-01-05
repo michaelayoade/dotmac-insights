@@ -1,5 +1,5 @@
 <!-- Payslips Grid Partial -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="payslips-table">
     {% if payslips %}
         {% for payslip in payslips %}
         <a href="/hr/my/payslips/{{ payslip.id }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:ring-primary-200 transition-all block">
@@ -21,7 +21,7 @@
         </a>
         {% endfor %}
     {% else %}
-        <div class="col-span-full bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center">
+        <div class="col-span-full bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-12 text-center" data-testid="payslips-empty-state">
             <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             <h3 class="text-lg font-semibold text-gray-900 mb-2">No Payslips</h3>
             <p class="text-gray-500">No payslips available for the selected period.</p>
@@ -30,14 +30,14 @@
 </div>
 
 <!-- Pagination -->
-{% if pagination.pages > 1 %}
-<div class="flex items-center justify-center gap-2 mt-6">
-    {% if pagination.page > 1 %}
-    <a href="?page={{ pagination.page - 1 }}{% if current_year %}&year={{ current_year }}{% endif %}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Previous</a>
-    {% endif %}
-    <span class="px-4 py-2 text-sm text-gray-500">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-    {% if pagination.page < pagination.pages %}
-    <a href="?page={{ pagination.page + 1 }}{% if current_year %}&year={{ current_year }}{% endif %}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Next</a>
-    {% endif %}
-</div>
+{% set total_pages = pagination.total_pages if pagination.total_pages is defined else pagination.pages %}
+{% if total_pages > 1 %}
+{% set query_params = [] %}
+{% if current_year %}
+{% set _ = query_params.append("year=" ~ current_year) %}
+{% endif %}
+{% set base_url = "/hr/my/payslips" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": total_pages, "has_prev": pagination.page > 1, "has_next": pagination.page < total_pages, "prev_page": pagination.page - 1 if pagination.page > 1 else None, "next_page": pagination.page + 1 if pagination.page < total_pages else None, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url=base_url %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 {% endif %}

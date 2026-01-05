@@ -40,7 +40,7 @@
             {% elif action.color == 'blue' %}
             text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100
             {% else %}
-            text-gray-700 bg-white border border-gray-200 hover:bg-gray-50
+            text-gray-700 bg-white border border-gray-200 hover:bg-surface-50
             {% endif %}"
             hx-get="/subscriptions/payments/{{ subscription.id }}/action-modal?action={{ action.action }}"
             hx-target="#modal-container"
@@ -70,7 +70,7 @@
 
         <button
             type="button"
-            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
             hx-get="/subscriptions/payments/{{ subscription.id }}/link-modal"
             hx-target="#modal-container"
             hx-swap="innerHTML"

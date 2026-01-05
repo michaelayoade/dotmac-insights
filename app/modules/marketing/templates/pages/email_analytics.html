@@ -1,0 +1,66 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Email Analytics</h1>
+        <p class="mt-1 text-sm text-gray-500">Track engagement trends and deliverability</p>
+    </div>
+    <div class="flex gap-3">
+        <button class="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Last 30 days</button>
+        <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Export</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set metrics = metrics | default([]) %}
+
+<div class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        {% if metrics %}
+            {% for metric in metrics %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <p class="text-sm font-medium text-gray-500">{{ metric.label }}</p>
+                <p class="text-2xl font-bold text-gray-900 mt-2">{{ metric.value }}</p>
+                <p class="text-xs text-emerald-600 mt-2">{{ metric.delta }} vs last period</p>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 col-span-full text-sm text-gray-500">
+                No email analytics data yet.
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Engagement Trend</h2>
+                <span class="text-xs text-gray-500">Open + Click rate</span>
+            </div>
+            <div class="mt-6 h-64 rounded-2xl bg-surface-50 border border-dashed border-gray-200 flex items-center justify-center text-sm text-gray-500">
+                Chart placeholder
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Top Campaigns</h2>
+            {% set top_campaigns = top_campaigns | default([]) %}
+            {% if top_campaigns %}
+                <div class="mt-4 space-y-3">
+                    {% for campaign in top_campaigns %}
+                    <div class="rounded-xl border border-gray-100 p-3">
+                        <p class="text-sm font-medium text-gray-900">{{ campaign.name }}</p>
+                        <p class="text-xs text-gray-500">Open {{ campaign.open_rate }} · Click {{ campaign.click_rate }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="mt-4 text-sm text-gray-500">No top campaigns yet.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

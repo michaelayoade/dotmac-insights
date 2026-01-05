@@ -45,30 +45,30 @@ export class ContactsPage extends BasePage {
     super(page);
 
     // List page
-    this.contactsTable = page.locator('[data-testid="contacts-table"] table, #contacts-table');
-    this.searchInput = page.locator('[data-testid="contacts-search"], input[name="q"]');
-    this.typeFilter = page.locator('[data-testid="type-filter-button"], select[name="contact_type"]');
-    this.statusFilter = page.locator('[data-testid="status-filter-button"], select[name="status"]');
-    this.createButton = page.locator('[data-testid="new-contact-button"], a[href*="/new"], button:has-text("New Contact")');
-    this.bulkActions = page.locator('[data-testid="bulk-actions-bar"], .bulk-actions, [data-bulk-actions]');
+    this.contactsTable = page.locator('[data-testid="contacts-table"] table');
+    this.searchInput = page.locator('[data-testid="contacts-search"]');
+    this.typeFilter = page.locator('[data-testid="type-filter-button"]');
+    this.statusFilter = page.locator('[data-testid="status-filter-button"]');
+    this.createButton = page.locator('[data-testid="new-contact-button"]');
+    this.bulkActions = page.locator('[data-testid="bulk-actions-bar"]');
 
     // Form
-    this.contactForm = page.locator('[data-testid="contact-form"], form[action*="/crm/contacts"]');
+    this.contactForm = page.locator('[data-testid="contact-form"]');
     this.nameInput = page.locator('input[name="name"]');
     this.emailInput = page.locator('input[name="email"]');
     this.phoneInput = page.locator('input[name="phone"]');
     this.typeSelect = page.locator('select[name="contact_type"]');
     this.categorySelect = page.locator('select[name="category"]');
     this.companyInput = page.locator('input[name="company_name"]');
-    this.saveButton = page.locator('button[type="submit"]:has-text("Save"), button:has-text("Create")');
-    this.cancelButton = page.locator('a:has-text("Cancel"), button:has-text("Cancel")');
+    this.saveButton = page.locator('[data-testid="contact-submit-button"]');
+    this.cancelButton = page.locator('[data-testid="contact-cancel-button"]');
 
     // Detail page
-    this.contactHeader = page.locator('.contact-header, [data-testid="contact-header"]');
-    this.contactTabs = page.locator('.tabs, [role="tablist"]');
-    this.activityTimeline = page.locator('.activity-timeline, [data-testid="activity"]');
-    this.editButton = page.locator('a:has-text("Edit"), button:has-text("Edit")');
-    this.deleteButton = page.locator('button:has-text("Delete")');
+    this.contactHeader = page.locator('[data-testid="contact-header"]');
+    this.contactTabs = page.locator('[role="tablist"]');
+    this.activityTimeline = page.locator('[data-testid="activity"]');
+    this.editButton = page.locator('[data-testid="edit-contact-button"]');
+    this.deleteButton = page.locator('[data-testid="delete-contact-button"]');
   }
 
   // =========================================================================
@@ -98,8 +98,14 @@ export class ContactsPage extends BasePage {
     await this.waitForHtmxComplete();
   }
 
+  async clearSearch(): Promise<void> {
+    await this.searchInput.fill('');
+    await this.page.waitForTimeout(300);
+    await this.waitForHtmxComplete();
+  }
+
   async filterByType(type: 'lead' | 'prospect' | 'customer' | 'churned'): Promise<void> {
-    const select = this.page.locator('select[name="contact_type"]');
+    const select = this.typeFilter;
     if (await select.count() > 0) {
       await select.selectOption(type);
       await this.waitForHtmxComplete();
@@ -110,7 +116,7 @@ export class ContactsPage extends BasePage {
   }
 
   async filterByStatus(status: 'active' | 'inactive' | 'suspended'): Promise<void> {
-    const select = this.page.locator('select[name="status"]');
+    const select = this.statusFilter;
     if (await select.count() > 0) {
       await select.selectOption(status);
       await this.waitForHtmxComplete();
@@ -157,7 +163,9 @@ export class ContactsPage extends BasePage {
   }
 
   async getContactRowByName(name: string): Promise<Locator> {
-    return this.contactsTable.locator(`tbody tr:has-text("${name}")`);
+    return this.contactsTable.locator('tbody tr', {
+      has: this.contactsTable.locator('[data-testid="contact-name"]', { hasText: name }),
+    });
   }
 
   async hasContacts(): Promise<boolean> {
@@ -178,7 +186,7 @@ export class ContactsPage extends BasePage {
 
   async clickContact(name: string): Promise<void> {
     const row = await this.getContactRowByName(name);
-    const link = row.locator('a').first();
+    const link = row.locator('[data-testid="contact-name"]').first();
     await this.htmxClick(link);
   }
 
@@ -190,10 +198,10 @@ export class ContactsPage extends BasePage {
   }> {
     const row = await this.getTableRow(rowIndex, this.contactsTable);
     return {
-      name: await row.locator('td').nth(0).textContent() || '',
-      email: await row.locator('td').nth(1).textContent() || '',
-      phone: await row.locator('td').nth(2).textContent() || '',
-      type: await row.locator('td').nth(3).textContent() || '',
+      name: await row.locator('[data-testid="contact-name"]').textContent() || '',
+      email: await row.locator('[data-testid="contact-email"]').textContent() || '',
+      phone: await row.locator('[data-testid="contact-phone"]').textContent() || '',
+      type: await row.locator('[data-testid="contact-type"]').textContent() || '',
     };
   }
 
@@ -268,13 +276,20 @@ export class ContactsPage extends BasePage {
   }
 
   async selectAllContacts(): Promise<void> {
-    const selectAll = this.contactsTable.locator('thead input[type="checkbox"]');
+    const selectAll = this.contactsTable.locator('[data-testid="select-all-contacts"]');
     await selectAll.check();
   }
 
   async bulkDelete(): Promise<void> {
     const deleteBtn = this.bulkActions.locator('button:has-text("Delete")');
     await this.htmxClick(deleteBtn);
+    const modalDelete = this.page.locator('button:has-text("Delete All")');
+    if (await modalDelete.count() > 0) {
+      const navPromise = this.page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => null);
+      await modalDelete.click();
+      await navPromise;
+      return;
+    }
     await this.confirmDialog();
   }
 
@@ -300,7 +315,7 @@ export class ContactsPage extends BasePage {
   }
 
   async expectContactType(type: string): Promise<void> {
-    const badge = this.contactHeader.locator('.badge, [data-type]');
+    const badge = this.contactHeader.locator('[data-type]');
     await expect(badge).toContainText(type);
   }
 
@@ -319,7 +334,7 @@ export class ContactsPage extends BasePage {
   }
 
   async expectEmptyState(): Promise<void> {
-    const emptyState = this.page.locator('.empty-state, [data-testid="contacts-empty-state"], [data-testid="empty-state"]');
+    const emptyState = this.page.locator('[data-testid="contacts-empty-state"], [data-testid="empty-state"]');
     await expect(emptyState).toBeVisible();
   }
 

@@ -1,0 +1,207 @@
+{% if entries %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="activity-table">
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('timestamp')" x-cloak>Timestamp</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('user')" x-cloak>User</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('action')" x-cloak>Action</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('entity')" x-cloak>Entity</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('summary')" x-cloak>Summary</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell" x-show="isVisible('details')" x-cloak>Details</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for entry in entries %}
+            <tr class="hover:bg-surface-50 transition-colors" x-data="{ expanded: false }">
+                <td class="whitespace-nowrap py-4 pl-6 pr-3 text-sm text-gray-600" x-show="isVisible('timestamp')" x-cloak>
+                    {{ entry.created_at | format_datetime }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('user')" x-cloak>
+                    <span class="text-sm font-medium text-gray-900">{{ entry.user_email or "System" }}</span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4" x-show="isVisible('action')" x-cloak>
+                    {% set action_styles = {
+                        'login': 'bg-emerald-50 text-emerald-700',
+                        'logout': 'bg-gray-50 text-gray-700',
+                        'session.revoke': 'bg-amber-50 text-amber-700',
+                        'session.revoke_all': 'bg-amber-50 text-amber-700',
+                        'rbac.user.create': 'bg-emerald-50 text-emerald-700',
+                        'rbac.user.update': 'bg-blue-50 text-blue-700',
+                        'rbac.role.create': 'bg-emerald-50 text-emerald-700',
+                        'rbac.role.update': 'bg-blue-50 text-blue-700',
+                        'rbac.role.delete': 'bg-red-50 text-red-700',
+                        'rbac.group.create': 'bg-emerald-50 text-emerald-700',
+                        'rbac.group.update': 'bg-blue-50 text-blue-700',
+                        'rbac.group.delete': 'bg-red-50 text-red-700',
+                        'rbac.group.member.add': 'bg-indigo-50 text-indigo-700',
+                        'rbac.group.member.remove': 'bg-amber-50 text-amber-700',
+                        'rbac.permission.assign': 'bg-indigo-50 text-indigo-700',
+                        'rbac.permission.revoke': 'bg-amber-50 text-amber-700',
+                        'settings.create': 'bg-emerald-50 text-emerald-700',
+                        'settings.update': 'bg-blue-50 text-blue-700',
+                        'settings.delete': 'bg-red-50 text-red-700',
+                        'settings.test': 'bg-amber-50 text-amber-700',
+                        'approval.submit': 'bg-indigo-50 text-indigo-700',
+                        'approval.approve': 'bg-green-50 text-green-700',
+                        'approval.reject': 'bg-red-50 text-red-700',
+                        'approval.post': 'bg-sky-50 text-sky-700',
+                        'approval.cancel': 'bg-gray-50 text-gray-700',
+                        'finance.invoice.create': 'bg-emerald-50 text-emerald-700',
+                        'finance.invoice.update': 'bg-blue-50 text-blue-700',
+                        'finance.invoice.delete': 'bg-red-50 text-red-700',
+                        'finance.invoice.submit': 'bg-indigo-50 text-indigo-700',
+                        'finance.invoice.post': 'bg-sky-50 text-sky-700',
+                        'finance.invoice.cancel': 'bg-gray-50 text-gray-700',
+                        'finance.payment.create': 'bg-emerald-50 text-emerald-700',
+                        'finance.payment.update': 'bg-blue-50 text-blue-700',
+                        'finance.payment.delete': 'bg-red-50 text-red-700',
+                        'finance.payment.approve': 'bg-green-50 text-green-700',
+                        'finance.payment.post': 'bg-sky-50 text-sky-700',
+                        'finance.payment.allocate': 'bg-indigo-50 text-indigo-700',
+                        'finance.supplier_payment.create': 'bg-emerald-50 text-emerald-700',
+                        'finance.supplier_payment.update': 'bg-blue-50 text-blue-700',
+                        'finance.supplier_payment.delete': 'bg-red-50 text-red-700',
+                        'finance.supplier_payment.allocate': 'bg-indigo-50 text-indigo-700',
+                        'finance.supplier_payment.approve': 'bg-green-50 text-green-700',
+                        'finance.supplier_payment.reject': 'bg-red-50 text-red-700',
+                        'finance.supplier_payment.post': 'bg-sky-50 text-sky-700',
+                        'finance.journal_entry.create': 'bg-emerald-50 text-emerald-700',
+                        'finance.journal_entry.update': 'bg-blue-50 text-blue-700',
+                        'finance.journal_entry.delete': 'bg-red-50 text-red-700',
+                        'finance.journal_entry.post': 'bg-sky-50 text-sky-700',
+                        'finance.bank_reconciliation.start': 'bg-indigo-50 text-indigo-700',
+                        'finance.bank_reconciliation.match': 'bg-blue-50 text-blue-700',
+                        'finance.bank_reconciliation.auto_match': 'bg-sky-50 text-sky-700',
+                        'finance.bank_reconciliation.complete': 'bg-green-50 text-green-700',
+                        'finance.bank_reconciliation.import': 'bg-amber-50 text-amber-700',
+                        'finance.expense_claim.create': 'bg-emerald-50 text-emerald-700',
+                        'finance.expense_claim.submit': 'bg-indigo-50 text-indigo-700',
+                        'finance.expense_claim.approve': 'bg-green-50 text-green-700',
+                        'finance.expense_claim.reject': 'bg-red-50 text-red-700',
+                        'finance.expense_claim.return': 'bg-amber-50 text-amber-700',
+                        'finance.expense_claim.recall': 'bg-gray-50 text-gray-700',
+                        'crm.party.create': 'bg-emerald-50 text-emerald-700',
+                        'crm.party.update': 'bg-blue-50 text-blue-700',
+                        'crm.party.delete': 'bg-red-50 text-red-700',
+                        'support.ticket.create': 'bg-emerald-50 text-emerald-700',
+                        'support.ticket.update': 'bg-blue-50 text-blue-700',
+                        'support.ticket.delete': 'bg-red-50 text-red-700',
+                        'support.message.inbound': 'bg-sky-50 text-sky-700',
+                        'support.message.outbound': 'bg-indigo-50 text-indigo-700',
+                        'support.message.note': 'bg-gray-50 text-gray-700',
+                        'subscriptions.create': 'bg-emerald-50 text-emerald-700',
+                        'subscriptions.update': 'bg-blue-50 text-blue-700',
+                        'subscriptions.delete': 'bg-red-50 text-red-700',
+                        'subscriptions.status.change': 'bg-indigo-50 text-indigo-700',
+                        'subscriptions.provisioning.configure': 'bg-sky-50 text-sky-700',
+                        'subscriptions.provisioning.mark': 'bg-amber-50 text-amber-700',
+                        'subscriptions.plan.upgrade': 'bg-green-50 text-green-700',
+                        'subscriptions.plan.downgrade': 'bg-amber-50 text-amber-700',
+                        'inventory.stock_entry.create': 'bg-emerald-50 text-emerald-700',
+                        'inventory.stock_entry.update': 'bg-blue-50 text-blue-700',
+                        'inventory.stock_entry.submit': 'bg-indigo-50 text-indigo-700',
+                        'inventory.stock_entry.cancel': 'bg-amber-50 text-amber-700',
+                        'inventory.stock_entry.delete': 'bg-red-50 text-red-700',
+                        'hr.employee.create': 'bg-emerald-50 text-emerald-700',
+                        'hr.employee.update': 'bg-blue-50 text-blue-700',
+                        'hr.employee.delete': 'bg-red-50 text-red-700',
+                        'hr.employee.status.activate': 'bg-green-50 text-green-700',
+                        'hr.employee.status.deactivate': 'bg-amber-50 text-amber-700',
+                        'hr.employee.status.terminate': 'bg-red-50 text-red-700',
+                        'hr.payroll.entry.create': 'bg-emerald-50 text-emerald-700',
+                        'hr.payroll.entry.update': 'bg-blue-50 text-blue-700',
+                        'hr.payroll.entry.delete': 'bg-red-50 text-red-700',
+                        'hr.payroll.slips.generate': 'bg-indigo-50 text-indigo-700',
+                        'hr.payroll.slips.submit': 'bg-green-50 text-green-700',
+                        'projects.project.create': 'bg-emerald-50 text-emerald-700',
+                        'projects.project.update': 'bg-blue-50 text-blue-700',
+                        'projects.project.delete': 'bg-red-50 text-red-700',
+                        'projects.task.create': 'bg-emerald-50 text-emerald-700',
+                        'projects.task.update': 'bg-blue-50 text-blue-700',
+                        'projects.task.delete': 'bg-red-50 text-red-700',
+                        'ops.import.csv': 'bg-indigo-50 text-indigo-700',
+                        'ops.import.rows': 'bg-indigo-50 text-indigo-700',
+                        'ops.data_cleanup.bulk_update': 'bg-amber-50 text-amber-700',
+                        'ops.data_cleanup.normalize_phones': 'bg-amber-50 text-amber-700',
+                        'ops.data_cleanup.normalize_emails': 'bg-amber-50 text-amber-700',
+                        'ops.data_cleanup.merge_duplicates': 'bg-amber-50 text-amber-700',
+                        'ops.data_cleanup.link_orphans': 'bg-amber-50 text-amber-700'
+                    } %}
+                    <span class="inline-flex items-center rounded-lg px-2 py-0.5 text-xs font-medium {{ action_styles.get(entry.action, 'bg-gray-50 text-gray-700') }}">
+                        {{ entry.action | replace('.', ' ') | title }}
+                    </span>
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-600" x-show="isVisible('entity')" x-cloak>
+                    {% if entry.entity_type %}
+                    <span class="font-medium text-gray-900">{{ entry.entity_type | title }}</span>
+                    {% if entry.entity_id %}
+                    <span class="text-gray-400">:</span>
+                    <span class="text-gray-600">{{ entry.entity_id }}</span>
+                    {% endif %}
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600 hidden lg:table-cell" x-show="isVisible('summary')" x-cloak>
+                    {{ entry.summary or "-" }}
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-500 hidden lg:table-cell" x-show="isVisible('details')" x-cloak>
+                    <button
+                        type="button"
+                        class="text-primary-600 hover:text-primary-500 text-xs font-medium"
+                        @click="expanded = !expanded"
+                    >
+                        <span x-show="!expanded">View</span>
+                        <span x-show="expanded" x-cloak>Hide</span>
+                    </button>
+                </td>
+            </tr>
+            <tr x-show="expanded" x-cloak class="bg-surface-50">
+                <td colspan="6" class="px-6 py-4">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">Metadata</h5>
+                            {% if entry.metadata %}
+                            <pre class="p-3 bg-white rounded-lg overflow-auto text-gray-600 max-h-48">{{ entry.metadata | tojson | e }}</pre>
+                            {% else %}
+                            <div class="text-gray-500">No additional metadata.</div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-gray-700 mb-2">Request</h5>
+                            <div class="text-gray-500">IP: {{ entry.ip_address or 'Unknown' }}</div>
+                            <div class="text-gray-500">Request ID: {{ entry.request_id or 'Unknown' }}</div>
+                            <div class="text-gray-500">User Agent: {{ entry.user_agent or 'Unknown' }}</div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% include "components/ui/pagination.html" with context %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="activity-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6l4 2"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No activity yet</h3>
+    <p class="text-sm text-gray-500 font-body">
+        {% if search_query or current_action or current_entity_type %}
+        No entries match your filters.
+        {% else %}
+        User activity will appear here as actions occur.
+        {% endif %}
+    </p>
+</div>
+{% endif %}

@@ -72,9 +72,14 @@ __all__ = [
     "TeamUpdate",
     "AgentWorkload",
     "TeamWorkload",
+    "AgentDetailStats",
+    "AgentDetailResult",
     # Canned response types
     "CannedResponseCreate",
     "CannedResponseUpdate",
+    "CannedResponseFilters",
+    "CannedResponseStats",
+    "CannedListResult",
     # Knowledge base types
     "KBCategoryCreate",
     "KBCategoryUpdate",
@@ -758,6 +763,32 @@ class TeamWorkload:
     avg_utilization_pct: float = 0.0
 
 
+@dataclass
+class AgentDetailStats:
+    """Statistics for agent detail page."""
+
+    open_tickets: int = 0
+    resolved_today: int = 0
+    team_count: int = 0
+    avg_resolution_hours: Optional[float] = None
+    csat_score: Optional[float] = None
+
+
+@dataclass
+class AgentDetailResult:
+    """Combined result for agent detail page.
+
+    After Agent → Party unification, 'agent' is now a Party instance
+    with PartyRole(role="support_agent").
+    """
+
+    agent: Any  # Party model (with support_agent role)
+    employee: Optional[Any] = None  # Employee model if linked via party_id
+    stats: AgentDetailStats = field(default_factory=AgentDetailStats)
+    team_memberships: List[Any] = field(default_factory=list)  # List of TeamMember
+    recent_tickets: List[Any] = field(default_factory=list)  # List of UnifiedTicket
+
+
 # ==============================================================================
 # Canned Response Types
 # ==============================================================================
@@ -787,6 +818,36 @@ class CannedResponseUpdate:
     team_id: Optional[int] = None
     category: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+@dataclass
+class CannedResponseFilters:
+    """Filters for canned response list queries."""
+
+    search: Optional[str] = None
+    scope: Optional[str] = None  # personal, team, global
+    team_id: Optional[int] = None
+    category: Optional[str] = None
+    active_only: bool = True
+
+
+@dataclass
+class CannedResponseStats:
+    """Statistics for canned responses."""
+
+    total: int = 0
+    personal_count: int = 0
+    team_count: int = 0
+    global_count: int = 0
+
+
+@dataclass
+class CannedListResult:
+    """Combined result for canned response list page."""
+
+    items: List[Any]  # List of CannedResponse
+    total: int
+    stats: CannedResponseStats
 
 
 # ==============================================================================
@@ -826,7 +887,7 @@ class KBArticleCreate:
 
     title: str
     content: str
-    category_id: int
+    category_id: Optional[int] = None
     slug: Optional[str] = None
     excerpt: Optional[str] = None
     visibility: str = "public"
@@ -869,6 +930,45 @@ class KBHelpfulnessStats:
     not_helpful_count: int = 0
     total_count: int = 0
     helpful_pct: float = 0.0
+
+
+@dataclass
+class KBArticleFilters:
+    """Filters for listing KB articles."""
+
+    search: Optional[str] = None
+    status: Optional[str] = None  # draft, published, archived
+    category_id: Optional[int] = None
+    visibility: Optional[str] = None  # public, internal, restricted
+
+
+@dataclass
+class KBArticleStats:
+    """Aggregate statistics for KB articles."""
+
+    published_count: int = 0
+    draft_count: int = 0
+    archived_count: int = 0
+    total_views: int = 0
+
+
+@dataclass
+class KBCategoryWithCount:
+    """Category with article count."""
+
+    category: Any  # KBCategory
+    article_count: int = 0
+
+
+@dataclass
+class KBListResult:
+    """Result of listing KB articles with stats."""
+
+    items: List[Any]  # List[KBArticle]
+    total: int
+    stats: KBArticleStats
+    categories: List[Any] = field(default_factory=list)  # List[KBCategory]
+    category_counts: Dict[int, int] = field(default_factory=dict)
 
 
 # ==============================================================================

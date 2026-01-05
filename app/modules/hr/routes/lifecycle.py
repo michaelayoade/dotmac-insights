@@ -7,8 +7,6 @@ Permission Requirements:
 
 Uses LifecycleService for all business logic.
 """
-from __future__ import annotations
-
 from typing import Optional
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends

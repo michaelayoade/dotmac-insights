@@ -292,6 +292,13 @@ class RecruitmentService:
 
         return paginate(self.db, query, pagination)
 
+    def get_applicants_by_ids(self, applicant_ids: List[int]) -> List[JobApplicant]:
+        """Get applicants by a list of IDs."""
+        if not applicant_ids:
+            return []
+        query = select(JobApplicant).where(JobApplicant.id.in_(applicant_ids))
+        return list(self.db.scalars(query).all())
+
     def get_applicant(self, applicant_id: int) -> JobApplicant:
         """Get a job applicant by ID."""
         applicant = self.db.get(JobApplicant, applicant_id)

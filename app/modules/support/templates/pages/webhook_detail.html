@@ -8,12 +8,12 @@
             <p class="mt-1 text-sm text-gray-500">{{ channel.name if channel else 'Unknown Channel' }} • {{ channel.type | title if channel else '' }}</p>
         </div>
         <div class="flex gap-2">
-            <a href="/support/webhooks" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+            <a href="/support/webhooks" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
                 Back to Webhooks
             </a>
             {% if event.error and not event.processed %}
             <form action="/support/webhooks/{{ event.id }}/retry" method="post">
-                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 font-medium ring-1 ring-amber-200">
                     Retry
                 </button>

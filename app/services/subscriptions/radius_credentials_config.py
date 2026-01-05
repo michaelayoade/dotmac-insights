@@ -3,24 +3,21 @@
 Module-specific settings for RADIUS credential generation.
 Settings are stored in the database via SettingGroup model.
 """
-from __future__ import annotations
-
 import json
 import logging
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
+from app.services.errors import ValidationError
+
 from .radius_credentials_types import (
     RADIUSCredentialConfig,
     RADIUS_CREDENTIAL_CONFIG_SCHEMA,
 )
-
-if TYPE_CHECKING:
-    from app.auth import Principal
 
 __all__ = [
     "RADIUSCredentialConfigService",
@@ -246,8 +243,8 @@ class RADIUSCredentialConfigService:
                 data = json.loads(setting.data) if isinstance(setting.data, str) else setting.data
                 return RADIUSCredentialConfig.from_dict(data)
 
-        except Exception as e:
-            logger.warning(
+        except (json.JSONDecodeError, ValidationError, TypeError, ValueError) as e:
+            logger.exception(
                 "Failed to load RADIUS credential config, using defaults: %s",
                 str(e),
             )
@@ -257,14 +254,18 @@ class RADIUSCredentialConfigService:
 
     def _save_to_db(self, data: Dict[str, Any]) -> None:
         """Save configuration to database."""
+        from datetime import datetime, timezone
+        from sqlalchemy import func
         from app.models.settings import SettingGroup
 
         data_json = json.dumps(data)
+        now = datetime.now(timezone.utc)
 
         stmt = insert(SettingGroup).values(
             group=SETTINGS_GROUP,
             data=data_json,
             schema_version=RADIUS_CREDENTIAL_CONFIG_SCHEMA["version"],
+            updated_at=now,
         )
 
         stmt = stmt.on_conflict_do_update(
@@ -272,7 +273,7 @@ class RADIUSCredentialConfigService:
             set_={
                 "data": data_json,
                 "schema_version": RADIUS_CREDENTIAL_CONFIG_SCHEMA["version"],
-                "updated_at": stmt.excluded.updated_at,
+                "updated_at": func.now(),
             },
         )
 

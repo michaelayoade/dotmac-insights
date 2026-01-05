@@ -1,0 +1,136 @@
+{% if accounts %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="accounts-table">
+    <table class="min-w-full divide-y divide-gray-100" id="accounts-table">
+        <thead>
+            <tr class="bg-surface-50">
+                <th scope="col" class="w-12 py-3.5 pl-6 pr-2">
+                    <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        @change="toggleAll($el.checked, '[data-bulk-id]')"
+                        :checked="allSelected"
+                        data-testid="select-all-accounts"
+                        aria-label="Select all accounts"
+                    >
+                </th>
+                <th class="py-3.5 pl-2 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Name</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Email</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Phone</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Type</th>
+                <th class="px-3 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Status</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            {% for account in accounts %}
+            <tr class="hover:bg-surface-50 transition-colors" data-bulk-id="{{ account.id }}">
+                <td class="py-4 pl-6 pr-2">
+                    <input
+                        type="checkbox"
+                        class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        value="{{ account.id }}"
+                        @change="toggle({{ account.id }})"
+                        :checked="selected.includes({{ account.id }})"
+                        data-testid="select-account-{{ account.id }}"
+                        aria-label="Select {{ account.name }}"
+                    >
+                </td>
+                <td class="py-4 pl-2 pr-3">
+                    <a
+                        href="/crm/accounts/{{ account.id }}"
+                        class="group flex items-center gap-3"
+                        data-testid="account-row-{{ account.id }}"
+                    >
+                        <div class="h-10 w-10 flex-shrink-0 rounded-xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                            </svg>
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
+                                {{ account.name or account.legal_name or 'Unnamed' }}
+                            </p>
+                            {% if account.trading_name and account.trading_name != account.name %}
+                            <p class="text-xs text-gray-500 truncate">{{ account.trading_name }}</p>
+                            {% endif %}
+                        </div>
+                    </a>
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600 font-body">
+                    {% if account.primary_email %}
+                    <a href="mailto:{{ account.primary_email }}" class="hover:text-primary-600 transition-colors">
+                        {{ account.primary_email }}
+                    </a>
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+                <td class="px-3 py-4 text-sm text-gray-600 font-body">
+                    {% if account.primary_phone %}
+                    <a href="tel:{{ account.primary_phone }}" class="hover:text-primary-600 transition-colors">
+                        {{ account.primary_phone }}
+                    </a>
+                    {% else %}
+                    <span class="text-gray-400">-</span>
+                    {% endif %}
+                </td>
+                <td class="px-3 py-4">
+                    {% if account.account_type %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+                        {{ account.account_type | title }}
+                    </span>
+                    {% else %}
+                    <span class="text-gray-400 text-sm">-</span>
+                    {% endif %}
+                </td>
+                <td class="px-3 py-4">
+                    {% set status_colors = {
+                        'active': 'bg-emerald-50 text-emerald-700',
+                        'inactive': 'bg-gray-100 text-gray-600',
+                        'blocked': 'bg-red-50 text-red-700'
+                    } %}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ status_colors.get(account.status, 'bg-gray-100 text-gray-600') }}">
+                        {{ account.status | title }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.total > pagination.per_page %}
+<div class="mt-6">
+    {% with pagination=pagination, base_url="/crm/accounts", htmx_target="#accounts-table-container" %}
+    {% include "components/ui/pagination.html" %}
+    {% endwith %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="accounts-empty-state">
+    <div class="mx-auto w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
+        <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+        </svg>
+    </div>
+    <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No accounts found</h3>
+    <p class="text-sm text-gray-500 font-body mb-6 max-w-sm mx-auto">
+        {% if search_query or current_type or current_status %}
+        No accounts match your current filters. Try adjusting your search or filters.
+        {% else %}
+        Get started by creating your first account.
+        {% endif %}
+    </p>
+    {% if not (search_query or current_type or current_status) %}
+    <a
+        href="/crm/accounts/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Create Account
+    </a>
+    {% endif %}
+</div>
+{% endif %}

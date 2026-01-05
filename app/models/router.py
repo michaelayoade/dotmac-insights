@@ -8,6 +8,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.pop import Pop
+    from app.models.asset import Asset
 
 
 class Router(Base):
@@ -62,6 +63,13 @@ class Router(Base):
     # Status
     status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
 
+    # Asset Management Integration
+    asset_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Metadata
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -69,6 +77,11 @@ class Router(Base):
 
     # Relationships
     pop: Mapped[Optional[Pop]] = relationship(backref="routers")
+    asset: Mapped[Optional["Asset"]] = relationship(
+        "Asset",
+        foreign_keys=[asset_id],
+        back_populates="network_device",
+    )
 
     def __repr__(self) -> str:
         return f"<Router {self.title} ({self.ip}) NAS:{self.nas_type}>"

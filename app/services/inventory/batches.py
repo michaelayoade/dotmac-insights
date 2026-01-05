@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.models.inventory import Batch, StockLedgerEntry
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import BatchFilters, BatchCreateData
 
@@ -109,7 +110,12 @@ class BatchService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_batch(self, batch_id: int) -> Batch:
         """Get a batch by ID.
@@ -265,6 +271,7 @@ class BatchService:
 
         self.db.add(batch)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(batch)
         return batch
 
     def update_batch(
@@ -299,6 +306,7 @@ class BatchService:
 
         batch.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(batch)
         return batch
 
     def disable_batch(self, batch_id: int) -> Batch:
@@ -317,6 +325,7 @@ class BatchService:
         batch.disabled = True
         batch.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(batch)
         return batch
 
     def enable_batch(self, batch_id: int) -> Batch:
@@ -335,4 +344,5 @@ class BatchService:
         batch.disabled = False
         batch.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(batch)
         return batch

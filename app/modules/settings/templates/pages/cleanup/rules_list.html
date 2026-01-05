@@ -8,7 +8,7 @@
     </div>
     <div class="flex items-center gap-3">
         <a href="/settings/data-cleanup"
-           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 transition-colors">
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
@@ -44,7 +44,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for rule in rules %}
-                <tr class="hover:bg-gray-50 transition-colors">
+                <tr class="hover:bg-surface-50 transition-colors">
                     <td class="px-6 py-4">
                         <div class="text-sm font-medium text-gray-900">{{ rule.name }}</div>
                         {% if rule.description %}
@@ -95,19 +95,9 @@
 
     <!-- Pagination -->
     {% if pagination.total_pages > 1 %}
-    <div class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-        <div class="text-sm text-gray-500">
-            Showing {{ pagination.start }} to {{ pagination.end }} of {{ pagination.total }} rules
-        </div>
-        <nav class="flex items-center gap-1">
-            {% if pagination.has_prev %}
-            <a href="?page={{ pagination.page - 1 }}" class="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Previous</a>
-            {% endif %}
-            {% if pagination.has_next %}
-            <a href="?page={{ pagination.page + 1 }}" class="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Next</a>
-            {% endif %}
-        </nav>
-    </div>
+    {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": pagination.total_pages, "has_prev": pagination.has_prev, "has_next": pagination.has_next, "prev_page": pagination.prev_page, "next_page": pagination.next_page, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url="/settings/data-cleanup/rules" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
     {% endif %}
     {% else %}
     <div class="px-6 py-16 text-center">

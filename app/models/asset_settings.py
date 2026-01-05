@@ -10,6 +10,7 @@ from sqlalchemy import String, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 
 class DepreciationMethod(str, Enum):
@@ -27,7 +28,7 @@ class DepreciationPostingDate(str, Enum):
     SCHEDULE_DATE = "schedule_date"
 
 
-class AssetSettings(Base):
+class AssetSettings(SoftValidationMixin, Base):
     """Global asset management settings.
 
     Stores default configurations for depreciation, CWIP accounting,
@@ -35,6 +36,7 @@ class AssetSettings(Base):
     """
 
     __tablename__ = "asset_settings"
+    __soft_validation_scope__ = "assets"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)

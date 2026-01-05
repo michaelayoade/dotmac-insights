@@ -20,6 +20,17 @@ class BoardingStatus(enum.Enum):
     COMPLETED = "completed"
 
 
+class SeparationType(enum.Enum):
+    """Type of employee separation."""
+    RESIGNATION = "resignation"
+    TERMINATION = "termination"
+    RETIREMENT = "retirement"
+    REDUNDANCY = "redundancy"
+    CONTRACT_END = "contract_end"
+    DEATH = "death"
+    OTHER = "other"
+
+
 # ============= EMPLOYEE ONBOARDING =============
 class EmployeeOnboarding(Base):
     """Employee Onboarding - onboarding process tracking."""
@@ -122,6 +133,9 @@ class EmployeeSeparation(Base):
     employee_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Separation details
+    separation_type: Mapped[Optional[SeparationType]] = mapped_column(
+        Enum(SeparationType), nullable=True, index=True
+    )
     resignation_letter_date: Mapped[Optional[date]] = mapped_column(nullable=True)
     separation_date: Mapped[Optional[date]] = mapped_column(nullable=True, index=True)
     boarding_status: Mapped[BoardingStatus] = mapped_column(

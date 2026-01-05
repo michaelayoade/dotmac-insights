@@ -23,6 +23,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Back Office",
     order=24,
     scopes=["purchasing:read"],
+    enabled=False,
     prefixes=["/purchasing"],
 )
 

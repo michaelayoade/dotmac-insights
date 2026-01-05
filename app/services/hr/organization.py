@@ -35,6 +35,7 @@ from .organization_types import (
     DepartmentUpdateData,
     DesignationCreateData,
     DesignationFilters,
+    DesignationHeadcount,
     DesignationUpdateData,
     HDTeamCreateData,
     HDTeamFilters,
@@ -322,6 +323,39 @@ class OrganizationService:
         return DepartmentHeadcount(
             department_id=department_id,
             department_name=department.department_name,
+            total_employees=total,
+            active_employees=status_counts.get(EmploymentStatus.ACTIVE, 0),
+            on_leave=status_counts.get(EmploymentStatus.ON_LEAVE, 0),
+            terminated=status_counts.get(EmploymentStatus.TERMINATED, 0),
+        )
+
+    def get_designation_headcount(self, designation_id: int) -> DesignationHeadcount:
+        """Get employee headcount for a designation.
+
+        Args:
+            designation_id: The designation ID.
+
+        Returns:
+            DesignationHeadcount with employee counts.
+
+        Raises:
+            DesignationNotFoundError: If designation not found.
+        """
+        designation = self.get_designation(designation_id)
+
+        stmt = (
+            select(Employee.status, func.count(Employee.id))
+            .where(Employee.designation_id == designation_id, Employee.is_deleted == False)
+            .group_by(Employee.status)
+        )
+        counts = self.db.execute(stmt).all()
+
+        status_counts = {status: count for status, count in counts}
+        total = sum(status_counts.values())
+
+        return DesignationHeadcount(
+            designation_id=designation_id,
+            designation_name=designation.designation_name,
             total_employees=total,
             active_employees=status_counts.get(EmploymentStatus.ACTIVE, 0),
             on_leave=status_counts.get(EmploymentStatus.ON_LEAVE, 0),

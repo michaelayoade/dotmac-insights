@@ -2,7 +2,7 @@
 
 {% if tariffs %}
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="tariffs-table">
-    <table class="min-w-full divide-y divide-gray-100">
+    <table class="min-w-full divide-y divide-gray-100" data-testid="tariffs-table-grid">
         <thead>
             <tr class="bg-surface-50">
                 <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">
@@ -82,7 +82,7 @@
                             </span>
                         </div>
                         <div class="min-w-0">
-                            <a href="/subscriptions/tariffs/{{ tariff.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block">
+                            <a href="/subscriptions/tariffs/{{ tariff.id }}" class="text-sm font-semibold text-gray-900 hover:text-primary-600 transition-colors truncate block" data-testid="tariff-name">
                                 {{ tariff.title }}
                             </a>
                             {% if tariff.service_name %}
@@ -106,7 +106,7 @@
 
                 <!-- Price -->
                 <td class="px-3 py-4">
-                    <p class="text-sm font-semibold text-gray-900 font-display tabular-nums">
+                    <p class="text-sm font-semibold text-gray-900 font-display tabular-nums" data-testid="tariff-price">
                         {{ tariff.currency }} {{ "{:,.0f}".format(tariff.price) }}
                     </p>
                 </td>
@@ -147,7 +147,7 @@
                     <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <a
                             href="/subscriptions/tariffs/{{ tariff.id }}"
-                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all"
+                            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all"
                         >
                             View
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,7 +171,7 @@
 
 {% else %}
 <!-- Empty state -->
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="tariffs-empty-state">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center empty-state data-testid="tariffs-empty-state"> data-testid="empty-state" data-empty-type="tariffs">
     <div class="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center mb-6 ring-2 ring-blue-200/50">
         <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>

@@ -1,0 +1,95 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto"
+     hx-get="/network/noc/partials/stats"
+     hx-trigger="every {{ refresh_interval }}s"
+     hx-swap="none">
+
+    {# Page Header #}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
+        <div class="relative">
+            <div class="absolute -left-4 top-1 bottom-1 w-1 bg-gradient-to-b from-red-500 to-orange-500 rounded-full"></div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-display">NOC Dashboard</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Network Operations Center - Real-time monitoring</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="text-xs text-gray-500">Auto-refresh: {{ refresh_interval }}s</span>
+            <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Live"></div>
+        </div>
+    </div>
+
+    {# Stats Cards #}
+    <div id="noc-stats" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8" data-testid="stats-grid">
+        {% include "network/noc/partials/stats_cards.html" %}
+    </div>
+
+    {# Main Content Grid #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        {# Device Status Grid (2 cols) #}
+        <div class="lg:col-span-2 space-y-6">
+            {# Device Grid #}
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-warm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-gray-900">Device Status</h2>
+                    <a href="/network/noc/devices" class="text-sm text-primary-600 hover:text-primary-700">View All</a>
+                </div>
+                <div id="device-grid"
+                     class="p-4"
+                     hx-get="/network/noc/partials/device-grid"
+                     hx-trigger="every {{ refresh_interval }}s"
+                     hx-swap="innerHTML">
+                    {% include "network/noc/partials/device_grid.html" %}
+                </div>
+            </div>
+
+            {# Active Incidents #}
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-warm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-gray-900">Active Incidents</h2>
+                    <a href="/network/noc/incidents" class="text-sm text-primary-600 hover:text-primary-700">View All</a>
+                </div>
+                <div id="incidents-list"
+                     hx-get="/network/noc/partials/incidents-list"
+                     hx-trigger="every {{ refresh_interval }}s"
+                     hx-swap="innerHTML">
+                    {% include "network/noc/partials/incidents_list.html" %}
+                </div>
+            </div>
+        </div>
+
+        {# Sidebar (1 col) #}
+        <div class="space-y-6">
+            {# Active Alerts #}
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-warm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-gray-900">Active Alerts</h2>
+                    <a href="/network/noc/alerts" class="text-sm text-primary-600 hover:text-primary-700">View All</a>
+                </div>
+                <div id="alerts-list"
+                     class="max-h-96 overflow-y-auto"
+                     hx-get="/network/noc/partials/alerts-list"
+                     hx-trigger="every {{ refresh_interval }}s"
+                     hx-swap="innerHTML">
+                    {% include "network/noc/partials/alerts_list.html" %}
+                </div>
+            </div>
+
+            {# Top Interfaces #}
+            <div class="bg-white rounded-2xl border border-gray-100 shadow-warm overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-gray-900">Top Interfaces</h2>
+                    <a href="/network/traffic" class="text-sm text-primary-600 hover:text-primary-700">Traffic</a>
+                </div>
+                <div id="top-interfaces"
+                     hx-get="/network/noc/partials/top-interfaces"
+                     hx-trigger="every {{ refresh_interval }}s"
+                     hx-swap="innerHTML">
+                    {% include "network/noc/partials/top_interfaces.html" %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

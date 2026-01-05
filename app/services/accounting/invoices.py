@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional, Tuple
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.document_lines import InvoiceLine
 from app.models.invoice import Invoice, InvoiceSource, InvoiceStatus
@@ -26,6 +26,8 @@ from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
 
 from .invoice_types import InvoiceCreateData, InvoiceFilters, InvoiceUpdateData
+from app.services.validation.soft_validation_service import SoftValidationService
+from app.services.activity_logger import ActivityLogger
 
 if TYPE_CHECKING:
     from app.auth import Principal
@@ -85,7 +87,11 @@ class InvoiceService:
         if pagination is None:
             pagination = PaginationParams()
 
-        query = self.db.query(Invoice).filter(Invoice.is_deleted == False)
+        query = (
+            self.db.query(Invoice)
+            .options(joinedload(Invoice.customer_account).joinedload(CustomerAccount.party))
+            .filter(Invoice.is_deleted == False)
+        )
         query = scoped_query(query, self.principal)
 
         # Apply simple equality filters
@@ -94,6 +100,9 @@ class InvoiceService:
             "status": filters.status,
         }
         query = safe_filter(query, Invoice, filter_dict, ALLOWED_FILTERS)
+
+        if filters.status_in:
+            query = query.filter(Invoice.status.in_(filters.status_in))
 
         # Date range filters
         if filters.start_date:
@@ -138,6 +147,7 @@ class InvoiceService:
         """
         invoice = (
             self.db.query(Invoice)
+            .options(joinedload(Invoice.customer_account).joinedload(CustomerAccount.party))
             .filter(Invoice.id == invoice_id, Invoice.is_deleted == False)
             .first()
         )
@@ -211,6 +221,7 @@ class InvoiceService:
         # Create lines and calculate totals
         total_amount = Decimal("0")
         total_tax = Decimal("0")
+        created_lines = []
 
         for idx, line_data in enumerate(data.lines):
             line = InvoiceLine(
@@ -229,6 +240,7 @@ class InvoiceService:
                 idx=idx,
             )
             self.db.add(line)
+            created_lines.append(line)
             total_amount += line_data.amount
             total_tax += line_data.tax_amount
 
@@ -242,6 +254,21 @@ class InvoiceService:
         invoice.base_tax_amount = invoice.tax_amount * invoice.conversion_rate
         invoice.base_total_amount = invoice.total_amount * invoice.conversion_rate
 
+        validator = SoftValidationService(self.db)
+        for line in created_lines:
+            validator.validate_and_store(line)
+        validator.validate_and_store(invoice)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.invoice.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="invoice",
+            entity_id=str(invoice.id),
+            summary=f"Created invoice {invoice.invoice_number or invoice.id}",
+            metadata={"customer_account_id": invoice.customer_account_id, "total_amount": float(invoice.total_amount)},
+        )
         return invoice
 
     def update_invoice(self, invoice_id: int, data: InvoiceUpdateData) -> Invoice:
@@ -304,6 +331,18 @@ class InvoiceService:
 
         invoice.updated_by_id = self.principal.id if self.principal else None
 
+        SoftValidationService(self.db).validate_and_store(invoice)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.invoice.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="invoice",
+            entity_id=str(invoice.id),
+            summary=f"Updated invoice {invoice.invoice_number or invoice.id}",
+            metadata={"status": invoice.status.value if invoice.status else None},
+        )
         return invoice
 
     def delete_invoice(self, invoice_id: int) -> None:
@@ -331,6 +370,16 @@ class InvoiceService:
         invoice.deleted_at = datetime.now(timezone.utc)
         invoice.deleted_by_id = self.principal.id if self.principal else None
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.invoice.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="invoice",
+            entity_id=str(invoice.id),
+            summary=f"Deleted invoice {invoice.invoice_number or invoice.id}",
+        )
+
     # -------------------------------------------------------------------------
     # Workflow
     # -------------------------------------------------------------------------
@@ -356,6 +405,15 @@ class InvoiceService:
         invoice.status = InvoiceStatus.PENDING
         invoice.workflow_status = "pending"
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.invoice.submit",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="invoice",
+            entity_id=str(invoice.id),
+            summary=f"Submitted invoice {invoice.invoice_number or invoice.id} for approval",
+        )
         return invoice
 
     def post_invoice(self, invoice_id: int) -> Tuple[Invoice, "JournalEntry"]:
@@ -392,6 +450,16 @@ class InvoiceService:
         invoice.workflow_status = "posted"
         invoice.journal_entry_id = je.id
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.invoice.post",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="invoice",
+            entity_id=str(invoice.id),
+            summary=f"Posted invoice {invoice.invoice_number or invoice.id}",
+            metadata={"journal_entry_id": je.id},
+        )
         return invoice, je
 
     def cancel_invoice(
@@ -436,4 +504,14 @@ class InvoiceService:
         invoice.status = InvoiceStatus.CANCELLED
         invoice.workflow_status = "cancelled"
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.invoice.cancel",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="invoice",
+            entity_id=str(invoice.id),
+            summary=f"Cancelled invoice {invoice.invoice_number or invoice.id}",
+            metadata={"reason": reason},
+        )
         return invoice, reversal_je

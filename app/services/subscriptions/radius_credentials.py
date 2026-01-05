@@ -3,15 +3,11 @@
 Generates usernames and passwords for RADIUS authentication.
 Supports multiple username formats and configurable password complexity.
 """
-from __future__ import annotations
-
 import re
 import secrets
-import string
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -26,11 +22,6 @@ from .radius_credentials_types import (
 )
 from .radius_credentials_config import RADIUSCredentialConfigService
 from app.services.errors import ValidationError, NotFoundError
-
-if TYPE_CHECKING:
-    from app.auth import Principal
-    from app.models.subscription import Subscription
-    from app.models.party import Party
 
 __all__ = [
     "RADIUSCredentialService",
@@ -122,23 +113,18 @@ class RADIUSCredentialService:
         config = config or self.get_config()
         format_type = UsernameFormatType(config.username.format_type)
 
+        if format_type == UsernameFormatType.SEQUENTIAL:
+            username = self._generate_sequential_username(config.sequential)
+            return self._apply_transformations(username, config.username)
+
+        base_username = self._generate_username(context, config)
+
         for attempt in range(max_attempts):
-            if format_type == UsernameFormatType.SEQUENTIAL:
-                # Sequential always generates unique
-                username = self._generate_sequential_username(config.sequential)
-            else:
-                username = self._generate_username(context, config)
+            candidate = base_username if attempt == 0 else f"{base_username}{attempt}"
+            candidate = self._apply_transformations(candidate, config.username)
 
-                # Add suffix on collision
-                if attempt > 0:
-                    username = f"{username}{attempt}"
-
-            # Apply transformations
-            username = self._apply_transformations(username, config.username)
-
-            # Check uniqueness
-            if self.validate_username_unique(username):
-                return username
+            if self.validate_username_unique(candidate):
+                return candidate
 
         raise ValidationError(
             f"Unable to generate unique username after {max_attempts} attempts"
@@ -189,8 +175,12 @@ class RADIUSCredentialService:
 
         # Update subscription
         if regenerate_username:
+            if not credentials.username:
+                raise ValidationError("Generated username is empty")
             subscription.ppp_username = credentials.username
         if regenerate_password:
+            if not credentials.password:
+                raise ValidationError("Generated password is empty")
             subscription.ppp_password = credentials.password
 
         self.db.flush()
@@ -369,7 +359,8 @@ class RADIUSCredentialService:
     ) -> str:
         """Generate sequential username (USER0001, USER0002, etc.).
 
-        Uses database-backed counter with row-level locking.
+        Uses database-backed counter with atomic increment via RETURNING clause
+        to avoid race conditions between concurrent requests.
 
         Args:
             sequential_config: Sequential configuration.
@@ -379,30 +370,33 @@ class RADIUSCredentialService:
         """
         from app.models.radius_credential_sequence import RADIUSCredentialSequence
 
-        # Ensure sequence exists using INSERT ... ON CONFLICT to avoid race conditions
-        stmt = insert(RADIUSCredentialSequence).values(
-            sequence_name="default",
-            current_value=sequential_config.start_from - 1,
-            prefix=sequential_config.prefix,
-            padding_length=sequential_config.padding_length,
+        # Insert row if missing, then lock and increment to avoid race conditions.
+        self.db.execute(
+            insert(RADIUSCredentialSequence).values(
+                sequence_name="default",
+                current_value=sequential_config.start_from - 1,
+                prefix=sequential_config.prefix,
+                padding_length=sequential_config.padding_length,
+            ).on_conflict_do_nothing(
+                index_elements=["sequence_name"],
+            )
         )
-        stmt = stmt.on_conflict_do_nothing(index_elements=["sequence_name"])
-        self.db.execute(stmt)
         self.db.flush()
 
-        # Now get the sequence with FOR UPDATE lock
         sequence = (
             self.db.query(RADIUSCredentialSequence)
             .filter(RADIUSCredentialSequence.sequence_name == "default")
             .with_for_update()
-            .first()
+            .one()
         )
 
-        # Increment and get username
-        username = sequence.increment_and_get()
+        next_value = max(sequence.current_value + 1, sequential_config.start_from)
+        sequence.current_value = next_value
+        sequence.prefix = sequential_config.prefix
+        sequence.padding_length = sequential_config.padding_length
         self.db.flush()
 
-        return username
+        return f"{sequence.prefix}{str(next_value).zfill(sequence.padding_length)}"
 
     def _apply_transformations(
         self,
@@ -423,7 +417,7 @@ class RADIUSCredentialService:
         # Strip special characters if configured
         if config.strip_special:
             # Keep alphanumeric, dots, underscores, hyphens, and @
-            result = re.sub(r"[^\w.@-]", "", result)
+            result = re.sub(r"[^\w.@-]", "", result, flags=re.UNICODE)
 
         # Convert to lowercase if configured
         if config.lowercase:
@@ -452,15 +446,18 @@ class RADIUSCredentialService:
 
         Returns:
             Generated password.
+
+        Raises:
+            ValidationError: If no character types are enabled.
         """
         # Build character pool
         pool = self._config_service.get_password_char_pool()
-        using_fallback = False
 
         if not pool:
-            # Fallback if no character types selected - use sensible defaults
-            pool = string.ascii_letters + string.digits
-            using_fallback = True
+            raise ValidationError(
+                "Password generation failed: at least one character type must be enabled "
+                "(lowercase, uppercase, digits, or special characters)"
+            )
 
         # Determine length
         length = secrets.randbelow(config.max_length - config.min_length + 1) + config.min_length
@@ -469,9 +466,7 @@ class RADIUSCredentialService:
         password = "".join(secrets.choice(pool) for _ in range(length))
 
         # Ensure at least one character from each enabled category
-        # Skip complexity enforcement if using fallback (no char types configured)
-        if not using_fallback:
-            password = self._ensure_complexity(password, config)
+        password = self._ensure_complexity(password, config)
 
         return password
 

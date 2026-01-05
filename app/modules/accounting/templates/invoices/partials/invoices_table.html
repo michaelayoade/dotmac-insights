@@ -2,7 +2,7 @@
 
 {% if invoices %}
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="invoices-table">
-    <table class="min-w-full divide-y divide-gray-100">
+    <table class="min-w-full divide-y divide-gray-100" id="invoices-table">
         <thead>
             <tr class="bg-surface-50">
                 <th scope="col" class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body" x-show="isVisible('invoice')" x-cloak>
@@ -85,7 +85,7 @@
 
 {% else %}
 <!-- Empty state -->
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="invoices-empty-state">
+<div class="empty-state bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center data-testid="invoices-empty-state"> data-testid="empty-state">
     <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
         <svg class="w-8 h-8 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>

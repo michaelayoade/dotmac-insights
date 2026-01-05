@@ -104,6 +104,29 @@ class PartyRoleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PartyMergeRequest(BaseModel):
+    duplicate_party_id: int
+    reason: str = Field(..., min_length=3, max_length=500)
+    deactivate_duplicate: bool = True
+    auto_select_primary: bool = True
+
+
+class PartyMergePreviewRequest(BaseModel):
+    duplicate_party_id: int
+    auto_select_primary: bool = True
+
+
+class PartyMergePreviewResponse(BaseModel):
+    primary_id: int
+    duplicate_id: int
+    selected_primary_id: int
+    selected_duplicate_id: int
+    auto_swapped: bool
+    primary_score: int
+    duplicate_score: int
+    audit_issues: List[str] = Field(default_factory=list)
+
+
 class PartyResponse(PartyBase):
     id: int
     primary_email: Optional[str] = None

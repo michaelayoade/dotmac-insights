@@ -30,7 +30,7 @@
         <a
             href="/subscriptions/new"
             class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
-            data-testid="new-subscription-button"
+            data-testid="new-subscription"
         >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -163,7 +163,6 @@
                 x-transition
                 class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
             >
-                <input type="hidden" name="status" value="{{ current_status or '' }}">
                 <a
                     href="#"
                     class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_status else 'text-gray-700 hover:bg-surface-50' }}"
@@ -172,6 +171,7 @@
                     hx-include="[name='q'], [name='service_type']"
                     hx-push-url="true"
                     @click="open = false"
+                    data-testid="status-option-all"
                 >All Status</a>
                 {% for opt in status_options %}
                 <a
@@ -182,6 +182,7 @@
                     hx-include="[name='q'], [name='service_type']"
                     hx-push-url="true"
                     @click="open = false"
+                    data-testid="status-option-{{ opt.value }}"
                 >{{ opt.label }}</a>
                 {% endfor %}
             </div>
@@ -213,7 +214,6 @@
                 x-transition
                 class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2"
             >
-                <input type="hidden" name="service_type" value="{{ current_service_type or '' }}">
                 <a
                     href="#"
                     class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_service_type else 'text-gray-700 hover:bg-surface-50' }}"
@@ -237,6 +237,36 @@
             </div>
         </div>
     </div>
+
+    <select
+        name="status"
+        class="sr-only"
+        data-testid="status-filter"
+        hx-get="/subscriptions/table"
+        hx-target="#subscriptions-table-container"
+        hx-include="[name='q'], [name='service_type']"
+        hx-trigger="change"
+        hx-push-url="true"
+    >
+        <option value="">All Status</option>
+        {% for opt in status_options %}
+        <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>{{ opt.label }}</option>
+        {% endfor %}
+    </select>
+    <select
+        name="service_type"
+        class="sr-only"
+        hx-get="/subscriptions/table"
+        hx-target="#subscriptions-table-container"
+        hx-include="[name='q'], [name='status']"
+        hx-trigger="change"
+        hx-push-url="true"
+    >
+        <option value="">All Types</option>
+        {% for opt in service_type_options %}
+        <option value="{{ opt.value }}" {{ 'selected' if current_service_type == opt.value else '' }}>{{ opt.label }}</option>
+        {% endfor %}
+    </select>
 
     <!-- Active filters display -->
     {% if current_status or current_service_type or search_query %}
@@ -310,6 +340,6 @@
 
 <!-- Subscriptions Table -->
 <div id="subscriptions-table-container">
-    {% include "modules/subscriptions/templates/partials/subscriptions_table.html" %}
+    {% include "subscriptions/partials/subscriptions_table.html" %}
 </div>
 {% endblock %}

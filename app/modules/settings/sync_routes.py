@@ -7,12 +7,9 @@ Permission Requirements:
 from __future__ import annotations
 
 from typing import Optional, TypedDict, Any
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, desc
-from sqlalchemy.orm import Session
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -22,12 +19,10 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.sync_log import SyncLog, SyncStatus, SyncSource
-from app.models.sync_cursor import SyncCursor, FailedSyncRecord
-from app.models.sync_schedule import SyncSchedule
+from app.models.sync_log import SyncSource
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.modules.settings.routes import get_settings_nav
-from app.utils.datetime_utils import utc_now
+from app.services.settings_sync_service import SettingsSyncService
 
 # Permission dependencies
 RequireSyncRead = Depends(require_scope("settings:sync"))
@@ -118,92 +113,6 @@ SYNC_ENTITIES: dict[str, SyncSourceConfig] = {
 }
 
 
-def get_entity_stats(db: Session, source: SyncSource, entity_type: str) -> dict:
-    """Get stats for a specific entity type."""
-    # Get cursor
-    cursor = db.query(SyncCursor).filter(
-        SyncCursor.source == source,
-        SyncCursor.entity_type == entity_type,
-    ).first()
-
-    # Get last sync log
-    last_log = db.query(SyncLog).filter(
-        SyncLog.source == source,
-        SyncLog.entity_type == entity_type,
-    ).order_by(desc(SyncLog.started_at)).first()
-
-    # Get recent failure count (last 24 hours)
-    yesterday = utc_now() - timedelta(hours=24)
-    recent_failures = db.query(func.count(SyncLog.id)).filter(
-        SyncLog.source == source,
-        SyncLog.entity_type == entity_type,
-        SyncLog.status == SyncStatus.FAILED,
-        SyncLog.started_at >= yesterday,
-    ).scalar() or 0
-
-    # Get failed records count
-    failed_records = db.query(func.count(FailedSyncRecord.id)).filter(
-        FailedSyncRecord.source == source,
-        FailedSyncRecord.entity_type == entity_type,
-        FailedSyncRecord.is_resolved == False,
-    ).scalar() or 0
-
-    return {
-        "cursor": cursor,
-        "last_log": last_log,
-        "recent_failures": recent_failures,
-        "failed_records": failed_records,
-        "last_sync_at": cursor.last_sync_at if cursor else None,
-        "records_synced": cursor.records_synced if cursor else 0,
-    }
-
-
-def get_overall_stats(db: Session) -> dict:
-    """Get overall sync statistics."""
-    yesterday = utc_now() - timedelta(hours=24)
-
-    # Total syncs in last 24 hours
-    total_syncs = db.query(func.count(SyncLog.id)).filter(
-        SyncLog.started_at >= yesterday,
-    ).scalar() or 0
-
-    # Successful syncs
-    successful_syncs = db.query(func.count(SyncLog.id)).filter(
-        SyncLog.started_at >= yesterday,
-        SyncLog.status == SyncStatus.COMPLETED,
-    ).scalar() or 0
-
-    # Failed syncs
-    failed_syncs = db.query(func.count(SyncLog.id)).filter(
-        SyncLog.started_at >= yesterday,
-        SyncLog.status == SyncStatus.FAILED,
-    ).scalar() or 0
-
-    # Records synced
-    records_created = db.query(func.sum(SyncLog.records_created)).filter(
-        SyncLog.started_at >= yesterday,
-    ).scalar() or 0
-
-    records_updated = db.query(func.sum(SyncLog.records_updated)).filter(
-        SyncLog.started_at >= yesterday,
-    ).scalar() or 0
-
-    # Pending failed records
-    pending_failures = db.query(func.count(FailedSyncRecord.id)).filter(
-        FailedSyncRecord.is_resolved == False,
-    ).scalar() or 0
-
-    return {
-        "total_syncs": total_syncs,
-        "successful_syncs": successful_syncs,
-        "failed_syncs": failed_syncs,
-        "records_created": records_created,
-        "records_updated": records_updated,
-        "pending_failures": pending_failures,
-        "success_rate": round((successful_syncs / total_syncs * 100) if total_syncs > 0 else 0, 1),
-    }
-
-
 # =============================================================================
 # SYNC DASHBOARD
 # =============================================================================
@@ -227,14 +136,15 @@ async def sync_dashboard(
     context["settings_nav"] = get_settings_nav(user, "sync")
 
     # Overall stats
-    context["stats"] = get_overall_stats(db)
+    service = SettingsSyncService(db)
+    context["stats"] = service.get_overall_stats()
 
     # Build entity data with stats for each source
     sources_data = {}
     for source_key, source_config in SYNC_ENTITIES.items():
         entities_with_stats: list[dict[str, Any]] = []
         for entity in source_config["entities"]:
-            entity_stats = get_entity_stats(db, source_config["source"], entity["id"])
+            entity_stats = service.get_entity_stats(source_config["source"], entity["id"])
             combined: dict[str, Any] = {**entity, **entity_stats}
             entities_with_stats.append(combined)
 
@@ -255,9 +165,7 @@ async def sync_dashboard(
     context["sources"] = sources_data
 
     # Get recent sync logs
-    recent_logs = db.query(SyncLog).order_by(
-        desc(SyncLog.started_at)
-    ).limit(10).all()
+    recent_logs = service.list_recent_logs(limit=10)
     context["recent_logs"] = recent_logs
 
     template = templates.get_template("modules/settings/templates/pages/sync/dashboard.html")
@@ -309,33 +217,29 @@ async def sync_entity_detail(
     context["entity_config"] = entity_config
 
     # Get entity stats
-    context["entity_stats"] = get_entity_stats(db, source_config["source"], entity_type)
+    service = SettingsSyncService(db)
+    context["entity_stats"] = service.get_entity_stats(source_config["source"], entity_type)
 
     # Get sync cursor
-    context["cursor"] = db.query(SyncCursor).filter(
-        SyncCursor.source == source_config["source"],
-        SyncCursor.entity_type == entity_type,
-    ).first()
+    context["cursor"] = service.get_cursor(source_config["source"], entity_type)
 
     # Get sync logs with pagination
-    logs_query = db.query(SyncLog).filter(
-        SyncLog.source == source_config["source"],
-        SyncLog.entity_type == entity_type,
-    ).order_by(desc(SyncLog.started_at))
-
-    total = logs_query.count()
-    offset = (page - 1) * per_page
-    logs = logs_query.offset(offset).limit(per_page).all()
+    logs, total = service.list_logs(
+        source_config["source"],
+        entity_type,
+        page,
+        per_page,
+    )
 
     context["logs"] = logs
     context["pagination"] = build_pagination_context(page, per_page, total)
 
     # Get failed records
-    failed_records = db.query(FailedSyncRecord).filter(
-        FailedSyncRecord.source == source_config["source"],
-        FailedSyncRecord.entity_type == entity_type,
-        FailedSyncRecord.is_resolved == False,
-    ).order_by(desc(FailedSyncRecord.created_at)).limit(10).all()
+    failed_records = service.list_failed_records(
+        source_config["source"],
+        entity_type,
+        limit=10,
+    )
     context["failed_records"] = failed_records
 
     # HTMX partial or full page
@@ -497,15 +401,10 @@ async def reset_sync_cursor(
         raise HTTPException(status_code=404, detail="Unknown sync source")
 
     source_config = SYNC_ENTITIES[source]
-
-    cursor = db.query(SyncCursor).filter(
-        SyncCursor.source == source_config["source"],
-        SyncCursor.entity_type == entity_type,
-    ).first()
+    service = SettingsSyncService(db)
+    cursor = service.reset_cursor(source_config["source"], entity_type)
 
     if cursor:
-        cursor.reset()
-        db.commit()
         message = f"Cursor reset for {entity_type}. Next sync will be a full sync."
     else:
         message = f"No cursor found for {entity_type}."
@@ -537,9 +436,8 @@ async def retry_failed_record(
     record_id: int,
 ):
     """Retry a failed sync record."""
-    record = db.query(FailedSyncRecord).filter(
-        FailedSyncRecord.id == record_id
-    ).first()
+    service = SettingsSyncService(db)
+    record = service.get_failed_record(record_id)
 
     if not record:
         raise HTTPException(status_code=404, detail="Failed record not found")
@@ -547,8 +445,7 @@ async def retry_failed_record(
     if not record.can_retry:
         raise HTTPException(status_code=400, detail="Record cannot be retried")
 
-    record.mark_retry()
-    db.commit()
+    service.retry_failed_record(record)
 
     message = f"Retry queued for record {record.external_id or record_id}"
 
@@ -571,9 +468,8 @@ async def resolve_failed_record(
     record_id: int,
 ):
     """Mark a failed sync record as resolved."""
-    record = db.query(FailedSyncRecord).filter(
-        FailedSyncRecord.id == record_id
-    ).first()
+    service = SettingsSyncService(db)
+    record = service.get_failed_record(record_id)
 
     if not record:
         raise HTTPException(status_code=404, detail="Failed record not found")
@@ -583,8 +479,7 @@ async def resolve_failed_record(
     notes = raw_notes if isinstance(raw_notes, str) else ""
     notes = notes.strip()
 
-    record.mark_resolved(notes or "Manually resolved")
-    db.commit()
+    service.resolve_failed_record(record, notes or "Manually resolved")
 
     message = f"Record {record.external_id or record_id} marked as resolved"
 
@@ -620,10 +515,8 @@ async def sync_schedules_list(
     ])
     context["settings_nav"] = get_settings_nav(user, "sync")
 
-    schedules = db.query(SyncSchedule).order_by(
-        SyncSchedule.is_system.desc(),
-        SyncSchedule.name
-    ).all()
+    service = SettingsSyncService(db)
+    schedules = service.list_schedules()
     context["schedules"] = schedules
 
     template = templates.get_template("modules/settings/templates/pages/sync/schedules.html")
@@ -640,15 +533,11 @@ async def toggle_schedule(
     schedule_id: int,
 ):
     """Toggle a sync schedule on/off."""
-    schedule = db.query(SyncSchedule).filter(
-        SyncSchedule.id == schedule_id
-    ).first()
+    service = SettingsSyncService(db)
+    schedule = service.toggle_schedule(schedule_id)
 
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
-
-    schedule.is_enabled = not schedule.is_enabled
-    db.commit()
 
     status = "enabled" if schedule.is_enabled else "disabled"
     message = f"Schedule '{schedule.name}' {status}"

@@ -5,14 +5,11 @@ Permission Requirements:
 - hr:read - View appraisals, templates
 - hr:write - Manage appraisals
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import date
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -23,18 +20,23 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.core.security import is_htmx_request, set_flash
-from app.models.employee import Employee
 from app.models.hr_appraisal import AppraisalTemplate, AppraisalStatus
 from app.services.hr.appraisal import AppraisalService
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import EmployeeFilters
+from app.services.types import PaginationParams
 from app.services.hr.appraisal_types import (
     AppraisalCreateData,
+    AppraisalFilters,
     AppraisalUpdateData,
     TemplateCreateData,
+    TemplateFilters,
     TemplateUpdateData,
 )
 from app.services.hr.errors import (
     AppraisalNotFoundError,
     AppraisalTemplateNotFoundError,
+    EmployeeNotFoundError,
     ValidationError,
 )
 
@@ -75,12 +77,22 @@ def _form_date(form: Any, key: str) -> Optional[date]:
 
 
 def get_employee_options(db):
-    employees = db.query(Employee).filter(Employee.is_deleted == False).order_by(Employee.name).all()
+    service = EmployeeService(db)
+    result = service.list_employees(
+        filters=EmployeeFilters(),
+        pagination=PaginationParams(offset=0, limit=500),
+    )
+    employees = sorted(result.items, key=lambda e: e.name or "")
     return [{"value": str(e.id), "label": e.name} for e in employees]
 
 
 def get_template_options(db):
-    templates_list = db.query(AppraisalTemplate).order_by(AppraisalTemplate.template_name).all()
+    service = AppraisalService(db)
+    result = service.list_templates(
+        filters=None,
+        pagination=PaginationParams(offset=0, limit=500),
+    )
+    templates_list = sorted(result.items, key=lambda t: t.template_name or "")
     return [{"value": str(t.id), "label": t.template_name} for t in templates_list]
 
 
@@ -135,20 +147,13 @@ async def appraisals_list(
 ):
     """Appraisals list page."""
     try:
-        from app.models.hr_appraisal import Appraisal
-        query = db.query(Appraisal)
-        if q:
-            query = query.filter(or_(
-                Appraisal.employee_name.ilike(f"%{q}%"),
-                Appraisal.employee.ilike(f"%{q}%"),
-            ))
-        if status:
-            status_enum = _appraisal_status(status)
-            if status_enum:
-                query = query.filter(Appraisal.status == status_enum)
-        total = query.count()
-        offset = (page - 1) * per_page
-        appraisals = query.order_by(Appraisal.start_date.desc()).offset(offset).limit(per_page).all()
+        service = AppraisalService(db, user)
+        status_enum = _appraisal_status(status) if status else None
+        filters = AppraisalFilters(search=q, status=status_enum)
+        pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+        result = service.list_appraisals(filters=filters, pagination=pagination)
+        appraisals = result.items
+        total = result.total
     except Exception:
         appraisals = []
         total = 0
@@ -263,12 +268,21 @@ async def appraisal_create(
     if not end_date:
         errors["end_date"] = "End date is required"
 
-    employee = db.query(Employee).filter(Employee.id == employee_id).first() if employee_id else None
-    template_obj = (
-        db.query(AppraisalTemplate).filter(AppraisalTemplate.id == template_id).first()
-        if template_id
-        else None
-    )
+    employee_service = EmployeeService(db, user)
+    template_service = AppraisalService(db, user)
+    employee = None
+    if employee_id:
+        try:
+            employee = employee_service.get_employee(employee_id)
+        except EmployeeNotFoundError:
+            employee = None
+
+    template_obj = None
+    if template_id:
+        try:
+            template_obj = template_service.get_template(template_id)
+        except AppraisalTemplateNotFoundError:
+            template_obj = None
     if employee_id and not employee:
         errors["employee_id"] = "Employee not found"
     if template_id and not template_obj:
@@ -435,13 +449,12 @@ async def appraisal_templates_list(
 ):
     """Appraisal templates list page."""
     try:
-        from app.models.hr_appraisal import AppraisalTemplate
-        query = db.query(AppraisalTemplate)
-        if q:
-            query = query.filter(AppraisalTemplate.template_name.ilike(f"%{q}%"))
-        total = query.count()
-        offset = (page - 1) * per_page
-        appraisal_templates = query.order_by(AppraisalTemplate.template_name).offset(offset).limit(per_page).all()
+        service = AppraisalService(db, user)
+        filters = TemplateFilters(search=q) if q else TemplateFilters()
+        pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+        result = service.list_templates(filters=filters, pagination=pagination)
+        appraisal_templates = result.items
+        total = result.total
     except Exception:
         appraisal_templates = []
         total = 0
@@ -624,13 +637,10 @@ async def appraisal_detail(
     appraisal_id: int,
 ):
     """Appraisal detail page."""
+    service = AppraisalService(db, user)
     try:
-        from app.models.hr_appraisal import Appraisal
-        appraisal = db.query(Appraisal).filter(Appraisal.id == appraisal_id).first()
-    except Exception:
-        appraisal = None
-
-    if not appraisal:
+        appraisal = service.get_appraisal(appraisal_id)
+    except AppraisalNotFoundError:
         raise HTTPException(status_code=404, detail="Appraisal not found")
 
     context = get_base_context(request, response, user, csrf_token)

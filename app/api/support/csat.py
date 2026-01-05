@@ -105,7 +105,8 @@ def serialize_response(r) -> Dict[str, Any]:
         "survey_name": r.survey.name if r.survey else None,
         "ticket_id": r.ticket_id,
         "party_id": r.party_id,
-        "agent_id": r.agent_id,
+        "party_agent_id": r.agent_party_id,
+        "agent_id": r.agent_party_id,
         "rating": r.rating,
         "feedback_text": r.feedback_text,
         "sent_at": r.sent_at.isoformat() if r.sent_at else None,
@@ -466,10 +467,16 @@ def queue_survey_for_ticket(
     # Try to get agent from ticket
     agent_id = None
     if ticket.assigned_to:
-        from app.models.agent import Agent
-        agent = db.query(Agent).filter(
-            Agent.display_name == ticket.assigned_to
-        ).first()
+        from app.models.party import Party, PartyRole
+        agent = (
+            db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                PartyRole.role == "support_agent",
+                Party.name == ticket.assigned_to,
+            )
+            .first()
+        )
         if agent:
             agent_id = agent.id
 
@@ -567,31 +574,33 @@ async def csat_by_agent(
 ) -> List[Dict[str, Any]]:
     """Get CSAT scores by agent."""
     from app.models.support_csat import CSATResponse
-    from app.models.agent import Agent
+    from app.models.party import Party, PartyRole
 
     start_dt = datetime.now(timezone.utc) - timedelta(days=days)
 
     by_agent = db.query(
-        CSATResponse.agent_id,
-        Agent.display_name,
+        CSATResponse.agent_party_id,
+        Party.name.label("display_name"),
         func.count(CSATResponse.id).label("count"),
         func.avg(CSATResponse.rating).label("avg_rating"),
         func.sum(case((CSATResponse.rating >= 4, 1), else_=0)).label("positive"),
         func.sum(case((CSATResponse.rating <= 2, 1), else_=0)).label("negative"),
-    ).join(Agent, CSATResponse.agent_id == Agent.id, isouter=True).filter(
+    ).join(Party, CSATResponse.agent_party_id == Party.id, isouter=True).join(
+        PartyRole, Party.id == PartyRole.party_id, isouter=True
+    ).filter(
         CSATResponse.responded_at >= start_dt,
         CSATResponse.rating.isnot(None),
-        CSATResponse.agent_id.isnot(None),
-    ).group_by(CSATResponse.agent_id, Agent.display_name).order_by(
+        CSATResponse.agent_party_id.isnot(None),
+    ).group_by(CSATResponse.agent_party_id, Party.name).order_by(
         func.avg(CSATResponse.rating).desc()
     ).all()
 
     results = []
     for row in by_agent:
         # Get CSAT score from service for each agent
-        agent_csat = service.get_agent_csat_score(row.agent_id, start_date=start_dt) if row.agent_id else None
+        agent_csat = service.get_agent_csat_score(row.agent_party_id, start_date=start_dt) if row.agent_party_id else None
         results.append({
-            "agent_id": row.agent_id,
+            "agent_id": row.agent_party_id,
             "agent_name": row.display_name,
             "response_count": row.count,
             "avg_rating": round(float(row.avg_rating or 0), 2),

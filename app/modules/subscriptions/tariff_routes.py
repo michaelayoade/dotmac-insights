@@ -26,6 +26,7 @@ from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.services.errors import NotFoundError
 from app.services.subscriptions import TariffService
 from app.services.types import PaginationParams
+from app.services.subscriptions.web_services import TariffWebService
 
 # Permission dependencies
 RequireSubscriptionsRead = Depends(require_scope("subscriptions:read"))
@@ -73,6 +74,7 @@ async def tariffs_list(
 ):
     """Tariffs list page."""
     svc = TariffService(db, principal=user)
+    web_svc = TariffWebService(db, svc)
 
     # Get tariffs using service
     result = svc.list_tariffs(
@@ -209,8 +211,7 @@ async def tariff_toggle(
         raise HTTPException(status_code=404, detail="Tariff not found")
 
     # Toggle status
-    tariff.enabled = not tariff.enabled
-    db.commit()
+    tariff = web_svc.toggle_enabled(tariff_id)
 
     status = "enabled" if tariff.enabled else "disabled"
 

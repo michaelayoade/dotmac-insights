@@ -1,4 +1,12 @@
 {# Service orders table partial - returned for HTMX updates #}
+<div id="orders-filter-state" hx-swap-oob="true" class="hidden">
+    {% include "modules/field_service/templates/partials/filter_state_inputs.html" %}
+</div>
+<div id="orders-active-filters" hx-swap-oob="true">
+    {% include "modules/field_service/templates/partials/active_filters.html" %}
+</div>
+<span id="field-service-map-count" hx-swap-oob="true">{{ orders_with_coords | length }}</span>
+<div id="field-service-map-data" hx-swap-oob="true" class="hidden" data-orders='{{ orders_with_coords | tojson | safe }}'></div>
 
 {% if orders %}
 <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="orders-table">
@@ -50,7 +58,29 @@
 <!-- Pagination -->
 {% if pagination.total > pagination.per_page %}
 <div class="mt-6">
-    {% include "components/ui/pagination.html" with context %}
+    {% set query_params = [] %}
+    {% if search_query %}
+    {% set _ = query_params.append("q=" ~ search_query) %}
+    {% endif %}
+    {% if current_status %}
+    {% set _ = query_params.append("status=" ~ current_status) %}
+    {% endif %}
+    {% if current_priority %}
+    {% set _ = query_params.append("priority=" ~ current_priority) %}
+    {% endif %}
+    {% if current_type %}
+    {% set _ = query_params.append("type=" ~ current_type) %}
+    {% endif %}
+    {% if sort_key %}
+    {% set _ = query_params.append("sort=" ~ sort_key) %}
+    {% endif %}
+    {% if sort_dir %}
+    {% set _ = query_params.append("dir=" ~ sort_dir) %}
+    {% endif %}
+    {% set base_url = "/field-service/table" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+    {% with pagination=pagination, base_url=base_url, htmx_target="#orders-table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 </div>
 {% endif %}
 

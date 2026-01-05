@@ -27,6 +27,7 @@ from app.models.party import CustomerAccount
 from app.models.employee import Employee
 from app.models.auth import User
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
 
 from .activities import ActivityService
 from .activity_types import ActivityCreateData
@@ -343,6 +344,16 @@ class ProjectService:
             company=project.company,
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="projects.project.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="project",
+            entity_id=str(project.id),
+            summary=f"Created project {project.project_name}",
+            metadata={"status": project.status},
+        )
         return project
 
     def update_project(self, project_id: int, data: ProjectUpdateData) -> Project:
@@ -503,6 +514,16 @@ class ProjectService:
                 company=project.company,
             )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="projects.project.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="project",
+            entity_id=str(project.id),
+            summary=f"Updated project {project.project_name}",
+            metadata={"changed_fields": changed_fields, "status": project.status.value},
+        )
         return project
 
     def delete_project(self, project_id: int) -> None:
@@ -518,6 +539,16 @@ class ProjectService:
 
         project.is_deleted = True
         project.deleted_at = datetime.now(timezone.utc)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="projects.project.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="project",
+            entity_id=str(project.id),
+            summary=f"Deleted project {project.project_name}",
+        )
 
     # -------------------------------------------------------------------------
     # Status Transition Methods

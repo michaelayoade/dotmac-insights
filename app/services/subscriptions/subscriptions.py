@@ -26,6 +26,7 @@ from app.models.party import Party, PartyRole
 from app.services.base import paginate, scoped_query, safe_filter
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
 
 from .subscription_types import (
     SubscriptionFilters,
@@ -157,6 +158,23 @@ class SubscriptionService:
 
         query = query.order_by(Subscription.created_at.desc())
         return paginate(query, pagination)
+
+    def list_subscriptions_by_ids(
+        self,
+        subscription_ids: List[int],
+        include_relations: bool = True,
+    ) -> List[Subscription]:
+        """List subscriptions by ID set."""
+        if not subscription_ids:
+            return []
+        query = scoped_query(self.db.query(Subscription), self.principal)
+        if include_relations:
+            query = query.options(
+                joinedload(Subscription.tariff),
+                joinedload(Subscription.router),
+                joinedload(Subscription.party),
+            )
+        return query.filter(Subscription.id.in_(subscription_ids)).all()
 
     def get_subscription(
         self, subscription_id: int, include_relations: bool = True
@@ -298,6 +316,16 @@ class SubscriptionService:
         self.db.add(sub)
         self.db.flush()
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Created subscription {sub.plan_name}",
+            metadata={"party_id": sub.party_id, "status": sub.status.value},
+        )
         return sub
 
     def update_subscription(
@@ -335,6 +363,16 @@ class SubscriptionService:
             except ValueError:
                 pass
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Updated subscription {sub.plan_name}",
+            metadata={"status": sub.status.value},
+        )
         return sub
 
     def delete_subscription(self, subscription_id: int) -> None:
@@ -349,6 +387,16 @@ class SubscriptionService:
         sub = self.get_subscription(subscription_id, include_relations=False)
         sub.status = SubscriptionStatus.CANCELLED
         sub.cancelled_date = datetime.now(timezone.utc)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Cancelled subscription {sub.plan_name}",
+        )
 
     # -------------------------------------------------------------------------
     # Status Management
@@ -406,6 +454,16 @@ class SubscriptionService:
         if target == SubscriptionStatus.CANCELLED:
             sub.cancelled_date = datetime.now(timezone.utc)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.status.change",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Changed subscription status to {target.value}",
+            metadata={"reason": reason},
+        )
         return sub
 
     def activate(self, subscription_id: int) -> Subscription:
@@ -537,6 +595,15 @@ class SubscriptionService:
         if data.ppp_password is not None:
             sub.ppp_password = data.ppp_password or None
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.provisioning.configure",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Configured provisioning for {sub.plan_name}",
+        )
         return sub
 
     def mark_provisioned(
@@ -559,6 +626,16 @@ class SubscriptionService:
             sub.provisioned_at = datetime.now(timezone.utc)
             sub.provisioning_error = None
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.provisioning.mark",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Marked provisioning for {sub.plan_name}",
+            metadata={"error": error},
+        )
         return sub
 
     # -------------------------------------------------------------------------
@@ -743,6 +820,16 @@ class SubscriptionService:
             change_fee=config_service.get_upgrade_fee(),
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.plan.upgrade",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Upgraded plan from {old_plan} to {new_tariff.title}",
+            metadata={"effective": effective, "proration_amount": float(proration_amount)},
+        )
         return UpgradeResult(
             subscription_id=subscription_id,
             old_tariff_id=old_tariff_id,
@@ -849,6 +936,16 @@ class SubscriptionService:
             change_fee=config_service.get_downgrade_fee(),
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="subscriptions.plan.downgrade",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="subscription",
+            entity_id=str(sub.id),
+            summary=f"Downgraded plan from {old_plan} to {new_tariff.title}",
+            metadata={"effective": effective, "proration_credit": float(proration_credit)},
+        )
         return DowngradeResult(
             subscription_id=subscription_id,
             old_tariff_id=old_tariff_id,
@@ -1094,5 +1191,3 @@ class RenewalResult:
     old_end_date: Optional[datetime]
     new_end_date: Optional[datetime]
     periods: int
-
-

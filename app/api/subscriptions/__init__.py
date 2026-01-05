@@ -155,6 +155,7 @@ from .radius_credentials import router as radius_credentials_router
 from .billing import router as billing_router
 from .provisioning import router as provisioning_router
 from .bundles import router as bundles_router
+from .upselling import router as upselling_router
 
 # Create main subscriptions router
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
@@ -183,3 +184,6 @@ router.include_router(provisioning_router, prefix="/provisioning", tags=["subscr
 
 # Data bundles
 router.include_router(bundles_router, prefix="/bundles", tags=["subscriptions-bundles"])
+
+# Upselling and business intelligence
+router.include_router(upselling_router, prefix="/upselling", tags=["subscriptions-upselling"])

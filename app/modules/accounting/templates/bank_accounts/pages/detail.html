@@ -48,11 +48,11 @@
 
     <!-- Balance Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Total Deposits</p>
             <p class="mt-1 text-2xl font-bold text-emerald-600 font-mono">{{ '{:,.2f}'.format(total_deposits) }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Withdrawals</p>
             <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(total_withdrawals) }}</p>
         </div>
@@ -63,7 +63,7 @@
     </div>
 
     <!-- Filters -->
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <div class="flex items-center gap-4">
             <label class="text-sm font-medium text-gray-700">Status:</label>
             <select
@@ -81,7 +81,7 @@
 
     <!-- Transactions Table -->
     {% if transactions %}
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100">
             <h2 class="text-lg font-display font-semibold text-gray-900">Transactions</h2>
         </div>
@@ -138,7 +138,7 @@
 
     {% else %}
     <!-- Empty State -->
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
         <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
             <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>

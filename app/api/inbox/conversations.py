@@ -120,8 +120,8 @@ def serialize_conversation(conv: OmniConversation, include_messages: bool = Fals
         "ticket_id": conv.ticket_id,
         "lead_id": conv.lead_id,
         "party_id": conv.party_id,
-        "assigned_agent_id": conv.assigned_agent_id,
-        "assigned_agent_name": conv.assigned_agent.display_name if conv.assigned_agent else None,
+        "assigned_agent_id": conv.assigned_party_id,
+        "assigned_agent_name": conv.assigned_party.display_name if conv.assigned_party else None,
         "assigned_team_id": conv.assigned_team_id,
         "assigned_team_name": conv.assigned_team.name if conv.assigned_team else None,
         "assigned_at": conv.assigned_at.isoformat() if conv.assigned_at else None,
@@ -160,7 +160,8 @@ def serialize_message(msg: OmniMessage) -> Dict[str, Any]:
         "subject": msg.subject,
         "message_type": msg.message_type,
         "participant_id": msg.participant_id,
-        "agent_id": msg.agent_id,
+        "party_id": msg.party_id,
+        "agent_id": msg.party_id,
         "delivery_status": msg.delivery_status,
         "meta": msg.meta,
         "sent_at": msg.sent_at.isoformat() if msg.sent_at else None,
@@ -322,7 +323,7 @@ async def update_conversation(
     conversation_payload = serialize_conversation(conv)
     await broadcast_conversation_update(
         conversation_payload,
-        assigned_agent_id=conv.assigned_agent_id,
+        assigned_agent_id=conv.assigned_party_id,
     )
     await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -353,10 +354,10 @@ async def assign_conversation(
         raise HTTPException(status_code=400, detail=str(e))
 
     conversation_payload = serialize_conversation(conv)
-    if conv.assigned_agent_id:
+    if conv.assigned_party_id:
         await broadcast_assignment(
             conversation_id=conv.id,
-            agent_id=conv.assigned_agent_id,
+            agent_id=conv.assigned_party_id,
             conversation_data=conversation_payload,
         )
     else:
@@ -412,11 +413,11 @@ async def send_reply(
     await broadcast_new_message(
         message_payload,
         conversation_id=conv.id,
-        assigned_agent_id=conv.assigned_agent_id,
+        assigned_agent_id=conv.assigned_party_id,
     )
     await broadcast_conversation_update(
         conversation_payload,
-        assigned_agent_id=conv.assigned_agent_id,
+        assigned_agent_id=conv.assigned_party_id,
     )
     await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -489,7 +490,7 @@ async def mark_conversation_read(
         conversation_payload = serialize_conversation(conv)
         await broadcast_conversation_update(
             conversation_payload,
-            assigned_agent_id=conv.assigned_agent_id,
+            assigned_agent_id=conv.assigned_party_id,
         )
         await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -576,7 +577,7 @@ async def resolve_conversation(
         conversation_payload = serialize_conversation(conv)
         await broadcast_conversation_update(
             conversation_payload,
-            assigned_agent_id=conv.assigned_agent_id,
+            assigned_agent_id=conv.assigned_party_id,
         )
         await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -603,7 +604,7 @@ async def snooze_conversation(
         conversation_payload = serialize_conversation(conv)
         await broadcast_conversation_update(
             conversation_payload,
-            assigned_agent_id=conv.assigned_agent_id,
+            assigned_agent_id=conv.assigned_party_id,
         )
         await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -629,7 +630,7 @@ async def reopen_conversation(
         conversation_payload = serialize_conversation(conv)
         await broadcast_conversation_update(
             conversation_payload,
-            assigned_agent_id=conv.assigned_agent_id,
+            assigned_agent_id=conv.assigned_party_id,
         )
         await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -655,7 +656,7 @@ async def archive_conversation(
         conversation_payload = serialize_conversation(conv)
         await broadcast_conversation_update(
             conversation_payload,
-            assigned_agent_id=conv.assigned_agent_id,
+            assigned_agent_id=conv.assigned_party_id,
         )
         await broadcast_stats_update(build_inbox_stats_snapshot(db))
 
@@ -681,7 +682,7 @@ async def delete_conversation(
 
         await broadcast_conversation_update(
             serialize_conversation(conv),
-            assigned_agent_id=conv.assigned_agent_id,
+            assigned_agent_id=conv.assigned_party_id,
         )
         await broadcast_stats_update(build_inbox_stats_snapshot(db))
 

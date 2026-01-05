@@ -761,6 +761,253 @@ SETTING_SCHEMAS: dict[str, dict[int, dict[str, Any]]] = {
             "required": [],
         },
     },
+
+    "monitoring": {
+        1: {
+            "label": "Network Monitoring Settings",
+            "description": "SNMP polling, alerting, and incident management configuration",
+            "type": "object",
+            "properties": {
+                # SNMP Polling Settings
+                "polling_interval_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "default": 300,
+                    "description": "Default SNMP polling interval in seconds",
+                },
+                "polling_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 60,
+                    "default": 10,
+                    "description": "SNMP request timeout in seconds",
+                },
+                "polling_retries": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5,
+                    "default": 2,
+                    "description": "Number of SNMP request retries",
+                },
+                "polling_batch_size": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100,
+                    "default": 20,
+                    "description": "Number of devices to poll concurrently",
+                },
+
+                # Device Down Detection
+                "device_down_after_failures": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 3,
+                    "description": "Consecutive poll failures before device marked down",
+                },
+                "device_recovery_polls": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 5,
+                    "default": 2,
+                    "description": "Consecutive successful polls before device marked up",
+                },
+
+                # CPU Alert Thresholds
+                "cpu_warning_percent": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "CPU percentage for warning alert",
+                },
+                "cpu_critical_percent": {
+                    "type": "integer",
+                    "minimum": 70,
+                    "maximum": 100,
+                    "default": 95,
+                    "description": "CPU percentage for critical alert",
+                },
+
+                # Memory Alert Thresholds
+                "memory_warning_percent": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "Memory percentage for warning alert",
+                },
+                "memory_critical_percent": {
+                    "type": "integer",
+                    "minimum": 70,
+                    "maximum": 100,
+                    "default": 95,
+                    "description": "Memory percentage for critical alert",
+                },
+
+                # Temperature Alert Thresholds
+                "temperature_warning_celsius": {
+                    "type": "integer",
+                    "minimum": 40,
+                    "maximum": 80,
+                    "default": 60,
+                    "description": "Temperature (Celsius) for warning alert",
+                },
+                "temperature_critical_celsius": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 100,
+                    "default": 75,
+                    "description": "Temperature (Celsius) for critical alert",
+                },
+
+                # Interface Utilization Thresholds
+                "interface_utilization_warning_percent": {
+                    "type": "integer",
+                    "minimum": 50,
+                    "maximum": 95,
+                    "default": 80,
+                    "description": "Interface utilization percentage for warning alert",
+                },
+                "interface_utilization_critical_percent": {
+                    "type": "integer",
+                    "minimum": 70,
+                    "maximum": 100,
+                    "default": 95,
+                    "description": "Interface utilization percentage for critical alert",
+                },
+
+                # Alert Behavior
+                "notification_cooldown_seconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 3600,
+                    "default": 300,
+                    "description": "Minimum time between repeat notifications",
+                },
+                "auto_resolve_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Automatically resolve alerts when condition clears",
+                },
+                "auto_resolve_delay_seconds": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 600,
+                    "default": 60,
+                    "description": "Delay before auto-resolving (to avoid flapping)",
+                },
+
+                # Escalation Settings
+                "escalation_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Enable alert escalation",
+                },
+                "escalation_level_1_minutes": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 60,
+                    "default": 15,
+                    "description": "Minutes before first escalation",
+                },
+                "escalation_level_2_minutes": {
+                    "type": "integer",
+                    "minimum": 15,
+                    "maximum": 120,
+                    "default": 30,
+                    "description": "Minutes before second escalation",
+                },
+                "escalation_level_3_minutes": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 240,
+                    "default": 60,
+                    "description": "Minutes before third escalation",
+                },
+
+                # Incident Settings
+                "auto_create_incident": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Auto-create incident for critical alerts",
+                },
+                "incident_auto_resolve_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Auto-resolve incidents when all alerts cleared",
+                },
+                "alert_correlation_window_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 5,
+                    "description": "Window for correlating related alerts into incident",
+                },
+
+                # Metrics Retention
+                "raw_metrics_retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30,
+                    "default": 7,
+                    "description": "Days to retain raw (5-min) metrics",
+                },
+                "hourly_rollup_retention_days": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 365,
+                    "default": 90,
+                    "description": "Days to retain hourly metric rollups",
+                },
+                "daily_rollup_retention_days": {
+                    "type": "integer",
+                    "minimum": 180,
+                    "maximum": 1095,
+                    "default": 730,
+                    "description": "Days to retain daily metric rollups (2 years default)",
+                },
+
+                # Notification Channels
+                "alert_email_enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Send alert notifications via email",
+                },
+                "alert_sms_enabled": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Send critical alerts via SMS",
+                },
+                "alert_slack_enabled": {
+                    "type": "boolean",
+                    "default": False,
+                    "description": "Send alerts to Slack",
+                },
+                "alert_slack_webhook_url": {
+                    "type": "string",
+                    "x-secret": True,
+                    "description": "Slack webhook URL for alerts",
+                },
+
+                # NOC Dashboard
+                "noc_dashboard_refresh_seconds": {
+                    "type": "integer",
+                    "minimum": 10,
+                    "maximum": 300,
+                    "default": 30,
+                    "description": "NOC dashboard auto-refresh interval",
+                },
+                "noc_dashboard_alert_sound": {
+                    "type": "boolean",
+                    "default": True,
+                    "description": "Play sound for new critical alerts",
+                },
+            },
+            "required": [],
+        },
+    },
 }
 
 

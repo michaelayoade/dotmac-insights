@@ -7,8 +7,6 @@ Permission Requirements:
 
 Uses LeaveService for all business logic.
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import date
 

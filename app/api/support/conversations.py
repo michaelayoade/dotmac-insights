@@ -177,7 +177,7 @@ def _serialize_conversation(conv) -> Dict[str, Any]:
         "id": conv.id,
         "status": conv.status,
         "is_starred": getattr(conv, "is_starred", False),
-        "assigned_agent_id": getattr(conv, "assigned_agent_id", None),
+        "assigned_agent_id": getattr(conv, "assigned_party_id", None),
         "assigned_team_id": getattr(conv, "assigned_team_id", None),
         "tags": conv.tags if hasattr(conv, "tags") else None,
         "resolved_at": conv.resolved_at.isoformat() if getattr(conv, "resolved_at", None) else None,

@@ -79,7 +79,7 @@
         <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
             <!-- Balance Card -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <div class="flex items-center justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-500">Current Balance</p>
@@ -101,7 +101,7 @@
 
             <!-- Child Accounts (if group) -->
             {% if account.is_group and children %}
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-100">
                     <h3 class="text-sm font-semibold text-gray-900">Child Accounts ({{ children | length }})</h3>
                 </div>
@@ -133,7 +133,7 @@
             {% endif %}
 
             <!-- GL Entries -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
                 <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 class="text-sm font-semibold text-gray-900">Ledger Entries</h3>
                     <a href="/accounting/general-ledger?account={{ account.account_name }}" class="text-sm text-primary-600 hover:text-primary-700 font-medium">
@@ -197,7 +197,7 @@
         <!-- Sidebar -->
         <div class="space-y-6">
             <!-- Account Info -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-4">Account Details</h3>
                 <dl class="space-y-3 text-sm">
                     <div class="flex justify-between">
@@ -244,7 +244,7 @@
             </div>
 
             <!-- Quick Actions -->
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
                 <h3 class="text-sm font-semibold text-gray-900 mb-4">Actions</h3>
                 <div class="space-y-2">
                     <a

@@ -25,7 +25,7 @@ from app.config import settings
 
 CSRF_TOKEN_NAME = "dotmac_csrf_token"
 CSRF_HEADER_NAME = "X-CSRF-Token"
-CSRF_FORM_FIELD = "_csrf_token"
+CSRF_FORM_FIELD = "csrf_token"
 CSRF_TOKEN_LENGTH = 32
 
 

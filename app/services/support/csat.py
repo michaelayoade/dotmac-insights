@@ -11,9 +11,9 @@ from __future__ import annotations
 
 import secrets
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import case, extract, func
 from sqlalchemy.orm import Session
 
 from app.models.support_csat import CSATResponse, CSATSurvey, SurveyTrigger, SurveyType
@@ -395,7 +395,7 @@ class CSATService:
             query = query.filter(CSATResponse.survey_id == survey_id)
 
         if agent_id:
-            query = query.filter(CSATResponse.agent_id == agent_id)
+            query = query.filter(CSATResponse.agent_party_id == agent_id)
 
         if start_date:
             query = query.filter(CSATResponse.responded_at >= start_date)
@@ -473,7 +473,7 @@ class CSATService:
             List of CSATResponse instances.
         """
         query = self.db.query(CSATResponse).filter(
-            CSATResponse.agent_id == agent_id,
+            CSATResponse.agent_party_id == agent_id,
         )
 
         if responded_only:
@@ -513,7 +513,7 @@ class CSATService:
         )
 
         if agent_id:
-            query = query.filter(CSATResponse.agent_id == agent_id)
+            query = query.filter(CSATResponse.agent_party_id == agent_id)
 
         if start_date:
             query = query.filter(CSATResponse.responded_at >= start_date)
@@ -743,3 +743,260 @@ class CSATService:
             start_date=start_date,
             end_date=end_date,
         )
+
+    # -------------------------------------------------------------------------
+    # Reporting Helpers
+    # -------------------------------------------------------------------------
+
+    def get_survey_stats(
+        self,
+        start_date: datetime,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[int, Dict[str, float]]:
+        """Get per-survey stats for a date range."""
+        query = self.db.query(
+            CSATResponse.survey_id.label("survey_id"),
+            func.count(CSATResponse.id).label("total"),
+            func.avg(CSATResponse.rating).label("avg_rating"),
+            func.sum(case((CSATResponse.rating >= 4, 1), else_=0)).label("positive"),
+        ).filter(
+            CSATResponse.responded_at >= start_date,
+            CSATResponse.rating.isnot(None),
+        )
+
+        if end_date:
+            query = query.filter(CSATResponse.responded_at <= end_date)
+
+        rows = query.group_by(CSATResponse.survey_id).all()
+        return {
+            row.survey_id: {
+                "total": row.total or 0,
+                "avg_rating": round(float(row.avg_rating or 0), 2),
+                "positive": row.positive or 0,
+            }
+            for row in rows
+        }
+
+    def get_overall_stats(
+        self,
+        start_date: datetime,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, float]:
+        """Get overall response stats for a date range."""
+        query = self.db.query(
+            func.count(CSATResponse.id).label("total"),
+            func.avg(CSATResponse.rating).label("avg_rating"),
+            func.sum(case((CSATResponse.rating >= 4, 1), else_=0)).label("positive"),
+            func.sum(case((CSATResponse.rating <= 2, 1), else_=0)).label("negative"),
+        ).filter(
+            CSATResponse.responded_at >= start_date,
+            CSATResponse.rating.isnot(None),
+        )
+
+        if end_date:
+            query = query.filter(CSATResponse.responded_at <= end_date)
+
+        stats = query.first()
+        return {
+            "total": stats.total if stats else 0,
+            "avg_rating": round(float(stats.avg_rating or 0), 2) if stats else 0,
+            "positive": stats.positive or 0 if stats else 0,
+            "negative": stats.negative or 0 if stats else 0,
+        }
+
+    def get_response_counts(
+        self,
+        start_date: datetime,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, int]:
+        """Get sent vs responded counts for a date range."""
+        sent_query = self.db.query(func.count(CSATResponse.id)).filter(
+            CSATResponse.sent_at >= start_date
+        )
+        responded_query = self.db.query(func.count(CSATResponse.id)).filter(
+            CSATResponse.responded_at >= start_date
+        )
+
+        if end_date:
+            sent_query = sent_query.filter(CSATResponse.sent_at <= end_date)
+            responded_query = responded_query.filter(CSATResponse.responded_at <= end_date)
+
+        return {
+            "sent": sent_query.scalar() or 0,
+            "responded": responded_query.scalar() or 0,
+        }
+
+    def get_survey_period_stats(
+        self,
+        survey_id: int,
+        start_date: datetime,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """Get per-survey stats and rating distribution for a date range."""
+        stats_query = self.db.query(
+            func.count(CSATResponse.id).label("total"),
+            func.avg(CSATResponse.rating).label("avg_rating"),
+            func.sum(case((CSATResponse.rating >= 4, 1), else_=0)).label("positive"),
+            func.sum(case((CSATResponse.rating <= 2, 1), else_=0)).label("negative"),
+        ).filter(
+            CSATResponse.survey_id == survey_id,
+            CSATResponse.responded_at >= start_date,
+            CSATResponse.rating.isnot(None),
+        )
+
+        if end_date:
+            stats_query = stats_query.filter(CSATResponse.responded_at <= end_date)
+
+        stats = stats_query.first()
+
+        rating_query = self.db.query(
+            CSATResponse.rating,
+            func.count(CSATResponse.id).label("count"),
+        ).filter(
+            CSATResponse.survey_id == survey_id,
+            CSATResponse.responded_at >= start_date,
+            CSATResponse.rating.isnot(None),
+        )
+        if end_date:
+            rating_query = rating_query.filter(CSATResponse.responded_at <= end_date)
+
+        rating_dist_rows = rating_query.group_by(CSATResponse.rating).all()
+        rating_distribution = {row.rating: row.count for row in rating_dist_rows}
+
+        return {
+            "total": stats.total if stats else 0,
+            "avg_rating": round(float(stats.avg_rating or 0), 2) if stats else 0,
+            "positive": stats.positive or 0 if stats else 0,
+            "negative": stats.negative or 0 if stats else 0,
+            "rating_distribution": rating_distribution,
+        }
+
+    def list_recent_feedback(
+        self,
+        start_date: datetime,
+        limit: int = 20,
+    ) -> List[CSATResponse]:
+        """List recent feedback comments within a date range."""
+        return (
+            self.db.query(CSATResponse)
+            .filter(
+                CSATResponse.responded_at >= start_date,
+                CSATResponse.feedback_text.isnot(None),
+                CSATResponse.feedback_text != "",
+            )
+            .order_by(CSATResponse.responded_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def get_trends(
+        self,
+        start_date: datetime,
+    ) -> List[Dict[str, Any]]:
+        """Get monthly CSAT trends since a start date."""
+        rows = (
+            self.db.query(
+                extract("year", CSATResponse.responded_at).label("year"),
+                extract("month", CSATResponse.responded_at).label("month"),
+                func.count(CSATResponse.id).label("count"),
+                func.avg(CSATResponse.rating).label("avg_rating"),
+            )
+            .filter(
+                CSATResponse.responded_at >= start_date,
+                CSATResponse.rating.isnot(None),
+            )
+            .group_by(
+                extract("year", CSATResponse.responded_at),
+                extract("month", CSATResponse.responded_at),
+            )
+            .order_by(
+                extract("year", CSATResponse.responded_at),
+                extract("month", CSATResponse.responded_at),
+            )
+            .all()
+        )
+
+        return [
+            {
+                "year": int(r.year),
+                "month": int(r.month),
+                "count": r.count,
+                "avg_rating": round(float(r.avg_rating or 0), 2),
+            }
+            for r in rows
+        ]
+
+    def get_agent_stats(
+        self,
+        start_date: datetime,
+        end_date: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get CSAT stats grouped by agent."""
+        from app.models.party import Party, PartyRole
+
+        query = (
+            self.db.query(
+                CSATResponse.agent_party_id,
+                Party.name.label("display_name"),
+                func.count(CSATResponse.id).label("count"),
+                func.avg(CSATResponse.rating).label("avg_rating"),
+                func.sum(case((CSATResponse.rating >= 4, 1), else_=0)).label("positive"),
+            )
+            .join(Party, Party.id == CSATResponse.agent_party_id, isouter=True)
+            .join(PartyRole, Party.id == PartyRole.party_id, isouter=True)
+            .filter(
+                CSATResponse.responded_at >= start_date,
+                CSATResponse.rating.isnot(None),
+                CSATResponse.agent_party_id.isnot(None),
+            )
+            .group_by(CSATResponse.agent_party_id, Party.name)
+            .order_by(func.avg(CSATResponse.rating).desc())
+        )
+
+        if end_date:
+            query = query.filter(CSATResponse.responded_at <= end_date)
+
+        rows = query.all()
+        return [
+            {
+                "agent_id": r.agent_party_id,
+                "agent_name": r.display_name or "Unknown",
+                "count": r.count,
+                "avg_rating": round(float(r.avg_rating or 0), 2),
+                "positive": r.positive or 0,
+            }
+            for r in rows
+        ]
+
+    def get_type_stats(
+        self,
+        start_date: datetime,
+        end_date: Optional[datetime] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get CSAT stats grouped by survey type."""
+        query = (
+            self.db.query(
+                CSATSurvey.survey_type,
+                func.count(CSATResponse.id).label("count"),
+                func.avg(CSATResponse.rating).label("avg_rating"),
+            )
+            .join(CSATSurvey, CSATSurvey.id == CSATResponse.survey_id)
+            .filter(
+                CSATResponse.responded_at >= start_date,
+                CSATResponse.rating.isnot(None),
+            )
+            .group_by(CSATSurvey.survey_type)
+        )
+
+        if end_date:
+            query = query.filter(CSATResponse.responded_at <= end_date)
+
+        rows = query.all()
+        return [
+            {
+                "type": r.survey_type,
+                "count": r.count,
+                "avg_rating": round(float(r.avg_rating or 0), 2),
+            }
+            for r in rows
+        ]

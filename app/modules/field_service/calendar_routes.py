@@ -7,6 +7,7 @@ Permission Requirements:
 """
 from __future__ import annotations
 
+from dataclasses import asdict
 from datetime import date, timedelta
 from typing import Optional
 
@@ -15,16 +16,23 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 
 from ._deps import (
     # Dependencies
-    SessionUser, CSRFToken, DB,
+    SessionUser, CSRFToken, CSRFProtect, DB,
     RequireFieldServiceRead, RequireFieldServiceWrite,
     # Helpers
     templates, get_base_context, get_navigation_context, build_breadcrumbs,
-    is_htmx_request, htmx_toast, set_flash, _form_date, _form_int,
-    # Options
-    get_technician_options, get_team_options, get_zone_options,
-    # Service
-    FieldServiceWebService,
+    is_htmx_request, htmx_toast, set_flash, _form_int,
 )
+from app.services.field_service import (
+    ScheduleService,
+    DispatchService,
+    CalendarFilters,
+    FieldServiceLookupService,
+    ServiceOrderService,
+    DispatchData,
+    ServiceOrderUpdateData,
+)
+from app.models.field_service import ServiceOrderStatus
+from app.services.errors import NotFoundError, ValidationError
 
 router = APIRouter(prefix="/field-service", tags=["field_service_calendar"])
 
@@ -46,7 +54,7 @@ async def calendar_view(
     zone_id: Optional[int] = Query(None),
 ):
     """Calendar view of service orders."""
-    service = FieldServiceWebService(db, user.id)
+    schedule_service = ScheduleService(db)
 
     # Parse dates
     if start:
@@ -62,12 +70,14 @@ async def calendar_view(
     end_date = start_date + timedelta(days=6)
 
     # Get calendar data
-    calendar_data = service.get_calendar_data(
-        start_date=start_date,
-        end_date=end_date,
-        technician_id=technician_id,
-        team_id=team_id,
-        zone_id=zone_id,
+    calendar_view = schedule_service.get_calendar(
+        CalendarFilters(
+            start_date=start_date,
+            end_date=end_date,
+            technician_id=technician_id,
+            team_id=team_id,
+            zone_id=zone_id,
+        )
     )
 
     # Build date range for template
@@ -80,8 +90,8 @@ async def calendar_view(
             "day_name": current.strftime("%a"),
             "day_number": current.day,
             "is_today": current == date.today(),
-            "orders": calendar_data["calendar"].get(current.isoformat(), []),
-            "summary": calendar_data["daily_summary"].get(current.isoformat(), {}),
+            "orders": calendar_view.calendar.get(current.isoformat(), []),
+            "summary": calendar_view.daily_summary.get(current.isoformat()),
         })
         current += timedelta(days=1)
 
@@ -100,7 +110,9 @@ async def calendar_view(
     context["prev_week"] = (start_date - timedelta(days=7)).isoformat()
     context["next_week"] = (start_date + timedelta(days=7)).isoformat()
     context["today"] = date.today().isoformat()
-    context["total_orders"] = calendar_data["total_orders"]
+    context["total_orders"] = sum(
+        len(orders) for orders in calendar_view.calendar.values()
+    )
 
     # Filter state
     context["technician_id"] = technician_id
@@ -108,9 +120,10 @@ async def calendar_view(
     context["zone_id"] = zone_id
 
     # Filter options
-    context["technician_options"] = get_technician_options(db)
-    context["team_options"] = get_team_options(db)
-    context["zone_options"] = get_zone_options(db)
+    lookup = FieldServiceLookupService(db)
+    context["technician_options"] = lookup.list_technician_options()
+    context["team_options"] = lookup.list_team_options()
+    context["zone_options"] = lookup.list_zone_options()
 
     if is_htmx_request(request):
         template = templates.get_template("modules/field_service/templates/partials/calendar_grid.html")
@@ -132,7 +145,7 @@ async def calendar_data(
     zone_id: Optional[int] = Query(None),
 ):
     """Get calendar data as JSON for dynamic updates."""
-    service = FieldServiceWebService(db, user.id)
+    schedule_service = ScheduleService(db)
 
     try:
         start_date = date.fromisoformat(start)
@@ -140,15 +153,17 @@ async def calendar_data(
     except ValueError:
         return JSONResponse({"error": "Invalid date format"}, status_code=400)
 
-    calendar_data = service.get_calendar_data(
-        start_date=start_date,
-        end_date=end_date,
-        technician_id=technician_id,
-        team_id=team_id,
-        zone_id=zone_id,
+    calendar_view = schedule_service.get_calendar(
+        CalendarFilters(
+            start_date=start_date,
+            end_date=end_date,
+            technician_id=technician_id,
+            team_id=team_id,
+            zone_id=zone_id,
+        )
     )
 
-    return JSONResponse(calendar_data)
+    return JSONResponse(asdict(calendar_view))
 
 
 # =============================================================================
@@ -165,7 +180,7 @@ async def dispatch_board(
     dispatch_date: Optional[str] = Query(None, alias="date"),
 ):
     """Dispatch board - Kanban-style view for daily dispatching."""
-    service = FieldServiceWebService(db, user.id)
+    dispatch_service = DispatchService(db)
 
     # Parse date
     if dispatch_date:
@@ -177,7 +192,7 @@ async def dispatch_board(
         check_date = date.today()
 
     # Get dispatch board data
-    board_data = service.get_dispatch_board(check_date)
+    board_view = dispatch_service.get_dispatch_board(check_date)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -189,10 +204,9 @@ async def dispatch_board(
 
     # Board data
     context["dispatch_date"] = check_date
-    context["orders"] = board_data["orders"]
-    context["all_orders"] = board_data["all_orders"]
-    context["summary"] = board_data["summary"]
-    context["technician_workload"] = board_data["technician_workload"]
+    context["orders"] = board_view.orders
+    context["summary"] = board_view.summary
+    context["technician_workload"] = board_view.technician_workload
 
     # Navigation
     context["prev_date"] = (check_date - timedelta(days=1)).isoformat()
@@ -200,7 +214,8 @@ async def dispatch_board(
     context["today"] = date.today().isoformat()
 
     # Technician options for assignment
-    context["technician_options"] = get_technician_options(db)
+    lookup = FieldServiceLookupService(db)
+    context["technician_options"] = lookup.list_technician_options()
 
     if is_htmx_request(request):
         template = templates.get_template("modules/field_service/templates/partials/dispatch_board.html")
@@ -208,6 +223,80 @@ async def dispatch_board(
 
     template = templates.get_template("modules/field_service/templates/pages/dispatch.html")
     return HTMLResponse(template.render(context))
+
+
+@router.post("/{order_id}/assign", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
+async def assign_dispatch_order(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    order_id: int,
+):
+    """Assign a technician from the dispatch board."""
+    form = await request.form()
+    technician_id = _form_int(form, "technician_id")
+
+    if not technician_id:
+        htmx_toast(response, "Select a technician to assign.", "error")
+        return HTMLResponse("", headers=dict(response.headers))
+
+    order_service = ServiceOrderService(db)
+    try:
+        order = order_service.get_order(order_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Service order not found")
+
+    try:
+        if order.status == ServiceOrderStatus.DRAFT:
+            order_service.schedule(order_id)
+            order_service.dispatch(
+                order_id,
+                DispatchData(
+                    technician_id=technician_id,
+                    team_id=order.assigned_team_id,
+                    scheduled_date=order.scheduled_date,
+                    notes="Assigned from dispatch board",
+                ),
+            )
+        elif order.status == ServiceOrderStatus.SCHEDULED:
+            order_service.dispatch(
+                order_id,
+                DispatchData(
+                    technician_id=technician_id,
+                    team_id=order.assigned_team_id,
+                    scheduled_date=order.scheduled_date,
+                    notes="Assigned from dispatch board",
+                ),
+            )
+        else:
+            order_service.update_order(
+                order_id,
+                ServiceOrderUpdateData(assigned_technician_id=technician_id),
+            )
+        db.commit()
+    except ValidationError as exc:
+        htmx_toast(response, str(exc), "error")
+        return HTMLResponse("", headers=dict(response.headers))
+
+    htmx_toast(response, "Technician assigned.", "success")
+
+    dispatch_service = DispatchService(db)
+    lookup = FieldServiceLookupService(db)
+    check_date = order.scheduled_date or date.today()
+    board_view = dispatch_service.get_dispatch_board(check_date)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["orders"] = board_view.orders
+    context["summary"] = board_view.summary
+    context["technician_workload"] = board_view.technician_workload
+    context["dispatch_date"] = check_date
+    context["technician_options"] = lookup.list_technician_options()
+
+    template = templates.get_template("modules/field_service/templates/partials/dispatch_board.html")
+    return HTMLResponse(template.render(context), headers=dict(response.headers))
 
 
 @router.get("/dispatch/data", dependencies=[RequireFieldServiceRead])
@@ -218,15 +307,15 @@ async def dispatch_data(
     dispatch_date: str = Query(..., alias="date"),
 ):
     """Get dispatch board data as JSON."""
-    service = FieldServiceWebService(db, user.id)
+    dispatch_service = DispatchService(db)
 
     try:
         check_date = date.fromisoformat(dispatch_date)
     except ValueError:
         return JSONResponse({"error": "Invalid date format"}, status_code=400)
 
-    board_data = service.get_dispatch_board(check_date)
-    return JSONResponse(board_data)
+    board_view = dispatch_service.get_dispatch_board(check_date)
+    return JSONResponse(asdict(board_view))
 
 
 # =============================================================================
@@ -246,7 +335,7 @@ async def map_dispatch(
     zone_id: Optional[int] = Query(None),
 ):
     """Map view for service order locations and route planning."""
-    service = FieldServiceWebService(db, user.id)
+    schedule_service = ScheduleService(db)
 
     # Parse date
     if map_date:
@@ -258,16 +347,18 @@ async def map_dispatch(
         check_date = date.today()
 
     # Get calendar data for the day (includes lat/lng)
-    calendar_data = service.get_calendar_data(
-        start_date=check_date,
-        end_date=check_date,
-        technician_id=technician_id,
-        team_id=team_id,
-        zone_id=zone_id,
+    calendar_view = schedule_service.get_calendar(
+        CalendarFilters(
+            start_date=check_date,
+            end_date=check_date,
+            technician_id=technician_id,
+            team_id=team_id,
+            zone_id=zone_id,
+        )
     )
 
     # Extract orders for map markers
-    orders_for_map = calendar_data["calendar"].get(check_date.isoformat(), [])
+    orders_for_map = calendar_view.calendar.get(check_date.isoformat(), [])
 
     # Filter only orders with coordinates
     orders_with_coords = [o for o in orders_for_map if o.get("latitude") and o.get("longitude")]
@@ -284,7 +375,7 @@ async def map_dispatch(
     context["map_date"] = check_date
     context["orders"] = orders_for_map
     context["orders_with_coords"] = orders_with_coords
-    context["summary"] = calendar_data["daily_summary"].get(check_date.isoformat(), {})
+    context["summary"] = calendar_view.daily_summary.get(check_date.isoformat())
 
     # Navigation
     context["prev_date"] = (check_date - timedelta(days=1)).isoformat()
@@ -297,9 +388,10 @@ async def map_dispatch(
     context["zone_id"] = zone_id
 
     # Filter options
-    context["technician_options"] = get_technician_options(db)
-    context["team_options"] = get_team_options(db)
-    context["zone_options"] = get_zone_options(db)
+    lookup = FieldServiceLookupService(db)
+    context["technician_options"] = lookup.list_technician_options()
+    context["team_options"] = lookup.list_team_options()
+    context["zone_options"] = lookup.list_zone_options()
 
     template = templates.get_template("modules/field_service/templates/pages/map_dispatch.html")
     return HTMLResponse(template.render(context))
@@ -316,27 +408,33 @@ async def map_orders_data(
     zone_id: Optional[int] = Query(None),
 ):
     """Get map order data as JSON for dynamic updates."""
-    service = FieldServiceWebService(db, user.id)
+    schedule_service = ScheduleService(db)
 
     try:
         check_date = date.fromisoformat(map_date)
     except ValueError:
         return JSONResponse({"error": "Invalid date format"}, status_code=400)
 
-    calendar_data = service.get_calendar_data(
-        start_date=check_date,
-        end_date=check_date,
-        technician_id=technician_id,
-        team_id=team_id,
-        zone_id=zone_id,
+    calendar_view = schedule_service.get_calendar(
+        CalendarFilters(
+            start_date=check_date,
+            end_date=check_date,
+            technician_id=technician_id,
+            team_id=team_id,
+            zone_id=zone_id,
+        )
     )
 
-    orders = calendar_data["calendar"].get(check_date.isoformat(), [])
+    orders = calendar_view.calendar.get(check_date.isoformat(), [])
 
     return JSONResponse({
         "date": check_date.isoformat(),
         "orders": orders,
-        "summary": calendar_data["daily_summary"].get(check_date.isoformat(), {}),
+        "summary": (
+            asdict(calendar_view.daily_summary.get(check_date.isoformat()))
+            if calendar_view.daily_summary.get(check_date.isoformat())
+            else {}
+        ),
     })
 
 
@@ -356,7 +454,7 @@ async def technician_schedule(
     days: int = Query(7, ge=1, le=14),
 ):
     """View a technician's schedule."""
-    service = FieldServiceWebService(db, user.id)
+    schedule_service = ScheduleService(db)
 
     # Parse start date
     if start:
@@ -367,9 +465,11 @@ async def technician_schedule(
     else:
         start_date = date.today()
 
-    schedule_data = service.get_technician_schedule(technician_id, start_date, days)
-
-    if not schedule_data:
+    try:
+        schedule_view = schedule_service.get_technician_schedule(
+            technician_id, start_date, days
+        )
+    except NotFoundError:
         set_flash(response, "Technician not found.", "error")
         return RedirectResponse(url="/field-service", status_code=303)
 
@@ -384,23 +484,31 @@ async def technician_schedule(
             "day_name": current.strftime("%a"),
             "day_number": current.day,
             "is_today": current == date.today(),
-            "orders": schedule_data["schedule"].get(current.isoformat(), []),
+            "orders": schedule_view.schedule.get(current.isoformat(), []),
         })
         current += timedelta(days=1)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = f"Schedule - {schedule_data['technician']['name']}"
+    context["page_title"] = f"Schedule - {schedule_view.technician_name}"
     context["breadcrumbs"] = build_breadcrumbs([
         {"label": "Field Service", "url": "/field-service"},
         {"label": "Technicians", "url": "/field-service/technicians"},
-        {"label": schedule_data["technician"]["name"], "url": f"/field-service/technicians/{technician_id}"},
+        {"label": schedule_view.technician_name, "url": f"/field-service/technicians/{technician_id}"},
         {"label": "Schedule", "url": None},
     ])
 
-    context["technician"] = schedule_data["technician"]
+    context["technician"] = {
+        "id": schedule_view.technician_id,
+        "name": schedule_view.technician_name,
+        "email": schedule_view.technician_email,
+    }
     context["date_range"] = date_range
-    context["summary"] = schedule_data["summary"]
+    context["summary"] = {
+        "total_orders": schedule_view.total_orders,
+        "completed": schedule_view.completed,
+        "total_hours_scheduled": schedule_view.total_hours_scheduled,
+    }
     context["start_date"] = start_date
     context["days"] = days
 

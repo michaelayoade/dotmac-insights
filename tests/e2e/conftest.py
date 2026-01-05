@@ -56,6 +56,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "hr: HR module tests")
     config.addinivalue_line("markers", "projects: Projects module tests")
     config.addinivalue_line("markers", "support: Support module tests")
+    config.addinivalue_line("markers", "marketing: Marketing module tests")
 
 
 # =============================================================================

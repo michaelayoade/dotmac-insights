@@ -1,6 +1,6 @@
 {# Salary slips table partial #}
 {% if slips %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="slips-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
             <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('employee')" x-cloak>
@@ -23,7 +23,7 @@
     </table>
 </div>
 {% else %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="slips-empty-state">
     <div class="mx-auto w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
         <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
     </div>

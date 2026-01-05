@@ -19,7 +19,7 @@
 } %}
 
 {% if approvals %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="approvals-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
@@ -92,7 +92,7 @@
 {% endif %}
 {% else %}
 <!-- Empty State -->
-<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-8 text-center">
+<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-8 text-center data-testid="approvals-empty-state">>
     <div class="mx-auto w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
         <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>

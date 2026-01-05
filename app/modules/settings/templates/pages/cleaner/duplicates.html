@@ -1,0 +1,159 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Find Duplicates</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Detect and merge duplicate records</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/data-cleaner"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<div x-data="{
+    selectedTable: '',
+    selectedFields: [],
+    loading: false,
+    hasResults: false
+}">
+    <!-- Configuration Form -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Scan Configuration</h2>
+
+        <form
+            hx-post="/settings/data-cleaner/duplicates/scan"
+            hx-target="#duplicate-results"
+            hx-indicator="#scan-spinner"
+            @htmx:before-request="loading = true"
+            @htmx:after-request="loading = false; hasResults = true"
+            class="space-y-6"
+        >
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+            <!-- Table Selection -->
+            <div>
+                <label for="table" class="block text-sm font-medium text-gray-700 mb-2">
+                    Select Table
+                </label>
+                <select
+                    id="table"
+                    name="table"
+                    x-model="selectedTable"
+                    required
+                    class="w-full max-w-md rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                >
+                    <option value="">Choose a table...</option>
+                    {% for table in tables %}
+                    <option value="{{ table.value }}">{{ table.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Match Fields -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Match On Fields
+                </label>
+                <p class="text-sm text-gray-500 mb-3">
+                    Records with matching values in any of these fields will be considered duplicates.
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    {% for field in match_fields %}
+                    <label class="relative flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl ring-1 ring-gray-200 cursor-pointer hover:bg-gray-100 transition-colors">
+                        <input
+                            type="checkbox"
+                            name="match_fields"
+                            value="{{ field.value }}"
+                            @change="selectedFields = $event.target.checked
+                                ? [...selectedFields, '{{ field.value }}']
+                                : selectedFields.filter(f => f !== '{{ field.value }}')"
+                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        >
+                        <span class="text-sm font-medium text-gray-700">{{ field.label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex items-center gap-4 pt-2">
+                <button
+                    type="submit"
+                    :disabled="!selectedTable || selectedFields.length === 0 || loading"
+                    class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <span id="scan-spinner" class="htmx-indicator">
+                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <svg x-show="!loading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <span x-text="loading ? 'Scanning...' : 'Scan for Duplicates'"></span>
+                </button>
+                <span x-show="!selectedTable || selectedFields.length === 0" class="text-sm text-gray-500">
+                    Select a table and at least one field to match on
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Card -->
+    <div class="bg-indigo-50 rounded-2xl ring-1 ring-indigo-100 p-6 mb-6" x-show="!hasResults">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="font-semibold text-indigo-900 mb-2">How Duplicate Detection Works</h3>
+                <ul class="text-sm text-indigo-700 space-y-2">
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Records are grouped when they share values in any selected match field
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        The oldest record (or most complete) is suggested as the primary
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Merging updates foreign keys on related records and soft-deletes duplicates
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        All merge operations can be rolled back
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Container -->
+    <div id="duplicate-results">
+        <!-- HTMX will load duplicates_table.html partial here -->
+    </div>
+</div>
+{% endblock %}

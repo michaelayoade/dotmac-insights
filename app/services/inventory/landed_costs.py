@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.inventory import LandedCostVoucher, LandedCostItem, LandedCostTax
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     LandedCostFilters,
@@ -93,7 +94,12 @@ class LandedCostService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_voucher(
         self, voucher_id: int, include_details: bool = True
@@ -193,6 +199,7 @@ class LandedCostService:
                 idx=idx,
             )
             self.db.add(item)
+            SoftValidationService(self.db).validate_and_store(item)
 
         # Add taxes
         total_charges = Decimal("0")
@@ -205,6 +212,7 @@ class LandedCostService:
                 idx=idx,
             )
             self.db.add(tax)
+            SoftValidationService(self.db).validate_and_store(tax)
             total_charges += tax_data.amount
 
         voucher.total_taxes_and_charges = total_charges
@@ -213,6 +221,7 @@ class LandedCostService:
         self._distribute_charges(voucher, data.items, data.taxes)
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(voucher)
         return voucher
 
     def _distribute_charges(
@@ -276,6 +285,7 @@ class LandedCostService:
             voucher.updated_by_id = self.principal.user_id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(voucher)
         return voucher
 
     def cancel_voucher(self, voucher_id: int) -> LandedCostVoucher:
@@ -302,6 +312,7 @@ class LandedCostService:
             voucher.updated_by_id = self.principal.user_id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(voucher)
         return voucher
 
     def delete_voucher(self, voucher_id: int) -> None:
@@ -327,3 +338,4 @@ class LandedCostService:
             voucher.deleted_by_id = self.principal.user_id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(voucher)

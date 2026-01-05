@@ -34,12 +34,8 @@ from app.api.analytics import (
     get_sla_attainment,
     get_agent_productivity,
 )
-from app.api.insights import (
-    get_data_completeness,
-    get_customer_segments,
-    get_customer_health,
-    detect_anomalies,
-)
+# Insights service for analytics
+from app.services.insights import InsightsService
 
 # Permission dependencies
 RequireAnalyticsRead = Depends(require_scope("analytics:read"))

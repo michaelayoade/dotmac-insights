@@ -22,12 +22,13 @@ from app.models.payment_subscription import (
     PaymentSubscriptionStatus,
     PaymentSubscriptionInterval,
 )
-from app.models.gateway_transaction import GatewayProvider
-from app.models.party import Party
+from app.models.gateway_transaction import GatewayProvider, GatewayTransaction
+from app.models.party import Party, CustomerAccount
 from app.models.subscription import Subscription
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .payment_subscription_types import (
     PaymentSubscriptionFilters,
@@ -145,6 +146,43 @@ class PaymentSubscriptionService:
             raise NotFoundError(f"PaymentSubscription {subscription_id} not found")
         return sub
 
+    def get_service_subscription(
+        self, subscription_id: Optional[int]
+    ) -> Optional[Subscription]:
+        """Get a linked service subscription, if present."""
+        if not subscription_id:
+            return None
+        query = scoped_query(self.db.query(Subscription), self.principal)
+        return query.filter(Subscription.id == subscription_id).first()
+
+    def get_customer_account(self, party_id: int) -> Optional[CustomerAccount]:
+        """Get the customer account for a party."""
+        return (
+            self.db.query(CustomerAccount)
+            .filter(CustomerAccount.party_id == party_id)
+            .first()
+        )
+
+    def list_recent_gateway_transactions(
+        self,
+        provider: GatewayProvider,
+        customer_account_id: Optional[int],
+        limit: int = 20,
+    ) -> List[GatewayTransaction]:
+        """List recent gateway transactions for a provider/customer account."""
+        query = self.db.query(GatewayTransaction).filter(
+            GatewayTransaction.provider == provider
+        )
+        if customer_account_id:
+            query = query.filter(
+                GatewayTransaction.customer_account_id == customer_account_id
+            )
+        return (
+            query.order_by(GatewayTransaction.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
     def create_payment_subscription(
         self, data: PaymentSubscriptionCreateData
     ) -> PaymentSubscription:
@@ -212,6 +250,7 @@ class PaymentSubscriptionService:
 
         self.db.add(sub)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(sub)
 
         return sub
 
@@ -254,6 +293,7 @@ class PaymentSubscriptionService:
                     )
             sub.service_subscription_id = data.service_subscription_id or None
 
+        SoftValidationService(self.db).validate_and_store(sub)
         return sub
 
     # -------------------------------------------------------------------------
@@ -282,6 +322,7 @@ class PaymentSubscriptionService:
 
         sub.status = PaymentSubscriptionStatus.PAUSED
         sub.paused_at = datetime.now(timezone.utc)
+        SoftValidationService(self.db).validate_and_store(sub)
 
         return BillingActionResult(
             success=True,
@@ -312,6 +353,7 @@ class PaymentSubscriptionService:
 
         sub.status = PaymentSubscriptionStatus.ACTIVE
         sub.paused_at = None
+        SoftValidationService(self.db).validate_and_store(sub)
 
         return BillingActionResult(
             success=True,
@@ -346,6 +388,7 @@ class PaymentSubscriptionService:
         sub.cancelled_at = datetime.now(timezone.utc)
         sub.cancellation_reason = reason
         sub.ended_at = datetime.now(timezone.utc)
+        SoftValidationService(self.db).validate_and_store(sub)
 
         return BillingActionResult(
             success=True,
@@ -371,6 +414,7 @@ class PaymentSubscriptionService:
             )
 
         sub.status = PaymentSubscriptionStatus.PAST_DUE
+        SoftValidationService(self.db).validate_and_store(sub)
 
         return BillingActionResult(
             success=True,
@@ -423,6 +467,7 @@ class PaymentSubscriptionService:
             if sub.retry_count >= sub.max_retries:
                 sub.status = PaymentSubscriptionStatus.PAST_DUE
 
+        SoftValidationService(self.db).validate_and_store(sub)
         return sub
 
     # -------------------------------------------------------------------------
@@ -455,6 +500,7 @@ class PaymentSubscriptionService:
             )
 
         sub.service_subscription_id = service_subscription_id
+        SoftValidationService(self.db).validate_and_store(sub)
         return sub
 
     def unlink_service_subscription(
@@ -470,6 +516,7 @@ class PaymentSubscriptionService:
         """
         sub = self.get_payment_subscription(subscription_id)
         sub.service_subscription_id = None
+        SoftValidationService(self.db).validate_and_store(sub)
         return sub
 
     # -------------------------------------------------------------------------

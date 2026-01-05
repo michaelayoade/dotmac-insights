@@ -7,8 +7,6 @@ Permission Requirements:
 
 Uses LeaveService for all business logic.
 """
-from __future__ import annotations
-
 from decimal import Decimal
 from typing import Optional, Any
 
@@ -20,7 +18,6 @@ from app.web.context import (
     get_base_context,
     get_navigation_context,
     build_breadcrumbs,
-    build_pagination_context,
 )
 from app.templates.environment import get_template_env
 from app.services.hr.leave import LeaveService

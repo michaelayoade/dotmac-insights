@@ -11,8 +11,6 @@ from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import joinedload
-
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
     get_base_context,
@@ -26,9 +24,7 @@ from app.models.payment_subscription import (
     PaymentSubscriptionStatus,
     PaymentSubscriptionInterval,
 )
-from app.models.gateway_transaction import GatewayProvider, GatewayTransaction
-from app.models.party import CustomerAccount
-from app.models.subscription import Subscription
+from app.models.gateway_transaction import GatewayProvider
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.subscriptions import (
@@ -36,6 +32,10 @@ from app.services.subscriptions import (
     PaymentSubscriptionFilters,
 )
 from app.services.types import PaginationParams
+from app.services.subscriptions.web_services import (
+    PaymentSubscriptionQueryService,
+    PaymentSubscriptionWebService,
+)
 
 # Permission dependencies
 RequirePaymentsRead = Depends(require_scope("payments:read"))
@@ -101,6 +101,14 @@ def get_available_actions(status: PaymentSubscriptionStatus) -> list:
     return actions.get(status, [])
 
 
+def _get_payment_web_service(db: DB, user: SessionUser) -> PaymentSubscriptionWebService:
+    return PaymentSubscriptionWebService(db, PaymentSubscriptionService(db, principal=user))
+
+
+def _get_payment_query_service(db: DB) -> PaymentSubscriptionQueryService:
+    return PaymentSubscriptionQueryService(db)
+
+
 # =============================================================================
 # PAYMENT SUBSCRIPTION LIST
 # =============================================================================
@@ -123,6 +131,7 @@ async def payment_subscriptions_list(
 ):
     """Payment subscriptions list page."""
     svc = PaymentSubscriptionService(db, principal=user)
+    query_svc = _get_payment_query_service(db)
 
     # Build filters
     filters = PaymentSubscriptionFilters(
@@ -220,27 +229,16 @@ async def payment_subscription_detail(
         raise HTTPException(status_code=404, detail="Payment subscription not found")
 
     # Get linked service subscription if any
-    service_subscription = None
-    if subscription.service_subscription_id:
-        service_subscription = db.query(Subscription).filter(
-            Subscription.id == subscription.service_subscription_id
-        ).first()
+    service_subscription = query_svc.get_service_subscription(
+        subscription.service_subscription_id
+    )
 
     # Get recent transactions for this payment subscription
-    customer_account = db.query(CustomerAccount).filter(
-        CustomerAccount.party_id == subscription.party_id
-    ).first()
-    transactions_query = db.query(GatewayTransaction).filter(
-        GatewayTransaction.provider == subscription.provider,
-    )
-    if customer_account:
-        transactions_query = transactions_query.filter(
-            GatewayTransaction.customer_account_id == customer_account.id
-        )
-    transactions = (
-        transactions_query.order_by(GatewayTransaction.created_at.desc())
-        .limit(20)
-        .all()
+    customer_account = query_svc.get_customer_account(subscription.party_id)
+    transactions = query_svc.list_gateway_transactions(
+        subscription.provider,
+        customer_account.id if customer_account else None,
+        limit=20,
     )
 
     # Available actions based on status
@@ -308,11 +306,10 @@ async def payment_subscription_pause(
     subscription_id: int,
 ):
     """Pause a payment subscription."""
-    svc = PaymentSubscriptionService(db, principal=user)
+    web_svc = _get_payment_web_service(db, user)
 
     try:
-        subscription = svc.pause(subscription_id)
-        db.commit()
+        subscription = web_svc.pause(subscription_id)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
     except (ValidationError, ConflictError) as exc:
@@ -337,11 +334,10 @@ async def payment_subscription_resume(
     subscription_id: int,
 ):
     """Resume a paused payment subscription."""
-    svc = PaymentSubscriptionService(db, principal=user)
+    web_svc = _get_payment_web_service(db, user)
 
     try:
-        subscription = svc.resume(subscription_id)
-        db.commit()
+        subscription = web_svc.resume(subscription_id)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
     except (ValidationError, ConflictError) as exc:
@@ -366,14 +362,13 @@ async def payment_subscription_cancel(
     subscription_id: int,
 ):
     """Cancel a payment subscription."""
-    svc = PaymentSubscriptionService(db, principal=user)
+    web_svc = _get_payment_web_service(db, user)
 
     form = await request.form()
     reason = _form_str(form, "reason") or None
 
     try:
-        subscription = svc.cancel(subscription_id, reason=reason)
-        db.commit()
+        subscription = web_svc.cancel(subscription_id, reason=reason)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
     except (ValidationError, ConflictError) as exc:
@@ -399,11 +394,16 @@ async def payment_subscription_retry(
 ):
     """Retry a failed charge for a payment subscription."""
     svc = PaymentSubscriptionService(db, principal=user)
+    web_svc = _get_payment_web_service(db, user)
 
     try:
         subscription = svc.get_payment_subscription(subscription_id)
-        svc.record_charge_attempt(subscription_id, success=False, reference=None, amount=subscription.amount)
-        db.commit()
+        web_svc.record_charge_attempt(
+            subscription_id,
+            success=False,
+            reference=None,
+            amount=subscription.amount,
+        )
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment subscription not found")
     except (ValidationError, ConflictError) as exc:
@@ -433,6 +433,7 @@ async def payment_subscription_link_modal(
 ):
     """Modal to link payment subscription to service subscription."""
     svc = PaymentSubscriptionService(db, principal=user)
+    query_svc = _get_payment_query_service(db)
 
     try:
         subscription = svc.get_payment_subscription(subscription_id)
@@ -440,9 +441,7 @@ async def payment_subscription_link_modal(
         raise HTTPException(status_code=404, detail="Payment subscription not found")
 
     # Get service subscriptions for the same customer
-    service_subscriptions = db.query(Subscription).filter(
-        Subscription.party_id == subscription.party_id,
-    ).order_by(Subscription.plan_name).all()
+    service_subscriptions = query_svc.list_service_subscriptions(subscription.party_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["subscription"] = subscription
@@ -463,6 +462,7 @@ async def payment_subscription_link(
 ):
     """Link payment subscription to a service subscription."""
     svc = PaymentSubscriptionService(db, principal=user)
+    web_svc = _get_payment_web_service(db, user)
 
     try:
         subscription = svc.get_payment_subscription(subscription_id)
@@ -474,14 +474,13 @@ async def payment_subscription_link(
 
     try:
         if service_subscription_id and service_subscription_id.isdigit():
-            subscription = svc.link_to_service_subscription(
+            subscription = web_svc.link_to_service_subscription(
                 subscription_id,
                 int(service_subscription_id),
             )
         else:
             # Unlink
-            subscription = svc.unlink_service_subscription(subscription_id)
-        db.commit()
+            subscription = web_svc.unlink_service_subscription(subscription_id)
     except (ValidationError, NotFoundError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

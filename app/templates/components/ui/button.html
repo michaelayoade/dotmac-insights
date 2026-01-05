@@ -2,27 +2,12 @@
 Button Component
 
 Usage:
-{% include "components/ui/button.html" with {
-    label: "Submit",
-    variant: "primary",  # primary, secondary, danger, ghost
-    size: "md",          # sm, md, lg
-    type: "submit",      # button, submit, reset
-    disabled: false,
-    loading: false,
-    href: "/path",       # If set, renders as <a> tag
-    icon: "plus",        # Icon name (optional)
-    testid: "submit-btn",
-    htmx: {
-        hx_get: "/url",
-        hx_post: "/url",
-        hx_target: "#target",
-        hx_swap: "innerHTML",
-        hx_confirm: "Are you sure?",
-    }
-} %}
+{% with label="Submit", variant="primary", ghost    size="md", lg    type="submit", reset    disabled=false, loading=false, href="/path", renders as <a> tag    icon="plus", # Icon name (optional)    testid="submit-btn", htmx={ hx_get: "/url", hx_post: "/url", hx_target: "#target", hx_swap: "innerHTML", hx_confirm: "Are you sure?", } %}
+{% include "components/ui/button.html" %}
+{% endwith %}
 #}
 
-{% set base_classes = "inline-flex items-center justify-center font-semibold rounded-lg transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed" %}
+{% set base_classes = "inline-flex items-center justify-center font-semibold rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed" %}
 
 {% set size_classes = {
     "sm": "px-2.5 py-1.5 text-xs gap-1",

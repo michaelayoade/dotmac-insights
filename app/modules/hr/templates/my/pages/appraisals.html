@@ -55,16 +55,11 @@
     </div>
 
     <!-- Pagination -->
-    {% if pagination.pages > 1 %}
-    <div class="flex items-center justify-center gap-2">
-        {% if pagination.page > 1 %}
-        <a href="?page={{ pagination.page - 1 }}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Previous</a>
-        {% endif %}
-        <span class="px-4 py-2 text-sm text-gray-500">Page {{ pagination.page }} of {{ pagination.pages }}</span>
-        {% if pagination.page < pagination.pages %}
-        <a href="?page={{ pagination.page + 1 }}" class="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">Next</a>
-        {% endif %}
-    </div>
+    {% set total_pages = pagination.total_pages if pagination.total_pages is defined else pagination.pages %}
+    {% if total_pages > 1 %}
+    {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": total_pages, "has_prev": pagination.page > 1, "has_next": pagination.page < total_pages, "prev_page": pagination.page - 1 if pagination.page > 1 else None, "next_page": pagination.page + 1 if pagination.page < total_pages else None, "start_item": pagination.start_item if pagination.start_item is defined else pagination.start, "end_item": pagination.end_item if pagination.end_item is defined else pagination.end }, base_url="/hr/my/appraisals" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
     {% endif %}
 
     {% else %}

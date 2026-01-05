@@ -23,13 +23,18 @@ from app.models.tax import (
     TaxFilingType,
     TaxPayment,
     TaxType,
+    RoundingMethod,
 )
 from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .tax_types import (
     TaxCodeFilters,
+    TaxCodeCreateData,
+    TaxCodeUpdateData,
     TaxDashboardSummary,
     TaxFilingCreateData,
     TaxFilingFilters,
@@ -104,6 +109,106 @@ class TaxService:
             "sales": sales,
             "purchase": purchase,
         }
+
+    def create_tax_code(
+        self,
+        data: TaxCodeCreateData,
+        user_id: Optional[int] = None,
+    ) -> TaxCode:
+        """Create a new tax code."""
+        existing = self.db.query(TaxCode).filter(TaxCode.code == data.code).first()
+        if existing:
+            raise ValidationError(f"Tax code '{data.code}' already exists")
+
+        try:
+            tax_type_enum = TaxType(data.tax_type.lower())
+        except ValueError:
+            raise ValidationError(f"Invalid tax type: {data.tax_type}")
+
+        try:
+            rounding_enum = RoundingMethod(data.rounding_method.lower())
+        except ValueError:
+            raise ValidationError(f"Invalid rounding method: {data.rounding_method}")
+
+        tc = TaxCode(
+            code=data.code,
+            name=data.name,
+            description=data.description,
+            rate=data.rate,
+            tax_type=tax_type_enum,
+            is_tax_inclusive=data.is_tax_inclusive,
+            rounding_method=rounding_enum,
+            rounding_precision=data.rounding_precision,
+            jurisdiction=data.jurisdiction,
+            country=data.country,
+            account_head=data.account_head,
+            cost_center=data.cost_center,
+            valid_from=data.valid_from,
+            valid_to=data.valid_to,
+            company=data.company,
+            created_by_id=user_id,
+        )
+        self.db.add(tc)
+        self.db.flush()
+        SoftValidationService(self.db).validate_and_store(tc)
+        return tc
+
+    def update_tax_code(self, tax_code_id: int, data: TaxCodeUpdateData) -> TaxCode:
+        """Update a tax code."""
+        tc = self.db.query(TaxCode).filter(TaxCode.id == tax_code_id).first()
+        if not tc:
+            raise NotFoundError("Tax code not found")
+
+        if data.name is not None:
+            tc.name = data.name
+        if data.description is not None:
+            tc.description = data.description
+        if data.rate is not None:
+            tc.rate = data.rate
+        if data.tax_type is not None:
+            try:
+                tc.tax_type = TaxType(data.tax_type.lower())
+            except ValueError:
+                raise ValidationError(f"Invalid tax type: {data.tax_type}")
+        if data.is_tax_inclusive is not None:
+            tc.is_tax_inclusive = data.is_tax_inclusive
+        if data.rounding_method is not None:
+            try:
+                tc.rounding_method = RoundingMethod(data.rounding_method.lower())
+            except ValueError:
+                raise ValidationError(f"Invalid rounding method: {data.rounding_method}")
+        if data.rounding_precision is not None:
+            tc.rounding_precision = data.rounding_precision
+        if data.jurisdiction is not None:
+            tc.jurisdiction = data.jurisdiction
+        if data.country is not None:
+            tc.country = data.country
+        if data.account_head is not None:
+            tc.account_head = data.account_head
+        if data.cost_center is not None:
+            tc.cost_center = data.cost_center
+        if data.valid_from is not None:
+            tc.valid_from = data.valid_from
+        if data.valid_to is not None:
+            tc.valid_to = data.valid_to
+        if data.company is not None:
+            tc.company = data.company
+        if data.is_active is not None:
+            tc.is_active = data.is_active
+
+        self.db.flush()
+        SoftValidationService(self.db).validate_and_store(tc)
+        return tc
+
+    def deactivate_tax_code(self, tax_code_id: int) -> TaxCode:
+        """Deactivate (soft delete) a tax code."""
+        tc = self.db.query(TaxCode).filter(TaxCode.id == tax_code_id).first()
+        if not tc:
+            raise NotFoundError("Tax code not found")
+        tc.is_active = False
+        self.db.flush()
+        SoftValidationService(self.db).validate_and_store(tc)
+        return tc
 
     # ============= TAX FILING PERIODS =============
 
@@ -234,6 +339,7 @@ class TaxService:
         )
         self.db.add(period)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(period)
         return period
 
     # ============= FILING WORKFLOW =============
@@ -269,6 +375,7 @@ class TaxService:
         period.filing_reference = filing_reference
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(period)
         return period
 
     def record_payment(
@@ -309,6 +416,9 @@ class TaxService:
             period.status = TaxFilingStatus.PAID
 
         self.db.flush()
+        validator = SoftValidationService(self.db)
+        validator.validate_and_store(payment)
+        validator.validate_and_store(period)
         return payment
 
     # ============= TAX DASHBOARD =============

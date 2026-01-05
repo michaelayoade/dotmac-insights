@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from app.models.project import ProjectPriority
 
 __all__ = [
     "TaskTemplateData",
     "MilestoneTemplateData",
+    "TemplateFilters",
     "TemplateCreateData",
     "TemplateUpdateData",
     "CreateFromTemplateData",
@@ -32,7 +33,7 @@ class TaskTemplateData:
     duration_days: int = 1
     default_assigned_role: Optional[str] = None
     is_group: bool = False
-    idx: int = 0
+    idx: Optional[int] = None
     parent_template_idx: Optional[int] = None  # Reference to parent task template by idx
     milestone_template_idx: Optional[int] = None  # Reference to milestone template by idx
 
@@ -45,7 +46,17 @@ class MilestoneTemplateData:
     description: Optional[str] = None
     start_day_offset: int = 0
     end_day_offset: int = 7
-    idx: int = 0
+    idx: Optional[int] = None
+
+
+@dataclass
+class TemplateFilters:
+    """Filters for querying project templates."""
+
+    active_only: bool = True
+    is_active: Optional[bool] = None
+    project_type: Optional[str] = None
+    search: Optional[str] = None
 
 
 @dataclass
@@ -97,8 +108,7 @@ class CreateFromTemplateData:
 class TemplateExpansionResult:
     """Result of expanding a template into a project."""
 
-    project_id: int
-    project_name: str
-    template_id: int
+    project: Any  # The created Project model instance
     milestones_created: int
     tasks_created: int
+    template_name: str

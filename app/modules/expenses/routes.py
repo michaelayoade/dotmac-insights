@@ -4,8 +4,6 @@ Expense Claims Routes.
 Handles SSR pages for expense claims, cash advances, and categories.
 Business logic is delegated to services in app/services/expenses/.
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import date
 from fastapi import APIRouter, Request, Response, Depends, Query, Form, UploadFile
@@ -17,19 +15,18 @@ from app.web.dependencies import SessionUser, CSRFToken, require_scope
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
 from app.auth import Principal
-from app.models.expense_management import (
-    ExpenseClaimStatus,
-    CashAdvanceStatus,
-)
-from app.models.employee import Employee
+from app.models.expense_management import ExpenseClaimStatus, CashAdvanceStatus
+from app.models.employee import EmploymentStatus
 from app.core.security import set_flash
+from app.services.expense_service import ExpenseService
+from app.services.cash_advance_service import CashAdvanceService
 from app.services.expenses import (
-    ExpenseService,
-    CashAdvanceService,
     ExpenseCategoryService,
     ExpenseClaimFilters,
     CashAdvanceFilters,
 )
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import EmployeeFilters
 from app.services.types import PaginationParams
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 
@@ -63,6 +60,19 @@ def get_category_service(
     principal: Principal = Depends(require_scope("expenses:read")),
 ) -> ExpenseCategoryService:
     return ExpenseCategoryService(db, principal)
+
+
+def get_employee_service(
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_scope("expenses:read")),
+) -> EmployeeService:
+    return EmployeeService(db, principal)
+
+
+def list_active_employees(service: EmployeeService) -> list:
+    filters = EmployeeFilters(status=EmploymentStatus.ACTIVE)
+    result = service.list_employees(filters, PaginationParams(offset=0, limit=500))
+    return result.items
 
 
 def _form_str(form: Any, key: str, default: str = "") -> str:
@@ -161,17 +171,18 @@ async def new_claim(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: Session = Depends(get_db),
+    service: ExpenseService = Depends(get_expense_service),
 ):
     """New expense claim form."""
-    employees = db.query(Employee).filter(Employee.status == "Active").order_by(Employee.name).all()
-    categories = db.query(ExpenseCategory).filter(ExpenseCategory.is_active == True).order_by(ExpenseCategory.name).all()
+    # Use service for form options (avoids duplicate queries)
+    form_options = service.get_form_options()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "New Expense Claim"
     context["claim"] = None
-    context["employee_options"] = [{"value": e.id, "label": e.name} for e in employees]
-    context["category_options"] = [{"value": c.id, "label": c.name} for c in categories]
+    context["employee_options"] = [{"value": e.id, "label": e.name} for e in form_options.employees]
+    context["category_options"] = [{"value": c.id, "label": c.name} for c in form_options.categories]
     context["errors"] = {}
     context["form_data"] = {}
 
@@ -186,12 +197,13 @@ async def create_claim(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: Session = Depends(get_db),
+    service: ExpenseService = Depends(get_expense_service),
     employee_id: int = Form(...),
     title: str = Form(...),
     description: Optional[str] = Form(None),
     claim_date: date = Form(...),
 ):
-    """Create new expense claim."""
+    """Create new expense claim via service."""
     from app.core.security import validate_csrf
     await validate_csrf(request)
 
@@ -202,34 +214,29 @@ async def create_claim(
         errors["title"] = "Title is required"
 
     if errors:
-        employees = db.query(Employee).filter(Employee.status == "Active").order_by(Employee.name).all()
-        categories = db.query(ExpenseCategory).filter(ExpenseCategory.is_active == True).order_by(ExpenseCategory.name).all()
+        # Use service for form options
+        form_options = service.get_form_options()
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
         context["page_title"] = "New Expense Claim"
         context["claim"] = None
-        context["employee_options"] = [{"value": e.id, "label": e.name} for e in employees]
-        context["category_options"] = [{"value": c.id, "label": c.name} for c in categories]
+        context["employee_options"] = [{"value": e.id, "label": e.name} for e in form_options.employees]
+        context["category_options"] = [{"value": c.id, "label": c.name} for c in form_options.categories]
         context["errors"] = errors
         context["form_data"] = {"employee_id": employee_id, "title": title, "description": description, "claim_date": claim_date}
 
         template = templates.get_template(f"{TEMPLATE_PATH}/pages/form.html")
         return HTMLResponse(template.render(context))
 
-    # Get employee department
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-
-    claim = ExpenseClaim(
+    # Create claim via service
+    claim = service.create_draft_claim(
         employee_id=employee_id,
-        department_id=employee.department_id if employee else None,
         title=title,
         description=description,
         claim_date=claim_date,
-        status=ExpenseClaimStatus.DRAFT,
         created_by_id=user.id,
     )
-    db.add(claim)
     db.commit()
 
     set_flash(response, "Expense claim created successfully.", "success")
@@ -315,10 +322,10 @@ async def advance_new(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: Session = Depends(get_db),
+    employee_service: EmployeeService = Depends(get_employee_service),
 ):
     """New cash advance form."""
-    employees = db.query(Employee).filter(Employee.status == "Active").order_by(Employee.name).all()
+    employees = list_active_employees(employee_service)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -339,11 +346,14 @@ async def advance_create(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: Session = Depends(get_db),
+    service: CashAdvanceService = Depends(get_cash_advance_service),
+    employee_service: EmployeeService = Depends(get_employee_service),
 ):
-    """Create new cash advance."""
+    """Create new cash advance via service."""
     from app.core.security import validate_csrf
     from datetime import date as date_type
     from decimal import Decimal
+    from types import SimpleNamespace
     await validate_csrf(request)
 
     form = await request.form()
@@ -360,8 +370,16 @@ async def advance_create(
     if not requested_amount:
         errors["requested_amount"] = "Amount is required"
 
+    # Validate Decimal conversion
+    amount_decimal = None
+    if requested_amount and not errors.get("requested_amount"):
+        try:
+            amount_decimal = Decimal(requested_amount)
+        except Exception:
+            errors["requested_amount"] = "Invalid amount format"
+
     if errors:
-        employees = db.query(Employee).filter(Employee.status == "Active").order_by(Employee.name).all()
+        employees = list_active_employees(employee_service)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -375,17 +393,26 @@ async def advance_create(
         template = templates.get_template(f"{TEMPLATE_PATH}/pages/advance_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    advance = CashAdvance(
+    # Build payload for service
+    currency = _form_str(form, "currency", "NGN")
+    payload = SimpleNamespace(
         employee_id=int(employee_id),
         purpose=purpose,
-        description=_form_str(form, "description") or None,
-        requested_amount=Decimal(requested_amount),
-        currency=_form_str(form, "currency", "USD"),
-        status=CashAdvanceStatus.DRAFT,
+        request_date=date_type.today(),
+        required_by_date=None,
+        project_id=None,
+        trip_start_date=None,
+        trip_end_date=None,
+        destination=None,
+        requested_amount=amount_decimal,
+        currency=currency,
+        base_currency=currency,
+        conversion_rate=Decimal("1"),
+        company=None,
     )
-    db.add(advance)
+
+    advance = service.create_advance(payload)
     db.commit()
-    db.refresh(advance)
 
     set_flash(response, "Cash advance request created successfully.", "success")
     return RedirectResponse(url=f"/expenses/advances/{advance.id}", status_code=303)
@@ -426,7 +453,7 @@ async def advance_edit(
     csrf_token: CSRFToken,
     advance_id: int,
     service: CashAdvanceService = Depends(get_cash_advance_service),
-    db: Session = Depends(get_db),
+    employee_service: EmployeeService = Depends(get_employee_service),
 ):
     """Edit cash advance form."""
     try:
@@ -437,7 +464,7 @@ async def advance_edit(
         context["message"] = "Cash advance not found"
         return HTMLResponse(template.render(context), status_code=404)
 
-    employees = db.query(Employee).filter(Employee.status == "Active").order_by(Employee.name).all()
+    employees = list_active_employees(employee_service)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -459,14 +486,18 @@ async def advance_update(
     csrf_token: CSRFToken,
     advance_id: int,
     db: Session = Depends(get_db),
+    service: CashAdvanceService = Depends(get_cash_advance_service),
+    employee_service: EmployeeService = Depends(get_employee_service),
 ):
-    """Update cash advance."""
+    """Update cash advance via service."""
     from app.core.security import validate_csrf
     from decimal import Decimal
+    from types import SimpleNamespace
     await validate_csrf(request)
 
-    advance = db.query(CashAdvance).filter(CashAdvance.id == advance_id).first()
-    if not advance:
+    try:
+        advance = service.get_advance(advance_id)
+    except NotFoundError:
         set_flash(response, "Cash advance not found.", "error")
         return RedirectResponse(url="/expenses/advances", status_code=303)
 
@@ -481,8 +512,16 @@ async def advance_update(
     if not requested_amount:
         errors["requested_amount"] = "Amount is required"
 
+    # Validate Decimal conversion
+    amount_decimal = None
+    if requested_amount and not errors.get("requested_amount"):
+        try:
+            amount_decimal = Decimal(requested_amount)
+        except Exception:
+            errors["requested_amount"] = "Invalid amount format"
+
     if errors:
-        employees = db.query(Employee).filter(Employee.status == "Active").order_by(Employee.name).all()
+        employees = list_active_employees(employee_service)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -495,14 +534,26 @@ async def advance_update(
         template = templates.get_template(f"{TEMPLATE_PATH}/pages/advance_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    advance.purpose = purpose
-    advance.description = _form_str(form, "description") or None
-    advance.requested_amount = Decimal(requested_amount)
-    advance.currency = _form_str(form, "currency", advance.currency)
-    db.commit()
+    # Build payload for service update
+    payload = SimpleNamespace(
+        purpose=purpose,
+        requested_amount=amount_decimal,
+        request_date=None,
+        required_by_date=None,
+        project_id=None,
+        destination=None,
+        trip_start_date=None,
+        trip_end_date=None,
+    )
 
-    set_flash(response, "Cash advance updated successfully.", "success")
-    return RedirectResponse(url=f"/expenses/advances/{advance.id}", status_code=303)
+    try:
+        service.update_advance(advance_id, payload)
+        db.commit()
+        set_flash(response, "Cash advance updated successfully.", "success")
+    except ValidationError as e:
+        set_flash(response, str(e), "error")
+
+    return RedirectResponse(url=f"/expenses/advances/{advance_id}", status_code=303)
 
 
 @router.post("/advances/{advance_id:int}/submit", dependencies=[RequireExpensesWrite])
@@ -561,8 +612,9 @@ async def category_create(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: Session = Depends(get_db),
+    service: ExpenseCategoryService = Depends(get_category_service),
 ):
-    """Create new expense category."""
+    """Create new expense category via service."""
     from app.core.security import validate_csrf
     await validate_csrf(request)
 
@@ -570,14 +622,11 @@ async def category_create(
 
     errors = {}
     name = _form_str(form, "name")
+    code = _form_str(form, "code") or name.upper().replace(" ", "_")[:20] if name else ""
+    expense_account = _form_str(form, "expense_account") or "6000"  # Default expense account
 
     if not name:
         errors["name"] = "Category name is required"
-
-    # Check for duplicate
-    existing = db.query(ExpenseCategory).filter(ExpenseCategory.name == name).first()
-    if existing:
-        errors["name"] = "A category with this name already exists"
 
     if errors:
         context = get_base_context(request, response, user, csrf_token)
@@ -590,16 +639,38 @@ async def category_create(
         template = templates.get_template(f"{TEMPLATE_PATH}/pages/category_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    category = ExpenseCategory(
-        name=name,
-        description=_form_str(form, "description") or None,
-        is_active=form.get("is_active") == "on",
-    )
-    db.add(category)
-    db.commit()
+    try:
+        category = service.create_category(
+            name=name,
+            code=code,
+            expense_account=expense_account,
+            description=_form_str(form, "description") or None,
+        )
+        db.commit()
+        set_flash(response, f"Category '{name}' created successfully.", "success")
+        return RedirectResponse(url="/expenses/categories", status_code=303)
+    except ConflictError as e:
+        errors["name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Expense Category"
+        context["category"] = None
+        context["errors"] = errors
+        context["form_data"] = dict(form)
 
-    set_flash(response, f"Category '{name}' created successfully.", "success")
-    return RedirectResponse(url="/expenses/categories", status_code=303)
+        template = templates.get_template(f"{TEMPLATE_PATH}/pages/category_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+    except ValidationError as e:
+        errors["name"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Expense Category"
+        context["category"] = None
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+
+        template = templates.get_template(f"{TEMPLATE_PATH}/pages/category_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.get("/categories/{category_id:int}/edit", response_class=HTMLResponse, dependencies=[RequireExpensesWrite])
@@ -638,13 +709,15 @@ async def category_update(
     csrf_token: CSRFToken,
     category_id: int,
     db: Session = Depends(get_db),
+    service: ExpenseCategoryService = Depends(get_category_service),
 ):
-    """Update expense category."""
+    """Update expense category via service."""
     from app.core.security import validate_csrf
     await validate_csrf(request)
 
-    category = db.query(ExpenseCategory).filter(ExpenseCategory.id == category_id).first()
-    if not category:
+    try:
+        category = service.get_category(category_id)
+    except NotFoundError:
         set_flash(response, "Category not found.", "error")
         return RedirectResponse(url="/expenses/categories", status_code=303)
 
@@ -656,14 +729,6 @@ async def category_update(
     if not name:
         errors["name"] = "Category name is required"
 
-    # Check for duplicate (excluding current)
-    existing = db.query(ExpenseCategory).filter(
-        ExpenseCategory.name == name,
-        ExpenseCategory.id != category_id
-    ).first()
-    if existing:
-        errors["name"] = "A category with this name already exists"
-
     if errors:
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -674,13 +739,29 @@ async def category_update(
         template = templates.get_template(f"{TEMPLATE_PATH}/pages/category_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    category.name = name
-    category.description = _form_str(form, "description") or None
-    category.is_active = form.get("is_active") == "on"
-    db.commit()
+    try:
+        service.update_category(
+            category_id=category_id,
+            name=name,
+            description=_form_str(form, "description") or None,
+            is_active=form.get("is_active") == "on",
+        )
+        db.commit()
+        set_flash(response, f"Category '{name}' updated successfully.", "success")
+        return RedirectResponse(url="/expenses/categories", status_code=303)
+    except ConflictError as e:
+        errors["name"] = str(e)
+    except ValidationError as e:
+        errors["name"] = str(e)
 
-    set_flash(response, f"Category '{name}' updated successfully.", "success")
-    return RedirectResponse(url="/expenses/categories", status_code=303)
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit Category: {category.name}"
+    context["category"] = category
+    context["errors"] = errors
+
+    template = templates.get_template(f"{TEMPLATE_PATH}/pages/category_form.html")
+    return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.get("/{claim_id:int}", response_class=HTMLResponse, dependencies=[RequireExpensesRead])

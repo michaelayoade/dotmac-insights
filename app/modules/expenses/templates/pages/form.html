@@ -3,7 +3,7 @@
 {% block content %}
 <div class="max-w-2xl mx-auto">
     <form method="POST" action="{{ '/expenses/' ~ claim.id if claim else '/expenses' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         {% if claim %}<input type="hidden" name="_method" value="PUT">{% endif %}
         <div class="px-6 py-5 border-b border-gray-100">
             <h3 class="text-lg font-display font-semibold text-gray-900">{{ 'Edit Expense Claim' if claim else 'New Expense Claim' }}</h3>
@@ -12,7 +12,7 @@
         <div class="px-6 py-6 space-y-6">
             <div>
                 <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1.5">Employee <span class="text-red-500">*</span></label>
-                <select name="employee_id" id="employee_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <select name="employee_id" id="employee_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white rounded-xl shadow-warm-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.employee_id else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors">
                     <option value="">Select employee</option>
                     {% for opt in employee_options %}<option value="{{ opt.value }}" {{ 'selected' if (claim and claim.employee_id == opt.value) or (form_data and form_data.employee_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
                 </select>
@@ -20,12 +20,12 @@
             </div>
             <div>
                 <label for="title" class="block text-sm font-medium text-gray-700 mb-1.5">Title <span class="text-red-500">*</span></label>
-                <input type="text" name="title" id="title" required value="{{ claim.title if claim else (form_data.title if form_data else '') }}" placeholder="e.g., Client Meeting Expenses - January" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <input type="text" name="title" id="title" required value="{{ claim.title if claim else (form_data.title if form_data else '') }}" placeholder="e.g., Client Meeting Expenses - January" class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white rounded-xl shadow-warm-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.title else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors">
                 {% if errors.title %}<p class="mt-1.5 text-sm text-red-600">{{ errors.title }}</p>{% endif %}
             </div>
             <div>
                 <label for="claim_date" class="block text-sm font-medium text-gray-700 mb-1.5">Claim Date <span class="text-red-500">*</span></label>
-                <input type="date" name="claim_date" id="claim_date" required value="{{ claim.claim_date if claim else (form_data.claim_date if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <input type="date" name="claim_date" id="claim_date" required value="{{ claim.claim_date if claim else (form_data.claim_date if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white rounded-xl shadow-warm-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors.claim_date else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm transition-colors">
                 {% if errors.claim_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.claim_date }}</p>{% endif %}
             </div>
             <div>

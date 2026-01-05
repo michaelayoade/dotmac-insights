@@ -13,6 +13,7 @@ from ._deps import (
     BankTransactionStatus,
 )
 from app.services.accounting import BankingService
+from app.services.accounting.web_services import AccountingBankAccountsWebService
 from app.services.bank_reconciliation import BankReconciliationService
 from app.services.accounting.banking_types import BankTransactionFilters
 from app.services.errors import NotFoundError, ValidationError
@@ -23,6 +24,10 @@ router = APIRouter()
 
 def _get_banking_service(db: DB, user: SessionUser) -> BankingService:
     return BankingService(db, user)
+
+
+def _get_banking_web_service(db: DB, user: SessionUser) -> AccountingBankAccountsWebService:
+    return AccountingBankAccountsWebService(db, _get_banking_service(db, user))
 
 
 @router.get("/bank-accounts", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -255,7 +260,7 @@ async def bank_reconciliation_mark(
         except ValueError:
             continue
 
-    count = service.mark_transactions_reconciled(parsed_ids)
-    db.commit()
+    web_service = _get_banking_web_service(db, user)
+    count = web_service.mark_transactions_reconciled(parsed_ids)
     set_flash(response, f"Marked {count} transaction(s) as reconciled.", "success")
     return RedirectResponse(url=f"/accounting/bank-accounts/{account_id}/reconcile", status_code=303)

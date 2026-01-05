@@ -69,35 +69,29 @@ export const test = base.extend<{ htmx: HTMXHelpers }>({
       },
 
       async waitForHtmxRequest(trigger: Locator) {
-        // Get the target selector from hx-target or use the trigger itself
-        const targetSelector = await trigger.getAttribute('hx-target');
+        const triggerHandle = await trigger.elementHandle();
+        const target = await helpers.getHtmxTarget(trigger);
+        const targetHandle = await target.elementHandle();
 
-        // Wait for the request class to appear and disappear
-        await Promise.race([
-          trigger.evaluate((el) => {
-            return new Promise<void>((resolve) => {
-              const observer = new MutationObserver((mutations) => {
-                for (const mutation of mutations) {
-                  if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                    const target = mutation.target as HTMLElement;
-                    if (!target.classList.contains('htmx-request')) {
-                      observer.disconnect();
-                      resolve();
-                    }
-                  }
-                }
-              });
-              observer.observe(el, { attributes: true });
+        const handles = [triggerHandle, targetHandle].filter(Boolean) as NonNullable<
+          typeof triggerHandle
+        >[];
 
-              // Also resolve if already not in request state
-              if (!el.classList.contains('htmx-request')) {
-                observer.disconnect();
-                resolve();
-              }
-            });
-          }),
-          page.waitForTimeout(10000), // Fallback timeout
-        ]);
+        if (handles.length === 0) {
+          throw new Error('HTMX wait failed: trigger element not found.');
+        }
+
+        // Wait for HTMX request to start on trigger or target.
+        await page.waitForFunction(
+          (elements) => elements.some((el) => el.classList.contains('htmx-request')),
+          { timeout: 10000 },
+          handles
+        );
+
+        // Wait for all HTMX requests to complete.
+        await page.waitForFunction(() => {
+          return document.querySelectorAll('.htmx-request').length === 0;
+        }, { timeout: 10000 });
 
         await page.waitForTimeout(50); // Buffer for DOM updates
       },

@@ -1,4 +1,4 @@
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="filing-table">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50/50">
@@ -17,7 +17,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
                 {% for p in periods %}
-                <tr class="hover:bg-gray-50/50 transition-colors duration-150 {{ 'bg-red-50/50' if p.is_overdue }}">
+                <tr class="hover:bg-surface-50/50 transition-colors duration-150 {{ 'bg-red-50/50' if p.is_overdue }}">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                             {% if p.tax_type == 'vat' %}bg-blue-100 text-blue-700
@@ -78,7 +78,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" class="px-6 py-12 text-center">
+                    <td colspan="8" class="px-6 py-12 text-center" data-testid="filing-empty-state">
                         <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                         </svg>

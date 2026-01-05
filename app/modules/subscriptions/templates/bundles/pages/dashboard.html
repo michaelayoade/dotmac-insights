@@ -8,7 +8,7 @@
     </div>
     <div class="flex items-center gap-3">
         <a href="/subscriptions/bundles"
-           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+           class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-surface-50">
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
             </svg>
@@ -174,7 +174,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
                 {% for product in analytics.top_products %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-surface-50">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <a href="/subscriptions/bundles/products/{{ product.product_id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                             {{ product.product_name }}

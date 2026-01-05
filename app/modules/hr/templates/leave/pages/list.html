@@ -34,6 +34,23 @@
 <div x-data="columnPicker('leave-applications-table', {{ leave_application_columns  | tojson | e }})">
 <div class="mb-6 bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
     <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <select
+            name="status"
+            class="sr-only"
+            data-testid="leave-status-filter"
+            hx-get="/hr/leave/table"
+            hx-trigger="change"
+            hx-target="#leave-table-container"
+            hx-include="[name='q'], [name='leave_type']"
+            hx-push-url="true"
+        >
+            <option value="">All Statuses</option>
+            {% for opt in status_options %}
+            <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>
+                {{ opt.label }}
+            </option>
+            {% endfor %}
+        </select>
         <div class="flex-1 relative">
             <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                 <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -46,15 +63,38 @@
         </div>
         <div class="flex gap-3 flex-wrap items-center">
             <div class="relative" x-data="{ open: false }">
-                <button type="button" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 border-0 rounded-xl hover:bg-surface-100" @click="open = !open">
+                <button
+                    type="button"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-surface-50 border-0 rounded-xl hover:bg-surface-100"
+                    @click="open = !open"
+                    data-testid="leave-status-filter-button"
+                >
                     <span>Status</span>
                     {% if current_status %}<span class="inline-flex items-center justify-center w-5 h-5 text-xs font-semibold text-primary-700 bg-primary-100 rounded-full">1</span>{% endif %}
                     <svg class="w-4 h-4 text-gray-400" :class="{ 'rotate-180': open }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>
                 <div x-show="open" x-cloak @click.away="open = false" class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-warm-lg ring-1 ring-gray-100 p-2">
-                    <a href="#" class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_status else 'text-gray-700 hover:bg-surface-50' }}" hx-get="/hr/leave/table" hx-target="#leave-table-container" hx-include="[name='q'], [name='leave_type']" hx-push-url="true" @click="open = false">All</a>
+                    <a
+                        href="#"
+                        class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_status else 'text-gray-700 hover:bg-surface-50' }}"
+                        hx-get="/hr/leave/table"
+                        hx-target="#leave-table-container"
+                        hx-include="[name='q'], [name='leave_type']"
+                        hx-push-url="true"
+                        @click="open = false"
+                        data-testid="leave-status-option-all"
+                    >All</a>
                     {% for opt in status_options %}
-                    <a href="#" class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if current_status == opt.value else 'text-gray-700 hover:bg-surface-50' }}" hx-get="/hr/leave/table?status={{ opt.value }}" hx-target="#leave-table-container" hx-include="[name='q'], [name='leave_type']" hx-push-url="true" @click="open = false">{{ opt.label }}</a>
+                    <a
+                        href="#"
+                        class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if current_status == opt.value else 'text-gray-700 hover:bg-surface-50' }}"
+                        hx-get="/hr/leave/table?status={{ opt.value }}"
+                        hx-target="#leave-table-container"
+                        hx-include="[name='q'], [name='leave_type']"
+                        hx-push-url="true"
+                        @click="open = false"
+                        data-testid="leave-status-option-{{ opt.value | replace(' ', '-') }}"
+                    >{{ opt.label }}</a>
                     {% endfor %}
                 </div>
             </div>

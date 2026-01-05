@@ -15,18 +15,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Response, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func
-
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
 
-# Import models for dashboard stats
-from app.models.project import Project, ProjectStatus
-from app.models.field_service import ServiceOrder, ServiceOrderStatus
-from app.models.inventory import Warehouse, StockEntry
-from app.models.asset import Asset, AssetStatus
-from app.models.vehicle import Vehicle
+from app.services.operations import OperationsDashboardService
 
 # Import sub-module routers
 from app.modules.projects.routes import (
@@ -63,96 +56,61 @@ async def operations_dashboard(
     context["page_title"] = "Operations"
     context["now"] = datetime.utcnow()
 
-    # Gather stats across all operations sub-modules
-    stats = []
+    stats_service = OperationsDashboardService(db, principal=user)
+    counts = stats_service.get_dashboard_counts()
 
-    # Active Projects
-    active_projects = db.query(func.count(Project.id)).filter(
-        Project.status.in_([
-            ProjectStatus.OPEN,
-            ProjectStatus.ON_HOLD,
-        ])
-    ).scalar() or 0
-    stats.append({
-        "key": "projects",
-        "label": "Active Projects",
-        "value": f"{active_projects:,}",
-        "subtext": "In progress",
-        "icon": "folder",
-        "icon_bg": "bg-blue-50",
-        "icon_color": "text-blue-600",
-        "href": "/operations/projects",
-    })
-
-    # Open Service Orders
-    open_orders = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.status.in_([
-            ServiceOrderStatus.DRAFT,
-            ServiceOrderStatus.SCHEDULED,
-            ServiceOrderStatus.DISPATCHED,
-            ServiceOrderStatus.IN_PROGRESS,
-        ])
-    ).scalar() or 0
-    stats.append({
-        "key": "field_service",
-        "label": "Service Orders",
-        "value": f"{open_orders:,}",
-        "subtext": "Open orders",
-        "icon": "truck",
-        "icon_bg": "bg-amber-50",
-        "icon_color": "text-amber-600",
-        "href": "/operations/field-service",
-    })
-
-    # Warehouses (active = not disabled)
-    warehouse_count = db.query(func.count(Warehouse.id)).filter(
-        Warehouse.disabled == False,
-        Warehouse.is_deleted == False,
-    ).scalar() or 0
-    stats.append({
-        "key": "inventory",
-        "label": "Warehouses",
-        "value": f"{warehouse_count:,}",
-        "subtext": "Active locations",
-        "icon": "package",
-        "icon_bg": "bg-emerald-50",
-        "icon_color": "text-emerald-600",
-        "href": "/operations/inventory",
-    })
-
-    # Active Assets (in service = submitted, partially/fully depreciated)
-    active_assets = db.query(func.count(Asset.id)).filter(
-        Asset.status.in_([
-            AssetStatus.SUBMITTED,
-            AssetStatus.PARTIALLY_DEPRECIATED,
-            AssetStatus.FULLY_DEPRECIATED,
-        ])
-    ).scalar() or 0
-    stats.append({
-        "key": "assets",
-        "label": "Active Assets",
-        "value": f"{active_assets:,}",
-        "subtext": "In service",
-        "icon": "box",
-        "icon_bg": "bg-purple-50",
-        "icon_color": "text-purple-600",
-        "href": "/operations/assets",
-    })
-
-    # Vehicles
-    vehicle_count = db.query(func.count(Vehicle.id)).filter(
-        Vehicle.is_active == True
-    ).scalar() or 0
-    stats.append({
-        "key": "vehicles",
-        "label": "Fleet Vehicles",
-        "value": f"{vehicle_count:,}",
-        "subtext": "Active fleet",
-        "icon": "truck",
-        "icon_bg": "bg-cyan-50",
-        "icon_color": "text-cyan-600",
-        "href": "/operations/vehicles",
-    })
+    stats = [
+        {
+            "key": "projects",
+            "label": "Active Projects",
+            "value": f"{counts['active_projects']:,}",
+            "subtext": "In progress",
+            "icon": "folder",
+            "icon_bg": "bg-blue-50",
+            "icon_color": "text-blue-600",
+            "href": "/operations/projects",
+        },
+        {
+            "key": "field_service",
+            "label": "Service Orders",
+            "value": f"{counts['open_orders']:,}",
+            "subtext": "Open orders",
+            "icon": "truck",
+            "icon_bg": "bg-amber-50",
+            "icon_color": "text-amber-600",
+            "href": "/operations/field-service",
+        },
+        {
+            "key": "inventory",
+            "label": "Warehouses",
+            "value": f"{counts['warehouse_count']:,}",
+            "subtext": "Active locations",
+            "icon": "package",
+            "icon_bg": "bg-emerald-50",
+            "icon_color": "text-emerald-600",
+            "href": "/operations/inventory",
+        },
+        {
+            "key": "assets",
+            "label": "Active Assets",
+            "value": f"{counts['active_assets']:,}",
+            "subtext": "In service",
+            "icon": "box",
+            "icon_bg": "bg-purple-50",
+            "icon_color": "text-purple-600",
+            "href": "/operations/assets",
+        },
+        {
+            "key": "vehicles",
+            "label": "Fleet Vehicles",
+            "value": f"{counts['vehicle_count']:,}",
+            "subtext": "Active fleet",
+            "icon": "truck",
+            "icon_bg": "bg-cyan-50",
+            "icon_color": "text-cyan-600",
+            "href": "/operations/vehicles",
+        },
+    ]
 
     context["stats"] = stats
 

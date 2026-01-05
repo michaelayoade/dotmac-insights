@@ -7,12 +7,13 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import BigInteger, String, Text, ForeignKey, Enum, Index, JSON, Date, Time
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
 from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.party import CustomerAccount
+    from app.models.party import Party
     from app.models.project import Project
     from app.models.task import Task
     from app.models.ticket import Ticket
@@ -158,12 +159,12 @@ class FieldTeam(Base):
 
 
 class FieldTeamMember(Base):
-    """Team member assignments."""
+    """Team member assignments (party-based)."""
     __tablename__ = "field_team_members"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("field_teams.id", ondelete="CASCADE"), nullable=False, index=True)
-    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), nullable=False, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(ForeignKey("parties.id"), nullable=True, index=True)
 
     # Role in team
     role: Mapped[str] = mapped_column(String(50), default="technician")  # lead, technician, helper
@@ -174,14 +175,21 @@ class FieldTeamMember(Base):
 
     # Relationships
     team: Mapped["FieldTeam"] = relationship(back_populates="members")
-    employee: Mapped["Employee"] = relationship(back_populates="field_team_memberships")
+    party: Mapped["Party"] = relationship(foreign_keys=[party_id])
+    employee: Mapped[Optional["Employee"]] = relationship(
+        "Employee",
+        primaryjoin="FieldTeamMember.party_id == Employee.party_id",
+        foreign_keys="[FieldTeamMember.party_id]",
+        back_populates="field_team_memberships",
+        viewonly=True,
+    )
 
     __table_args__ = (
-        Index("ix_field_team_members_team_employee", "team_id", "employee_id", unique=True),
+        Index("ix_field_team_members_team_party", "team_id", "party_id", unique=True),
     )
 
     def __repr__(self) -> str:
-        return f"<FieldTeamMember team={self.team_id} employee={self.employee_id}>"
+        return f"<FieldTeamMember team={self.team_id} party={self.party_id}>"
 
 
 # =============================================================================
@@ -591,6 +599,10 @@ class ServiceOrderItem(Base):
 
     def __repr__(self) -> str:
         return f"<ServiceOrderItem {self.item_name} x{self.quantity}>"
+
+
+# Alias for backwards compatibility (analytics uses TimeEntry)
+TimeEntry = ServiceTimeEntry
 
 
 # =============================================================================

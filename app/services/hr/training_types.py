@@ -99,6 +99,7 @@ class TrainingEventFilters:
     from_date: Optional[datetime] = None
     to_date: Optional[datetime] = None
     search: Optional[str] = None
+    employee_id: Optional[int] = None  # Filter by enrolled employee
 
 
 @dataclass

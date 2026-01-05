@@ -1,5 +1,5 @@
 {% if milestones %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="milestones-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
             <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Milestone</th>
@@ -17,22 +17,23 @@
 </div>
 
 {% if pagination.total_pages > 1 %}
-<div class="flex items-center justify-between mt-6">
-    <p class="text-sm text-gray-500">Showing {{ pagination.start }} to {{ pagination.end }} of {{ pagination.total }}</p>
-    <div class="flex gap-2">
-        {% if pagination.page > 1 %}
-        <button hx-get="/projects/milestones?page={{ pagination.page - 1 }}&q={{ search_query }}&status={{ current_status }}&project_id={{ current_project_id }}" hx-target="#table-container" hx-push-url="true"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
-        {% endif %}
-        {% if pagination.page < pagination.total_pages %}
-        <button hx-get="/projects/milestones?page={{ pagination.page + 1 }}&q={{ search_query }}&status={{ current_status }}&project_id={{ current_project_id }}" hx-target="#table-container" hx-push-url="true"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
-        {% endif %}
-    </div>
-</div>
+{% set query_params = [] %}
+{% if search_query %}
+{% set _ = query_params.append("q=" ~ search_query) %}
+{% endif %}
+{% if current_status %}
+{% set _ = query_params.append("status=" ~ current_status) %}
+{% endif %}
+{% if current_project_id %}
+{% set _ = query_params.append("project_id=" ~ current_project_id) %}
+{% endif %}
+{% set base_url = "/projects/milestones" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+{% with base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 {% endif %}
 {% else %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="milestones-empty-state">
     <div class="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
         <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9"/></svg>
     </div>

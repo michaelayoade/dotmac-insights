@@ -20,26 +20,30 @@
 {% block content %}
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-    <div class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4">
+    <a href="/accounting/approvals?status=pending" class="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-4 hover:from-amber-100 hover:to-amber-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-amber-700 uppercase tracking-wider">Pending</p>
         <p class="mt-1 text-2xl font-bold text-amber-800">{{ stats.pending }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-amber-600 mt-1 group-hover:underline">View pending →</p>
+    </a>
+    <a href="/accounting/approvals?status=approved&period=today" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-emerald-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Approved Today</p>
         <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.approved_today }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-emerald-600">View approved →</p>
+    </a>
+    <a href="/accounting/approvals?status=rejected&period=today" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Rejected Today</p>
         <p class="mt-1 text-2xl font-bold text-red-600">{{ stats.rejected_today }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View rejected →</p>
+    </a>
+    <a href="/accounting/approvals?overdue=true" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-gray-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Overdue</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.overdue }}</p>
-    </div>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-gray-600">View overdue →</p>
+    </a>
 </div>
 
 <!-- Filters -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
     <form method="GET" class="flex flex-wrap items-center gap-4">
         <div class="sm:w-48">
             <select

@@ -36,7 +36,10 @@ class RADIUSCredentialSequence(Base):
     prefix: Mapped[str] = mapped_column(String(50), nullable=False, default="USER")
     padding_length: Mapped[int] = mapped_column(default=4, nullable=False)
 
-    # Optional company scope for multi-tenant
+    # Optional company scope for multi-tenant deployments
+    # NOTE: Currently unused - service uses sequence_name="default" for all companies.
+    # To enable per-company sequences, update RADIUSCredentialService._generate_sequential_username
+    # to use sequence_name=f"company_{company_id}" or similar.
     company: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
     # Timestamps

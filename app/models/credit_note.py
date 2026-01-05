@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base, SoftDeleteMixin
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.invoice import Invoice
@@ -21,7 +22,7 @@ class CreditNoteStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class CreditNote(SoftDeleteMixin, Base):
+class CreditNote(SoftValidationMixin, SoftDeleteMixin, Base):
     """Credit notes/adjustments issued to customers."""
 
     __tablename__ = "credit_notes"

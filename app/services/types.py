@@ -61,6 +61,11 @@ class PaginatedResult(Generic[T]):
             return 1
         return (self.total + self.limit - 1) // self.limit
 
+    @property
+    def data(self) -> Sequence[T]:
+        """Alias for items (backwards compatibility)."""
+        return self.items
+
 
 @dataclass(frozen=True)
 class SortParams:

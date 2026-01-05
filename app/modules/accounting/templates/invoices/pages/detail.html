@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+<div class="invoice-header flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8" data-testid="invoice-header">
     <div class="flex items-center gap-4">
         <div class="flex-shrink-0">
             {% set status_icon_colors = {
@@ -59,12 +59,12 @@
         <a
             href="/accounting/payments/new?invoice_id={{ invoice.id }}"
             class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-600 to-emerald-700 rounded-xl shadow-lg shadow-emerald-600/25 hover:from-emerald-500 hover:to-emerald-600 transition-all duration-200"
-            data-testid="record-payment-button"
+            data-testid="receive-payment"
         >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
             </svg>
-            Record Payment
+            Receive Payment
         </a>
         {% endif %}
         {% if invoice.status.value == 'draft' %}
@@ -103,7 +103,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div>
                     <p class="text-sm font-medium text-primary-700 font-body">Total Amount</p>
-                    <p class="mt-2 text-3xl font-display font-bold text-primary-900" data-testid="total-amount">
+                    <p class="mt-2 text-3xl font-display font-bold text-primary-900 invoice-amount" data-testid="total-amount">
                         {{ invoice.total_amount | currency }}
                     </p>
                 </div>
@@ -115,7 +115,7 @@
                 </div>
                 <div>
                     <p class="text-sm font-medium text-primary-700 font-body">Balance Due</p>
-                    <p class="mt-2 text-3xl font-display font-bold {{ 'text-red-700' if invoice.balance and invoice.balance > 0 else 'text-gray-500' }}" data-testid="balance">
+                    <p class="mt-2 text-3xl font-display font-bold invoice-balance {{ 'text-red-700' if invoice.balance and invoice.balance > 0 else 'text-gray-500' }}" data-testid="balance">
                         {{ invoice.balance | currency if invoice.balance else (invoice.total_amount - invoice.amount_paid) | currency }}
                     </p>
                 </div>

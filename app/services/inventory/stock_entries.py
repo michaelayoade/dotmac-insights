@@ -25,6 +25,8 @@ from app.models.inventory import (
 
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
+from app.services.activity_logger import ActivityLogger
 
 from .types import (
     StockEntryFilters,
@@ -130,7 +132,12 @@ class StockEntryService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_entry(self, entry_id: int, include_items: bool = True) -> StockEntry:
         """Get a single stock entry by ID.
@@ -277,6 +284,7 @@ class StockEntryService:
                 idx=idx,
             )
             self.db.add(item)
+            SoftValidationService(self.db).validate_and_store(item)
 
             # Calculate totals
             if item.t_warehouse:
@@ -290,7 +298,18 @@ class StockEntryService:
         entry.value_difference = total_incoming - total_outgoing
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(entry)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="inventory.stock_entry.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="stock_entry",
+            entity_id=str(entry.id),
+            summary=f"Created stock entry {entry.id}",
+            metadata={"type": entry.stock_entry_type},
+        )
         return entry
 
     def update_entry(self, entry_id: int, data: StockEntryUpdateData) -> StockEntry:
@@ -334,7 +353,17 @@ class StockEntryService:
             entry.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(entry)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="inventory.stock_entry.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="stock_entry",
+            entity_id=str(entry.id),
+            summary=f"Updated stock entry {entry.id}",
+        )
         return entry
 
     def submit_entry(self, entry_id: int) -> StockEntry:
@@ -365,7 +394,17 @@ class StockEntryService:
         entry.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(entry)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="inventory.stock_entry.submit",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="stock_entry",
+            entity_id=str(entry.id),
+            summary=f"Submitted stock entry {entry.id}",
+        )
         return entry
 
     def cancel_entry(self, entry_id: int) -> StockEntry:
@@ -395,7 +434,17 @@ class StockEntryService:
         entry.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(entry)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="inventory.stock_entry.cancel",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="stock_entry",
+            entity_id=str(entry.id),
+            summary=f"Cancelled stock entry {entry.id}",
+        )
         return entry
 
     def delete_entry(self, entry_id: int) -> None:
@@ -421,6 +470,17 @@ class StockEntryService:
             entry.deleted_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(entry)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="inventory.stock_entry.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="stock_entry",
+            entity_id=str(entry.id),
+            summary=f"Deleted stock entry {entry.id}",
+        )
 
     # -------------------------------------------------------------------------
     # Helpers
@@ -511,6 +571,7 @@ class StockEntryService:
                     serial_no=item.serial_no,
                 )
                 self.db.add(sle)
+                SoftValidationService(self.db).validate_and_store(sle)
 
             # Incoming entry (to target warehouse)
             if item.t_warehouse:
@@ -537,6 +598,7 @@ class StockEntryService:
                     serial_no=item.serial_no,
                 )
                 self.db.add(sle)
+                SoftValidationService(self.db).validate_and_store(sle)
 
     def _create_reverse_stock_ledger_entries(self, entry: StockEntry) -> None:
         """Create reverse stock ledger entries for cancellation."""
@@ -563,6 +625,7 @@ class StockEntryService:
                     is_cancelled=True,
                 )
                 self.db.add(sle)
+                SoftValidationService(self.db).validate_and_store(sle)
 
             # Reverse incoming (remove from target)
             if item.t_warehouse:
@@ -586,6 +649,7 @@ class StockEntryService:
                     is_cancelled=True,
                 )
                 self.db.add(sle)
+                SoftValidationService(self.db).validate_and_store(sle)
 
     def _get_stock_balance(self, item_code: str, warehouse: str) -> Decimal:
         """Get current stock balance for item at warehouse."""

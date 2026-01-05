@@ -29,12 +29,16 @@ from app.models.support_kb import (
 
 from .types import (
     KBArticleCreate,
+    KBArticleFilters,
+    KBArticleStats,
     KBArticleUpdate,
     KBAttachmentData,
     KBCategoryCreate,
     KBCategoryUpdate,
     KBHelpfulnessStats,
+    KBListResult,
 )
+from app.services.base import PaginationParams
 from .errors import (
     DuplicateSlugError,
     KBArticleNotFoundError,
@@ -102,6 +106,30 @@ class KnowledgeBaseService:
         else:
             # Return root categories only if parent_id not specified
             query = query.filter(KBCategory.parent_id.is_(None))
+
+        if visibility:
+            query = query.filter(KBCategory.visibility == visibility)
+
+        return query.order_by(KBCategory.display_order.asc(), KBCategory.name.asc()).all()
+
+    def list_categories_flat(
+        self,
+        visibility: Optional[str] = None,
+        active_only: bool = True,
+    ) -> List[KBCategory]:
+        """List all categories without hierarchy.
+
+        Args:
+            visibility: Filter by visibility (public, internal, restricted).
+            active_only: Only return active categories.
+
+        Returns:
+            List of KBCategory instances.
+        """
+        query = self.db.query(KBCategory)
+
+        if active_only:
+            query = query.filter(KBCategory.is_active == True)
 
         if visibility:
             query = query.filter(KBCategory.visibility == visibility)
@@ -368,6 +396,189 @@ class KnowledgeBaseService:
 
         query = query.order_by(KBArticle.created_at.desc())
         return query.offset(offset).limit(limit).all()
+
+    def list_articles_with_stats(
+        self,
+        filters: Optional[KBArticleFilters] = None,
+        pagination: Optional[PaginationParams] = None,
+        sort_by: str = "updated_at",
+        sort_dir: str = "desc",
+    ) -> KBListResult:
+        """List KB articles with filtering, pagination, and aggregate stats.
+
+        This is the primary method for the KB list page - it returns everything
+        needed in a single call to avoid N+1 queries.
+
+        Args:
+            filters: Optional filters for search, status, category.
+            pagination: Pagination parameters (offset, limit).
+            sort_by: Field to sort by (default: updated_at).
+            sort_dir: Sort direction ('asc' or 'desc').
+
+        Returns:
+            KBListResult with items, total, stats, categories, and category_counts.
+        """
+        filters = filters or KBArticleFilters()
+        pagination = pagination or PaginationParams(offset=0, limit=25)
+
+        # Build base query
+        query = self.db.query(KBArticle)
+
+        # Apply filters
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            query = query.filter(
+                or_(
+                    KBArticle.title.ilike(search_term),
+                    KBArticle.content.ilike(search_term),
+                    KBArticle.search_keywords.ilike(search_term),
+                )
+            )
+
+        if filters.status:
+            query = query.filter(KBArticle.status == filters.status)
+
+        if filters.category_id:
+            query = query.filter(KBArticle.category_id == filters.category_id)
+
+        if filters.visibility:
+            query = query.filter(KBArticle.visibility == filters.visibility)
+
+        # Get total count
+        total = query.count()
+
+        # Apply sorting
+        sort_column = getattr(KBArticle, sort_by, KBArticle.updated_at)
+        if sort_dir == "desc":
+            sort_column = sort_column.desc()
+        query = query.order_by(sort_column)
+
+        # Apply pagination
+        items = query.offset(pagination.offset).limit(pagination.limit).all()
+
+        # Get stats (single optimized query using conditional aggregation)
+        stats_query = self.db.query(
+            func.count(KBArticle.id).filter(
+                KBArticle.status == ArticleStatus.PUBLISHED.value
+            ).label("published"),
+            func.count(KBArticle.id).filter(
+                KBArticle.status == ArticleStatus.DRAFT.value
+            ).label("draft"),
+            func.count(KBArticle.id).filter(
+                KBArticle.status == ArticleStatus.ARCHIVED.value
+            ).label("archived"),
+            func.coalesce(func.sum(KBArticle.view_count), 0).label("total_views"),
+        ).first()
+
+        stats = KBArticleStats(
+            published_count=stats_query.published or 0,
+            draft_count=stats_query.draft or 0,
+            archived_count=stats_query.archived or 0,
+            total_views=stats_query.total_views or 0,
+        )
+
+        # Get categories with counts (single query)
+        categories = (
+            self.db.query(KBCategory)
+            .filter(KBCategory.is_active == True)
+            .order_by(KBCategory.display_order, KBCategory.name)
+            .all()
+        )
+
+        # Get category counts in single query
+        category_count_query = (
+            self.db.query(
+                KBArticle.category_id,
+                func.count(KBArticle.id).label("count"),
+            )
+            .filter(KBArticle.category_id.isnot(None))
+            .group_by(KBArticle.category_id)
+            .all()
+        )
+        category_counts = {row.category_id: row.count for row in category_count_query}
+
+        return KBListResult(
+            items=items,
+            total=total,
+            stats=stats,
+            categories=categories,
+            category_counts=category_counts,
+        )
+
+    def get_article_with_related(
+        self,
+        article_id: int,
+        increment_view: bool = True,
+    ) -> tuple:
+        """Get an article with its related articles.
+
+        Args:
+            article_id: The article ID.
+            increment_view: Whether to increment view count.
+
+        Returns:
+            Tuple of (article, related_articles).
+
+        Raises:
+            KBArticleNotFoundError: If not found.
+        """
+        from sqlalchemy.orm import joinedload
+
+        article = (
+            self.db.query(KBArticle)
+            .options(joinedload(KBArticle.category))
+            .filter(KBArticle.id == article_id)
+            .first()
+        )
+
+        if not article:
+            raise KBArticleNotFoundError(article_id)
+
+        # Increment view count
+        if increment_view:
+            article.view_count = (article.view_count or 0) + 1
+            self.db.flush()
+
+        # Get related articles
+        related_articles = []
+        if article.related_article_ids:
+            related_articles = (
+                self.db.query(KBArticle)
+                .filter(
+                    KBArticle.id.in_(article.related_article_ids),
+                    KBArticle.status == ArticleStatus.PUBLISHED.value,
+                )
+                .all()
+            )
+
+        return article, related_articles
+
+    def get_categories_with_counts(self) -> list:
+        """Get all active categories with their article counts.
+
+        Returns:
+            List of tuples (category, article_count).
+        """
+        categories = (
+            self.db.query(KBCategory)
+            .filter(KBCategory.is_active == True)
+            .order_by(KBCategory.display_order, KBCategory.name)
+            .all()
+        )
+
+        # Get counts in single query
+        count_query = (
+            self.db.query(
+                KBArticle.category_id,
+                func.count(KBArticle.id).label("count"),
+            )
+            .filter(KBArticle.category_id.isnot(None))
+            .group_by(KBArticle.category_id)
+            .all()
+        )
+        counts = {row.category_id: row.count for row in count_query}
+
+        return [(cat, counts.get(cat.id, 0)) for cat in categories]
 
     def get_article(self, article_id: int) -> KBArticle:
         """Get an article by ID.
@@ -741,7 +952,7 @@ class KnowledgeBaseService:
             is_helpful=is_helpful,
             feedback_text=feedback_text,
             party_id=party_id,
-            agent_id=agent_id,
+            agent_party_id=agent_id,
             created_at=datetime.now(timezone.utc),
         )
         self.db.add(feedback)

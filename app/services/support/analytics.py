@@ -19,11 +19,14 @@ from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 from collections import defaultdict
 
+import sqlalchemy
 from sqlalchemy import func, case, extract, and_, or_, distinct
 from sqlalchemy.orm import Session
 
-from app.models.ticket import Ticket, TicketStatus, TicketPriority
-from app.models.agent import Agent, Team
+from app.models.ticket import Ticket, TicketStatus as LegacyTicketStatus, TicketPriority
+from app.models.unified_ticket import UnifiedTicket, TicketStatus
+from app.models.party import Party, PartyRole
+from app.models.agent import Team, TeamMember
 from app.models.support_automation import AutomationRule, AutomationLog
 from app.models.support_kb import KBArticle, KBArticleFeedback
 from app.models.support_csat import CSATSurvey, CSATResponse
@@ -62,8 +65,8 @@ PRIORITY_VALUES = {
     "low": 1,
 }
 
-# Status groupings
-OPEN_STATUSES = [TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD]
+# Status groupings (using UnifiedTicket statuses - no REPLIED in unified model)
+OPEN_STATUSES = [TicketStatus.OPEN, TicketStatus.IN_PROGRESS, TicketStatus.WAITING, TicketStatus.ON_HOLD]
 CLOSED_STATUSES = [TicketStatus.RESOLVED, TicketStatus.CLOSED]
 
 
@@ -121,10 +124,10 @@ class SupportAnalyticsService:
 
         # First response time
         first_response_hours = func.extract(
-            "epoch", Ticket.first_responded_at - Ticket.created_at
+            "epoch", Ticket.first_responded_on - Ticket.created_at
         ) / 3600
         avg_first_response = (
-            base_q.filter(Ticket.first_responded_at.isnot(None))
+            base_q.filter(Ticket.first_responded_on.isnot(None))
             .with_entities(func.avg(first_response_hours))
             .scalar()
             or 0
@@ -310,17 +313,17 @@ class SupportAnalyticsService:
         start_dt, end_dt = self._get_date_range(filters)
 
         response_hours = func.extract(
-            "epoch", Ticket.first_responded_at - Ticket.created_at
+            "epoch", Ticket.first_responded_on - Ticket.created_at
         ) / 3600
 
         query = (
             self.db.query(
                 response_hours.label("hours"),
                 Ticket.response_by,
-                Ticket.first_responded_at,
+                Ticket.first_responded_on,
             )
             .filter(
-                Ticket.first_responded_at.isnot(None),
+                Ticket.first_responded_on.isnot(None),
                 Ticket.created_at >= start_dt,
             )
         )
@@ -333,7 +336,7 @@ class SupportAnalyticsService:
         hours_list = [r.hours for r in results if r.hours is not None and r.hours >= 0]
         within_sla = sum(
             1 for r in results
-            if r.response_by and r.first_responded_at and r.first_responded_at <= r.response_by
+            if r.response_by and r.first_responded_on and r.first_responded_on <= r.response_by
         )
 
         if not hours_list:
@@ -369,19 +372,24 @@ class SupportAnalyticsService:
             "epoch", Ticket.resolution_date - Ticket.opening_date
         ) / 3600
         first_response_hours = func.extract(
-            "epoch", Ticket.first_responded_at - Ticket.created_at
+            "epoch", Ticket.first_responded_on - Ticket.created_at
         ) / 3600
 
-        # Main agent stats query
+        # Main agent stats query (Party-based after Agent → Party unification)
+        # Agents are now Parties with PartyRole(role="support_agent")
+        # Capacity is stored in PartyRole.metadata_->>'capacity'
+        capacity_expr = func.coalesce(
+            func.cast(PartyRole.metadata_["capacity"].astext, sqlalchemy.Integer),
+            10
+        )
+
         query = (
             self.db.query(
-                Agent.id.label("agent_id"),
-                Agent.name.label("agent_name"),
-                Agent.team_id,
-                Team.name.label("team_name"),
-                func.count(Ticket.id).label("total_tickets"),
+                Party.id.label("agent_id"),
+                Party.name.label("agent_name"),
+                func.count(UnifiedTicket.id).label("total_tickets"),
                 func.sum(
-                    case((Ticket.status.in_(CLOSED_STATUSES), 1), else_=0)
+                    case((UnifiedTicket.status.in_([s.value for s in [TicketStatus.RESOLVED, TicketStatus.CLOSED]]), 1), else_=0)
                 ).label("resolved_tickets"),
                 func.avg(resolution_hours).label("avg_resolution_hours"),
                 func.avg(first_response_hours).label("avg_first_response_hours"),
@@ -389,9 +397,9 @@ class SupportAnalyticsService:
                     case(
                         (
                             and_(
-                                Ticket.resolution_by.isnot(None),
-                                Ticket.resolution_date.isnot(None),
-                                Ticket.resolution_date <= Ticket.resolution_by,
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
                             ),
                             1,
                         ),
@@ -402,8 +410,8 @@ class SupportAnalyticsService:
                     case(
                         (
                             and_(
-                                Ticket.resolution_by.isnot(None),
-                                Ticket.resolution_date.isnot(None),
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
                             ),
                             1,
                         ),
@@ -411,31 +419,38 @@ class SupportAnalyticsService:
                     )
                 ).label("sla_tracked"),
                 func.sum(
-                    case((Ticket.status.in_(OPEN_STATUSES), 1), else_=0)
+                    case((UnifiedTicket.status.in_([s.value for s in OPEN_STATUSES]), 1), else_=0)
                 ).label("current_open"),
-                Agent.max_concurrent_tickets.label("capacity"),
+                capacity_expr.label("capacity"),
             )
-            .select_from(Agent)
-            .outerjoin(Team, Team.id == Agent.team_id)
+            .select_from(Party)
+            .join(PartyRole, and_(
+                PartyRole.party_id == Party.id,
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+                PartyRole.until.is_(None),
+            ))
             .outerjoin(
-                Ticket,
+                UnifiedTicket,
                 and_(
-                    Ticket.assigned_to_id == Agent.id,
-                    Ticket.created_at >= start_dt,
-                    Ticket.created_at <= end_dt if end_dt else True,
+                    UnifiedTicket.assigned_to_party_id == Party.id,
+                    UnifiedTicket.created_at >= start_dt,
+                    UnifiedTicket.created_at <= end_dt if end_dt else True,
+                    UnifiedTicket.is_deleted == False,
                 ),
             )
-            .filter(Agent.is_active == True)
+            .filter(Party.status == "active")
         )
 
         if filters.team_id:
-            query = query.filter(Agent.team_id == filters.team_id)
+            # Filter by team via TeamMember join table
+            query = query.join(TeamMember, TeamMember.party_id == Party.id).filter(TeamMember.team_id == filters.team_id)
         if filters.agent_id:
-            query = query.filter(Agent.id == filters.agent_id)
+            query = query.filter(Party.id == filters.agent_id)
 
         results = (
-            query.group_by(Agent.id, Agent.name, Agent.team_id, Team.name, Agent.max_concurrent_tickets)
-            .order_by(func.count(Ticket.id).desc())
+            query.group_by(Party.id, Party.name, capacity_expr)
+            .order_by(func.count(UnifiedTicket.id).desc())
             .limit(limit)
             .all()
         )
@@ -458,8 +473,8 @@ class SupportAnalyticsService:
                 AgentPerformance(
                     agent_id=row.agent_id,
                     agent_name=row.agent_name or f"Agent {row.agent_id}",
-                    team_id=row.team_id,
-                    team_name=row.team_name,
+                    team_id=None,  # Agents can belong to multiple teams
+                    team_name=None,
                     total_tickets=total,
                     resolved_tickets=resolved,
                     resolution_rate=round(resolved / total * 100, 1) if total > 0 else 0,
@@ -491,20 +506,26 @@ class SupportAnalyticsService:
             "epoch", Ticket.resolution_date - Ticket.opening_date
         ) / 3600
         first_response_hours = func.extract(
-            "epoch", Ticket.first_responded_at - Ticket.created_at
+            "epoch", Ticket.first_responded_on - Ticket.created_at
         ) / 3600
+
+        # After Agent → Party unification, agents are Parties with support_agent role
+        capacity_expr = func.coalesce(
+            func.cast(PartyRole.metadata_["capacity"].astext, sqlalchemy.Integer),
+            10
+        )
 
         query = (
             self.db.query(
                 Team.id.label("team_id"),
                 Team.name.label("team_name"),
-                func.count(distinct(Agent.id)).label("total_agents"),
+                func.count(distinct(Party.id)).label("total_agents"),
                 func.sum(
-                    case((Agent.is_active == True, 1), else_=0)
+                    case((and_(Party.status == "active", PartyRole.status == "active"), 1), else_=0)
                 ).label("active_agents"),
-                func.count(Ticket.id).label("total_tickets"),
+                func.count(UnifiedTicket.id).label("total_tickets"),
                 func.sum(
-                    case((Ticket.status.in_(CLOSED_STATUSES), 1), else_=0)
+                    case((UnifiedTicket.status.in_([s.value for s in [TicketStatus.RESOLVED, TicketStatus.CLOSED]]), 1), else_=0)
                 ).label("resolved_tickets"),
                 func.avg(resolution_hours).label("avg_resolution_hours"),
                 func.avg(first_response_hours).label("avg_first_response_hours"),
@@ -512,9 +533,9 @@ class SupportAnalyticsService:
                     case(
                         (
                             and_(
-                                Ticket.resolution_by.isnot(None),
-                                Ticket.resolution_date.isnot(None),
-                                Ticket.resolution_date <= Ticket.resolution_by,
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
                             ),
                             1,
                         ),
@@ -525,8 +546,8 @@ class SupportAnalyticsService:
                     case(
                         (
                             and_(
-                                Ticket.resolution_by.isnot(None),
-                                Ticket.resolution_date.isnot(None),
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
                             ),
                             1,
                         ),
@@ -534,18 +555,25 @@ class SupportAnalyticsService:
                     )
                 ).label("sla_tracked"),
                 func.sum(
-                    case((Ticket.status.in_(OPEN_STATUSES), 1), else_=0)
+                    case((UnifiedTicket.status.in_([s.value for s in OPEN_STATUSES]), 1), else_=0)
                 ).label("current_open"),
-                func.sum(Agent.max_concurrent_tickets).label("total_capacity"),
+                func.sum(capacity_expr).label("total_capacity"),
             )
             .select_from(Team)
-            .outerjoin(Agent, Agent.team_id == Team.id)
+            .outerjoin(TeamMember, TeamMember.team_id == Team.id)
+            .outerjoin(Party, Party.id == TeamMember.party_id)
+            .outerjoin(PartyRole, and_(
+                PartyRole.party_id == Party.id,
+                PartyRole.role == "support_agent",
+                PartyRole.until.is_(None),
+            ))
             .outerjoin(
-                Ticket,
+                UnifiedTicket,
                 and_(
-                    Ticket.assigned_to_id == Agent.id,
-                    Ticket.created_at >= start_dt,
-                    Ticket.created_at <= end_dt if end_dt else True,
+                    UnifiedTicket.assigned_to_party_id == Party.id,
+                    UnifiedTicket.created_at >= start_dt,
+                    UnifiedTicket.created_at <= end_dt if end_dt else True,
+                    UnifiedTicket.is_deleted == False,
                 ),
             )
             .filter(Team.is_active == True)
@@ -612,7 +640,7 @@ class SupportAnalyticsService:
             "epoch", Ticket.resolution_date - Ticket.opening_date
         ) / 3600
         first_response_hours = func.extract(
-            "epoch", Ticket.first_responded_at - Ticket.created_at
+            "epoch", Ticket.first_responded_on - Ticket.created_at
         ) / 3600
 
         query = (
@@ -756,8 +784,8 @@ class SupportAnalyticsService:
                         (
                             and_(
                                 Ticket.response_by.isnot(None),
-                                Ticket.first_responded_at.isnot(None),
-                                Ticket.first_responded_at <= Ticket.response_by,
+                                Ticket.first_responded_on.isnot(None),
+                                Ticket.first_responded_on <= Ticket.response_by,
                             ),
                             1,
                         ),
@@ -769,8 +797,8 @@ class SupportAnalyticsService:
                         (
                             and_(
                                 Ticket.response_by.isnot(None),
-                                Ticket.first_responded_at.isnot(None),
-                                Ticket.first_responded_at > Ticket.response_by,
+                                Ticket.first_responded_on.isnot(None),
+                                Ticket.first_responded_on > Ticket.response_by,
                             ),
                             1,
                         ),
@@ -949,22 +977,26 @@ class SupportAnalyticsService:
         total_reopens = sum(t.reopen_count or 0 for t in reopened_tickets)
         avg_reopens = total_reopens / total_reopened if total_reopened > 0 else 0
 
-        # By agent
+        # By agent (Party-based after Agent → Party unification)
+        # Note: For legacy Ticket model, assigned_to_id points to employees
+        # For UnifiedTicket, use assigned_to_party_id
         by_agent_dict: Dict[int, int] = defaultdict(int)
         for t in reopened_tickets:
-            if t.assigned_to_id:
-                by_agent_dict[t.assigned_to_id] += 1
+            # Try UnifiedTicket's party-based assignment first
+            agent_id = getattr(t, "assigned_to_party_id", None) or getattr(t, "assigned_to_id", None)
+            if agent_id:
+                by_agent_dict[agent_id] += 1
 
-        # Get agent names
-        agent_ids = list(by_agent_dict.keys())
-        agents = {
-            a.id: a.name
-            for a in self.db.query(Agent.id, Agent.name).filter(Agent.id.in_(agent_ids)).all()
-        } if agent_ids else {}
+        # Get party names (agents are now Parties)
+        party_ids = list(by_agent_dict.keys())
+        parties = {
+            p.id: p.name
+            for p in self.db.query(Party.id, Party.name).filter(Party.id.in_(party_ids)).all()
+        } if party_ids else {}
 
         by_agent = [
-            {"agent_id": aid, "agent_name": agents.get(aid, f"Agent {aid}"), "reopen_count": count}
-            for aid, count in sorted(by_agent_dict.items(), key=lambda x: -x[1])[:10]
+            {"agent_id": pid, "agent_name": parties.get(pid, f"Agent {pid}"), "reopen_count": count}
+            for pid, count in sorted(by_agent_dict.items(), key=lambda x: -x[1])[:10]
         ]
 
         # By category
@@ -1272,16 +1304,16 @@ class SupportAnalyticsService:
         try:
             query = (
                 self.db.query(
-                    CSATResponse.agent_id,
+                    CSATResponse.agent_party_id,
                     func.avg(CSATResponse.rating).label("avg_rating"),
                     func.count(CSATResponse.id).label("count"),
                 )
                 .filter(
                     CSATResponse.created_at >= start_dt,
-                    CSATResponse.agent_id.isnot(None),
+                    CSATResponse.agent_party_id.isnot(None),
                     CSATResponse.rating.isnot(None),
                 )
-                .group_by(CSATResponse.agent_id)
+                .group_by(CSATResponse.agent_party_id)
             )
             if end_dt:
                 query = query.filter(CSATResponse.created_at <= end_dt)
@@ -1296,21 +1328,25 @@ class SupportAnalyticsService:
     def _get_csat_by_team(
         self, start_dt: datetime, end_dt: Optional[datetime]
     ) -> Dict[int, Dict[str, Any]]:
-        """Get CSAT scores grouped by team."""
+        """Get CSAT scores grouped by team.
+
+        After Agent → Party unification, agents connect to teams through TeamMember.
+        """
         try:
             query = (
                 self.db.query(
-                    Agent.team_id,
+                    TeamMember.team_id,
                     func.avg(CSATResponse.rating).label("avg_rating"),
                     func.count(CSATResponse.id).label("count"),
                 )
-                .join(Agent, Agent.id == CSATResponse.agent_id)
+                .join(Party, Party.id == CSATResponse.agent_party_id)
+                .join(TeamMember, TeamMember.party_id == Party.id)
                 .filter(
                     CSATResponse.created_at >= start_dt,
-                    Agent.team_id.isnot(None),
+                    TeamMember.is_active == True,
                     CSATResponse.rating.isnot(None),
                 )
-                .group_by(Agent.team_id)
+                .group_by(TeamMember.team_id)
             )
             if end_dt:
                 query = query.filter(CSATResponse.created_at <= end_dt)
@@ -1325,25 +1361,30 @@ class SupportAnalyticsService:
     def _get_top_performers_by_team(
         self, start_dt: datetime, end_dt: Optional[datetime]
     ) -> Dict[int, List[str]]:
-        """Get top performing agents per team."""
+        """Get top performing agents per team.
+
+        After Agent → Party unification, agents are Parties with support_agent role.
+        """
         try:
             query = (
                 self.db.query(
-                    Agent.team_id,
-                    Agent.name,
-                    func.count(Ticket.id).label("resolved_count"),
+                    TeamMember.team_id,
+                    Party.name,
+                    func.count(UnifiedTicket.id).label("resolved_count"),
                 )
-                .join(Ticket, Ticket.assigned_to_id == Agent.id)
+                .join(Party, Party.id == TeamMember.party_id)
+                .join(UnifiedTicket, UnifiedTicket.assigned_to_party_id == Party.id)
                 .filter(
-                    Ticket.status.in_(CLOSED_STATUSES),
-                    Ticket.resolution_date >= start_dt,
-                    Agent.team_id.isnot(None),
+                    UnifiedTicket.status.in_([TicketStatus.RESOLVED.value, TicketStatus.CLOSED.value]),
+                    UnifiedTicket.resolved_at >= start_dt,
+                    TeamMember.is_active == True,
+                    UnifiedTicket.is_deleted == False,
                 )
-                .group_by(Agent.team_id, Agent.id, Agent.name)
-                .order_by(Agent.team_id, func.count(Ticket.id).desc())
+                .group_by(TeamMember.team_id, Party.id, Party.name)
+                .order_by(TeamMember.team_id, func.count(UnifiedTicket.id).desc())
             )
             if end_dt:
-                query = query.filter(Ticket.resolution_date <= end_dt)
+                query = query.filter(UnifiedTicket.resolved_at <= end_dt)
 
             result: Dict[int, List[str]] = defaultdict(list)
             for row in query.all():

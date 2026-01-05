@@ -57,7 +57,7 @@
             'terminated': 'bg-red-500',
             'on_leave': 'bg-amber-500'
         } %}
-        <span class="inline-flex items-center gap-1.5 text-sm text-gray-700 font-body" data-testid="employee-status-{{ employee.id }}">
+        <span class="inline-flex items-center gap-1.5 text-sm text-gray-700 font-body" data-testid="employee-status-{{ employee.id }}" data-status="{{ employee.status.value }}">
             <span class="w-1.5 h-1.5 rounded-full {{ status_styles.get(employee.status.value, 'bg-gray-400') }}"></span>
             {{ employee.status.value | replace('_', ' ') | title }}
         </span>

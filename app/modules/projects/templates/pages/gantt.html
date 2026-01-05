@@ -6,10 +6,11 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Gantt Chart</h1>
         <p class="mt-1.5 text-gray-500 font-body">{{ project_name }}</p>
     </div>
+    {% if project_id %}
     <div class="flex items-center gap-3">
         <a
             href="/projects/{{ project_id }}"
-            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 transition-all duration-200"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-surface-50 transition-all duration-200"
         >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -17,6 +18,7 @@
             Back to Project
         </a>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -64,7 +66,7 @@
     </div>
 
     <!-- Gantt Container -->
-    <div id="gantt-container" class="overflow-x-auto">
+    <div id="gantt" class="gantt-chart overflow-x-auto" data-testid="gantt">
         {% if gantt_data.tasks %}
         <div class="min-w-[800px]">
             <!-- Task List + Timeline Grid -->
@@ -137,7 +139,7 @@
         </div>
         {% else %}
         <!-- Empty State -->
-        <div class="text-center py-12">
+        <div class="text-center py-12 empty-state" data-testid="empty-state">
             <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
             </svg>

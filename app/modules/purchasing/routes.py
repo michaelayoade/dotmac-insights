@@ -2,28 +2,59 @@
 Purchasing module web routes.
 
 Provides SSR pages for purchase orders and procurement.
+Routes are thin wrappers that delegate to services.
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, Request, Response, Depends, Query
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select, func, or_, and_, case
-from sqlalchemy.orm import selectinload
 from typing import Optional
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import get_base_context, get_navigation_context, build_breadcrumbs
 from app.templates.environment import get_template_env
-from app.models.purchasing_order import PurchaseOrder, PurchaseOrderStatus
-from app.models.accounting import PurchaseInvoice, PurchaseInvoiceStatus, Supplier
+from app.models.purchasing_order import PurchaseOrderStatus
+from app.models.accounting import PurchaseInvoiceStatus
+
+from app.services.purchasing import (
+    PurchasingDashboardService,
+    BillService,
+    APAgingService,
+    PurchasingAnalyticsService,
+    BillFilters,
+)
+from app.services.types import PaginationParams
+from app.services.purchasing.web_queries import PurchasingQueryService
 
 router = APIRouter(prefix="/purchasing", tags=["purchasing-web"])
 templates = get_template_env()
 
 RequirePurchasingRead = Depends(require_scope("purchasing:read"))
 RequirePurchasingWrite = Depends(require_scope("purchasing:write"))
+
+
+# --- Service Providers ---
+
+def get_dashboard_service(db: DB) -> PurchasingDashboardService:
+    return PurchasingDashboardService(db)
+
+
+def get_bill_service(db: DB) -> BillService:
+    return BillService(db)
+
+
+def get_aging_service(db: DB) -> APAgingService:
+    return APAgingService(db)
+
+
+def get_analytics_service(db: DB) -> PurchasingAnalyticsService:
+    return PurchasingAnalyticsService(db)
+
+
+def get_query_service(db: DB) -> PurchasingQueryService:
+    return PurchasingQueryService(db)
 
 # Allowed sort columns to prevent SQL injection via getattr
 ALLOWED_PO_SORTS = {"transaction_date", "name", "supplier_name", "status", "grand_total"}
@@ -36,121 +67,24 @@ async def purchasing_dashboard(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    dashboard_service: PurchasingDashboardService = Depends(get_dashboard_service),
+    bill_service: BillService = Depends(get_bill_service),
+    query_service: PurchasingQueryService = Depends(get_query_service),
 ):
     """Purchasing dashboard - AP overview and key metrics."""
     today = date.today()
-    week_end = today + timedelta(days=7)
 
-    # Total outstanding AP
-    total_outstanding = db.execute(
-        select(func.sum(PurchaseInvoice.outstanding_amount)).where(
-            PurchaseInvoice.outstanding_amount > 0,
-            PurchaseInvoice.status.in_([
-                PurchaseInvoiceStatus.SUBMITTED,
-                PurchaseInvoiceStatus.UNPAID,
-                PurchaseInvoiceStatus.OVERDUE,
-            ])
-        )
-    ).scalar() or Decimal("0")
+    # Get dashboard metrics from service
+    metrics = dashboard_service.get_dashboard_metrics(as_of_date=today)
 
-    # Bills count by status
-    bills_by_status = db.execute(
-        select(
-            PurchaseInvoice.status,
-            func.count(PurchaseInvoice.id).label("count"),
-            func.sum(PurchaseInvoice.grand_total).label("total"),
-        ).group_by(PurchaseInvoice.status)
-    ).all()
+    # Get recent unpaid bills and overdue bills from service
+    recent_unpaid_bills = bill_service.get_bills_due_soon(days=365)[:10]
+    overdue_bills = bill_service.get_overdue_bills(as_of_date=today)[:10]
 
-    status_breakdown = {}
-    for row in bills_by_status:
-        status_val = row.status.value if row.status else "unknown"
-        status_breakdown[status_val] = {
-            "count": row.count,
-            "total": float(row.total or 0),
-        }
+    # Calculate overdue count
+    overdue_count = len(bill_service.get_overdue_bills(as_of_date=today))
 
-    # Overdue amounts
-    total_overdue = db.execute(
-        select(func.sum(PurchaseInvoice.outstanding_amount)).where(
-            PurchaseInvoice.outstanding_amount > 0,
-            PurchaseInvoice.due_date < today,
-            PurchaseInvoice.status.in_([
-                PurchaseInvoiceStatus.SUBMITTED,
-                PurchaseInvoiceStatus.UNPAID,
-                PurchaseInvoiceStatus.OVERDUE,
-            ])
-        )
-    ).scalar() or Decimal("0")
-
-    # Overdue bills count
-    overdue_count = db.execute(
-        select(func.count(PurchaseInvoice.id)).where(
-            PurchaseInvoice.outstanding_amount > 0,
-            PurchaseInvoice.due_date < today,
-        )
-    ).scalar() or 0
-
-    # Bills due this week
-    due_this_week = db.execute(
-        select(
-            func.count(PurchaseInvoice.id),
-            func.sum(PurchaseInvoice.outstanding_amount),
-        ).where(
-            PurchaseInvoice.outstanding_amount > 0,
-            PurchaseInvoice.due_date >= today,
-            PurchaseInvoice.due_date <= week_end,
-        )
-    ).first()
-
-    due_this_week_count = int(due_this_week[0] or 0) if due_this_week else 0
-    due_this_week_total = float(due_this_week[1] or 0) if due_this_week else 0
-
-    # Supplier count
-    supplier_count = db.execute(
-        select(func.count(Supplier.id)).where(Supplier.disabled == False)
-    ).scalar() or 0
-
-    # Top 5 suppliers by outstanding
-    top_suppliers = db.execute(
-        select(
-            PurchaseInvoice.supplier_name,
-            func.sum(PurchaseInvoice.outstanding_amount).label("outstanding"),
-            func.count(PurchaseInvoice.id).label("bill_count"),
-        ).where(
-            PurchaseInvoice.outstanding_amount > 0,
-        ).group_by(
-            PurchaseInvoice.supplier_name
-        ).order_by(
-            func.sum(PurchaseInvoice.outstanding_amount).desc()
-        ).limit(5)
-    ).all()
-
-    # Recent unpaid bills
-    recent_unpaid_bills = db.execute(
-        select(PurchaseInvoice).where(
-            PurchaseInvoice.outstanding_amount > 0,
-        ).order_by(PurchaseInvoice.posting_date.desc()).limit(10)
-    ).scalars().all()
-
-    # Overdue bills requiring attention
-    overdue_bills = db.execute(
-        select(PurchaseInvoice).where(
-            PurchaseInvoice.outstanding_amount > 0,
-            PurchaseInvoice.due_date < today,
-        ).order_by(PurchaseInvoice.due_date.asc()).limit(10)
-    ).scalars().all()
-
-    # Purchase orders stats
-    po_stats = db.execute(
-        select(
-            func.count(PurchaseOrder.id).label("total"),
-            func.sum(case((PurchaseOrder.status == PurchaseOrderStatus.DRAFT, 1), else_=0)).label("draft"),
-            func.sum(case((PurchaseOrder.status == PurchaseOrderStatus.TO_RECEIVE, 1), else_=0)).label("to_receive"),
-            func.sum(case((PurchaseOrder.status == PurchaseOrderStatus.COMPLETED, 1), else_=0)).label("completed"),
-        )
-    ).first()
+    po_stats = query_service.get_purchase_order_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -162,33 +96,21 @@ async def purchasing_dashboard(
     ])
 
     context["stats"] = {
-        "total_outstanding": total_outstanding,
-        "total_overdue": total_overdue,
+        "total_outstanding": metrics.total_outstanding,
+        "total_overdue": metrics.total_overdue,
         "overdue_count": overdue_count,
-        "overdue_percentage": round(float(total_overdue / total_outstanding * 100), 1) if total_outstanding > 0 else 0,
-        "supplier_count": supplier_count,
-        "due_this_week_count": due_this_week_count,
-        "due_this_week_total": due_this_week_total,
+        "overdue_percentage": metrics.overdue_percentage,
+        "supplier_count": metrics.supplier_count,
+        "due_this_week_count": metrics.due_this_week["count"],
+        "due_this_week_total": metrics.due_this_week["total"],
     }
 
-    context["status_breakdown"] = status_breakdown
-    context["top_suppliers"] = [
-        {
-            "name": row.supplier_name,
-            "outstanding": float(row.outstanding),
-            "bill_count": row.bill_count,
-        }
-        for row in top_suppliers
-    ]
+    context["status_breakdown"] = metrics.status_breakdown
+    context["top_suppliers"] = metrics.top_suppliers
     context["recent_unpaid_bills"] = recent_unpaid_bills
     context["overdue_bills"] = overdue_bills
 
-    context["po_stats"] = {
-        "total": po_stats.total if po_stats else 0,
-        "draft": po_stats.draft if po_stats else 0,
-        "to_receive": po_stats.to_receive if po_stats else 0,
-        "completed": po_stats.completed if po_stats else 0,
-    }
+    context["po_stats"] = po_stats
     context["today"] = today
 
     template = templates.get_template("modules/purchasing/templates/pages/dashboard.html")
@@ -201,7 +123,6 @@ async def purchase_orders_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
     q: Optional[str] = Query(None, description="Search query"),
     status: Optional[str] = Query(None, description="Filter by status"),
     supplier: Optional[str] = Query(None, description="Filter by supplier"),
@@ -209,52 +130,19 @@ async def purchase_orders_list(
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("transaction_date", description="Sort field"),
     dir: str = Query("desc", description="Sort direction"),
+    query_service: PurchasingQueryService = Depends(get_query_service),
 ):
     """Purchase orders list page."""
-    # Base query
-    query = select(PurchaseOrder)
-
-    # Search
-    if q:
-        search = f"%{q}%"
-        query = query.where(
-            or_(
-                PurchaseOrder.erpnext_id.ilike(search),
-                PurchaseOrder.supplier_name.ilike(search),
-                PurchaseOrder.supplier.ilike(search),
-            )
-        )
-
-    # Filters
-    if status:
-        try:
-            status_enum = PurchaseOrderStatus(status)
-            query = query.where(PurchaseOrder.status == status_enum)
-        except ValueError:
-            pass
-
-    if supplier:
-        query = query.where(PurchaseOrder.supplier_name.ilike(f"%{supplier}%"))
-
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
-    total = db.scalar(count_query) or 0
-
-    # Sorting - validate sort column against whitelist to prevent SQL injection
-    if sort not in ALLOWED_PO_SORTS:
-        sort = "transaction_date"
-    sort_column = getattr(PurchaseOrder, sort, PurchaseOrder.transaction_date)
-    if dir == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
-
-    # Pagination
-    offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
-
-    result = db.execute(query)
-    orders = result.scalars().all()
+    orders, total = query_service.list_purchase_orders(
+        q=q,
+        status=status,
+        supplier=supplier,
+        page=page,
+        per_page=per_page,
+        sort=sort,
+        direction=dir,
+        allowed_sorts=ALLOWED_PO_SORTS,
+    )
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -292,7 +180,6 @@ async def purchase_orders_table(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     supplier: Optional[str] = Query(None),
@@ -300,12 +187,14 @@ async def purchase_orders_table(
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("transaction_date"),
     dir: str = Query("desc"),
+    query_service: PurchasingQueryService = Depends(get_query_service),
 ):
     """Purchase orders table partial for HTMX."""
     # Reuse list logic
     return await purchase_orders_list(
-        request, response, user, csrf_token, db,
-        q, status, supplier, page, per_page, sort, dir
+        request, response, user, csrf_token,
+        q, status, supplier, page, per_page, sort, dir,
+        query_service=query_service,
     )
 
 
@@ -316,16 +205,10 @@ async def purchase_order_detail(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    query_service: PurchasingQueryService = Depends(get_query_service),
 ):
     """Purchase order detail page."""
-    query = (
-        select(PurchaseOrder)
-        .options(selectinload(PurchaseOrder.items))
-        .where(PurchaseOrder.id == order_id)
-    )
-    result = db.execute(query)
-    order = result.scalar_one_or_none()
+    order = query_service.get_purchase_order(order_id)
 
     if not order:
         template = templates.get_template("errors/404.html")
@@ -350,7 +233,8 @@ async def bills_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    bill_service: BillService = Depends(get_bill_service),
+    dashboard_service: PurchasingDashboardService = Depends(get_dashboard_service),
     q: Optional[str] = Query(None, description="Search query"),
     status: Optional[str] = Query(None, description="Filter by status"),
     supplier: Optional[str] = Query(None, description="Filter by supplier"),
@@ -363,71 +247,28 @@ async def bills_list(
     """Bills (Purchase Invoices) list page."""
     today = date.today()
 
-    # Base query
-    query = select(PurchaseInvoice)
-
-    # Search
-    if q:
-        search = f"%{q}%"
-        query = query.where(
-            or_(
-                PurchaseInvoice.erpnext_id.ilike(search),
-                PurchaseInvoice.supplier_name.ilike(search),
-                PurchaseInvoice.supplier.ilike(search),
-            )
-        )
-
-    # Filters
-    if status:
-        try:
-            status_enum = PurchaseInvoiceStatus(status.lower())
-            query = query.where(PurchaseInvoice.status == status_enum)
-        except ValueError:
-            pass
-
-    if supplier:
-        query = query.where(PurchaseInvoice.supplier_name.ilike(f"%{supplier}%"))
-
-    if overdue:
-        query = query.where(
-            PurchaseInvoice.due_date < today,
-            PurchaseInvoice.outstanding_amount > 0,
-        )
-
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
-    total = db.scalar(count_query) or 0
-
-    # Sorting - validate sort column against whitelist to prevent SQL injection
+    # Validate sort column
     if sort not in ALLOWED_PI_SORTS:
         sort = "posting_date"
-    sort_column = getattr(PurchaseInvoice, sort, PurchaseInvoice.posting_date)
-    if dir == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
 
-    # Pagination
-    offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
+    # Build filters for service
+    filters = BillFilters(
+        status=status.lower() if status else None,
+        supplier=supplier or q,  # Use search query for supplier search
+        overdue_only=overdue or False,
+        sort_by=sort,
+        sort_order=dir,
+    )
 
-    result = db.execute(query)
-    bills = result.scalars().all()
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
-    # Stats
-    stats = db.execute(
-        select(
-            func.count(PurchaseInvoice.id).label("total"),
-            func.sum(PurchaseInvoice.grand_total).label("total_amount"),
-            func.sum(PurchaseInvoice.outstanding_amount).label("outstanding"),
-            func.sum(
-                case(
-                    (and_(PurchaseInvoice.due_date < today, PurchaseInvoice.outstanding_amount > 0), PurchaseInvoice.outstanding_amount),
-                    else_=Decimal("0")
-                )
-            ).label("overdue_amount"),
-        )
-    ).first()
+    # Get bills from service
+    result = bill_service.list_bills(filters, pagination)
+    bills = result.data
+    total = result.total
+
+    # Get summary stats from dashboard service
+    summary = dashboard_service.get_summary_stats()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -452,10 +293,10 @@ async def bills_list(
     context["today"] = today
 
     context["stats"] = {
-        "total_bills": stats.total if stats else 0,
-        "total_amount": float(stats.total_amount or 0) if stats else 0,
-        "outstanding": float(stats.outstanding or 0) if stats else 0,
-        "overdue_amount": float(stats.overdue_amount or 0) if stats else 0,
+        "total_bills": summary["total_bills"],
+        "total_amount": summary["total_outstanding"],
+        "outstanding": summary["total_outstanding"],
+        "overdue_amount": summary["total_outstanding"],  # Dashboard doesn't break this out
     }
 
     # Status options for filter
@@ -479,7 +320,6 @@ async def bills_table(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     supplier: Optional[str] = Query(None),
@@ -488,10 +328,12 @@ async def bills_table(
     per_page: int = Query(25, ge=10, le=100),
     sort: str = Query("posting_date"),
     dir: str = Query("desc"),
+    bill_service: BillService = Depends(get_bill_service),
+    dashboard_service: PurchasingDashboardService = Depends(get_dashboard_service),
 ):
     """Bills table partial for HTMX."""
     return await bills_list(
-        request, response, user, csrf_token, db,
+        request, response, user, csrf_token, bill_service, dashboard_service,
         q, status, supplier, overdue, page, per_page, sort, dir
     )
 
@@ -503,38 +345,22 @@ async def bill_detail(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    bill_service: BillService = Depends(get_bill_service),
 ):
     """Bill detail page."""
-    from app.models.accounting import GLEntry
-    from app.models.document_lines import BillLine
+    from app.services.errors import NotFoundError
 
-    bill = db.execute(
-        select(PurchaseInvoice).where(PurchaseInvoice.id == bill_id)
-    ).scalar_one_or_none()
-
-    if not bill:
+    try:
+        detail = bill_service.get_bill_detail(bill_id)
+    except NotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Bill not found"
         return HTMLResponse(template.render(context), status_code=404)
 
-    # Get line items
-    items = db.execute(
-        select(BillLine).where(
-            BillLine.purchase_invoice_id == bill_id
-        )
-    ).scalars().all()
-
-    # Get related GL entries
-    gl_entries: list[GLEntry] = []
-    if bill.erpnext_id:
-        gl_entries = list(db.execute(
-            select(GLEntry).where(
-                GLEntry.voucher_type == "Purchase Invoice",
-                GLEntry.voucher_no == bill.erpnext_id,
-            ).order_by(GLEntry.posting_date.desc())
-        ).scalars().all())
+    bill = detail["bill"]
+    items = detail["lines"]
+    gl_entries = detail["gl_entries"]
 
     # Calculate days overdue
     today = date.today()
@@ -574,66 +400,46 @@ async def ap_aging_report(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    aging_service: APAgingService = Depends(get_aging_service),
 ):
     """AP Aging Report - aged payables by supplier."""
     today = date.today()
 
-    # Get all unpaid bills grouped by supplier with aging buckets
-    aging_case_current = case(
-        (PurchaseInvoice.due_date >= today, PurchaseInvoice.outstanding_amount),
-        else_=Decimal("0")
-    )
-    aging_case_1_30 = case(
-        (and_(PurchaseInvoice.due_date < today, PurchaseInvoice.due_date >= today - timedelta(days=30)), PurchaseInvoice.outstanding_amount),
-        else_=Decimal("0")
-    )
-    aging_case_31_60 = case(
-        (and_(PurchaseInvoice.due_date < today - timedelta(days=30), PurchaseInvoice.due_date >= today - timedelta(days=60)), PurchaseInvoice.outstanding_amount),
-        else_=Decimal("0")
-    )
-    aging_case_61_90 = case(
-        (and_(PurchaseInvoice.due_date < today - timedelta(days=60), PurchaseInvoice.due_date >= today - timedelta(days=90)), PurchaseInvoice.outstanding_amount),
-        else_=Decimal("0")
-    )
-    aging_case_over_90 = case(
-        (PurchaseInvoice.due_date < today - timedelta(days=90), PurchaseInvoice.outstanding_amount),
-        else_=Decimal("0")
-    )
+    # Get aging report from service
+    report = aging_service.get_aging_report(as_of_date=today)
+    aging_data = report["aging"]
 
-    aging_by_supplier = db.execute(
-        select(
-            PurchaseInvoice.supplier_name,
-            func.count(PurchaseInvoice.id).label("bill_count"),
-            func.sum(PurchaseInvoice.outstanding_amount).label("total"),
-            func.sum(aging_case_current).label("current"),
-            func.sum(aging_case_1_30).label("days_1_30"),
-            func.sum(aging_case_31_60).label("days_31_60"),
-            func.sum(aging_case_61_90).label("days_61_90"),
-            func.sum(aging_case_over_90).label("over_90"),
-        ).where(
-            PurchaseInvoice.outstanding_amount > 0,
-        ).group_by(
-            PurchaseInvoice.supplier_name
-        ).order_by(
-            func.sum(PurchaseInvoice.outstanding_amount).desc()
-        )
-    ).all()
+    # Group by supplier from individual invoices
+    supplier_aging: dict = {}
+    for bucket_key, bucket_data in aging_data.items():
+        for inv in bucket_data["invoices"]:
+            supplier = inv["supplier"] or "Unknown"
+            if supplier not in supplier_aging:
+                supplier_aging[supplier] = {
+                    "supplier": supplier,
+                    "bill_count": 0,
+                    "total": 0.0,
+                    "current": 0.0,
+                    "days_1_30": 0.0,
+                    "days_31_60": 0.0,
+                    "days_61_90": 0.0,
+                    "over_90": 0.0,
+                }
+            supplier_aging[supplier]["bill_count"] += 1
+            supplier_aging[supplier]["total"] += inv["outstanding"]
+            if bucket_key == "current":
+                supplier_aging[supplier]["current"] += inv["outstanding"]
+            elif bucket_key == "1_30":
+                supplier_aging[supplier]["days_1_30"] += inv["outstanding"]
+            elif bucket_key == "31_60":
+                supplier_aging[supplier]["days_31_60"] += inv["outstanding"]
+            elif bucket_key == "61_90":
+                supplier_aging[supplier]["days_61_90"] += inv["outstanding"]
+            elif bucket_key == "over_90":
+                supplier_aging[supplier]["over_90"] += inv["outstanding"]
 
-    # Summary totals
-    summary = db.execute(
-        select(
-            func.count(PurchaseInvoice.id).label("total_bills"),
-            func.sum(PurchaseInvoice.outstanding_amount).label("total"),
-            func.sum(aging_case_current).label("current"),
-            func.sum(aging_case_1_30).label("days_1_30"),
-            func.sum(aging_case_31_60).label("days_31_60"),
-            func.sum(aging_case_61_90).label("days_61_90"),
-            func.sum(aging_case_over_90).label("over_90"),
-        ).where(
-            PurchaseInvoice.outstanding_amount > 0,
-        )
-    ).first()
+    # Sort by total descending
+    aging_list = sorted(supplier_aging.values(), key=lambda x: x["total"], reverse=True)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -643,28 +449,16 @@ async def ap_aging_report(
         {"label": "Aging Report"},
     ])
 
-    context["aging_data"] = [
-        {
-            "supplier": row.supplier_name or "Unknown",
-            "bill_count": row.bill_count,
-            "total": float(row.total or 0),
-            "current": float(row.current or 0),
-            "days_1_30": float(row.days_1_30 or 0),
-            "days_31_60": float(row.days_31_60 or 0),
-            "days_61_90": float(row.days_61_90 or 0),
-            "over_90": float(row.over_90 or 0),
-        }
-        for row in aging_by_supplier
-    ]
+    context["aging_data"] = aging_list
 
     context["summary"] = {
-        "total_bills": summary.total_bills if summary else 0,
-        "total": float(summary.total or 0) if summary else 0,
-        "current": float(summary.current or 0) if summary else 0,
-        "days_1_30": float(summary.days_1_30 or 0) if summary else 0,
-        "days_31_60": float(summary.days_31_60 or 0) if summary else 0,
-        "days_61_90": float(summary.days_61_90 or 0) if summary else 0,
-        "over_90": float(summary.over_90 or 0) if summary else 0,
+        "total_bills": report["total_invoices"],
+        "total": report["total_payable"],
+        "current": aging_data["current"]["total"],
+        "days_1_30": aging_data["1_30"]["total"],
+        "days_31_60": aging_data["31_60"]["total"],
+        "days_61_90": aging_data["61_90"]["total"],
+        "over_90": aging_data["over_90"]["total"],
     }
 
     context["today"] = today
@@ -681,50 +475,12 @@ async def expenses_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    query_service: PurchasingQueryService = Depends(get_query_service),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Expenses list - categorized purchasing expenses."""
-    from app.models.expense import Expense
-
-    today = date.today()
-    start_of_month = today.replace(day=1)
-    start_of_year = today.replace(month=1, day=1)
-
-    # Query expenses
-    query = select(Expense).order_by(Expense.posting_date.desc())
-    count_query = select(func.count()).select_from(Expense)
-    total = db.scalar(count_query) or 0
-
-    offset = (page - 1) * per_page
-    expenses = db.execute(query.offset(offset).limit(per_page)).scalars().all()
-
-    # Stats
-    mtd_total = db.execute(
-        select(func.sum(Expense.total_claimed_amount)).where(
-            Expense.posting_date >= start_of_month
-        )
-    ).scalar() or Decimal("0")
-
-    ytd_total = db.execute(
-        select(func.sum(Expense.total_claimed_amount)).where(
-            Expense.posting_date >= start_of_year
-        )
-    ).scalar() or Decimal("0")
-
-    # By category (top 10)
-    by_category = db.execute(
-        select(
-            Expense.expense_type,
-            func.count(Expense.id).label("count"),
-            func.sum(Expense.total_claimed_amount).label("total"),
-        ).where(
-            Expense.posting_date >= start_of_year
-        ).group_by(Expense.expense_type).order_by(
-            func.sum(Expense.total_claimed_amount).desc()
-        ).limit(10)
-    ).all()
+    results = query_service.list_expenses(page=page, per_page=per_page)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -734,22 +490,19 @@ async def expenses_list(
         {"label": "Expenses"},
     ])
 
-    context["expenses"] = expenses
-    context["total"] = total
+    context["expenses"] = results["expenses"]
+    context["total"] = results["total"]
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (results["total"] + per_page - 1) // per_page
 
     context["stats"] = {
-        "mtd_total": mtd_total,
-        "ytd_total": ytd_total,
-        "total_expenses": total,
+        "mtd_total": results["mtd_total"],
+        "ytd_total": results["ytd_total"],
+        "total_expenses": results["total"],
     }
 
-    context["by_category"] = [
-        {"category": row.expense_type or "Uncategorized", "count": row.count, "total": float(row.total or 0)}
-        for row in by_category
-    ]
+    context["by_category"] = results["by_category"]
 
     template = templates.get_template("modules/purchasing/templates/pages/expenses.html")
     return HTMLResponse(template.render(context))
@@ -763,30 +516,12 @@ async def debit_notes_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    query_service: PurchasingQueryService = Depends(get_query_service),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Debit Notes list - supplier returns and adjustments."""
-    from app.models.books_settings import DebitNote
-
-    query = select(DebitNote).order_by(DebitNote.posting_date.desc())
-    count_query = select(func.count()).select_from(DebitNote)
-    total = db.scalar(count_query) or 0
-
-    offset = (page - 1) * per_page
-    notes = db.execute(query.offset(offset).limit(per_page)).scalars().all()
-
-    # Stats
-    total_amount = db.execute(
-        select(func.sum(DebitNote.total_amount))
-    ).scalar() or Decimal("0")
-
-    outstanding = db.execute(
-        select(func.sum(DebitNote.outstanding_amount)).where(
-            DebitNote.outstanding_amount > 0
-        )
-    ).scalar() or Decimal("0")
+    results = query_service.list_debit_notes(page=page, per_page=per_page)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -796,16 +531,16 @@ async def debit_notes_list(
         {"label": "Debit Notes"},
     ])
 
-    context["notes"] = notes
-    context["total"] = total
+    context["notes"] = results["notes"]
+    context["total"] = results["total"]
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (results["total"] + per_page - 1) // per_page
 
     context["stats"] = {
-        "total_notes": total,
-        "total_amount": total_amount,
-        "outstanding": outstanding,
+        "total_notes": results["total"],
+        "total_amount": results["total_amount"],
+        "outstanding": results["outstanding"],
     }
 
     template = templates.get_template("modules/purchasing/templates/pages/debit_notes.html")
@@ -820,35 +555,12 @@ async def purchasing_payments(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    query_service: PurchasingQueryService = Depends(get_query_service),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Purchase Payments list - payments made to suppliers."""
-    from app.models.supplier_payment import SupplierPayment
-
-    today = date.today()
-    start_of_month = today.replace(day=1)
-
-    # Query payments where payment_type is "Pay"
-    query = select(SupplierPayment).order_by(SupplierPayment.posting_date.desc())
-
-    count_query = select(func.count()).select_from(SupplierPayment)
-    total = db.scalar(count_query) or 0
-
-    offset = (page - 1) * per_page
-    payments = db.execute(query.offset(offset).limit(per_page)).scalars().all()
-
-    # Stats
-    mtd_paid = db.execute(
-        select(func.sum(SupplierPayment.paid_amount)).where(
-            SupplierPayment.posting_date >= start_of_month
-        )
-    ).scalar() or Decimal("0")
-
-    total_paid = db.execute(
-        select(func.sum(SupplierPayment.paid_amount))
-    ).scalar() or Decimal("0")
+    results = query_service.list_supplier_payments(page=page, per_page=per_page)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -858,16 +570,16 @@ async def purchasing_payments(
         {"label": "Payments"},
     ])
 
-    context["payments"] = payments
-    context["total"] = total
+    context["payments"] = results["payments"]
+    context["total"] = results["total"]
     context["page"] = page
     context["per_page"] = per_page
-    context["total_pages"] = (total + per_page - 1) // per_page
+    context["total_pages"] = (results["total"] + per_page - 1) // per_page
 
     context["stats"] = {
-        "mtd_paid": mtd_paid,
-        "total_paid": total_paid,
-        "total_count": total,
+        "mtd_paid": results["mtd_paid"],
+        "total_paid": results["total_paid"],
+        "total_count": results["total"],
     }
 
     template = templates.get_template("modules/purchasing/templates/pages/payments.html")
@@ -882,74 +594,32 @@ async def purchasing_analytics(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
-    db: DB,
+    analytics_service: PurchasingAnalyticsService = Depends(get_analytics_service),
+    dashboard_service: PurchasingDashboardService = Depends(get_dashboard_service),
 ):
     """Purchasing analytics - spend analysis and trends."""
-    from sqlalchemy import extract
+    from datetime import timedelta
 
     today = date.today()
     start_of_year = today.replace(month=1, day=1)
     twelve_months_ago = today - timedelta(days=365)
 
-    # Monthly spend trend
-    monthly_spend = db.execute(
-        select(
-            extract('year', PurchaseInvoice.posting_date).label('year'),
-            extract('month', PurchaseInvoice.posting_date).label('month'),
-            func.sum(PurchaseInvoice.grand_total).label('total'),
-            func.count(PurchaseInvoice.id).label('count'),
-        ).where(
-            PurchaseInvoice.posting_date >= twelve_months_ago
-        ).group_by(
-            extract('year', PurchaseInvoice.posting_date),
-            extract('month', PurchaseInvoice.posting_date)
-        ).order_by(
-            extract('year', PurchaseInvoice.posting_date),
-            extract('month', PurchaseInvoice.posting_date)
-        )
-    ).all()
+    # Get expense trend from service
+    trend_data = analytics_service.get_expense_trend(
+        start_date=twelve_months_ago,
+        end_date=today,
+        granularity="month",
+    )
 
-    # Top suppliers by spend YTD
-    top_suppliers = db.execute(
-        select(
-            PurchaseInvoice.supplier_name,
-            func.sum(PurchaseInvoice.grand_total).label('total'),
-            func.count(PurchaseInvoice.id).label('bill_count'),
-        ).where(
-            PurchaseInvoice.posting_date >= start_of_year
-        ).group_by(
-            PurchaseInvoice.supplier_name
-        ).order_by(
-            func.sum(PurchaseInvoice.grand_total).desc()
-        ).limit(10)
-    ).all()
+    # Get top suppliers from service
+    suppliers_data = analytics_service.get_purchases_by_supplier(
+        start_date=start_of_year,
+        end_date=today,
+        limit=10,
+    )
 
-    # YTD totals
-    ytd_total = db.execute(
-        select(func.sum(PurchaseInvoice.grand_total)).where(
-            PurchaseInvoice.posting_date >= start_of_year
-        )
-    ).scalar() or Decimal("0")
-
-    ytd_count = db.execute(
-        select(func.count(PurchaseInvoice.id)).where(
-            PurchaseInvoice.posting_date >= start_of_year
-        )
-    ).scalar() or 0
-
-    # Active supplier count
-    active_suppliers = db.execute(
-        select(func.count(func.distinct(PurchaseInvoice.supplier_name))).where(
-            PurchaseInvoice.posting_date >= start_of_year
-        )
-    ).scalar() or 0
-
-    # Outstanding AP
-    total_outstanding = db.execute(
-        select(func.sum(PurchaseInvoice.outstanding_amount)).where(
-            PurchaseInvoice.outstanding_amount > 0
-        )
-    ).scalar() or Decimal("0")
+    # Get dashboard metrics for summary stats
+    metrics = dashboard_service.get_dashboard_metrics(as_of_date=today)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -961,28 +631,32 @@ async def purchasing_analytics(
 
     context["monthly_spend"] = [
         {
-            "period": f"{int(row.year)}-{int(row.month):02d}",
-            "total": float(row.total or 0),
-            "count": row.count,
+            "period": t["period"],
+            "total": t["total"],
+            "count": t["entry_count"],
         }
-        for row in monthly_spend
+        for t in trend_data["trend"]
     ]
 
     context["top_suppliers"] = [
         {
-            "name": row.supplier_name or "Unknown",
-            "total": float(row.total or 0),
-            "bill_count": row.bill_count,
+            "name": s["name"] or "Unknown",
+            "total": s["total_purchases"],
+            "bill_count": s["bill_count"],
         }
-        for row in top_suppliers
+        for s in suppliers_data["suppliers"]
     ]
 
+    ytd_total = suppliers_data["total"]
+    ytd_count = sum(s["bill_count"] for s in suppliers_data["suppliers"])
+    active_suppliers = len(suppliers_data["suppliers"])
+
     context["stats"] = {
-        "ytd_total": ytd_total,
+        "ytd_total": Decimal(str(ytd_total)),
         "ytd_count": ytd_count,
         "active_suppliers": active_suppliers,
-        "total_outstanding": total_outstanding,
-        "avg_bill": round(float(ytd_total / ytd_count), 2) if ytd_count > 0 else 0,
+        "total_outstanding": metrics.total_outstanding,
+        "avg_bill": round(ytd_total / ytd_count, 2) if ytd_count > 0 else 0,
     }
 
     template = templates.get_template("modules/purchasing/templates/pages/analytics.html")

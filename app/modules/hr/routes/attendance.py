@@ -7,11 +7,8 @@ Permission Requirements:
 - hr:read - View attendance records, shifts
 - hr:write - Create, update attendance
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import date
-from decimal import Decimal
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse

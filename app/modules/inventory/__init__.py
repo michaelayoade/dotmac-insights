@@ -22,6 +22,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Operations",
     order=60,
     scopes=["inventory:read"],
+    enabled=False,
     prefixes=["/inventory"],
 )
 

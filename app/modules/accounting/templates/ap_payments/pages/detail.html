@@ -36,7 +36,7 @@
         </form>
         <a
             href="/accounting/ap-payments/{{ payment.id }}/edit"
-            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-gray-50 transition-colors"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-surface-50 transition-colors"
         >
             Edit
         </a>
@@ -89,7 +89,7 @@
     <!-- Main Content -->
     <div class="lg:col-span-2 space-y-6">
         <!-- Payment Details -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Payment Details</h2>
             </div>
@@ -134,7 +134,7 @@
 
         <!-- Deductions -->
         {% if payment.total_discount or payment.total_write_off or payment.total_withholding_tax %}
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Deductions</h2>
             </div>
@@ -164,7 +164,7 @@
         {% endif %}
 
         <!-- Allocations -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Bill Allocations</h2>
                 {% if payment.unallocated_amount and payment.unallocated_amount > 0 and payment.status.value != 'cancelled' %}
@@ -238,7 +238,7 @@
     <!-- Sidebar -->
     <div class="space-y-6">
         <!-- Status Card -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Status</h2>
             </div>
@@ -269,7 +269,7 @@
         </div>
 
         <!-- Supplier Info -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Supplier</h2>
             </div>
@@ -296,7 +296,7 @@
 
         <!-- Bank Account -->
         {% if payment.bank_account_id %}
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Bank Account</h2>
             </div>

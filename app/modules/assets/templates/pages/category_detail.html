@@ -1,0 +1,132 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">
+            <a href="/assets" class="hover:text-primary-600">Assets</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <a href="/assets/categories" class="hover:text-primary-600">Categories</a>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+            <span class="text-gray-900">{{ category.asset_category_name }}</span>
+        </nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">{{ category.asset_category_name }}</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Asset category settings and finance books</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="lg:col-span-2 space-y-6">
+        {% if validation_issues %}
+        <div class="bg-amber-50/60 rounded-2xl ring-1 ring-amber-200/70 overflow-hidden">
+            <div class="px-6 py-4 border-b border-amber-200/70 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-amber-900">Validation Warnings</h3>
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                    {{ validation_issues | length }} issue{% if validation_issues | length != 1 %}s{% endif %}
+                </span>
+            </div>
+            <div class="px-6 py-4 space-y-3">
+                {% for issue in validation_issues %}
+                {% set severity_styles = {
+                    'critical': 'bg-red-100 text-red-700 ring-red-200',
+                    'warning': 'bg-amber-100 text-amber-800 ring-amber-200',
+                    'info': 'bg-blue-100 text-blue-700 ring-blue-200'
+                } %}
+                <div class="flex items-start gap-3 rounded-xl bg-white/70 p-3 ring-1 ring-amber-100">
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset {{ severity_styles.get(issue.severity, 'bg-gray-100 text-gray-700 ring-gray-200') }}">
+                        {{ issue.severity | upper if issue.severity else 'WARN' }}
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-gray-900">{{ issue.message }}</p>
+                        <p class="text-xs text-gray-500">
+                            {{ issue.field or 'General' }} · {{ issue.code }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Category Details</h3>
+            </div>
+            <div class="px-6 py-6">
+                <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-6">
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Name</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ category.asset_category_name }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">CWIP Accounting</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ 'Enabled' if category.enable_cwip_accounting else 'Disabled' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Last Synced</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ category.last_synced_at | format_date if category.last_synced_at else '-' }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-sm font-medium text-gray-500">Created</dt>
+                        <dd class="mt-1.5 text-gray-900">{{ category.created_at | format_date }}</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+
+        {% if finance_books %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Finance Books</h3>
+            </div>
+            <table class="min-w-full divide-y divide-gray-100">
+                <thead><tr class="bg-surface-50">
+                    <th class="py-3 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Finance Book</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden sm:table-cell">Method</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden md:table-cell">Depreciations</th>
+                    <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 hidden lg:table-cell">Frequency</th>
+                </tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for fb in finance_books %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="whitespace-nowrap py-3 pl-6 pr-3 text-sm text-gray-900">{{ fb.finance_book or '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600 hidden sm:table-cell">{{ fb.depreciation_method or '-' }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600 hidden md:table-cell">{{ fb.total_number_of_depreciations }}</td>
+                        <td class="whitespace-nowrap px-3 py-3 text-sm text-gray-600 hidden lg:table-cell">{{ fb.frequency_of_depreciation }} months</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-display font-semibold text-gray-900">Assets in Category</h3>
+            </div>
+            {% if assets %}
+            <div class="px-6 py-4 space-y-3">
+                {% for asset in assets %}
+                <div class="flex items-center justify-between gap-3 rounded-xl bg-surface-50 px-4 py-3">
+                    <div>
+                        <p class="text-sm font-medium text-gray-900">{{ asset.asset_name }}</p>
+                        <p class="text-xs text-gray-500">{{ asset.item_code or 'No item code' }}</p>
+                    </div>
+                    <a href="/assets/{{ asset.id }}" class="text-xs font-semibold text-primary-600 hover:text-primary-700">View</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="px-6 py-6 text-sm text-gray-500">No assets in this category yet.</div>
+            {% endif %}
+            {% if asset_count and asset_count > (assets | length) %}
+            <div class="px-6 pb-6 text-xs text-gray-500">Showing {{ assets | length }} of {{ asset_count }} assets.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

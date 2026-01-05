@@ -5,13 +5,44 @@ This module provides utilities to:
 2. Ensure company is set on new records
 3. Apply company filters to queries
 """
-from typing import Optional, TypeVar, Type
+from typing import Optional, TypeVar, Type, Any, TYPE_CHECKING
 from sqlalchemy.orm import Session
 from sqlalchemy import inspect
 
 from app.config import settings
 
+if TYPE_CHECKING:
+    from app.auth import Principal
+
 T = TypeVar('T')
+
+
+def get_company_id(principal: Optional["Principal"] = None) -> int:
+    """Get the company ID from a principal or settings.
+
+    Args:
+        principal: The authenticated principal (user or service token)
+
+    Returns:
+        The company ID for the current context.
+        Defaults to 1 if no company context can be determined.
+    """
+    # Try to get company_id from principal if it has the attribute
+    if principal is not None:
+        if hasattr(principal, 'company_id') and principal.company_id:
+            return principal.company_id
+        # Check raw_claims for company info
+        if hasattr(principal, 'raw_claims') and principal.raw_claims:
+            claims = principal.raw_claims
+            if 'company_id' in claims:
+                return int(claims['company_id'])
+
+    # Check settings for default company ID
+    if hasattr(settings, 'default_company_id') and settings.default_company_id:
+        return settings.default_company_id
+
+    # Default fallback for single-tenant deployments
+    return 1
 
 
 def get_default_company() -> str:

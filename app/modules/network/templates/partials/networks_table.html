@@ -93,7 +93,7 @@
                     <td class="py-4 pl-3 pr-6 text-right">
                         <a
                             href="/network/ip/addresses?q={{ network.network }}"
-                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all opacity-0 group-hover:opacity-100"
+                            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all opacity-0 group-hover:opacity-100"
                         >
                             View IPs
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,7 +105,7 @@
                 {% endfor %}
             {% else %}
             <tr>
-                <td colspan="6" class="px-6 py-16 text-center">
+                <td colspan="6" class="px-6 py-16 text-center" data-testid="networks-empty-state">
                     <div class="mx-auto w-20 h-20 bg-gradient-to-br from-cyan-50 to-blue-100 rounded-2xl flex items-center justify-center mb-5 ring-1 ring-cyan-200/50">
                         <svg class="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
@@ -144,7 +144,7 @@
                     hx-get="/network/ip/networks/table?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_network_type %}&network_type={{ current_network_type }}{% endif %}{% if current_usage_type %}&usage_type={{ current_usage_type }}{% endif %}"
                     hx-target="#networks-table-container"
                     hx-push-url="true"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
                 >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
@@ -157,7 +157,7 @@
                     hx-get="/network/ip/networks/table?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_network_type %}&network_type={{ current_network_type }}{% endif %}{% if current_usage_type %}&usage_type={{ current_usage_type }}{% endif %}"
                     hx-target="#networks-table-container"
                     hx-push-url="true"
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-all duration-200"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 hover:border-gray-300 transition-all duration-200"
                 >
                     Next
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

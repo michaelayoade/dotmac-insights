@@ -25,6 +25,7 @@ from .debit_notes_types import (
     DebitNoteUpdateData,
     DebitNoteLineData,
 )
+from app.services.validation.soft_validation_service import SoftValidationService
 
 if TYPE_CHECKING:
     from app.auth import Principal
@@ -192,6 +193,7 @@ class DebitNoteService:
         # Add lines and calculate totals
         total_amount = Decimal("0")
         total_tax = Decimal("0")
+        created_lines = []
 
         for idx, line_data in enumerate(data.lines):
             line = DebitNoteLine(
@@ -211,12 +213,18 @@ class DebitNoteService:
                 idx=idx,
             )
             self.db.add(line)
+            created_lines.append(line)
             total_amount += line_data.amount
             total_tax += line_data.tax_amount
 
         note.total_amount = total_amount + total_tax
         note.outstanding_amount = note.total_amount
         note.base_amount = note.total_amount * note.conversion_rate
+
+        validator = SoftValidationService(self.db)
+        for line in created_lines:
+            validator.validate_and_store(line)
+        validator.validate_and_store(note)
 
         return note
 
@@ -283,6 +291,12 @@ class DebitNoteService:
             note.total_amount = total_amount + total_tax
             note.outstanding_amount = note.total_amount
             note.base_amount = note.total_amount * note.conversion_rate
+
+        validator = SoftValidationService(self.db)
+        if data.lines is not None:
+            for line in self.db.query(DebitNoteLine).filter(DebitNoteLine.debit_note_id == note_id).all():
+                validator.validate_and_store(line)
+        validator.validate_and_store(note)
 
         return note
 

@@ -7,6 +7,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.invoice import Invoice
@@ -64,7 +65,7 @@ class DocumentLineMixin:
     idx: Mapped[int] = mapped_column(default=0)
 
 
-class InvoiceLine(DocumentLineMixin, Base):
+class InvoiceLine(SoftValidationMixin, DocumentLineMixin, Base):
     """
     Line item for customer invoices.
 
@@ -95,7 +96,7 @@ class InvoiceLine(DocumentLineMixin, Base):
         return f"<InvoiceLine {self.item_name or self.item_code} @ {self.rate}>"
 
 
-class BillLine(DocumentLineMixin, Base):
+class BillLine(SoftValidationMixin, DocumentLineMixin, Base):
     """
     Line item for purchase invoices (bills).
 
@@ -270,6 +271,13 @@ class QuotationItem(DocumentLineMixin, Base):
     margin_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     margin_rate_or_amount: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
 
+    # Tariff/Subscription Plan link (for ISP service quotations)
+    tariff_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("tariffs.id"), nullable=True, index=True
+    )
+    is_recurring: Mapped[bool] = mapped_column(default=False)  # For subscription services
+    billing_cycle: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # monthly, quarterly, yearly
+
     # ERPNext reference
     erpnext_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
@@ -279,6 +287,7 @@ class QuotationItem(DocumentLineMixin, Base):
 
     # Relationships
     quotation: Mapped["Quotation"] = relationship(back_populates="items")
+    tariff = relationship("Tariff", backref="quotation_items")
 
     def __repr__(self) -> str:
         return f"<QuotationItem {self.item_name or self.item_code} @ {self.rate}>"

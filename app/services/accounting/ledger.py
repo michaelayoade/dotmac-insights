@@ -21,6 +21,7 @@ from app.models.accounting import Account, AccountType, GLEntry
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .ledger_types import (
     AccountBalanceInfo,
@@ -545,6 +546,7 @@ class LedgerService:
         )
         self.db.add(account)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(account)
         return account
 
     def update_account(
@@ -582,6 +584,8 @@ class LedgerService:
             account.disabled = data.disabled
         if data.balance_must_be is not None:
             account.balance_must_be = data.balance_must_be
+
+        SoftValidationService(self.db).validate_and_store(account)
 
         return account
 
@@ -735,6 +739,7 @@ class LedgerService:
         )
         self.db.add(entry)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(entry)
         return entry
 
     def update_gl_entry(self, entry_id: int, data: GLEntryUpdateData) -> GLEntry:
@@ -780,6 +785,8 @@ class LedgerService:
             entry.fiscal_year = data.fiscal_year
         if data.is_cancelled is not None:
             entry.is_cancelled = data.is_cancelled
+
+        SoftValidationService(self.db).validate_and_store(entry)
 
         return entry
 

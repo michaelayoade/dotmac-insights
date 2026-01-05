@@ -57,6 +57,14 @@ module.exports = {
         'warm-lg': '0 10px 15px -3px rgba(26, 29, 33, 0.08), 0 4px 6px -4px rgba(26, 29, 33, 0.06)',
         'warm-xl': '0 20px 25px -5px rgba(26, 29, 33, 0.1), 0 8px 10px -6px rgba(26, 29, 33, 0.08)',
         'inner-glow': 'inset 0 1px 0 0 rgba(255, 255, 255, 0.05)',
+        // Enhanced focus ring for better accessibility
+        'focus-ring': '0 0 0 3px rgba(13, 115, 119, 0.4)',
+      },
+      ringWidth: {
+        '3': '3px',
+      },
+      ringColor: {
+        'focus': 'rgba(13, 115, 119, 0.4)',
       },
       animation: {
         'fade-in': 'fadeIn 0.5s ease-out',

@@ -7,8 +7,6 @@ Permission Requirements:
 
 Uses OrganizationService for all business logic.
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
@@ -196,12 +194,8 @@ async def designation_detail(
     except DesignationNotFoundError:
         raise HTTPException(status_code=404, detail="Designation not found")
 
-    # Count employees with this designation (service doesn't have a headcount method for designations)
-    from app.models.employee import Employee
-    employee_count = db.query(Employee).filter(
-        Employee.designation_id == designation_id,
-        Employee.is_deleted == False
-    ).count()
+    headcount = service.get_designation_headcount(designation_id)
+    employee_count = headcount.total_employees
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)

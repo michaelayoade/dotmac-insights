@@ -1,7 +1,7 @@
 {# Single conversation row #}
 <a
     href="/inbox/{{ conversation.id }}"
-    class="block px-5 py-4 hover:bg-gray-50/80 transition-all group {% if conversation.unread_count > 0 %}bg-blue-50/30{% endif %}"
+    class="block px-5 py-4 hover:bg-surface-50/80 transition-all group {% if conversation.unread_count > 0 %}bg-blue-50/30{% endif %}"
     id="conversation-row-{{ conversation.id }}"
     data-testid="conversation-row-{{ conversation.id }}"
 >

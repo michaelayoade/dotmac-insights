@@ -52,20 +52,33 @@
         async deleteSelected(url, itemName) {
             const count = this.selectedIds.length;
             showModal(`
-                <div class="text-center">
+                <div class="text-center" data-modal="bulk-delete">
                     <div class="mx-auto w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mb-4">
                         <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete ${count} ${itemName}?</h3>
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">Delete <span data-modal-count></span> <span data-modal-item></span>?</h3>
                     <p class="text-sm text-gray-500 mb-6">This action cannot be undone.</p>
                     <div class="flex gap-3 justify-center">
-                        <button onclick="hideModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
-                        <button onclick="hideModal(); window.executeBulkDelete('${url}')" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 transition-colors">Delete All</button>
+                        <button data-modal-close class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">Cancel</button>
+                        <button data-confirm-bulk-delete class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500 transition-colors">Delete All</button>
                     </div>
                 </div>
             `);
+            const modalRoot = document.getElementById('modal-content');
+            const modal = modalRoot?.querySelector('[data-modal="bulk-delete"]');
+            const countEl = modal?.querySelector('[data-modal-count]');
+            const itemEl = modal?.querySelector('[data-modal-item]');
+            if (countEl) countEl.textContent = String(count);
+            if (itemEl) itemEl.textContent = itemName || 'items';
+            const cancelBtn = modal?.querySelector('[data-modal-close]');
+            cancelBtn?.addEventListener('click', hideModal, { once: true });
+            const confirmBtn = modal?.querySelector('[data-confirm-bulk-delete]');
+            confirmBtn?.addEventListener('click', () => {
+                hideModal();
+                window.executeBulkDelete(url);
+            }, { once: true });
         },
 
         async exportSelected(url) {
@@ -76,7 +89,8 @@
 
         async bulkAction(url, method, confirm, message) {
             if (confirm) {
-                if (!window.confirm(message)) return;
+                const confirmed = await window.showConfirmModal(message || 'Are you sure?');
+                if (!confirmed) return;
             }
             await this.executeBulkAction(url, method);
         },
@@ -86,7 +100,7 @@
                 method,
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-Token': document.querySelector('[name="_csrf_token"]')?.value || ''
+                    'X-CSRF-Token': document.querySelector('[name="csrf_token"]')?.value || ''
                 },
                 body: JSON.stringify({ ids: this.selectedIds })
             });
@@ -175,7 +189,7 @@
 
     function isModalOpen() {
         const shortcutsModal = document.getElementById('keyboard-shortcuts-modal');
-        if (shortcutsModal && !shortcutsModal.classList.contains('hidden')) return true;
+        if (shortcutsModal && shortcutsModal.getAttribute('aria-hidden') !== 'true') return true;
         return document.body.classList.contains('overflow-hidden');
     }
 

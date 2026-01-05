@@ -19,6 +19,7 @@ from app.models.inventory import Warehouse
 
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import WarehouseFilters, WarehouseCreateData, WarehouseUpdateData
 
@@ -109,7 +110,12 @@ class WarehouseService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_warehouse(self, warehouse_id: int) -> Warehouse:
         """Get a single warehouse by ID.
@@ -333,6 +339,7 @@ class WarehouseService:
 
         self.db.add(warehouse)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(warehouse)
 
         return warehouse
 
@@ -399,6 +406,7 @@ class WarehouseService:
             warehouse.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(warehouse)
 
         return warehouse
 
@@ -441,6 +449,7 @@ class WarehouseService:
             warehouse.deleted_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(warehouse)
 
     def disable_warehouse(self, warehouse_id: int, disabled: bool = True) -> Warehouse:
         """Enable or disable a warehouse.
@@ -460,6 +469,7 @@ class WarehouseService:
             warehouse.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(warehouse)
         return warehouse
 
     def enable_warehouse(self, warehouse_id: int) -> Warehouse:

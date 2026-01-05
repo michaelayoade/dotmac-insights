@@ -9,7 +9,7 @@
     <div class="flex items-center gap-3">
         <a
             href="/settings/data-cleanup/scans"
-            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 transition-colors"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors"
         >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -161,7 +161,7 @@
         {% if recent_issues %}
         <ul class="divide-y divide-gray-100">
             {% for issue in recent_issues %}
-            <li class="px-6 py-4 hover:bg-gray-50 transition-colors">
+            <li class="px-6 py-4 hover:bg-surface-50 transition-colors">
                 <a href="/settings/data-cleanup/issues/{{ issue.id }}" class="block">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-3">
@@ -201,7 +201,7 @@
         {% if recent_jobs %}
         <ul class="divide-y divide-gray-100">
             {% for job in recent_jobs %}
-            <li class="px-6 py-4 hover:bg-gray-50 transition-colors">
+            <li class="px-6 py-4 hover:bg-surface-50 transition-colors">
                 <a href="/settings/data-cleanup/jobs/{{ job.id }}" class="block">
                     <div class="flex items-center justify-between">
                         <span class="text-sm text-gray-900 font-medium">{{ job.name }}</span>

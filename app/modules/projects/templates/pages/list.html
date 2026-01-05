@@ -56,6 +56,21 @@
 
         <!-- Filters -->
         <div class="flex gap-3">
+            <select
+                name="status"
+                class="sr-only"
+                data-testid="status-filter"
+                hx-get="/projects/table"
+                hx-target="#projects-table-container"
+                hx-include="[name='q'], [name='priority']"
+                hx-trigger="change"
+                hx-push-url="true"
+            >
+                <option value="">All Statuses</option>
+                {% for opt in status_options %}
+                <option value="{{ opt.value }}" {{ 'selected' if current_status == opt.value else '' }}>{{ opt.label }}</option>
+                {% endfor %}
+            </select>
             <!-- Status filter -->
             <div class="relative" x-data="{ open: false }">
                 <button
@@ -90,6 +105,7 @@
                         hx-include="[name='q'], [name='priority']"
                         hx-push-url="true"
                         @click="open = false"
+                        data-testid="status-option-all"
                     >All Statuses</a>
                     {% for opt in status_options %}
                     <a
@@ -100,6 +116,7 @@
                         hx-include="[name='q'], [name='priority']"
                         hx-push-url="true"
                         @click="open = false"
+                        data-testid="status-option-{{ opt.value | replace(' ', '-') }}"
                     >{{ opt.label }}</a>
                     {% endfor %}
                 </div>

@@ -1,0 +1,92 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Email Campaigns</h1>
+        <p class="mt-1 text-sm text-gray-500">Create, schedule, and analyze email sends</p>
+    </div>
+    <a href="/marketing/email/campaigns/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Email Campaign
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set kpis = email_kpis | default([]) %}
+
+<div class="space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {% if kpis %}
+            {% for kpi in kpis %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+                <div class="flex items-center justify-between">
+                    <p class="text-sm font-medium text-gray-500">{{ kpi.label }}</p>
+                    <span class="{{ kpi.color }}">{% include "components/icons/" ~ kpi.icon ~ ".html" ignore missing %}</span>
+                </div>
+                <p class="text-2xl font-bold text-gray-900 mt-2">{{ kpi.value }}</p>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 col-span-full text-sm text-gray-500">
+                No email KPIs available.
+            </div>
+        {% endif %}
+    </div>
+
+    {% set campaigns = campaigns | default([]) %}
+
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Campaigns</h2>
+            <div class="flex items-center gap-2">
+                <input type="search" placeholder="Search email campaigns..." class="rounded-xl border-0 bg-surface-50 px-4 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+                <button class="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Filter</button>
+            </div>
+        </div>
+        {% if campaigns %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <thead class="bg-surface-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Campaign</th>
+                            <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Segment</th>
+                            <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Send Date</th>
+                            <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Open Rate</th>
+                            <th class="px-6 py-3 text-left font-medium text-gray-500 uppercase tracking-wider">Click Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for campaign in campaigns %}
+                        <tr class="hover:bg-surface-50">
+                            <td class="px-6 py-4 font-medium text-gray-900">{{ campaign.name }}</td>
+                            <td class="px-6 py-4 text-gray-600">{{ campaign.segment }}</td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                                    {% if campaign.status == 'sent' %}bg-emerald-50 text-emerald-700
+                                    {% elif campaign.status == 'scheduled' %}bg-blue-50 text-blue-700
+                                    {% elif campaign.status == 'draft' %}bg-gray-100 text-gray-600
+                                    {% else %}bg-slate-100 text-slate-600{% endif %}">
+                                    {{ campaign.status | title }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-gray-600">{{ campaign.send_date }}</td>
+                            <td class="px-6 py-4 text-gray-600">{{ campaign.opens }}</td>
+                            <td class="px-6 py-4 text-gray-600">{{ campaign.clicks }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="px-6 py-6 text-sm text-gray-500">No email campaigns yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

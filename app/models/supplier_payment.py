@@ -8,6 +8,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 from app.database import Base, SoftDeleteMixin
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.payment_allocation import PaymentAllocation
@@ -22,7 +23,7 @@ class SupplierPaymentStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class SupplierPayment(SoftDeleteMixin, Base):
+class SupplierPayment(SoftValidationMixin, SoftDeleteMixin, Base):
     """
     Payment made to suppliers/vendors.
 

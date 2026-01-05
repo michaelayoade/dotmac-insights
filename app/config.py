@@ -74,6 +74,25 @@ class Settings(BaseSettings):
     product_name: str = "DotMac BOS"
     support_email: str = "support@dotmac.ng"
 
+    # Marketing integrations
+    meta_app_id: Optional[str] = None
+    meta_app_secret: Optional[str] = None
+    meta_redirect_uri: Optional[str] = None
+    twitter_client_id: Optional[str] = None
+    twitter_client_secret: Optional[str] = None
+    twitter_redirect_uri: Optional[str] = None
+    linkedin_client_id: Optional[str] = None
+    linkedin_client_secret: Optional[str] = None
+    linkedin_redirect_uri: Optional[str] = None
+    whatsapp_access_token: Optional[str] = None
+    email_unsubscribe_secret: Optional[str] = None
+    marketing_public_base_url: Optional[str] = None
+
+    meta_webhook_secret: Optional[str] = None
+    twitter_webhook_secret: Optional[str] = None
+    linkedin_webhook_secret: Optional[str] = None
+    whatsapp_webhook_secret: Optional[str] = None
+
     # OpenBao (secrets management)
     openbao_url: Optional[str] = None  # e.g., http://localhost:8200
     openbao_token: Optional[str] = None

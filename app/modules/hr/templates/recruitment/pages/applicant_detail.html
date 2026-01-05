@@ -23,7 +23,7 @@
             <div x-show="open" @click.outside="open = false" x-cloak class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg ring-1 ring-gray-100 py-1 z-10">
                 {% for status in ['Screening', 'Interview', 'Offer', 'Rejected', 'Accepted'] %}
                 <form method="POST" action="/hr/recruitment/applicants/{{ applicant.id }}/status">
-                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="status" value="{{ status }}">
                     <button type="submit" class="block w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-surface-50">{{ status }}</button>
                 </form>

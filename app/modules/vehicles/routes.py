@@ -7,14 +7,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request, Response, Depends, Query
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select, func, or_
-from sqlalchemy.orm import selectinload
 from typing import Optional
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
-from app.models.vehicle import Vehicle
+from app.services.fleet import VehicleService, VehicleFilters, VehicleNotFoundError
+from app.services.types import PaginationParams
 
 router = APIRouter(prefix="/vehicles", tags=["vehicles-web"])
 templates = get_template_env()
@@ -40,54 +39,31 @@ async def vehicles_list(
     dir: str = Query("asc", description="Sort direction"),
 ):
     """Vehicles list page."""
-    query = select(Vehicle).options(selectinload(Vehicle.assigned_driver))
+    service = VehicleService(db)
 
-    # Search
-    if q:
-        search = f"%{q}%"
-        query = query.where(
-            or_(
-                Vehicle.license_plate.ilike(search),
-                Vehicle.make.ilike(search),
-                Vehicle.model.ilike(search),
-                Vehicle.chassis_no.ilike(search),
-            )
-        )
-
-    # Filters
+    # Convert status filter to is_active boolean
+    is_active: Optional[bool] = None
     if status == "active":
-        query = query.where(Vehicle.is_active == True)
+        is_active = True
     elif status == "inactive":
-        query = query.where(Vehicle.is_active == False)
+        is_active = False
 
-    if fuel_type:
-        query = query.where(Vehicle.fuel_type == fuel_type)
+    filters = VehicleFilters(
+        search=q,
+        make=make,
+        fuel_type=fuel_type,
+        is_active=is_active,
+        sort_by=sort,
+        sort_order=dir,
+    )
+    pagination = PaginationParams(page=page, limit=per_page)
 
-    if make:
-        query = query.where(Vehicle.make.ilike(f"%{make}%"))
+    result = service.list_vehicles(filters, pagination)
+    vehicles = result.items
+    total = result.total
 
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
-    total = db.scalar(count_query) or 0
-
-    # Sorting
-    sort_column = getattr(Vehicle, sort, Vehicle.license_plate)
-    if dir == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
-
-    # Pagination
-    offset = (page - 1) * per_page
-    query = query.offset(offset).limit(per_page)
-
-    result = db.execute(query)
-    vehicles = result.scalars().all()
-
-    # Get distinct fuel types for filter
-    fuel_types_query = select(Vehicle.fuel_type).distinct().where(Vehicle.fuel_type.isnot(None))
-    fuel_types_result = db.execute(fuel_types_query)
-    fuel_types = [ft[0] for ft in fuel_types_result.fetchall() if ft[0]]
+    # Get distinct fuel types for filter dropdown
+    fuel_types = service.get_distinct_fuel_types()
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
@@ -148,15 +124,11 @@ async def vehicle_detail(
     db: DB,
 ):
     """Vehicle detail page."""
-    query = (
-        select(Vehicle)
-        .options(selectinload(Vehicle.assigned_driver))
-        .where(Vehicle.id == vehicle_id)
-    )
-    result = db.execute(query)
-    vehicle = result.scalar_one_or_none()
+    service = VehicleService(db)
 
-    if not vehicle:
+    try:
+        vehicle = service.get_vehicle(vehicle_id)
+    except VehicleNotFoundError:
         template = templates.get_template("errors/404.html")
         context = get_base_context(request, response, user, csrf_token)
         context["message"] = "Vehicle not found"

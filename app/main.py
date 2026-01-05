@@ -22,6 +22,7 @@ from app.auth import get_current_principal
 from app.middleware.metrics import get_metrics_response
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
+from app.middleware.validation_warnings import ValidationWarningsMiddleware
 from app.observability.otel import setup_otel, shutdown_otel
 from app.middleware.license import enforce_license
 from app.services.rbac_sync import ensure_admin_has_all_permissions
@@ -84,6 +85,7 @@ async def lifespan(app: FastAPI):
     register_subscription_events()
     logger.info("subscription_events_registered")
 
+
     yield
 
     # Shutdown
@@ -126,6 +128,7 @@ logger.info("cors_configured", origins=settings.cors_origins_list)
 
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(ValidationWarningsMiddleware)
 logger.info("security_middleware_enabled")
 
 

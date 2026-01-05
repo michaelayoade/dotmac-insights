@@ -7,6 +7,15 @@
     {'key': 'completed', 'label': 'Completed', 'color': 'green', 'icon': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>'},
 ] %}
 
+<span id="dispatch-summary-total" hx-swap-oob="true">{{ summary.total }}</span>
+<span id="dispatch-summary-unassigned" hx-swap-oob="true">{{ summary.unassigned }}</span>
+<span id="dispatch-summary-assigned" hx-swap-oob="true">{{ summary.assigned }}</span>
+<span id="dispatch-summary-in-field" hx-swap-oob="true">{{ summary.in_field }}</span>
+<span id="dispatch-summary-completed" hx-swap-oob="true">{{ summary.completed }}</span>
+<div id="dispatch-workload-container" hx-swap-oob="true">
+    {% include "modules/field_service/templates/partials/dispatch_workload.html" %}
+</div>
+
 {% for col in columns %}
 <div class="flex-shrink-0 w-72 bg-surface-50 rounded-xl" data-column="{{ col.key }}">
     <!-- Column Header -->
@@ -93,7 +102,8 @@
                     hx-post="/field-service/{{ order.id }}/assign"
                     hx-target="#dispatch-board"
                     hx-swap="innerHTML"
-                    hx-include="[name='_csrf_token']"
+                    hx-include="[name='csrf_token']"
+                    hx-indicator="#dispatch-assign-indicator"
                     name="technician_id"
                 >
                     <option value="">Assign technician...</option>

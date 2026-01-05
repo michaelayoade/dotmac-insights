@@ -1,75 +1,30 @@
 {% extends "layouts/base.html" %}
 
+{% set nav_items = namespace(items=[]) %}
+{% set nav_section_keys = namespace(items=[]) %}
+{% for group in navigation %}
+{% for section in group.sections %}
+{% set nav_section_keys.items = nav_section_keys.items + [(section.module ~ '-' ~ loop.index) | lower | replace(' ', '-')] %}
+{% for item in section.links %}
+{% set nav_items.items = nav_items.items + [{
+    "label": item.label,
+    "href": item.href,
+    "icon": item.icon,
+    "section": section.section,
+    "module": section.module
+}] %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
 {% block body %}
 <!-- Skip link for accessibility -->
 <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary-600 focus:text-white focus:rounded-lg focus:shadow-lg">
     Skip to main content
 </a>
-
-{% set ns = namespace(default_collapsed={}) %}
-{% set visible = namespace(count=0) %}
-{% for section in navigation %}
-{% if section.module == "global" or (active_module_id and section.module == active_module_id) %}
-{% set _ = ns.default_collapsed.update({section.section: True}) %}
-{% set visible.count = visible.count + 1 %}
-{% endif %}
-{% endfor %}
 <div
-    class="min-h-full"
-    x-data="{
-        sidebarOpen: false,
-        navSearch: '',
-        favorites: [],
-        defaultCollapsed: {{ ns.default_collapsed | tojson | forceescape }},
-        collapsedSections: {},
-        init() {
-            this.loadNavPrefs();
-        },
-        loadNavPrefs() {
-            try {
-                const favorites = window.localStorage.getItem('nav:favorites');
-                this.favorites = favorites ? JSON.parse(favorites) : [];
-            } catch (error) {
-                this.favorites = [];
-            }
-            try {
-                const collapsed = window.localStorage.getItem('nav:collapsed');
-                const parsed = collapsed ? JSON.parse(collapsed) : {};
-                this.collapsedSections = { ...this.defaultCollapsed, ...parsed };
-            } catch (error) {
-                this.collapsedSections = this.defaultCollapsed;
-            }
-        },
-        saveFavorites() {
-            window.localStorage.setItem('nav:favorites', JSON.stringify(this.favorites));
-        },
-        saveCollapsed() {
-            window.localStorage.setItem('nav:collapsed', JSON.stringify(this.collapsedSections));
-        },
-        toggleFavorite(href) {
-            if (this.favorites.includes(href)) {
-                this.favorites = this.favorites.filter(item => item !== href);
-            } else {
-                this.favorites = [...this.favorites, href];
-            }
-            this.saveFavorites();
-        },
-        isFavorite(href) {
-            return this.favorites.includes(href);
-        },
-        toggleSection(sectionKey) {
-            this.collapsedSections[sectionKey] = this.isSectionOpen(sectionKey);
-            this.saveCollapsed();
-        },
-        isSectionOpen(sectionKey) {
-            if (this.navSearch) return true;
-            return !this.collapsedSections[sectionKey];
-        },
-        matchesFilter(label) {
-            if (!this.navSearch) return true;
-            return label.toLowerCase().includes(this.navSearch.toLowerCase());
-        }
-    }"
+    class="min-h-full lg:flex"
+    x-data="navState()"
+    @close-sidebar.window="sidebarOpen = false"
 >
     <!-- Mobile sidebar overlay -->
     <div
@@ -87,8 +42,8 @@
 
     <!-- Sidebar -->
     <aside
-        class="fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-gradient-to-b from-slate-850 to-slate-950 sidebar-transition"
-        :class="{ '-translate-x-full lg:translate-x-0': !sidebarOpen, 'translate-x-0': sidebarOpen }"
+        class="fixed inset-y-0 left-0 z-40 flex flex-col bg-gradient-to-b from-slate-850 to-slate-950 sidebar-transition lg:sticky lg:top-0 lg:h-screen lg:shrink-0 -translate-x-full lg:translate-x-0"
+        :class="[sidebarOpen ? 'translate-x-0' : '', compactSidebar ? 'w-20' : 'w-72']"
         data-testid="sidebar"
     >
         <!-- Mobile close button -->
@@ -103,211 +58,210 @@
         </button>
 
         <!-- Logo & Brand -->
-        <div class="flex h-20 shrink-0 items-center px-6 border-b border-white/5">
-            <a href="/" class="flex items-center gap-3 group" data-testid="sidebar-logo">
+        <div class="flex h-20 shrink-0 items-center border-b border-white/5" :class="compactSidebar ? 'px-3 justify-center' : 'px-6'">
+            <a href="/" class="flex items-center gap-3 group" :class="compactSidebar ? 'justify-center' : ''" data-testid="sidebar-logo">
                 <!-- Logo mark -->
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-600/20 group-hover:shadow-primary-500/30 transition-shadow">
                     <svg class="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </div>
-                <div>
+                <div x-show="!compactSidebar" x-cloak>
                     <span class="text-lg font-display font-bold text-white tracking-tight">{{ product_name }}</span>
                     <span class="block text-xs text-white/40 font-medium tracking-wide">Business Suite</span>
                 </div>
             </a>
         </div>
 
-        {% if module_registry %}
-        <div class="px-6 py-4 border-b border-white/5">
-            <label class="text-[10px] font-semibold uppercase tracking-[0.2em] text-white/40">
-                Module
-            </label>
-            <div class="mt-2">
-                <select
-                    class="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-sm text-white/80 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition"
-                    onchange="if (this.value) window.location = this.value;"
-                    aria-label="Module switcher"
-                    data-testid="module-switcher"
+        <div class="px-6 py-4 border-b border-white/5" :class="compactSidebar ? 'px-3' : 'px-6'">
+            <div class="flex items-center justify-end">
+                <button
+                    type="button"
+                    class="ml-auto p-2 rounded-lg text-white/40 hover:text-white/80 hover:bg-white/10 transition"
+                    @click="toggleCompactSidebar()"
+                    :aria-label="compactSidebar ? 'Expand sidebar' : 'Collapse sidebar'"
+                    data-testid="sidebar-compact-toggle"
                 >
-                    {% for module in module_registry %}
-                    <option
-                        value="{{ module.href }}"
-                        {% if active_module_id == module.id %}selected{% endif %}
-                    >
-                        {{ module.label }}
-                    </option>
-                    {% endfor %}
-                </select>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" :class="{ 'rotate-180': compactSidebar }">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
             </div>
         </div>
-        {% endif %}
 
         <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto scrollbar-thin py-6 px-4" aria-label="Main navigation" data-testid="sidebar-nav">
-            <div class="px-2 mb-5">
-                <div class="relative">
-                    <input
-                        type="text"
-                        x-model="navSearch"
-                        placeholder="Search navigation..."
-                        class="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 pl-9 text-sm text-white/80 placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:border-primary-500/40 transition"
-                        aria-label="Search navigation"
-                    >
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
-                    <button
-                        type="button"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70 transition"
-                        x-show="navSearch.length"
-                        @click="navSearch = ''"
-                        aria-label="Clear navigation search"
-                    >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        <nav class="flex-1 overflow-y-auto scrollbar-thin py-4 px-4" :class="compactSidebar ? 'px-2' : 'px-4'" aria-label="Main navigation" data-testid="sidebar-nav">
+            <div class="space-y-4">
+                <!-- Nav search - hidden in compact mode -->
+                <div class="px-3" x-show="!compactSidebar">
+                    <div class="relative">
+                        <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                    </button>
+                        <input
+                            type="search"
+                            x-model="navSearch"
+                            placeholder="Search navigation..."
+                            class="w-full rounded-xl border border-white/10 bg-white/5 py-2 pl-10 pr-8 text-sm text-white placeholder:text-white/40 focus:border-primary-400 focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition"
+                            id="nav-search-input"
+                            name="nav-search"
+                            data-testid="nav-search-input"
+                        >
+                        <button
+                            type="button"
+                            class="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/80 transition"
+                            x-show="navSearch.length"
+                            x-cloak
+                            @click="navSearch = ''"
+                            aria-label="Clear navigation search"
+                        >
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="mb-8" x-show="favorites.length > 0">
-                <h3 class="px-3 mb-3 text-xs font-bold text-amber-300/70 uppercase tracking-[0.18em]">
-                    Favorites
-                </h3>
-                <ul class="space-y-1">
-                    {% for section in navigation %}
-                    {% if section.module == "global" or (active_module_id and section.module == active_module_id) %}
-                    {% for item in section.links %}
-                    <li x-show="isFavorite({{ item.href | tojson | forceescape }}) && matchesFilter({{ item.label | tojson | forceescape }})" data-nav-item>
-                        <div class="flex items-center gap-2">
-                            <a
-                                href="{{ item.href }}"
-                                class="group flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
-                                       {% if current_path == item.href %}
-                                       bg-white/10 text-white shadow-inner-glow
-                                       {% else %}
-                                       text-white/60 hover:bg-white/5 hover:text-white
-                                       {% endif %}"
-                                data-testid="nav-favorite-{{ item.label | lower | replace(' ', '-') }}"
-                                {% if current_path == item.href %}aria-current="page"{% endif %}
-                            >
-                                <span class="w-5 h-5 flex items-center justify-center {% if current_path == item.href %}text-primary-400{% else %}text-white/40 group-hover:text-white/70{% endif %} transition-colors">
-                                    {% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}
-                                </span>
-                                <span>{{ item.label }}</span>
-                                {% if current_path == item.href %}
-                                <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400"></span>
-                                {% endif %}
-                            </a>
-                            <button
-                                type="button"
-                                class="p-1 rounded-md hover:bg-white/10 transition"
-                                :class="isFavorite({{ item.href | tojson | forceescape }}) ? 'text-amber-300' : 'text-white/30 hover:text-white/60'"
-                                @click.stop.prevent="toggleFavorite({{ item.href | tojson | forceescape }})"
-                                aria-label="Toggle favorite"
-                            >
-                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.168c.969 0 1.371 1.24.588 1.81l-3.372 2.45a1 1 0 00-.364 1.118l1.287 3.966c.3.921-.755 1.688-1.538 1.118l-3.372-2.45a1 1 0 00-1.176 0l-3.372 2.45c-.783.57-1.838-.197-1.538-1.118l1.287-3.966a1 1 0 00-.364-1.118L2.05 9.393c-.783-.57-.38-1.81.588-1.81h4.168a1 1 0 00.95-.69l1.286-3.966z"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </li>
-                    {% endfor %}
-                    {% endif %}
-                    {% endfor %}
-                </ul>
-            </div>
-
-            {% for section in navigation %}
-            {% if section.module == "global" or (active_module_id and section.module == active_module_id) %}
-            <div class="mb-8">
-                <div class="flex items-center justify-between px-3 mb-3">
-                    {% if section.href %}
-                    <a
-                        href="{{ section.href }}"
-                        class="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] group transition-colors {{ 'text-primary-400' if current_path == section.href else 'text-white/30 hover:text-white/60' }}"
-                        data-testid="section-{{ section.section | lower }}"
-                    >
-                        <span>{{ section.section }}</span>
-                        <svg class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </a>
-                    {% else %}
-                    <h3 class="text-xs font-bold text-white/30 uppercase tracking-[0.18em]">
-                        {{ section.section }}
+                <!-- Favorites section - only show if there are favorites -->
+                <div class="space-y-2" x-show="favoriteItems.length > 0" x-cloak>
+                    <h3 class="px-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/60" x-show="!compactSidebar">
+                        Favorites
                     </h3>
-                    {% endif %}
-                    <button
-                        type="button"
-                        class="p-1 rounded-md text-white/30 hover:text-white/70 hover:bg-white/10 transition"
-                        @click="toggleSection({{ section.section | tojson | forceescape }})"
-                        aria-label="Toggle section"
-                    >
-                        <svg class="w-3.5 h-3.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" :class="{ 'rotate-180': isSectionOpen({{ section.section | tojson | forceescape }}) }">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </button>
-                </div>
-                <ul class="space-y-1" x-show="isSectionOpen({{ section.section | tojson | forceescape }})">
-                    {% for item in section.links %}
-                    <li x-show="!isFavorite({{ item.href | tojson | forceescape }}) && matchesFilter({{ item.label | tojson | forceescape }})" data-nav-item>
-                        <div class="flex items-center gap-2">
-                            <a
-                                href="{{ item.href }}"
-                                class="group flex flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200
-                                       {% if current_path == item.href %}
-                                       bg-white/10 text-white shadow-inner-glow
-                                       {% else %}
-                                       text-white/60 hover:bg-white/5 hover:text-white
-                                       {% endif %}"
-                                data-testid="nav-{{ item.label | lower | replace(' ', '-') }}"
-                                {% if current_path == item.href %}aria-current="page"{% endif %}
-                            >
-                                <span class="w-5 h-5 flex items-center justify-center {% if current_path == item.href %}text-primary-400{% else %}text-white/40 group-hover:text-white/70{% endif %} transition-colors">
-                                    {% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}
-                                </span>
-                                <span>{{ item.label }}</span>
-                                {% if current_path == item.href %}
-                                <span class="ml-auto w-1.5 h-1.5 rounded-full bg-primary-400"></span>
-                                {% endif %}
-                            </a>
+                    <div class="flex flex-col gap-1">
+                        {% for item in nav_items.items %}
+                        {% set href_json = item.href | tojson | forceescape %}
+                        <div
+                            class="group flex items-center gap-2"
+                            x-show="isFavorite({{ href_json }}) && matchesFilter({{ item.label | tojson | forceescape }})"
+                            :style="`order: ${favorites.indexOf({{ href_json }})}`"
+                        >
+                                <a
+                                    href="{{ item.href }}"
+                                    class="flex flex-1 min-w-0 items-center gap-3 rounded-xl px-3 py-2 text-sm transition ring-1 ring-transparent"
+                                    :class="(currentPath === {{ href_json }} || ({{ href_json }} !== '/' && currentPath.startsWith({{ href_json }} + '/'))) ? 'bg-white/15 text-white shadow-inner ring-white/10' : 'text-white/80 hover:text-white hover:bg-white/5'"
+                                    :aria-current="(currentPath === {{ href_json }} || ({{ href_json }} !== '/' && currentPath.startsWith({{ href_json }} + '/'))) ? 'page' : false"
+                                    title="{{ item.label }}"
+                                >
+                                    <span class="inline-flex h-5 w-5 items-center justify-center text-white/80">
+                                        {% if item.icon %}{% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}{% endif %}
+                                    </span>
+                                    <span class="truncate" x-show="!compactSidebar">{{ item.label }}</span>
+                                </a>
                             <button
                                 type="button"
-                                class="p-1 rounded-md hover:bg-white/10 transition"
-                                :class="isFavorite({{ item.href | tojson | forceescape }}) ? 'text-amber-300' : 'text-white/30 hover:text-white/60'"
-                                @click.stop.prevent="toggleFavorite({{ item.href | tojson | forceescape }})"
-                                aria-label="Toggle favorite"
+                                class="p-1 text-amber-300/80 hover:text-amber-300"
+                                @click.prevent.stop="toggleFavorite({{ href_json }})"
+                                x-show="!compactSidebar"
+                                aria-label="Remove from favorites"
                             >
-                                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.966a1 1 0 00.95.69h4.168c.969 0 1.371 1.24.588 1.81l-3.372 2.45a1 1 0 00-.364 1.118l1.287 3.966c.3.921-.755 1.688-1.538 1.118l-3.372-2.45a1 1 0 00-1.176 0l-3.372 2.45c-.783.57-1.838-.197-1.538-1.118l1.287-3.966a1 1 0 00-.364-1.118L2.05 9.393c-.783-.57-.38-1.81.588-1.81h4.168a1 1 0 00.95-.69l1.286-3.966z"/>
+                                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.93 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z"/>
                                 </svg>
                             </button>
                         </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
-            {% endif %}
-            {% endfor %}
-
-            {% if visible.count <= 1 %}
-            <!-- Limited access notice -->
-            <div class="mt-4 mx-2 p-4 rounded-xl bg-white/5 border border-white/10" data-testid="limited-access-notice">
-                <div class="flex items-start gap-3">
-                    <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <p class="text-xs font-medium text-white/80">Limited Access</p>
-                        <p class="mt-0.5 text-xs text-white/50">Contact your administrator for additional permissions.</p>
+                        {% endfor %}
                     </div>
                 </div>
+                <!-- Recent section - only show if there are recent items -->
+                <div class="space-y-2" x-show="recentItems.length > 0" x-cloak>
+                    <h3 class="px-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/60" x-show="!compactSidebar">
+                        Recent
+                    </h3>
+                    <div class="flex flex-col gap-1">
+                        {% for item in nav_items.items %}
+                        {% set href_json = item.href | tojson | forceescape %}
+                        <a
+                            href="{{ item.href }}"
+                            class="flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition ring-1 ring-transparent"
+                            x-show="isRecent({{ href_json }}) && matchesFilter({{ item.label | tojson | forceescape }})"
+                            :style="`order: ${recent.indexOf({{ href_json }})}`"
+                            :class="(currentPath === {{ href_json }} || ({{ href_json }} !== '/' && currentPath.startsWith({{ href_json }} + '/'))) ? 'bg-white/15 text-white shadow-inner ring-white/10' : 'text-white/80 hover:text-white hover:bg-white/5'"
+                            :aria-current="(currentPath === {{ href_json }} || ({{ href_json }} !== '/' && currentPath.startsWith({{ href_json }} + '/'))) ? 'page' : false"
+                            title="{{ item.label }}"
+                        >
+                            <span class="inline-flex h-5 w-5 items-center justify-center text-white/80">
+                                {% if item.icon %}{% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}{% endif %}
+                            </span>
+                            <span class="truncate" x-show="!compactSidebar">{{ item.label }}</span>
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% for group in navigation %}
+                <div class="space-y-2">
+                    <h3 class="px-3 text-[12px] font-semibold uppercase tracking-[0.2em] text-white/60" x-show="!compactSidebar">
+                        {{ group.label }}
+                    </h3>
+                    {% for section in group.sections %}
+                    {% set section_key = (section.module ~ '-' ~ loop.index) | lower | replace(' ', '-') %}
+                    {% set section_labels = section.links | map(attribute='label') | list %}
+                    {% set section_icon = section.icon or "folder" %}
+                    <div class="space-y-2" x-show="sectionHasMatch({{ section_labels | tojson | forceescape }})" x-transition>
+                        <h4 class="px-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/60">
+                            <button
+                                type="button"
+                                class="flex w-full items-center justify-between text-left hover:text-white transition-colors"
+                                @click="toggleSection('{{ section_key }}')"
+                                :aria-expanded="isSectionOpen('{{ section_key }}') ? 'true' : 'false'"
+                                :aria-controls="'nav-section-{{ section_key }}'"
+                            >
+                                <span class="flex items-center gap-2">
+                                    <span class="inline-flex h-5 w-5 items-center justify-center text-white/60" x-show="compactSidebar">
+                                        {% if section_icon %}{% include "components/icons/" ~ section_icon ~ ".html" ignore missing %}{% endif %}
+                                    </span>
+                                    <span x-show="!compactSidebar">{{ section.section }}</span>
+                                </span>
+                                <span class="flex items-center gap-2">
+                                    <svg class="h-3 w-3 text-white/50 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" :class="isSectionOpen('{{ section_key }}') ? 'rotate-90' : ''">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </span>
+                            </button>
+                        </h4>
+                        <div
+                            class="space-y-1"
+                            :id="'nav-section-{{ section_key }}'"
+                            x-show="isSectionOpen('{{ section_key }}')"
+                            x-transition:enter="transition ease-out duration-150"
+                            x-transition:enter-start="opacity-0 -translate-y-1"
+                            x-transition:enter-end="opacity-100 translate-y-0"
+                            x-transition:leave="transition ease-in duration-100"
+                            x-transition:leave-start="opacity-100 translate-y-0"
+                            x-transition:leave-end="opacity-0 -translate-y-1"
+                        >
+                            {% for item in section.links %}
+                            {% set href_json = item.href | tojson | forceescape %}
+                            <div class="group flex items-center gap-2" x-show="matchesFilter({{ item.label | tojson | forceescape }})" x-transition>
+                                <a
+                                    href="{{ item.href }}"
+                                    class="flex flex-1 min-w-0 items-center gap-3 rounded-xl px-3 py-2 text-sm transition ring-1 ring-transparent"
+                                    :class="(currentPath === {{ href_json }} || ({{ href_json }} !== '/' && currentPath.startsWith({{ href_json }} + '/'))) ? 'bg-white/15 text-white shadow-inner ring-white/10' : 'text-white/80 hover:text-white hover:bg-white/5'"
+                                    :aria-current="(currentPath === {{ href_json }} || ({{ href_json }} !== '/' && currentPath.startsWith({{ href_json }} + '/'))) ? 'page' : false"
+                                    title="{{ item.label }}"
+                                >
+                                    <span class="inline-flex h-5 w-5 items-center justify-center text-white/80">
+                                        {% if item.icon %}{% include "components/icons/" ~ item.icon ~ ".html" ignore missing %}{% endif %}
+                                    </span>
+                                    <span class="truncate" x-show="!compactSidebar || !{{ item.icon | default('') | tojson | forceescape }}">{{ item.label }}</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    class="p-1 text-white/50 hover:text-amber-300 opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 transition"
+                                    @click.prevent.stop="toggleFavorite({{ href_json }})"
+                                    x-show="!compactSidebar"
+                                    :aria-label="isFavorite({{ href_json }}) ? 'Remove from favorites' : 'Add to favorites'"
+                                >
+                                    <svg class="h-4 w-4" :class="isFavorite({{ href_json }}) ? 'text-amber-300' : 'text-white/30'" fill="currentColor" viewBox="0 0 20 20">
+                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.93 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endfor %}
             </div>
-            {% endif %}
         </nav>
 
         <!-- User section -->
@@ -347,7 +301,7 @@
     </aside>
 
     <!-- Main content area -->
-    <div class="lg:pl-72">
+    <div class="flex-1 min-w-0">
         <!-- Top bar -->
         <header class="sticky top-0 z-20 bg-surface-50/80 backdrop-blur-xl border-b border-gray-200/50">
             <div class="flex h-16 items-center gap-4 px-4 sm:px-6 lg:px-8">
@@ -405,7 +359,7 @@
                 </div>
 
                 <!-- Global Search -->
-                <div x-data="globalSearch()" class="hidden sm:block flex-1 max-w-md mx-4" @keydown.escape="close()">
+                <div x-data="globalSearch()" class="flex-1 max-w-md mx-2 sm:mx-4" @keydown.escape="close()">
                     <div class="relative">
                         <div class="relative">
                             <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,6 +375,8 @@
                                 @keydown.enter.prevent="selectFocused()"
                                 placeholder="Search..."
                                 class="block w-full rounded-xl border-0 bg-gray-100/80 py-2 pl-10 pr-10 text-sm text-gray-900 placeholder:text-gray-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 focus:outline-none transition-all"
+                                id="global-search-input"
+                                name="global-search"
                                 data-testid="global-search-input"
                             >
                             <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -473,8 +429,8 @@
                                             >
                                                 <span
                                                     class="w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0"
-                                                    :class="getIconClass(item.type)"
-                                                    x-html="getIcon(item.type)"
+                                                    :class="getIconClass(item)"
+                                                    x-html="getIcon(item)"
                                                 ></span>
                                                 <div class="min-w-0 flex-1">
                                                     <div class="text-sm font-medium text-gray-900 truncate" x-text="item.title"></div>
@@ -509,6 +465,15 @@
                     <div id="page-loader" class="htmx-indicator">
                         <div class="w-5 h-5 border-2 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
                     </div>
+                    <button
+                        type="button"
+                        class="hidden sm:inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 transition"
+                        @click="window.openShortcutsModal && window.openShortcutsModal()"
+                        aria-label="Open keyboard shortcuts"
+                    >
+                        <span>Shortcuts</span>
+                        <kbd class="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-500">?</kbd>
+                    </button>
 
                 </div>
             </div>
@@ -516,7 +481,7 @@
 
         <!-- Main content -->
         <main class="py-8" id="main-content" data-testid="main-content" data-page-title="{{ page_title | default('Dashboard') }}">
-            <div class="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+            <div class="px-4 sm:px-6 lg:px-8 max-w-7xl">
                 <!-- Page header -->
                 {% block page_header %}
                 <div class="mb-8">
@@ -542,10 +507,30 @@
 </div>
 
 <!-- Keyboard shortcuts help (shown with ?) -->
-<div id="keyboard-shortcuts-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm" onclick="this.classList.add('hidden')">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onclick="event.stopPropagation()">
-        <h3 class="text-lg font-semibold text-gray-900 mb-4">Keyboard Shortcuts</h3>
+<div
+    id="keyboard-shortcuts-modal"
+    x-data="{ open: false }"
+    x-show="open"
+    x-cloak
+    @open-shortcuts.window="open = true"
+    @close-shortcuts.window="open = false"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    :aria-hidden="open ? 'false' : 'true'"
+    aria-labelledby="keyboard-shortcuts-title"
+    @click.self="window.closeShortcutsModal && window.closeShortcutsModal()"
+>
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" @click.stop>
+        <h3 id="keyboard-shortcuts-title" class="text-lg font-semibold text-gray-900 mb-4">Keyboard Shortcuts</h3>
         <div class="space-y-2 text-sm">
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Go to dashboard</span><span class="flex items-center gap-1"><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">g</kbd><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">d</kbd></span></div>
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Go to support</span><span class="flex items-center gap-1"><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">g</kbd><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">s</kbd></span></div>
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Go to HR</span><span class="flex items-center gap-1"><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">g</kbd><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">h</kbd></span></div>
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Go to finance</span><span class="flex items-center gap-1"><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">g</kbd><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">a</kbd></span></div>
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Go to projects</span><span class="flex items-center gap-1"><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">g</kbd><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">p</kbd></span></div>
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Go to subscriptions</span><span class="flex items-center gap-1"><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">g</kbd><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">i</kbd></span></div>
+            <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Open search</span><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">Cmd+K</kbd></div>
             <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Navigate down</span><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">j</kbd></div>
             <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Navigate up</span><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">k</kbd></div>
             <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Open/View</span><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">Enter</kbd></div>
@@ -555,7 +540,185 @@
             <div class="flex justify-between py-1 border-b border-gray-100"><span class="text-gray-600">Focus search</span><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">/</kbd></div>
             <div class="flex justify-between py-1"><span class="text-gray-600">Clear selection</span><kbd class="px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">Esc</kbd></div>
         </div>
-        <button onclick="document.getElementById('keyboard-shortcuts-modal').classList.add('hidden')" class="mt-4 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium">Close</button>
+        <button @click="window.closeShortcutsModal && window.closeShortcutsModal()" class="mt-4 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 text-sm font-medium">Close</button>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    window.navContext = {
+        currentPath: {{ current_path | tojson }},
+        allNavItems: {{ nav_items.items | tojson }},
+        sectionKeys: {{ nav_section_keys.items | tojson }},
+    };
+    window.navState = function() {
+        return {
+            sidebarOpen: false,
+            navSearch: '',
+            favorites: [],
+            recent: [],
+            compactSidebar: false,
+            currentPath: window.navContext.currentPath,
+            allNavItems: window.navContext.allNavItems,
+            collapsedSections: {},
+            get favoriteItems() {
+                return this.allNavItems.filter((item) => item && item.href && this.isFavorite(item.href));
+            },
+            get recentItems() {
+                return this.recent
+                    .map((href) => this.allNavItems.find((item) => item && item.href === href))
+                    .filter(Boolean);
+            },
+            init() {
+                this.loadNavPrefs();
+                this.loadRecent();
+                this.loadSidebarPrefs();
+                this.trackRecent();
+                if (!Object.keys(this.collapsedSections).length && Array.isArray(window.navContext.sectionKeys)) {
+                    window.navContext.sectionKeys.forEach((key) => {
+                        this.collapsedSections[key] = true;
+                    });
+                    this.saveCollapsed();
+                }
+                window.addEventListener('close-sidebar', () => {
+                    this.sidebarOpen = false;
+                });
+            },
+            loadNavPrefs() {
+                try {
+                    const favorites = window.localStorage.getItem('nav:favorites');
+                    this.favorites = favorites ? JSON.parse(favorites) : [];
+                } catch (error) {
+                    this.favorites = [];
+                }
+                try {
+                    const collapsed = window.localStorage.getItem('nav:collapsed');
+                    const parsed = collapsed ? JSON.parse(collapsed) : {};
+                    this.collapsedSections = { ...parsed };
+                } catch (error) {
+                    this.collapsedSections = {};
+                }
+            },
+            saveFavorites() {
+                try {
+                    window.localStorage.setItem('nav:favorites', JSON.stringify(this.favorites));
+                } catch (error) {}
+            },
+            saveCollapsed() {
+                try {
+                    window.localStorage.setItem('nav:collapsed', JSON.stringify(this.collapsedSections));
+                } catch (error) {}
+            },
+            saveRecent() {
+                try {
+                    window.localStorage.setItem('nav:recent', JSON.stringify(this.recent));
+                } catch (error) {}
+            },
+            saveSidebarPrefs() {
+                try {
+                    window.localStorage.setItem('nav:compact', this.compactSidebar ? 'true' : 'false');
+                } catch (error) {}
+            },
+            toggleFavorite(href) {
+                if (this.favorites.includes(href)) {
+                    this.favorites = this.favorites.filter(item => item !== href);
+                } else {
+                    this.favorites = [...this.favorites, href];
+                }
+                this.saveFavorites();
+            },
+            isFavorite(href) {
+                return this.favorites.includes(href);
+            },
+            isRecent(href) {
+                return this.recent.includes(href);
+            },
+            loadRecent() {
+                try {
+                    const recent = window.localStorage.getItem('nav:recent');
+                    this.recent = recent ? JSON.parse(recent) : [];
+                } catch (error) {
+                    this.recent = [];
+                }
+            },
+            loadSidebarPrefs() {
+                const compact = window.localStorage.getItem('nav:compact');
+                this.compactSidebar = compact === 'true';
+            },
+            resolveNavItem(path) {
+                let best = null;
+                let bestLen = 0;
+                for (const item of this.allNavItems) {
+                    if (!item || !item.href) continue;
+                    const href = item.href;
+                    const isExact = path === href;
+                    const isPrefix = href !== '/' && path.startsWith(href + '/');
+                    if (isExact || isPrefix) {
+                        if (href.length > bestLen) {
+                            best = item;
+                            bestLen = href.length;
+                        }
+                    }
+                }
+                return best;
+            },
+            trackRecent() {
+                const item = this.resolveNavItem(this.currentPath);
+                if (!item) return;
+                const href = item.href;
+            this.recent = [href, ...this.recent.filter(existing => existing !== href)].slice(0, 1);
+                this.saveRecent();
+            },
+            toggleSection(sectionKey) {
+                this.collapsedSections[sectionKey] = this.isSectionOpen(sectionKey);
+                this.saveCollapsed();
+            },
+            toggleCompactSidebar() {
+                this.compactSidebar = !this.compactSidebar;
+                this.saveSidebarPrefs();
+            },
+            isSectionOpen(sectionKey) {
+                if (this.navSearch || this.compactSidebar) return true;
+                return !this.collapsedSections[sectionKey];
+            },
+            matchesFilter(label) {
+                if (!this.navSearch) return true;
+                return label.toLowerCase().includes(this.navSearch.toLowerCase());
+            },
+            sectionHasMatch(labels) {
+                if (!this.navSearch) return true;
+                return labels.some((label) => label && label.toLowerCase().includes(this.navSearch.toLowerCase()));
+            }
+        };
+    };
+    window.moduleRegistry = {{ module_registry | tojson if module_registry else '[]' }};
+    window.moduleShortcuts = {
+        d: '/',
+        s: '/support',
+        h: '/hr',
+        a: '/accounting',
+        p: '/projects',
+        o: '/operations',
+        i: '/subscriptions'
+    };
+    if (!window.globalSearch) {
+        window.globalSearch = function() {
+            return {
+                open: false,
+                query: '',
+                results: [],
+                loading: false,
+                totalItems: 0,
+                focusedIndex: -1,
+                search() {},
+                close() {},
+                focusNext() {},
+                focusPrev() {},
+                selectFocused() {}
+            };
+        };
+    }
+</script>
 {% endblock %}

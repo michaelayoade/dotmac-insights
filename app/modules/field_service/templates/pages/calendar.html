@@ -55,10 +55,10 @@
     <a href="/field-service/calendar?start={{ start_date.isoformat() }}" class="px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg">
         Calendar
     </a>
-    <a href="/field-service/dispatch" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+    <a href="/field-service/dispatch?date={{ start_date.isoformat() }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
         Dispatch
     </a>
-    <a href="/field-service/map" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+    <a href="/field-service/map?date={{ start_date.isoformat() }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
         Map
     </a>
 </div>

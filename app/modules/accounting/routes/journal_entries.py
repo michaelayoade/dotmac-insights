@@ -14,6 +14,7 @@ from ._deps import (
     datetime, Decimal,
 )
 from app.services.accounting import JournalEntryService, LedgerService
+from app.services.accounting.web_services import AccountingJournalEntriesWebService
 from app.services.accounting.journal_entry_types import JECreateData, JEFilters, JELineData, JEUpdateData
 from app.services.accounting.ledger_types import AccountFilters
 from app.services.errors import NotFoundError, ValidationError
@@ -24,6 +25,10 @@ router = APIRouter()
 
 def _get_journal_entry_service(db: DB, user: SessionUser) -> JournalEntryService:
     return JournalEntryService(db, user)
+
+
+def _get_journal_entry_web_service(db: DB, user: SessionUser) -> AccountingJournalEntriesWebService:
+    return AccountingJournalEntriesWebService(db, _get_journal_entry_service(db, user))
 
 
 def _get_ledger_service(db: DB, user: SessionUser) -> LedgerService:
@@ -66,6 +71,8 @@ async def journal_entries_list(
 ):
     """Journal Entries list page."""
     service = _get_journal_entry_service(db, user)
+    web_service = _get_journal_entry_web_service(db, user)
+    web_service = _get_journal_entry_web_service(db, user)
     docstatus_value = None
     if docstatus:
         try:
@@ -284,7 +291,7 @@ async def journal_entry_create(
 
     service = _get_journal_entry_service(db, user)
     try:
-        entry = service.create_entry(
+        entry = web_service.create_entry(
             JECreateData(
                 posting_date=datetime.strptime(posting_date, "%Y-%m-%d").date(),
                 voucher_type=JournalEntryType(voucher_type_value),
@@ -319,8 +326,6 @@ async def journal_entry_create(
         context["line_items"] = line_items
         template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
-
-    db.commit()
 
     set_flash(response, "Journal entry created successfully.", "success")
     return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
@@ -510,7 +515,7 @@ async def journal_entry_update(
         return HTMLResponse(template.render(context), status_code=422)
 
     try:
-        entry = service.update_entry_with_lines(
+        entry = web_service.update_entry_with_lines(
             entry_id,
             JECreateData(
                 posting_date=datetime.strptime(posting_date, "%Y-%m-%d").date(),
@@ -549,8 +554,6 @@ async def journal_entry_update(
         template = templates.get_template("modules/accounting/templates/journal_entries/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    db.commit()
-
     set_flash(response, "Journal entry updated successfully.", "success")
     return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)
 
@@ -567,15 +570,14 @@ async def journal_entry_post(
 ):
     """Post a journal entry to the general ledger."""
     service = _get_journal_entry_service(db, user)
+    web_service = _get_journal_entry_web_service(db, user)
     try:
-        entry = service.post_entry(entry_id)
+        entry = web_service.post_entry(entry_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail="Journal entry not found") from exc
     except ValidationError as exc:
         set_flash(response, str(exc), "error")
         return RedirectResponse(url=f"/accounting/journal-entries/{entry_id}", status_code=303)
-
-    db.commit()
 
     set_flash(response, "Journal entry posted to GL successfully.", "success")
     return RedirectResponse(url=f"/accounting/journal-entries/{entry.id}", status_code=303)

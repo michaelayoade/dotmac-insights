@@ -20,6 +20,7 @@ from app.models.asset import AssetCategory, AssetCategoryFinanceBook
 from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     CategoryFilters,
@@ -216,6 +217,10 @@ class AssetCategoryService:
 
         # Create finance books
         self._create_finance_books(category, data.finance_books)
+        validator = SoftValidationService(self.db)
+        for fb in category.finance_books:
+            validator.validate_and_store(fb)
+        validator.validate_and_store(category)
 
         return category
 
@@ -284,6 +289,7 @@ class AssetCategoryService:
 
         category.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(category)
         return category
 
     def delete_category(self, category_id: int) -> None:
@@ -365,6 +371,7 @@ class AssetCategoryService:
         )
         self.db.add(fb)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(fb)
         return fb
 
     def update_finance_book(
@@ -399,6 +406,7 @@ class AssetCategoryService:
         fb.capital_work_in_progress_account = data.capital_work_in_progress_account
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(fb)
         return fb
 
     def delete_finance_book(self, finance_book_id: int) -> None:

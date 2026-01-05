@@ -57,6 +57,7 @@ from app.services.hr.payroll_types import (
     StructureAssignmentUpdateData,
     YTDEarnings,
 )
+from app.services.activity_logger import ActivityLogger
 from app.services.hr.errors import (
     NoSalaryAssignmentError,
     PayrollAlreadyProcessedError,
@@ -587,6 +588,16 @@ class PayrollService:
 
         self.db.add(entry)
         self.db.flush()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.payroll.entry.create",
+            user_id=self.principal.user_id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payroll_entry",
+            entity_id=str(entry.id),
+            summary=f"Created payroll entry {entry.erpnext_id or entry.id}",
+            metadata={"company": entry.company},
+        )
         return entry
 
     def update_payroll_entry(
@@ -625,6 +636,15 @@ class PayrollService:
             entry.updated_by_id = self.principal.user_id
 
         self.db.flush()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.payroll.entry.update",
+            user_id=self.principal.user_id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payroll_entry",
+            entity_id=str(entry.id),
+            summary=f"Updated payroll entry {entry.erpnext_id or entry.id}",
+        )
         return entry
 
     def delete_payroll_entry(self, entry_id: int) -> None:
@@ -644,6 +664,15 @@ class PayrollService:
 
         self.db.delete(entry)
         self.db.flush()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.payroll.entry.delete",
+            user_id=self.principal.user_id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payroll_entry",
+            entity_id=str(entry.id),
+            summary=f"Deleted payroll entry {entry.erpnext_id or entry.id}",
+        )
 
     # ==========================================================================
     # Salary Slips
@@ -680,6 +709,17 @@ class PayrollService:
             query = query.order_by(SalarySlip.posting_date.desc())
 
         return paginate(self.db, query, pagination)
+
+    def list_salary_slip_years(self, employee_id: int) -> List[int]:
+        """List distinct payroll years for an employee."""
+        stmt = (
+            select(func.extract("year", SalarySlip.posting_date))
+            .where(SalarySlip.employee_id == employee_id)
+            .distinct()
+            .order_by(func.extract("year", SalarySlip.posting_date).desc())
+        )
+        years = self.db.scalars(stmt).all()
+        return [int(y) for y in years if y]
 
     def get_salary_slip(self, slip_id: int) -> SalarySlip:
         """Get a salary slip by ID with earnings and deductions."""
@@ -1116,6 +1156,16 @@ class PayrollService:
             entry.updated_by_id = self.principal.user_id
 
         self.db.flush()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.payroll.slips.generate",
+            user_id=self.principal.user_id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payroll_entry",
+            entity_id=str(entry.id),
+            summary=f"Generated salary slips for payroll entry {entry.erpnext_id or entry.id}",
+            metadata={"created": result.created_count, "failed": result.failed_count, "skipped": result.skipped_count},
+        )
         return result
 
     def submit_salary_slips(self, payroll_entry_id: int) -> BulkSlipResult:
@@ -1148,6 +1198,16 @@ class PayrollService:
             entry.updated_by_id = self.principal.user_id
 
         self.db.flush()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="hr.payroll.slips.submit",
+            user_id=self.principal.user_id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payroll_entry",
+            entity_id=str(entry.id),
+            summary=f"Submitted salary slips for payroll entry {entry.erpnext_id or entry.id}",
+            metadata={"submitted": result.submitted_count, "failed": len(result.failed_ids)},
+        )
         return result
 
     def calculate_slip_components(

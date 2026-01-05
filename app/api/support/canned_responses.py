@@ -47,6 +47,7 @@ class CannedResponseCreateRequest(BaseModel):
     scope: str = "personal"
     team_id: Optional[int] = None
     agent_id: Optional[int] = None
+    party_id: Optional[int] = None
     category: Optional[str] = None
 
 
@@ -108,7 +109,8 @@ def list_canned_responses(
                 "scope": r.scope,
                 "team_id": r.team_id,
                 "team_name": r.team.name if r.team else None,
-                "agent_id": r.agent_id,
+                "party_id": r.party_id,
+                "agent_id": r.party_id,
                 "category": r.category,
                 "usage_count": r.usage_count,
                 "is_active": r.is_active,
@@ -132,7 +134,7 @@ def create_canned_response(
             shortcode=payload.shortcode,
             scope=payload.scope,
             team_id=payload.team_id,
-            agent_id=payload.agent_id,
+            agent_id=payload.party_id or payload.agent_id,
             category=payload.category,
         )
         response = service.create(data)
@@ -241,8 +243,9 @@ def get_canned_response(
             "scope": response.scope,
             "team_id": response.team_id,
             "team_name": response.team.name if response.team else None,
-            "agent_id": response.agent_id,
-            "agent_name": response.agent.display_name if response.agent else None,
+            "party_id": response.party_id,
+            "agent_id": response.party_id,
+            "agent_name": response.party.display_name if response.party else None,
             "category": response.category,
             "usage_count": response.usage_count,
             "last_used_at": response.last_used_at.isoformat() if response.last_used_at else None,

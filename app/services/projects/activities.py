@@ -115,6 +115,7 @@ class ActivityService:
         self,
         project_id: int,
         limit: int = 100,
+        offset: int = 0,
     ) -> List[ProjectActivity]:
         """Get combined activity timeline for a project including its tasks and milestones.
 
@@ -170,7 +171,12 @@ class ActivityService:
             )
         )
 
-        activities = query.order_by(ProjectActivity.created_at.desc()).limit(limit).all()
+        activities = (
+            query.order_by(ProjectActivity.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
 
         return activities
 

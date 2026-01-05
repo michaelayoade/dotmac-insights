@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from sqlalchemy import func, or_, and_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, load_only
 
 from app.models.party import Party, PartyRole
 from app.models.crm import Opportunity, OpportunityStatus
@@ -77,6 +77,31 @@ class LeadService:
         # Join Party with PartyRole where role = 'lead'
         query = (
             self.db.query(Party, PartyRole)
+            .options(
+                load_only(
+                    Party.id,
+                    Party.name,
+                    Party.type,
+                    Party.primary_email,
+                    Party.primary_phone,
+                    Party.first_name,
+                    Party.last_name,
+                    Party.notes,
+                    Party.tags,
+                    Party.custom_fields,
+                    Party.created_at,
+                ),
+                load_only(
+                    PartyRole.id,
+                    PartyRole.status,
+                    PartyRole.source,
+                    PartyRole.source_campaign,
+                    PartyRole.qualification,
+                    PartyRole.lead_score,
+                    PartyRole.owner_party_id,
+                    PartyRole.since,
+                ),
+            )
             .join(PartyRole, Party.id == PartyRole.party_id)
             .filter(PartyRole.role == LEAD_ROLE)
             .filter(PartyRole.until.is_(None))  # Active role
@@ -124,21 +149,28 @@ class LeadService:
 
         # Manual pagination since we're returning Lead objects
         if pagination:
-            total = query.count()
+            total = (
+                query.order_by(None)
+                .with_entities(func.count())
+                .scalar()
+                or 0
+            )
             offset = pagination.offset or 0
             limit = pagination.limit or 50
             results = query.offset(offset).limit(limit).all()
         else:
             results = query.all()
             total = len(results)
+            offset = 0
+            limit = total
 
         leads = [self._to_lead(party, role) for party, role in results]
 
         return PaginatedResult(
-            data=leads,
+            items=leads,
             total=total,
-            page=pagination.page if pagination else 1,
-            page_size=pagination.limit if pagination else total,
+            offset=offset,
+            limit=limit,
         )
 
     def get_lead(self, lead_id: int) -> Lead:
@@ -155,6 +187,31 @@ class LeadService:
         """
         result = (
             self.db.query(Party, PartyRole)
+            .options(
+                load_only(
+                    Party.id,
+                    Party.name,
+                    Party.type,
+                    Party.primary_email,
+                    Party.primary_phone,
+                    Party.first_name,
+                    Party.last_name,
+                    Party.notes,
+                    Party.tags,
+                    Party.custom_fields,
+                    Party.created_at,
+                ),
+                load_only(
+                    PartyRole.id,
+                    PartyRole.status,
+                    PartyRole.source,
+                    PartyRole.source_campaign,
+                    PartyRole.qualification,
+                    PartyRole.lead_score,
+                    PartyRole.owner_party_id,
+                    PartyRole.since,
+                ),
+            )
             .join(PartyRole, Party.id == PartyRole.party_id)
             .filter(Party.id == lead_id)
             .filter(PartyRole.role == LEAD_ROLE)
@@ -179,6 +236,31 @@ class LeadService:
         """
         result = (
             self.db.query(Party, PartyRole)
+            .options(
+                load_only(
+                    Party.id,
+                    Party.name,
+                    Party.type,
+                    Party.primary_email,
+                    Party.primary_phone,
+                    Party.first_name,
+                    Party.last_name,
+                    Party.notes,
+                    Party.tags,
+                    Party.custom_fields,
+                    Party.created_at,
+                ),
+                load_only(
+                    PartyRole.id,
+                    PartyRole.status,
+                    PartyRole.source,
+                    PartyRole.source_campaign,
+                    PartyRole.qualification,
+                    PartyRole.lead_score,
+                    PartyRole.owner_party_id,
+                    PartyRole.since,
+                ),
+            )
             .join(PartyRole, Party.id == PartyRole.party_id)
             .filter(Party.primary_email == email)
             .filter(PartyRole.role == LEAD_ROLE)

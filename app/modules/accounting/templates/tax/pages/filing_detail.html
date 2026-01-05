@@ -45,7 +45,7 @@
         {% endif %}
         <a
             href="/accounting/tax/filing"
-            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-colors duration-200"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-surface-50 transition-colors duration-200"
         >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
@@ -62,22 +62,22 @@
     <div class="lg:col-span-2 space-y-6">
         <!-- Summary Cards -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Tax Amount</p>
                 <p class="mt-1 text-2xl font-bold text-gray-900">{{ base_currency }} {{ "{:,.2f}".format(period.tax_amount) }}</p>
             </div>
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
                 <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Amount Paid</p>
                 <p class="mt-1 text-2xl font-bold text-emerald-600">{{ base_currency }} {{ "{:,.2f}".format(period.amount_paid) }}</p>
             </div>
-            <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+            <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
                 <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Outstanding</p>
                 <p class="mt-1 text-2xl font-bold {{ 'text-red-600' if period.outstanding_amount > 0 else 'text-gray-600' }}">{{ base_currency }} {{ "{:,.2f}".format(period.outstanding_amount) }}</p>
             </div>
         </div>
 
         <!-- Payments -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-semibold text-gray-900">Payments</h2>
             </div>
@@ -94,7 +94,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-100">
                         {% for p in payments %}
-                        <tr class="hover:bg-gray-50/50 transition-colors duration-150">
+                        <tr class="hover:bg-surface-50/50 transition-colors duration-150">
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ p.payment_date }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">{{ base_currency }} {{ "{:,.2f}".format(p.amount) }}</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{{ p.payment_reference or '-' }}</td>
@@ -117,7 +117,7 @@
 
     <!-- Sidebar -->
     <div class="space-y-6">
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Status</h2>
             <div class="space-y-4">
                 <div>
@@ -148,7 +148,7 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Dates</h2>
             <dl class="space-y-4">
                 <div>
@@ -173,13 +173,13 @@
         </div>
 
         {% if period.filing_reference %}
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Filing Reference</h2>
             <p class="text-sm text-gray-900 font-mono">{{ period.filing_reference }}</p>
         </div>
         {% endif %}
 
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-4">Tax Base</h2>
             <p class="text-2xl font-bold text-gray-900">{{ base_currency }} {{ "{:,.2f}".format(period.tax_base) }}</p>
             <p class="mt-1 text-xs text-gray-500">Taxable amount for this period</p>

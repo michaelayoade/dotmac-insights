@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.support_settings import (
@@ -22,6 +22,7 @@ from app.models.support_settings import (
     EscalationTrigger,
 )
 from app.models.ticket import Ticket
+from app.models.unified_ticket import UnifiedTicket
 
 from .types import (
     EscalationLevelCreate,
@@ -201,6 +202,65 @@ class EscalationService:
             return bool(actual)
 
         return False
+
+    def _apply_unified_conditions(self, query, conditions: Optional[List[Dict[str, Any]]]):
+        """Apply policy conditions against UnifiedTicket."""
+        for condition in conditions or []:
+            field = condition.get("field")
+            operator = condition.get("operator", "equals")
+            value = condition.get("value")
+
+            if not field or not hasattr(UnifiedTicket, field):
+                continue
+
+            column = getattr(UnifiedTicket, field)
+
+            if operator == "equals":
+                query = query.filter(column == value)
+            elif operator == "not_equals":
+                query = query.filter(column != value)
+            elif operator == "in":
+                if isinstance(value, list):
+                    query = query.filter(column.in_(value))
+            elif operator == "not_in":
+                if isinstance(value, list):
+                    query = query.filter(~column.in_(value))
+            elif operator == "is_empty":
+                query = query.filter(or_(column.is_(None), column == ""))
+            elif operator == "is_not_empty":
+                query = query.filter(and_(column.isnot(None), column != ""))
+
+        return query
+
+    def get_candidate_counts(
+        self,
+        policies: List[EscalationPolicy],
+        now: Optional[datetime] = None,
+    ) -> Dict[int, int]:
+        """Get escalation candidate counts per policy based on UnifiedTicket."""
+        now = now or datetime.utcnow()
+        overdue_filter = or_(
+            and_(
+                UnifiedTicket.response_by.isnot(None),
+                UnifiedTicket.first_response_at.is_(None),
+                UnifiedTicket.response_by < now,
+            ),
+            and_(
+                UnifiedTicket.resolution_by.isnot(None),
+                UnifiedTicket.resolved_at.is_(None),
+                UnifiedTicket.resolution_by < now,
+            ),
+        )
+
+        candidate_counts: Dict[int, int] = {}
+        for policy in policies:
+            query = self.db.query(UnifiedTicket).filter(
+                UnifiedTicket.is_deleted == False,
+            )
+            query = self._apply_unified_conditions(query, policy.conditions)
+            candidate_counts[policy.id] = query.filter(overdue_filter).count()
+
+        return candidate_counts
 
     # -------------------------------------------------------------------------
     # Policy Mutations

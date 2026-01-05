@@ -23,19 +23,19 @@
 {% block content %}
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Outstanding</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ base_currency }} {{ "{:,.2f}".format(dashboard.total_outstanding or 0) }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Overdue</p>
         <p class="mt-1 text-2xl font-bold text-red-600">{{ dashboard.total_overdue_count or 0 }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Due Soon</p>
         <p class="mt-1 text-2xl font-bold text-amber-600">{{ (dashboard.upcoming_due or []) | length }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Filed This Month</p>
         <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.filed_this_month or 0 }}</p>
     </div>
@@ -65,7 +65,7 @@
 {% endif %}
 
 <!-- Filters -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
     <form method="GET" class="flex flex-wrap items-center gap-4">
         <select
             name="tax_type"

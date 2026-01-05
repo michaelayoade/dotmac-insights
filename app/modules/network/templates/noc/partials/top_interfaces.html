@@ -1,0 +1,64 @@
+{# Top Interfaces by Traffic #}
+<div class="divide-y divide-gray-100">
+{% for iface in interfaces %}
+    <a href="/network/traffic/router/{{ iface.router_id }}/interface/{{ iface.interface_index }}"
+       class="block px-4 py-3 hover:bg-surface-50 transition-colors">
+        <div class="flex items-center gap-3">
+            {# Interface Icon #}
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-50 to-blue-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            </div>
+
+            {# Interface Details #}
+            <div class="flex-1 min-w-0">
+                <h4 class="text-sm font-medium text-gray-900 truncate" title="{{ iface.interface_name }}">
+                    {{ iface.interface_name }}
+                </h4>
+                <p class="text-xs text-gray-500 truncate" title="{{ iface.router_name }}">
+                    {{ iface.router_name }}
+                </p>
+            </div>
+
+            {# Traffic Stats #}
+            <div class="flex-shrink-0 text-right">
+                <div class="flex items-center gap-1 text-xs">
+                    <svg class="w-3 h-3 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-gray-600 font-medium tabular-nums">{{ iface.rx_rate_formatted }}</span>
+                </div>
+                <div class="flex items-center gap-1 text-xs mt-0.5">
+                    <svg class="w-3 h-3 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="text-gray-600 font-medium tabular-nums">{{ iface.tx_rate_formatted }}</span>
+                </div>
+            </div>
+
+            {# Utilization Bar #}
+            <div class="flex-shrink-0 w-16">
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full transition-all duration-300
+                        {% if iface.utilization_percent > 90 %}bg-red-500
+                        {% elif iface.utilization_percent > 75 %}bg-amber-500
+                        {% else %}bg-green-500{% endif %}"
+                         style="width: {{ iface.utilization_percent }}%">
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400 text-center mt-0.5 tabular-nums">{{ iface.utilization_percent|round(0)|int }}%</p>
+            </div>
+        </div>
+    </a>
+{% else %}
+    <div class="px-4 py-8 text-center">
+        <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        <p class="text-sm text-gray-500">No traffic data available</p>
+    </div>
+{% endfor %}
+</div>

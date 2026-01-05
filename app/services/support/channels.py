@@ -16,6 +16,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.omni import OmniChannel, OmniMessage
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     ChannelCreate,
@@ -178,6 +179,7 @@ class ChannelService:
         )
         self.db.add(channel)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(channel)
         return channel
 
     def update(
@@ -227,6 +229,7 @@ class ChannelService:
 
         channel.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(channel)
         return channel
 
     def delete(self, channel_id: int) -> bool:
@@ -280,6 +283,7 @@ class ChannelService:
         channel.is_active = True
         channel.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(channel)
         return channel
 
     def deactivate(self, channel_id: int) -> OmniChannel:
@@ -298,6 +302,7 @@ class ChannelService:
         channel.is_active = False
         channel.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(channel)
         return channel
 
     # -------------------------------------------------------------------------

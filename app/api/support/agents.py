@@ -155,14 +155,13 @@ def get_agent(
 
         return {
             "id": agent.id,
-            "employee_id": agent.employee_id,
-            "email": agent.email,
+            "email": agent.primary_email,
             "display_name": agent.display_name,
-            "domains": agent.domains,
-            "skills": agent.skills,
-            "channel_caps": agent.channel_caps,
-            "routing_weight": agent.routing_weight,
-            "capacity": agent.capacity,
+            "domains": agent.agent_domains,
+            "skills": agent.agent_skills,
+            "channel_caps": agent.agent_channel_caps,
+            "routing_weight": agent.agent_routing_weight,
+            "capacity": agent.agent_capacity,
             "is_active": agent.is_active,
             "teams": [
                 {"team_id": t.id, "team_name": t.name, "domain": t.domain}
@@ -298,9 +297,10 @@ def get_team(
             "is_active": team.is_active,
             "members": [
                 {
+                    "party_id": m.id,
                     "agent_id": m.id,
                     "display_name": m.display_name,
-                    "email": m.email,
+                    "email": m.primary_email,
                     "is_active": m.is_active,
                 }
                 for m in members
@@ -392,11 +392,12 @@ def list_team_members(
         members = service.get_team_members(team_id, active_only=active_only)
         return [
             {
+                "party_id": m.id,
                 "agent_id": m.id,
                 "display_name": m.display_name,
-                "email": m.email,
+                "email": m.primary_email,
                 "is_active": m.is_active,
-                "capacity": m.capacity,
+                "capacity": m.agent_capacity,
             }
             for m in members
         ]
@@ -415,7 +416,7 @@ def add_team_member(
     try:
         member = service.add_member(team_id, payload.agent_id, payload.role or "member")
         db.commit()
-        return {"id": member.id, "team_id": member.team_id, "agent_id": member.agent_id}
+        return {"id": member.id, "team_id": member.team_id, "party_id": member.party_id, "agent_id": member.party_id}
     except TeamNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except AgentNotFoundError as e:
@@ -466,7 +467,7 @@ def add_agent_skill(
     try:
         agent = service.add_skill(agent_id, skill, level)
         db.commit()
-        return {"id": agent.id, "skills": agent.skills}
+        return {"id": agent.id, "skills": agent.agent_skills}
     except AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -482,6 +483,6 @@ def remove_agent_skill(
     try:
         agent = service.remove_skill(agent_id, skill)
         db.commit()
-        return {"id": agent.id, "skills": agent.skills}
+        return {"id": agent.id, "skills": agent.agent_skills}
     except AgentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))

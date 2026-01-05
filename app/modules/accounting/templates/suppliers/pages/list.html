@@ -30,26 +30,30 @@
 <div x-data="columnPicker('suppliers-table', {{ supplier_columns  | tojson | e }})">
 <!-- Stats Cards -->
 <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <a href="/accounting/suppliers" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Suppliers</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_suppliers }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+    <a href="/accounting/suppliers?status=active" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-emerald-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Active</p>
         <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.active_suppliers }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-emerald-600">View active →</p>
+    </a>
+    <a href="/accounting/aging/ap" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Payables</p>
         <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(stats.total_payables or 0) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View aging →</p>
+    </a>
+    <a href="/accounting/aging/ap?aging=overdue" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Overdue</p>
         <p class="mt-1 text-2xl font-bold text-amber-600 font-mono">{{ '{:,.2f}'.format(stats.total_overdue or 0) }}</p>
-    </div>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View overdue →</p>
+    </a>
 </div>
 
 <!-- Search and Filters -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
     <form method="GET" class="flex flex-wrap items-center gap-4" x-data="{ open: false }">
         <div class="flex-1 min-w-[200px]">
             <div class="relative">

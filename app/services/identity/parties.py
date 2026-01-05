@@ -13,9 +13,13 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple
 
 from sqlalchemy import func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, load_only
 
-from app.models.party import Party, PartyRole, PartyRelation
+from app.models.party import Party, PartyExternalId, PartyRole, PartyRelation
+from app.models.omni import OmniConversation, OmniMessage, OmniParticipant
+from app.models.marketing import EmailSend, JourneyEnrollment, MarketingConsent, SuppressionEntry
+from app.models.ticket import Ticket
+from app.models.crm import Activity, ActivityType, ActivityStatus
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
@@ -61,7 +65,33 @@ class PartyService:
         Returns:
             PaginatedResult containing parties and total count.
         """
-        query = scoped_query(self.db.query(Party), self.principal)
+        query = scoped_query(self.db.query(Party), self.principal).options(
+            load_only(
+                Party.id,
+                Party.type,
+                Party.status,
+                Party.name,
+                Party.first_name,
+                Party.last_name,
+                Party.legal_name,
+                Party.trading_name,
+                Party.primary_email,
+                Party.primary_phone,
+                Party.emails,
+                Party.phones,
+                Party.addresses,
+                Party.external_ids,
+                Party.avatar_url,
+                Party.timezone,
+                Party.locale,
+                Party.tax_id,
+                Party.tags,
+                Party.custom_fields,
+                Party.notes,
+                Party.created_at,
+                Party.updated_at,
+            )
+        )
 
         if include_roles:
             query = query.options(joinedload(Party.roles))
@@ -106,7 +136,33 @@ class PartyService:
         Raises:
             NotFoundError: If party not found.
         """
-        query = scoped_query(self.db.query(Party), self.principal)
+        query = scoped_query(self.db.query(Party), self.principal).options(
+            load_only(
+                Party.id,
+                Party.type,
+                Party.status,
+                Party.name,
+                Party.first_name,
+                Party.last_name,
+                Party.legal_name,
+                Party.trading_name,
+                Party.primary_email,
+                Party.primary_phone,
+                Party.emails,
+                Party.phones,
+                Party.addresses,
+                Party.external_ids,
+                Party.avatar_url,
+                Party.timezone,
+                Party.locale,
+                Party.tax_id,
+                Party.tags,
+                Party.custom_fields,
+                Party.notes,
+                Party.created_at,
+                Party.updated_at,
+            )
+        )
 
         if include_roles:
             query = query.options(joinedload(Party.roles))
@@ -126,8 +182,72 @@ class PartyService:
         Returns:
             The Party or None if not found.
         """
-        query = scoped_query(self.db.query(Party), self.principal)
+        query = scoped_query(self.db.query(Party), self.principal).options(
+            load_only(
+                Party.id,
+                Party.type,
+                Party.status,
+                Party.name,
+                Party.first_name,
+                Party.last_name,
+                Party.legal_name,
+                Party.trading_name,
+                Party.primary_email,
+                Party.primary_phone,
+                Party.emails,
+                Party.phones,
+                Party.addresses,
+                Party.external_ids,
+                Party.avatar_url,
+                Party.timezone,
+                Party.locale,
+                Party.tax_id,
+                Party.tags,
+                Party.custom_fields,
+                Party.notes,
+                Party.created_at,
+                Party.updated_at,
+            )
+        )
         return query.filter(Party.primary_email == email).first()
+
+    def get_party_by_phone(self, phone: str) -> Optional[Party]:
+        """Get a party by primary phone number.
+
+        Args:
+            phone: The phone number.
+
+        Returns:
+            The Party or None if not found.
+        """
+        query = scoped_query(self.db.query(Party), self.principal).options(
+            load_only(
+                Party.id,
+                Party.type,
+                Party.status,
+                Party.name,
+                Party.first_name,
+                Party.last_name,
+                Party.legal_name,
+                Party.trading_name,
+                Party.primary_email,
+                Party.primary_phone,
+                Party.emails,
+                Party.phones,
+                Party.addresses,
+                Party.external_ids,
+                Party.avatar_url,
+                Party.timezone,
+                Party.locale,
+                Party.tax_id,
+                Party.tags,
+                Party.custom_fields,
+                Party.notes,
+                Party.created_at,
+                Party.updated_at,
+            )
+        )
+        return query.filter(Party.primary_phone == phone).first()
 
     def create_party(self, data: PartyCreateData) -> Party:
         """Create a new party.
@@ -256,6 +376,313 @@ class PartyService:
         """
         party = self.get_party(party_id)
         party.status = "inactive"
+
+    # -------------------------------------------------------------------------
+    # Merge Parties
+    # -------------------------------------------------------------------------
+
+    def merge_parties(
+        self,
+        primary_id: int,
+        duplicate_id: int,
+        deactivate_duplicate: bool = True,
+        reason: str | None = None,
+        auto_select_primary: bool = True,
+    ) -> Party:
+        if primary_id == duplicate_id:
+            raise ValidationError("Primary and duplicate parties must differ")
+
+        primary = self.db.query(Party).filter(Party.id == primary_id).first()
+        if not primary:
+            raise NotFoundError(f"Party {primary_id} not found")
+
+        duplicate = self.db.query(Party).filter(Party.id == duplicate_id).first()
+        if not duplicate:
+            raise NotFoundError(f"Party {duplicate_id} not found")
+
+        now = datetime.now(timezone.utc)
+
+        selection = self.preview_merge(primary_id, duplicate_id, auto_select_primary=auto_select_primary)
+        if selection["selected_primary_id"] != primary_id:
+            primary, duplicate = duplicate, primary
+        primary_score = selection["primary_score"]
+        duplicate_score = selection["duplicate_score"]
+        audit_issues = selection["audit_issues"]
+
+        if not primary.primary_email and duplicate.primary_email:
+            primary.primary_email = duplicate.primary_email
+        if not primary.primary_phone and duplicate.primary_phone:
+            primary.primary_phone = duplicate.primary_phone
+        if not primary.name and duplicate.name:
+            primary.name = duplicate.name
+        if not primary.first_name and duplicate.first_name:
+            primary.first_name = duplicate.first_name
+        if not primary.last_name and duplicate.last_name:
+            primary.last_name = duplicate.last_name
+
+        primary.external_ids = _merge_dict(primary.external_ids, duplicate.external_ids)
+        primary.tags = _merge_list(primary.tags, duplicate.tags)
+
+        mappings = (
+            self.db.query(PartyExternalId)
+            .filter(PartyExternalId.party_id == duplicate.id)
+            .all()
+        )
+        for mapping in mappings:
+            exists = (
+                self.db.query(PartyExternalId)
+                .filter(
+                    PartyExternalId.system == mapping.system,
+                    PartyExternalId.external_id == mapping.external_id,
+                )
+                .first()
+            )
+            if exists:
+                self.db.delete(mapping)
+                continue
+
+            has_primary = (
+                self.db.query(PartyExternalId)
+                .filter(
+                    PartyExternalId.party_id == primary.id,
+                    PartyExternalId.system == mapping.system,
+                    PartyExternalId.is_primary.is_(True),
+                )
+                .first()
+            )
+            mapping.party_id = primary.id
+            if has_primary:
+                mapping.is_primary = False
+
+        self.db.query(OmniParticipant).filter(OmniParticipant.party_id == duplicate.id).update(
+            {"party_id": primary.id, "updated_at": now},
+            synchronize_session=False,
+        )
+        self.db.query(OmniConversation).filter(OmniConversation.party_id == duplicate.id).update(
+            {"party_id": primary.id, "updated_at": now},
+            synchronize_session=False,
+        )
+        self.db.query(OmniMessage).filter(OmniMessage.party_id == duplicate.id).update(
+            {"party_id": primary.id, "updated_at": now},
+            synchronize_session=False,
+        )
+
+        self._merge_marketing_records(primary.id, duplicate.id)
+        self.db.query(JourneyEnrollment).filter(JourneyEnrollment.party_id == duplicate.id).update(
+            {"party_id": primary.id},
+            synchronize_session=False,
+        )
+        self.db.query(EmailSend).filter(EmailSend.party_id == duplicate.id).update(
+            {"party_id": primary.id},
+            synchronize_session=False,
+        )
+        self.db.query(Ticket).filter(Ticket.party_id == duplicate.id).update(
+            {"party_id": primary.id},
+            synchronize_session=False,
+        )
+
+        duplicate_roles = self.db.query(PartyRole).filter(PartyRole.party_id == duplicate.id).all()
+        for role in duplicate_roles:
+            if role.until is None:
+                exists = (
+                    self.db.query(PartyRole)
+                    .filter(
+                        PartyRole.party_id == primary.id,
+                        PartyRole.role == role.role,
+                        PartyRole.scope_party_id == role.scope_party_id,
+                        PartyRole.until.is_(None),
+                    )
+                    .first()
+                )
+                if exists:
+                    role.until = now
+                    role.status = "inactive"
+                    role.updated_at = now
+                    continue
+            role.party_id = primary.id
+            role.updated_at = now
+
+        if deactivate_duplicate:
+            duplicate.status = "inactive"
+            note = f"Merged into party {primary.id} on {now.date().isoformat()}"
+            duplicate.notes = f"{duplicate.notes}\n{note}" if duplicate.notes else note
+            duplicate.updated_at = now
+
+        primary.updated_at = now
+        self._log_merge_activity(
+            primary_id=primary.id,
+            duplicate_id=duplicate.id,
+            reason=reason or "unspecified",
+            occurred_at=now,
+            primary_score=primary_score,
+            duplicate_score=duplicate_score,
+            swapped=selection["auto_swapped"],
+            audit_issues=audit_issues,
+        )
+        return primary
+
+    def _merge_marketing_records(self, primary_id: int, duplicate_id: int) -> None:
+        duplicate_consents = (
+            self.db.query(MarketingConsent)
+            .filter(MarketingConsent.party_id == duplicate_id)
+            .all()
+        )
+        for consent in duplicate_consents:
+            existing = (
+                self.db.query(MarketingConsent)
+                .filter(
+                    MarketingConsent.party_id == primary_id,
+                    MarketingConsent.channel == consent.channel,
+                )
+                .first()
+            )
+            if existing:
+                self.db.delete(consent)
+            else:
+                consent.party_id = primary_id
+
+        duplicate_suppressions = (
+            self.db.query(SuppressionEntry)
+            .filter(SuppressionEntry.party_id == duplicate_id)
+            .all()
+        )
+        for suppression in duplicate_suppressions:
+            existing = (
+                self.db.query(SuppressionEntry)
+                .filter(
+                    SuppressionEntry.party_id == primary_id,
+                    SuppressionEntry.channel == suppression.channel,
+                )
+                .first()
+            )
+            if existing:
+                self.db.delete(suppression)
+            else:
+                suppression.party_id = primary_id
+
+    def preview_merge(self, primary_id: int, duplicate_id: int, auto_select_primary: bool = True) -> dict:
+        if primary_id == duplicate_id:
+            raise ValidationError("Primary and duplicate parties must differ")
+
+        primary = self.db.query(Party).filter(Party.id == primary_id).first()
+        if not primary:
+            raise NotFoundError(f"Party {primary_id} not found")
+
+        duplicate = self.db.query(Party).filter(Party.id == duplicate_id).first()
+        if not duplicate:
+            raise NotFoundError(f"Party {duplicate_id} not found")
+
+        primary_score = self._party_history_score(primary.id)
+        duplicate_score = self._party_history_score(duplicate.id)
+
+        selected_primary_id = primary_id
+        selected_duplicate_id = duplicate_id
+        if auto_select_primary and duplicate_score > primary_score:
+            selected_primary_id = duplicate_id
+            selected_duplicate_id = primary_id
+
+        audit_issues = self._identity_audit(selected_primary_id)
+        return {
+            "primary_id": primary_id,
+            "duplicate_id": duplicate_id,
+            "selected_primary_id": selected_primary_id,
+            "selected_duplicate_id": selected_duplicate_id,
+            "auto_swapped": selected_primary_id != primary_id,
+            "primary_score": primary_score,
+            "duplicate_score": duplicate_score,
+            "audit_issues": audit_issues,
+        }
+
+    def _party_history_score(self, party_id: int) -> int:
+        score = 0
+        score += self.db.query(PartyRole).filter(PartyRole.party_id == party_id).count()
+        score += self.db.query(OmniConversation).filter(OmniConversation.party_id == party_id).count()
+        score += self.db.query(OmniMessage).filter(OmniMessage.party_id == party_id).count()
+        score += self.db.query(EmailSend).filter(EmailSend.party_id == party_id).count()
+        score += self.db.query(JourneyEnrollment).filter(JourneyEnrollment.party_id == party_id).count()
+        score += self.db.query(PartyExternalId).filter(PartyExternalId.party_id == party_id).count()
+        return score
+
+    def _identity_audit(self, party_id: int) -> List[str]:
+        issues: List[str] = []
+        party = self.db.query(Party).filter(Party.id == party_id).first()
+        if not party:
+            return issues
+
+        if party.primary_email:
+            dup_email = (
+                self.db.query(Party)
+                .filter(Party.primary_email == party.primary_email, Party.id != party.id)
+                .first()
+            )
+            if dup_email:
+                issues.append(f"primary_email_duplicate:{party.primary_email}")
+
+        if party.primary_phone:
+            dup_phone = (
+                self.db.query(Party)
+                .filter(Party.primary_phone == party.primary_phone, Party.id != party.id)
+                .first()
+            )
+            if dup_phone:
+                issues.append(f"primary_phone_duplicate:{party.primary_phone}")
+
+        participants = self.db.query(OmniParticipant).filter(OmniParticipant.party_id == party.id).all()
+        for participant in participants:
+            if not participant.handle:
+                continue
+            if participant.handle in {party.primary_email, party.primary_phone}:
+                continue
+            system = f"marketing:{participant.channel_type}"
+            mapping = (
+                self.db.query(PartyExternalId)
+                .filter(
+                    PartyExternalId.party_id == party.id,
+                    PartyExternalId.system == system,
+                    PartyExternalId.external_id == participant.handle,
+                )
+                .first()
+            )
+            if not mapping:
+                issues.append(f"missing_mapping:{system}:{participant.handle}")
+
+        return issues
+
+    def _log_merge_activity(
+        self,
+        primary_id: int,
+        duplicate_id: int,
+        reason: str,
+        occurred_at: datetime,
+        primary_score: int,
+        duplicate_score: int,
+        swapped: bool,
+        audit_issues: List[str],
+    ) -> None:
+        actor_label = "system"
+        if self.principal:
+            actor_label = self.principal.email or self.principal.name or f"{self.principal.type}:{self.principal.id}"
+        details = [
+            f"actor={actor_label}",
+            f"reason={reason}",
+            f"primary_id={primary_id}",
+            f"duplicate_id={duplicate_id}",
+            f"primary_score={primary_score}",
+            f"duplicate_score={duplicate_score}",
+            f"auto_swapped={str(swapped).lower()}",
+            f"audit_issues={audit_issues if audit_issues else 'none'}",
+        ]
+        activity = Activity(
+            activity_type=ActivityType.NOTE,
+            subject="Party merge",
+            description="\n".join(details),
+            status=ActivityStatus.COMPLETED,
+            party_id=primary_id,
+            completed_at=occurred_at,
+            created_at=occurred_at,
+            updated_at=occurred_at,
+        )
+        self.db.add(activity)
 
     # -------------------------------------------------------------------------
     # Party Roles
@@ -559,5 +986,51 @@ class PartyService:
             .first()
         )
         if mapping:
-            return self.db.query(Party).filter(Party.id == mapping.party_id).first()
+            return (
+                self.db.query(Party)
+                .options(
+                    load_only(
+                        Party.id,
+                        Party.type,
+                        Party.status,
+                        Party.name,
+                        Party.first_name,
+                        Party.last_name,
+                        Party.legal_name,
+                        Party.trading_name,
+                        Party.primary_email,
+                        Party.primary_phone,
+                        Party.emails,
+                        Party.phones,
+                        Party.addresses,
+                        Party.external_ids,
+                        Party.avatar_url,
+                        Party.timezone,
+                        Party.locale,
+                        Party.tax_id,
+                        Party.tags,
+                        Party.custom_fields,
+                        Party.notes,
+                        Party.created_at,
+                        Party.updated_at,
+                    )
+                )
+                .filter(Party.id == mapping.party_id)
+                .first()
+            )
         return None
+
+
+def _merge_list(left: list, right: Optional[list]) -> list:
+    merged = list(left or [])
+    for item in right or []:
+        if item not in merged:
+            merged.append(item)
+    return merged
+
+
+def _merge_dict(left: dict, right: Optional[dict]) -> dict:
+    merged = dict(left or {})
+    for key, value in (right or {}).items():
+        merged.setdefault(key, value)
+    return merged

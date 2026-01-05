@@ -1,5 +1,5 @@
 {% if accounts %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="bank-accounts-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
@@ -77,7 +77,7 @@
 
 {% else %}
 <!-- Empty State -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center data-testid="bank-accounts-empty-state">>
     <div class="mx-auto w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mb-6">
         <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>

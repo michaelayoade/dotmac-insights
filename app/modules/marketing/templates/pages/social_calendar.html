@@ -1,0 +1,60 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Social Calendar</h1>
+        <p class="mt-1 text-sm text-gray-500">Plan and visualize social posts across channels</p>
+    </div>
+    <div class="flex gap-3">
+        <button class="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Week</button>
+        <a href="/marketing/social/compose" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Schedule Post
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+{% set days = days | default([]) %}
+{% set posts = social_posts | default([]) %}
+
+{% if days %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="grid grid-cols-5 border-b border-gray-100 bg-surface-50">
+            {% for day in days %}
+            <div class="px-4 py-3 border-r border-gray-100 last:border-r-0">
+                <p class="text-xs uppercase tracking-wider text-gray-500">{{ day.label }}</p>
+                <p class="text-sm font-medium text-gray-900">{{ day.date }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-5">
+            {% for day in days %}
+            <div class="min-h-[180px] border-r border-gray-100 last:border-r-0 p-4 space-y-3">
+                {% if posts %}
+                    {% for post in posts %}
+                    <div class="rounded-xl border border-gray-100 bg-surface-50 p-3">
+                        <p class="text-xs text-gray-500">{{ post.time }}</p>
+                        <p class="text-sm font-medium text-gray-900 mt-1">{{ post.title }}</p>
+                        <p class="text-xs text-gray-500 mt-1">{{ post.platforms }}</p>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-xs text-gray-500">No posts scheduled.</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+{% else %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 text-sm text-gray-500">
+        No calendar data available.
+    </div>
+{% endif %}
+{% endblock %}

@@ -6,13 +6,27 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Leave Application</h1>
         <div class="mt-2 flex flex-wrap items-center gap-2">
             {% set status_styles = {'open': 'bg-blue-50 text-blue-700', 'approved': 'bg-emerald-50 text-emerald-700', 'rejected': 'bg-red-50 text-red-700', 'cancelled': 'bg-gray-100 text-gray-600'} %}
-            <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium {{ status_styles.get(application.status.value, 'bg-gray-100 text-gray-600') }}">{{ application.status.value | title }}</span>
+            <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium {{ status_styles.get(application.status.value, 'bg-gray-100 text-gray-600') }}" data-testid="leave-status" data-status="{{ application.status.value }}">{{ application.status.value | title }}</span>
         </div>
     </div>
     {% if application.status.value == 'open' %}
     <div class="flex items-center gap-2">
-        <button type="button" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-500" hx-post="/hr/leave/{{ application.id }}/approve" hx-confirm="Approve this leave application?">Approve</button>
-        <button type="button" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500" hx-post="/hr/leave/{{ application.id }}/reject" hx-confirm="Reject this leave application?">Reject</button>
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-500"
+            hx-post="/hr/leave/{{ application.id }}/approve"
+            hx-confirm="Approve this leave application?"
+            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+            data-testid="approve-leave"
+        >Approve</button>
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-500"
+            hx-post="/hr/leave/{{ application.id }}/reject"
+            hx-confirm="Reject this leave application?"
+            hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
+            data-testid="reject-leave"
+        >Reject</button>
     </div>
     {% endif %}
 </div>

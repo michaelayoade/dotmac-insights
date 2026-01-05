@@ -1,6 +1,6 @@
 """add_data_bundle_tables
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c0ffee123456
 Revises: b284a20bc2a9
 Create Date: 2026-01-03 12:00:00.000000
 
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'c0ffee123456'
 down_revision: Union[str, None] = 'b284a20bc2a9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

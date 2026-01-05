@@ -26,6 +26,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Operations",
     order=50,
     scopes=["projects:read"],
+    enabled=True,
     prefixes=["/projects"],
 )
 

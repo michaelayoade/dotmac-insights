@@ -4,14 +4,11 @@ HR Dashboard Routes - HR Overview with SSR + HTMX.
 Permission Requirements:
 - hr:read - View HR dashboard
 """
-from __future__ import annotations
+from datetime import date, datetime
+from typing import Optional
 
-from datetime import date, datetime, timedelta
-from typing import Any
-
-from fastapi import APIRouter, Request, Response, Depends
+from fastapi import APIRouter, Request, Response, Depends, Query
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, and_
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import (
@@ -20,11 +17,7 @@ from app.web.context import (
     build_breadcrumbs,
 )
 from app.templates.environment import get_template_env
-from app.models.employee import Employee, EmploymentStatus
-from app.models.hr import Department
-from app.models.hr_leave import LeaveApplication, LeaveApplicationStatus
-from app.models.hr_attendance import Attendance
-from app.models.hr_payroll import SalarySlip, PayrollEntry
+from app.services.hr.analytics import HRAnalyticsService
 
 RequireHRRead = Depends(require_scope("hr:read"))
 
@@ -39,99 +32,30 @@ async def hr_dashboard(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
+    as_at: Optional[str] = Query(None, description="View as at date (YYYY-MM-DD)"),
 ):
-    """HR Dashboard with overview stats and quick actions."""
-    today = date.today()
-    start_of_month = today.replace(day=1)
+    """HR Dashboard with overview stats and quick actions.
 
-    # Employee Stats
-    total_employees = db.query(func.count(Employee.id)).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE
-    ).scalar() or 0
+    Args:
+        as_at: Optional date string to view historical data (YYYY-MM-DD format)
+    """
+    # Parse as_at date filter
+    view_date: Optional[date] = None
+    if as_at:
+        try:
+            view_date = datetime.strptime(as_at, "%Y-%m-%d").date()
+        except ValueError:
+            pass  # Invalid date format, use today
 
-    # Today's attendance
-    today_present = db.query(func.count(Attendance.id)).filter(
-        func.date(Attendance.attendance_date) == today,
-        Attendance.status == "Present"
-    ).scalar() or 0
-
-    # On leave today
-    on_leave_today = db.query(func.count(LeaveApplication.id)).filter(
-        LeaveApplication.status == LeaveApplicationStatus.APPROVED,
-        LeaveApplication.from_date <= today,
-        LeaveApplication.to_date >= today
-    ).scalar() or 0
-
-    # Pending leave requests
-    pending_leave = db.query(func.count(LeaveApplication.id)).filter(
-        LeaveApplication.status == LeaveApplicationStatus.OPEN
-    ).scalar() or 0
-
-    # Recent leave applications
-    recent_leave_requests = db.query(LeaveApplication).filter(
-        LeaveApplication.status == LeaveApplicationStatus.OPEN
-    ).order_by(LeaveApplication.posting_date.desc()).limit(5).all()
-
-    # Employees by department
-    dept_counts = db.query(
-        Department.department_name,
-        func.count(Employee.id).label("count")
-    ).outerjoin(
-        Employee, and_(
-            Employee.department_id == Department.id,
-            Employee.is_deleted == False,
-            Employee.status == EmploymentStatus.ACTIVE
-        )
-    ).group_by(Department.id, Department.department_name).order_by(
-        func.count(Employee.id).desc()
-    ).limit(8).all()
-
-    department_stats = [
-        {"name": d[0], "count": d[1]}
-        for d in dept_counts
-    ]
+    # Use service for all dashboard data
+    analytics_service = HRAnalyticsService(db)
+    try:
+        dashboard_data = analytics_service.get_dashboard_data(as_at=view_date)
+    except Exception:
+        dashboard_data = None
 
     # Birthday tracking is omitted (Employee has no date_of_birth field)
-    employees_with_birthdays: list[dict[str, Any]] = []
-
-    # Work anniversaries this month
-    work_anniversaries = []
-    try:
-        anniversary_query = db.query(Employee).filter(
-            Employee.is_deleted == False,
-            Employee.status == EmploymentStatus.ACTIVE,
-            func.extract('month', Employee.date_of_joining) == today.month,
-            Employee.date_of_joining < today.replace(year=today.year)
-        ).order_by(func.extract('day', Employee.date_of_joining)).limit(5).all()
-
-        for emp in anniversary_query:
-            if emp.date_of_joining:
-                years = today.year - emp.date_of_joining.year
-                if years > 0:
-                    work_anniversaries.append({
-                        "id": emp.id,
-                        "name": emp.name,
-                        "date": emp.date_of_joining,
-                        "years": years
-                    })
-    except Exception:
-        pass
-
-    # Next payroll due
-    next_payroll = None
-    try:
-        upcoming_payroll = db.query(PayrollEntry).filter(
-            PayrollEntry.docstatus == 0
-        ).order_by(PayrollEntry.posting_date.desc()).first()
-        if upcoming_payroll:
-            next_payroll = {
-                "id": upcoming_payroll.id,
-                "name": f"Payroll #{upcoming_payroll.id}",
-                "date": upcoming_payroll.end_date
-            }
-    except Exception:
-        pass
+    employees_with_birthdays: list = []
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -140,18 +64,43 @@ async def hr_dashboard(
         {"label": "HR"},
     ])
 
-    context["stats"] = {
-        "total_employees": total_employees,
-        "present_today": today_present,
-        "on_leave_today": on_leave_today,
-        "pending_leave": pending_leave,
-    }
-    context["recent_leave_requests"] = recent_leave_requests
-    context["department_stats"] = department_stats
+    # Map service dataclass to template format
+    if dashboard_data:
+        context["stats"] = {
+            "total_employees": dashboard_data.stats.total_employees,
+            "present_today": dashboard_data.stats.present_today,
+            "on_leave_today": dashboard_data.stats.on_leave_today,
+            "pending_leave": dashboard_data.stats.pending_leave,
+        }
+        context["recent_leave_requests"] = dashboard_data.recent_leave_requests
+        context["department_stats"] = [
+            {"name": d.name, "count": d.count}
+            for d in dashboard_data.department_stats
+        ]
+        context["anniversaries"] = [
+            {"id": a.id, "name": a.name, "date": a.date, "years": a.years}
+            for a in dashboard_data.anniversaries
+        ]
+        context["next_payroll"] = (
+            {"id": dashboard_data.next_payroll.id, "name": dashboard_data.next_payroll.name, "date": dashboard_data.next_payroll.date}
+            if dashboard_data.next_payroll
+            else None
+        )
+    else:
+        context["stats"] = {
+            "total_employees": 0,
+            "present_today": 0,
+            "on_leave_today": 0,
+            "pending_leave": 0,
+        }
+        context["recent_leave_requests"] = []
+        context["department_stats"] = []
+        context["anniversaries"] = []
+        context["next_payroll"] = None
     context["birthdays"] = employees_with_birthdays
-    context["anniversaries"] = work_anniversaries
-    context["next_payroll"] = next_payroll
-    context["today"] = today
+    context["today"] = date.today()
+    context["as_at"] = view_date  # For date picker
+    context["view_date"] = view_date or date.today()  # Actual date being viewed
 
     template = templates.get_template("modules/hr/templates/pages/dashboard.html")
     return HTMLResponse(template.render(context))

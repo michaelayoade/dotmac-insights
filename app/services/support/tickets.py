@@ -27,10 +27,12 @@ from app.models.ticket import (
 )
 from app.models.support_tags import TicketCustomField, TicketTag
 from app.models.auth import User
-from app.models.agent import Agent, Team, TeamMember
+from app.models.party import Party, PartyRole
+from app.models.agent import Team, TeamMember
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
 
 from .ticket_types import (
     ActivityData,
@@ -357,6 +359,16 @@ class TicketService:
             ):
                 tag.usage_count = (tag.usage_count or 0) + 1
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="support.ticket.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="ticket",
+            entity_id=str(ticket.id),
+            summary=f"Created ticket {ticket.ticket_number}",
+            metadata={"status": ticket.status.value if ticket.status else None},
+        )
         return ticket
 
     def update_ticket(self, ticket_id: int, data: TicketUpdateData) -> Ticket:
@@ -429,6 +441,17 @@ class TicketService:
         ticket.updated_by_id = self.principal.id if self.principal else None
         ticket.updated_at = datetime.now(timezone.utc)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="support.ticket.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="ticket",
+            entity_id=str(ticket.id),
+            summary=f"Updated ticket {ticket.ticket_number}",
+            metadata={"status": ticket.status.value if ticket.status else None},
+        )
+
         return ticket
 
     def delete_ticket(self, ticket_id: int) -> None:
@@ -445,6 +468,16 @@ class TicketService:
         ticket.is_deleted = True
         ticket.deleted_at = datetime.now(timezone.utc)
         ticket.deleted_by_id = self.principal.id if self.principal else None
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="support.ticket.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="ticket",
+            entity_id=str(ticket.id),
+            summary=f"Deleted ticket {ticket.ticket_number}",
+        )
         ticket.updated_at = datetime.now(timezone.utc)
 
     # -------------------------------------------------------------------------
@@ -836,23 +869,41 @@ class TicketService:
 
         agent = None
         if data.agent_id:
-            agent = self.db.query(Agent).filter(Agent.id == data.agent_id).first()
+            agent = (
+                self.db.query(Party)
+                .join(PartyRole, Party.id == PartyRole.party_id)
+                .filter(Party.id == data.agent_id, PartyRole.role == "support_agent")
+                .first()
+            )
             if not agent:
                 raise ValidationError(f"Agent {data.agent_id} does not exist")
 
         # Resolve agent from member if not explicitly provided
-        if member and member.agent_id and not agent:
-            agent = self.db.query(Agent).filter(Agent.id == member.agent_id).first()
+        if member and member.party_id and not agent:
+            agent = (
+                self.db.query(Party)
+                .join(PartyRole, Party.id == PartyRole.party_id)
+                .filter(Party.id == member.party_id, PartyRole.role == "support_agent")
+                .first()
+            )
 
         # Set employee ID from agent or explicit value
-        if agent and agent.employee_id:
-            ticket.assigned_employee_id = agent.employee_id
+        if agent:
+            from app.models.employee import Employee
+
+            employee = (
+                self.db.query(Employee)
+                .filter(Employee.party_id == agent.id)
+                .first()
+            )
+            if employee:
+                ticket.assigned_employee_id = employee.id
         elif data.employee_id:
             ticket.assigned_employee_id = data.employee_id
 
         # Set assigned_to from agent or explicit value
         if agent:
-            ticket.assigned_to = data.assigned_to or agent.display_name or agent.email
+            ticket.assigned_to = data.assigned_to or agent.name or agent.primary_email
         elif data.assigned_to:
             ticket.assigned_to = data.assigned_to
 
@@ -1633,17 +1684,17 @@ class TicketService:
             .subquery()
         )
 
-        # Join agents with their ticket counts
+        # Join agents (parties with support_agent role) with their ticket counts
         agents_with_counts = (
             self.db.query(
-                Agent.id,
-                Agent.display_name,
-                Agent.email,
-                Agent.employee_id,
+                Party.id,
+                Party.name,
+                Party.primary_email,
                 func.coalesce(open_tickets_subq.c.open_count, 0).label("open_tickets"),
             )
-            .outerjoin(open_tickets_subq, Agent.employee_id == open_tickets_subq.c.assigned_to_id)
-            .filter(Agent.is_active == True)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .outerjoin(open_tickets_subq, Party.id == open_tickets_subq.c.assigned_to_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
             .order_by(func.coalesce(open_tickets_subq.c.open_count, 0).desc())
             .limit(limit)
             .all()
@@ -1652,8 +1703,8 @@ class TicketService:
         return [
             {
                 "id": row.id,
-                "name": row.display_name or row.email or f"Agent {row.id}",
-                "email": row.email,
+                "name": row.name or row.primary_email or f"Agent {row.id}",
+                "email": row.primary_email,
                 "open_tickets": row.open_tickets,
             }
             for row in agents_with_counts

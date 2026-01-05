@@ -21,34 +21,40 @@
 {% block content %}
 <!-- Stats Cards -->
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <a href="/accounting/accounts" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Total</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.total_count }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View all →</p>
+    </a>
+    <a href="/accounting/accounts?is_group=true" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-gray-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Groups</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ stats.group_count }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-gray-600">View groups →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=asset" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-blue-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-blue-600 uppercase tracking-wider">Assets</p>
         <p class="mt-1 text-2xl font-bold text-blue-600">{{ stats.by_root_type.get('asset', 0) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-blue-600">View assets →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=liability" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Liabilities</p>
         <p class="mt-1 text-2xl font-bold text-red-600">{{ stats.by_root_type.get('liability', 0) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View liabilities →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=income" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-emerald-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Income</p>
         <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.by_root_type.get('income', 0) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-emerald-600">View income →</p>
+    </a>
+    <a href="/accounting/accounts?root_type=expense" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Expenses</p>
         <p class="mt-1 text-2xl font-bold text-amber-600">{{ stats.by_root_type.get('expense', 0) }}</p>
-    </div>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">View expenses →</p>
+    </a>
 </div>
 
 <!-- Filters -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
     <div class="flex flex-col sm:flex-row gap-4">
         <!-- Search -->
         <div class="flex-1">

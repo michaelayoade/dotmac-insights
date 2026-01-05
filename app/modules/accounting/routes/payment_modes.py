@@ -13,6 +13,7 @@ from ._deps import (
 )
 from app.models.accounting import PaymentModeType
 from app.services.accounting import PaymentModeService
+from app.services.accounting.web_services import AccountingPaymentModesWebService
 from app.services.accounting.payment_modes_types import (
     PaymentModeFilters,
     PaymentModeCreateData,
@@ -26,6 +27,10 @@ router = APIRouter()
 
 def _get_service(db: DB, user: SessionUser) -> PaymentModeService:
     return PaymentModeService(db, user)
+
+
+def _get_web_service(db: DB, user: SessionUser) -> AccountingPaymentModesWebService:
+    return AccountingPaymentModesWebService(db, _get_service(db, user))
 
 
 def _get_mode_type_options() -> list:
@@ -53,6 +58,7 @@ async def payment_modes_list(
 ):
     """Payment modes list page."""
     service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
     pagination = PaginationParams(limit=per_page, offset=(page - 1) * per_page)
 
     # Parse mode type filter
@@ -90,7 +96,6 @@ async def payment_modes_list(
         page=page,
         per_page=per_page,
         total=total,
-        base_url="/accounting/payment-modes",
     )
 
     if is_htmx_request(request):
@@ -272,8 +277,7 @@ async def payment_modes_create(
             mode_type=mode_type,
             enabled=enabled,
         )
-        mode = service.create_payment_mode(create_data)
-        db.commit()
+        mode = web_service.create_payment_mode(create_data)
 
         set_flash(response, "Payment mode created successfully", "success")
         return RedirectResponse(
@@ -281,7 +285,7 @@ async def payment_modes_create(
             status_code=303,
         )
     except ValidationError as e:
-        db.rollback()
+        web_service.rollback()
         set_flash(response, str(e), "error")
         return RedirectResponse(
             url="/accounting/payment-modes/new",
@@ -304,6 +308,7 @@ async def payment_modes_update(
 
     form = await request.form()
     service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
 
     mode_of_payment = form_str(form, "mode_of_payment") or None
     mode_type_str = form_str(form, "mode_type")
@@ -323,8 +328,7 @@ async def payment_modes_update(
             mode_type=mode_type,
             enabled=enabled,
         )
-        service.update_payment_mode(mode_id, update_data)
-        db.commit()
+        web_service.update_payment_mode(mode_id, update_data)
 
         set_flash(response, "Payment mode updated successfully", "success")
         return RedirectResponse(
@@ -334,7 +338,7 @@ async def payment_modes_update(
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment mode not found")
     except ValidationError as e:
-        db.rollback()
+        web_service.rollback()
         set_flash(response, str(e), "error")
         return RedirectResponse(
             url=f"/accounting/payment-modes/{mode_id}/edit",
@@ -355,16 +359,16 @@ async def payment_modes_toggle(
     await validate_csrf(request, csrf_protect)
 
     service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
 
     try:
         mode = service.get_payment_mode(mode_id)
         if mode.enabled:
-            service.disable_payment_mode(mode_id)
+            web_service.disable_payment_mode(mode_id)
             message = "Payment mode disabled"
         else:
-            service.enable_payment_mode(mode_id)
+            web_service.enable_payment_mode(mode_id)
             message = "Payment mode enabled"
-        db.commit()
         set_flash(response, message, "success")
     except NotFoundError:
         set_flash(response, "Payment mode not found", "error")
@@ -384,11 +388,10 @@ async def payment_modes_delete(
     """Delete (disable) payment mode."""
     await validate_csrf(request, csrf_protect)
 
-    service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
 
     try:
-        service.disable_payment_mode(mode_id)
-        db.commit()
+        web_service.disable_payment_mode(mode_id)
         set_flash(response, "Payment mode disabled successfully", "success")
     except NotFoundError:
         set_flash(response, "Payment mode not found", "error")

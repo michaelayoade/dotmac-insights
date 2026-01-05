@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, or_, and_
 from sqlalchemy.orm import joinedload
 
-from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
+from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_any_scope
 from app.web.context import (
     get_base_context,
     get_navigation_context,
@@ -34,8 +34,9 @@ from app.models.unified_ticket import (
     TicketSource,
 )
 
-# Models - Agents and Teams
-from app.models.agent import Agent, Team, TeamMember
+# Models - Teams (Agent model deprecated - use Party with support_agent role)
+from app.models.agent import Team, TeamMember
+from app.models.party import PartyRole
 
 # Models - Support Config
 from app.models.support_canned import CannedResponse, CannedResponseScope
@@ -46,8 +47,8 @@ from app.models.employee import Employee, EmploymentStatus
 from app.models.party import Party
 
 # Permission dependencies
-RequireSupportRead = Depends(require_scope("support:read"))
-RequireSupportWrite = Depends(require_scope("support:write"))
+RequireSupportRead = Depends(require_any_scope("support:read", "tickets:read"))
+RequireSupportWrite = Depends(require_any_scope("support:write", "tickets:write"))
 
 # Template environment
 templates = get_template_env()
@@ -123,25 +124,30 @@ def get_source_options():
 
 
 # =============================================================================
-# DYNAMIC OPTIONS FROM DATABASE
+# DYNAMIC OPTIONS FROM DATABASE (using services)
 # =============================================================================
 
 def get_agent_options(db):
-    """Get active agents for assignment dropdown."""
-    agents = db.query(Agent).filter(
-        Agent.is_active == True
-    ).order_by(Agent.display_name).all()
+    """Get active support agents for assignment dropdown.
+
+    After Agent → Party unification, agents are Party records
+    with PartyRole(role="support_agent").
+    """
+    from app.services.support import AgentService
+    service = AgentService(db)
+    from app.services.support.types import AgentFilters
+    agents = service.list_agents(filters=AgentFilters(is_active=True))
     return [
-        {"value": str(a.id), "label": a.display_name or a.email or f"Agent {a.id}"}
+        {"value": str(a.id), "label": a.display_name or f"Agent {a.id}"}
         for a in agents
     ]
 
 
 def get_team_options(db):
     """Get active teams for assignment dropdown."""
-    teams = db.query(Team).filter(
-        Team.is_active == True
-    ).order_by(Team.name).all()
+    from app.services.support import AgentService
+    service = AgentService(db)
+    teams = service.list_teams(active_only=True)
     return [
         {"value": str(t.id), "label": t.name}
         for t in teams
@@ -150,9 +156,9 @@ def get_team_options(db):
 
 def get_sla_policy_options(db):
     """Get active SLA policies for dropdown."""
-    policies = db.query(SLAPolicy).filter(
-        SLAPolicy.is_active == True
-    ).order_by(SLAPolicy.name).all()
+    from app.services.support import SLAService
+    service = SLAService(db)
+    policies = service.list_policies(active_only=True)
     return [
         {"value": str(p.id), "label": p.name}
         for p in policies
@@ -161,11 +167,11 @@ def get_sla_policy_options(db):
 
 def get_canned_response_options(db):
     """Get canned responses for quick reply dropdown."""
-    responses = db.query(CannedResponse).filter(
-        CannedResponse.is_active == True
-    ).order_by(CannedResponse.title).all()
+    from app.services.support import CannedResponseService
+    service = CannedResponseService(db)
+    responses = service.list(active_only=True)
     return [
-        {"value": str(r.id), "label": r.title, "content": r.content}
+        {"value": str(r.id), "label": r.name, "content": r.content}
         for r in responses
     ]
 
@@ -176,17 +182,19 @@ def get_canned_response_options(db):
 
 def get_agents(db):
     """Get list of active employees who can be assigned tickets."""
-    return db.query(Employee).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE
-    ).order_by(Employee.name).all()
+    from app.services.hr import EmployeeService
+    from app.models.employee import EmploymentStatus
+    service = EmployeeService(db)
+    from app.services.hr.employee_types import EmployeeFilters
+    result = service.list_employees(filters=EmployeeFilters(status=EmploymentStatus.ACTIVE))
+    return result.items
 
 
 def get_teams(db):
     """Get list of support teams for assignment."""
-    return db.query(Team).filter(
-        Team.is_active == True
-    ).order_by(Team.name).all()
+    from app.services.support import AgentService
+    service = AgentService(db)
+    return service.list_teams(active_only=True)
 
 
 # =============================================================================
@@ -198,24 +206,24 @@ def resolve_party_for_ticket(db, email: str, phone: str = None, name: str = None
     if not email and not phone:
         return None
 
+    from app.services.identity import PartyService
+    from app.services.identity.party_types import PartyCreateData
+
+    service = PartyService(db)
     party = None
     if email:
-        party = db.query(Party).filter(Party.primary_email == email).first()
+        party = service.get_party_by_email(email)
     if not party and phone:
-        party = db.query(Party).filter(Party.primary_phone == phone).first()
+        party = service.get_party_by_phone(phone)
 
     if party:
         return party
 
-    party = Party(
+    create_data = PartyCreateData(
         type="person",
         status="active",
         name=name or email or phone,
-        primary_email=email,
-        primary_phone=phone,
         emails=[{"address": email, "is_primary": True}] if email else [],
         phones=[{"number": phone, "is_primary": True}] if phone else [],
     )
-    db.add(party)
-    db.flush()
-    return party
+    return service.create_party(create_data)

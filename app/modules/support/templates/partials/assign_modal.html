@@ -12,14 +12,14 @@
         <div class="space-y-4">
             {# Agent select #}
             <div>
-                <label for="agent_id" class="block text-sm font-medium text-gray-700">Assign to Agent</label>
-                <select name="agent_id" id="agent_id"
+                <label for="party_id" class="block text-sm font-medium text-gray-700">Assign to Agent</label>
+                <select name="party_id" id="party_id"
                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm">
                     <option value="">-- Select Agent --</option>
                     {% for agent in agents %}
                     <option value="{{ agent.id }}"
-                            {% if ticket.assigned_to_id == agent.id %}selected{% endif %}>
-                        {{ agent.display_name or agent.email }}
+                            {% if ticket.assigned_to_party_id == agent.id %}selected{% endif %}>
+                        {{ agent.display_name or agent.name or agent.primary_email }}
                     </option>
                     {% endfor %}
                 </select>
@@ -43,7 +43,7 @@
 
         <div class="mt-6 flex justify-end space-x-3">
             <button type="button" @click="$dispatch('close-modal')"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-surface-50">
                 Cancel
             </button>
             <button type="submit" :disabled="submitting"

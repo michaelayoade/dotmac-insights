@@ -1,0 +1,105 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900" data-testid="page-title">Consent & Suppression</h1>
+        <p class="mt-1 text-sm text-gray-500">Manage opt-in status and channel preferences</p>
+    </div>
+    <div class="flex gap-3">
+        <button class="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Export</button>
+        <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Add Suppression</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Consent Overview</h2>
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">Email Opt-in</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-2">{{ overview.email_opt_in | default("0%") }}</p>
+                </div>
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">WhatsApp Opt-in</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-2">{{ overview.whatsapp_opt_in | default("0%") }}</p>
+                </div>
+                <div class="rounded-xl border border-gray-100 p-4">
+                    <p class="text-xs uppercase tracking-wider text-gray-500">Suppressed</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-2">{{ overview.suppressed_count | default(0) }}</p>
+                </div>
+            </div>
+        </div>
+
+        {% set records = records | default([]) %}
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 class="text-lg font-display font-semibold text-gray-900">Recent Consent Updates</h2>
+                <input type="search" placeholder="Search people..." class="rounded-xl border-0 bg-surface-50 px-4 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-primary-200">
+            </div>
+            <div class="divide-y divide-gray-100">
+                {% if records %}
+                    {% for record in records %}
+                    <div class="px-6 py-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ record.name }}</p>
+                            <p class="text-xs text-gray-500">{{ record.email }} · {{ record.channel }}</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                                {% if record.status == 'granted' %}bg-emerald-50 text-emerald-700
+                                {% elif record.status == 'revoked' %}bg-red-50 text-red-700
+                                {% else %}bg-amber-50 text-amber-700{% endif %}">
+                                {{ record.status | title }}
+                            </span>
+                            <span class="text-xs text-gray-500">{{ record.updated }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="px-6 py-6 text-sm text-gray-500">No consent updates yet.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-6">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Suppression List</h2>
+            {% set suppressions = suppressions | default([]) %}
+            {% if suppressions %}
+                <div class="mt-4 space-y-3">
+                    {% for item in suppressions %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="text-gray-600">{{ item.label }}</span>
+                        <span class="font-medium text-gray-900">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="mt-4 text-sm text-gray-500">No suppressed entries.</div>
+            {% endif %}
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Quick Actions</h2>
+            <div class="mt-4 space-y-3 text-sm">
+                <a href="/marketing/consent/unsubscribe" class="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-50 hover:bg-surface-100">
+                    Generate unsubscribe link
+                    <span class="text-primary-600">Open</span>
+                </a>
+                <a href="/marketing/consent" class="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-50 hover:bg-surface-100">
+                    Review consent requests
+                    <span class="text-primary-600">Review</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

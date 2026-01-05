@@ -17,8 +17,10 @@ from sqlalchemy.orm import Session
 
 from app.models.omni import InboxRoutingRule, OmniConversation
 from app.models.ticket import Ticket, TicketStatus
-from app.models.agent import Agent, Team, TeamMember
+from app.models.agent import Team, TeamMember
+from app.models.party import Party, PartyRole
 from app.models.support_sla import RoutingRule, RoutingRoundRobinState, RoutingStrategy
+from app.models.unified_ticket import UnifiedTicket, TicketStatus as UnifiedTicketStatus
 
 from .types import (
     RoutingMatch,
@@ -60,7 +62,7 @@ class RoutingService:
     # Auto-Assignment
     # -------------------------------------------------------------------------
 
-    def auto_assign_ticket(self, ticket: Ticket) -> Optional[Agent]:
+    def auto_assign_ticket(self, ticket: Ticket) -> Optional[Party]:
         """Automatically assign a ticket based on routing rules.
 
         Args:
@@ -79,7 +81,7 @@ class RoutingService:
     def auto_assign_conversation(
         self,
         conversation: OmniConversation,
-    ) -> Optional[Agent]:
+    ) -> Optional[Party]:
         """Automatically assign a conversation based on routing rules.
 
         Args:
@@ -95,12 +97,17 @@ class RoutingService:
 
         return self._execute_assignment(match)
 
-    def _execute_assignment(self, match: RoutingMatch) -> Optional[Agent]:
+    def _execute_assignment(self, match: RoutingMatch) -> Optional[Party]:
         """Execute the assignment from a routing match."""
         if match.action_type == "assign_agent":
             if match.action_value:
                 agent_id = int(match.action_value)
-                agent = self.db.query(Agent).filter(Agent.id == agent_id).first()
+                agent = (
+                    self.db.query(Party)
+                    .join(PartyRole, Party.id == PartyRole.party_id)
+                    .filter(Party.id == agent_id, PartyRole.role == "support_agent")
+                    .first()
+                )
                 if agent:
                     return agent
 
@@ -291,7 +298,7 @@ class RoutingService:
     # Agent Selection
     # -------------------------------------------------------------------------
 
-    def select_agent_round_robin(self, team_id: int) -> Optional[Agent]:
+    def select_agent_round_robin(self, team_id: int) -> Optional[Party]:
         """Select an agent using round-robin within a team.
 
         Args:
@@ -310,23 +317,28 @@ class RoutingService:
         if not members:
             return None
 
-        agent_ids = [m.agent_id for m in members if m.agent_id]
+        agent_ids = [m.party_id for m in members if m.party_id]
         if not agent_ids:
             return None
 
         # Get agents with conversation counts
         agents_with_counts = (
             self.db.query(
-                Agent,
+                Party,
                 func.count(OmniConversation.id).label("conv_count"),
             )
             .outerjoin(
                 OmniConversation,
-                (OmniConversation.assigned_agent_id == Agent.id)
+                (OmniConversation.assigned_party_id == Party.id)
                 & (OmniConversation.status.in_(["open", "pending"])),
             )
-            .filter(Agent.id.in_(agent_ids), Agent.is_active == True)
-            .group_by(Agent.id)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                Party.id.in_(agent_ids),
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+            )
+            .group_by(Party.id)
             .order_by(func.count(OmniConversation.id).asc())
             .first()
         )
@@ -336,12 +348,17 @@ class RoutingService:
 
         # Fallback: just get first active agent
         return (
-            self.db.query(Agent)
-            .filter(Agent.id.in_(agent_ids), Agent.is_active == True)
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                Party.id.in_(agent_ids),
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+            )
             .first()
         )
 
-    def select_agent_load_balanced(self, team_id: int) -> Optional[Agent]:
+    def select_agent_load_balanced(self, team_id: int) -> Optional[Party]:
         """Select an agent using load-balancing within a team.
 
         This considers the agent's current workload.
@@ -790,7 +807,7 @@ class RoutingService:
             }
 
         # Assign the ticket
-        ticket.assigned_to = selected_agent.display_name or selected_agent.email
+        ticket.assigned_to = selected_agent.display_name or selected_agent.primary_email
         team = self.db.query(Team).filter(Team.id == team_id).first()
         if team:
             ticket.resolution_team = team.name
@@ -850,7 +867,7 @@ class RoutingService:
 
         return True
 
-    def _get_available_agents_for_team(self, team_id: int) -> List[Agent]:
+    def _get_available_agents_for_team(self, team_id: int) -> List[Party]:
         """Get active agents for a team."""
         members = self.db.query(TeamMember).filter(
             TeamMember.team_id == team_id,
@@ -860,19 +877,25 @@ class RoutingService:
         if not members:
             return []
 
-        agent_ids = [m.agent_id for m in members]
-        return self.db.query(Agent).filter(
-            Agent.id.in_(agent_ids),
-            Agent.is_active == True
-        ).all()
+        agent_ids = [m.party_id for m in members]
+        return (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                Party.id.in_(agent_ids),
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+            )
+            .all()
+        )
 
     def _select_agent_by_strategy(
         self,
         strategy: str,
         team_id: int,
-        agents: List[Agent],
+        agents: List[Party],
         ticket: Ticket,
-    ) -> Optional[Agent]:
+    ) -> Optional[Party]:
         """Select agent based on routing strategy."""
         if strategy == RoutingStrategy.ROUND_ROBIN.value:
             return self._ticket_round_robin_select(team_id, agents)
@@ -888,8 +911,8 @@ class RoutingService:
     def _ticket_round_robin_select(
         self,
         team_id: int,
-        agents: List[Agent],
-    ) -> Optional[Agent]:
+        agents: List[Party],
+    ) -> Optional[Party]:
         """Select next agent in round-robin rotation."""
         state = self.db.query(RoutingRoundRobinState).filter(
             RoutingRoundRobinState.team_id == team_id
@@ -899,30 +922,30 @@ class RoutingService:
 
         if not state:
             selected = agents[0]
-            state = RoutingRoundRobinState(team_id=team_id, last_agent_id=selected.id)
+            state = RoutingRoundRobinState(team_id=team_id, last_party_id=selected.id)
             self.db.add(state)
             self.db.flush()
             return selected
 
-        if state.last_agent_id is None:
+        if state.last_party_id is None:
             next_idx = 0
         else:
             try:
-                last_idx = agent_ids.index(state.last_agent_id)
+                last_idx = agent_ids.index(state.last_party_id)
                 next_idx = (last_idx + 1) % len(agents)
             except ValueError:
                 next_idx = 0
 
         selected = agents[next_idx]
-        state.last_agent_id = selected.id
+        state.last_party_id = selected.id
         self.db.flush()
         return selected
 
-    def _ticket_least_busy_select(self, agents: List[Agent]) -> Optional[Agent]:
+    def _ticket_least_busy_select(self, agents: List[Party]) -> Optional[Party]:
         """Select agent with fewest open tickets."""
         ticket_counts = {}
         for agent in agents:
-            name = agent.display_name or agent.email
+            name = agent.display_name or agent.primary_email
             count = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
                 Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
@@ -939,8 +962,8 @@ class RoutingService:
     def _ticket_skill_based_select(
         self,
         ticket: Ticket,
-        agents: List[Agent],
-    ) -> Optional[Agent]:
+        agents: List[Party],
+    ) -> Optional[Party]:
         """Select agent based on skill matching."""
         ticket_type = ticket.ticket_type or ""
         issue_type = ticket.issue_type or ""
@@ -950,8 +973,8 @@ class RoutingService:
 
         for agent in agents:
             score = 0
-            skills = agent.skills or {}
-            domains = agent.domains or {}
+            skills = agent.agent_skills
+            domains = agent.agent_domains
 
             if ticket_type.lower() in [k.lower() for k in skills.keys()]:
                 score += 2
@@ -966,14 +989,14 @@ class RoutingService:
 
         return best_match or (agents[0] if agents else None)
 
-    def _ticket_load_balanced_select(self, agents: List[Agent]) -> Optional[Agent]:
+    def _ticket_load_balanced_select(self, agents: List[Party]) -> Optional[Party]:
         """Select agent based on capacity utilization."""
         best_agent = None
         lowest_utilization = float('inf')
 
         for agent in agents:
-            capacity = agent.capacity or 10
-            name = agent.display_name or agent.email
+            capacity = agent.agent_capacity
+            name = agent.display_name or agent.primary_email
 
             current_load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -1004,27 +1027,31 @@ class RoutingService:
         Returns:
             List of AgentWorkload instances.
         """
-        query = self.db.query(Agent).filter(Agent.is_active == True)
+        query = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
+        )
 
         if team_id:
-            member_agent_ids = self.db.query(TeamMember.agent_id).filter(
+            member_agent_ids = self.db.query(TeamMember.party_id).filter(
                 TeamMember.team_id == team_id,
                 TeamMember.is_active == True
             ).all()
             agent_ids = [m[0] for m in member_agent_ids]
-            query = query.filter(Agent.id.in_(agent_ids))
+            query = query.filter(Party.id.in_(agent_ids))
 
         agents = query.all()
 
         result = []
         for agent in agents:
-            name = agent.display_name or agent.email
+            name = agent.display_name or agent.primary_email
             open_tickets = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
                 Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])
             ).scalar() or 0
 
-            capacity = agent.capacity or 10
+            capacity = agent.agent_capacity
             utilization = (open_tickets / capacity * 100) if capacity > 0 else 0
 
             result.append(AgentWorkload(
@@ -1036,6 +1063,112 @@ class RoutingService:
             ))
 
         return result
+
+    def get_unified_agent_workloads(
+        self,
+        team_id: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Get workload stats for agents based on UnifiedTicket assignments."""
+        query = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
+        )
+
+        if team_id:
+            member_agent_ids = self.db.query(TeamMember.party_id).filter(
+                TeamMember.team_id == team_id,
+                TeamMember.is_active == True,
+            ).all()
+            agent_ids = [m[0] for m in member_agent_ids]
+            query = query.filter(Party.id.in_(agent_ids))
+
+        agents = query.all()
+
+        open_statuses = [
+            UnifiedTicketStatus.OPEN.value,
+            UnifiedTicketStatus.IN_PROGRESS.value,
+            UnifiedTicketStatus.WAITING.value,
+            UnifiedTicketStatus.ON_HOLD.value,
+            UnifiedTicketStatus.REOPENED.value,
+        ]
+
+        workloads: list[dict[str, Any]] = []
+        for agent in agents:
+            # agents are now Party objects with support_agent role
+            capacity = agent.agent_capacity
+            open_count = self.db.query(func.count(UnifiedTicket.id)).filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.assigned_to_party_id == agent.id,
+                UnifiedTicket.status.in_(open_statuses),
+            ).scalar() or 0
+
+            utilization = round(open_count / capacity * 100, 1) if capacity > 0 else 0
+            workloads.append({
+                "id": agent.id,
+                "name": agent.display_name,
+                "email": agent.primary_email,
+                "capacity": capacity,
+                "load": open_count,
+                "utilization": utilization,
+                "available": max(0, capacity - open_count),
+            })
+
+        workloads.sort(key=lambda x: -float(x.get("utilization") or 0))
+        return workloads
+
+    def get_ticket_queue_health(self) -> Dict[str, Any]:
+        """Get queue health metrics based on UnifiedTicket."""
+        open_statuses = [
+            UnifiedTicketStatus.OPEN.value,
+            UnifiedTicketStatus.IN_PROGRESS.value,
+            UnifiedTicketStatus.WAITING.value,
+            UnifiedTicketStatus.ON_HOLD.value,
+            UnifiedTicketStatus.REOPENED.value,
+        ]
+
+        unassigned = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.assigned_to_party_id.is_(None),
+            UnifiedTicket.status.in_(open_statuses),
+        ).scalar() or 0
+
+        total_open = self.db.query(func.count(UnifiedTicket.id)).filter(
+            UnifiedTicket.is_deleted == False,
+            UnifiedTicket.status.in_(open_statuses),
+        ).scalar() or 0
+
+        # Get active support agents (Party with support_agent role)
+        agents = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+                PartyRole.until.is_(None),
+            )
+            .all()
+        )
+        total_capacity = sum(float(a.agent_capacity if hasattr(a, 'agent_capacity') else 10) for a in agents)
+
+        total_load = 0.0
+        for agent in agents:
+            total_load += self.db.query(func.count(UnifiedTicket.id)).filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.assigned_to_party_id == agent.id,
+                UnifiedTicket.status.in_(open_statuses),
+            ).scalar() or 0
+
+        utilization = round(total_load / total_capacity * 100, 1) if total_capacity > 0 else 0
+
+        return {
+            "unassigned": unassigned,
+            "total_open": total_open,
+            "total_agents": len(agents),
+            "total_capacity": total_capacity,
+            "total_load": total_load,
+            "utilization": utilization,
+        }
 
     def get_queue_health(self) -> QueueHealth:
         """Get queue health metrics.
@@ -1080,16 +1213,25 @@ class RoutingService:
             avg_wait = 0.0
 
         # Agent counts
-        agents_active = self.db.query(func.count(Agent.id)).filter(
-            Agent.is_active == True
-        ).scalar() or 0
+        agents_active = (
+            self.db.query(func.count(Party.id))
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
+            .scalar()
+            or 0
+        )
 
         # Count agents at capacity
         agents_at_capacity = 0
-        agents = self.db.query(Agent).filter(Agent.is_active == True).all()
+        agents = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
+            .all()
+        )
         for agent in agents:
-            name = agent.display_name or agent.email
-            capacity = agent.capacity or 10
+            name = agent.display_name or agent.primary_email
+            capacity = agent.agent_capacity
             current = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
                 Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED, TicketStatus.ON_HOLD])

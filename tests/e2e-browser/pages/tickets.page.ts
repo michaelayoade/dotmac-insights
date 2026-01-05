@@ -55,7 +55,7 @@ export class TicketsPage extends BasePage {
     this.statusFilter = page.locator('[data-testid="status-filter"], select[name="status"]');
     this.priorityFilter = page.locator('[data-testid="priority-filter"], select[name="priority"]');
     this.assigneeFilter = page.locator('[data-testid="my-tickets-filter"], select[name="assignee"]');
-    this.createButton = page.locator('[data-testid="new-ticket-btn"], a[href*="/new"], button:has-text("New Ticket")');
+    this.createButton = page.locator('[data-testid="new-ticket-button"], a[href*="/new"], button:has-text("New Ticket")');
 
     // Form
     this.ticketForm = page.locator('[data-testid="ticket-form"], form[action*="/support/tickets"]');
@@ -202,7 +202,9 @@ export class TicketsPage extends BasePage {
     priority?: string;
     customer?: string;
   }): Promise<void> {
-    await this.gotoCreate();
+    if (!this.page.url().includes(this.createUrl)) {
+      await this.gotoCreate();
+    }
     await this.subjectInput.fill(data.subject);
     await this.descriptionInput.fill(data.description);
     if (data.priority) await this.prioritySelect.selectOption(data.priority);

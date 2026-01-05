@@ -123,6 +123,7 @@ async def accounting_dashboard(
             "icon": "trending-up",
             "icon_bg": "bg-emerald-50",
             "icon_color": "text-emerald-600",
+            "href": "/accounting/reports/balance-sheet",
         },
         {
             "label": "Total Liabilities",
@@ -131,6 +132,7 @@ async def accounting_dashboard(
             "icon": "inbox",
             "icon_bg": "bg-red-50",
             "icon_color": "text-red-600",
+            "href": "/accounting/reports/balance-sheet",
         },
         {
             "label": "Net Worth",
@@ -139,6 +141,7 @@ async def accounting_dashboard(
             "icon": "award",
             "icon_bg": "bg-blue-50",
             "icon_color": "text-blue-600",
+            "href": "/accounting/reports/balance-sheet",
         },
         {
             "label": "Net Profit",
@@ -147,6 +150,7 @@ async def accounting_dashboard(
             "icon": "bar-chart",
             "icon_bg": "bg-amber-50",
             "icon_color": "text-amber-600",
+            "href": "/accounting/reports/income-statement",
         },
         {
             "label": "Receivables",
@@ -155,6 +159,7 @@ async def accounting_dashboard(
             "icon": "file-text",
             "icon_bg": "bg-indigo-50",
             "icon_color": "text-indigo-600",
+            "href": "/accounting/receivables",
         },
         {
             "label": "Payables",
@@ -163,6 +168,7 @@ async def accounting_dashboard(
             "icon": "receipt",
             "icon_bg": "bg-orange-50",
             "icon_color": "text-orange-600",
+            "href": "/accounting/payables",
         },
     ]
 

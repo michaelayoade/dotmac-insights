@@ -8,12 +8,10 @@ Permission Requirements:
 from __future__ import annotations
 
 from typing import Optional, Any
-from decimal import Decimal
 from datetime import datetime
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -23,12 +21,28 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.project import Project, ProjectStatus, ProjectPriority, ProjectType, Milestone, MilestoneStatus
-from app.models.task import Task, TaskStatus, TaskPriority
-from app.models.party import CustomerAccount, Party
-from app.models.employee import Employee
+from app.models.project import ProjectStatus, ProjectPriority, ProjectType, MilestoneStatus
+from app.models.task import TaskStatus, TaskPriority
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from datetime import timedelta
+from app.services.projects import (
+    ProjectService,
+    TaskService,
+    MilestoneService,
+    ProjectsAnalyticsService,
+    ProjectsLookupService,
+    ProjectFilters,
+    ProjectCreateData,
+    ProjectUpdateData,
+    TaskFilters,
+    TaskCreateData,
+    TaskUpdateData,
+    MilestoneFilters,
+    MilestoneCreateData,
+    MilestoneUpdateData,
+)
+from app.services.types import PaginationParams
+from app.services.errors import NotFoundError, ValidationError
 
 # Permission dependencies
 RequireProjectsRead = Depends(require_scope("projects:read"))
@@ -110,39 +124,25 @@ async def projects_list(
     dir: str = Query("asc", description="Sort direction"),
 ):
     """Project list page."""
-    query = db.query(Project).filter(Project.is_deleted == False)
+    service = ProjectService(db)
 
-    # Search
-    if q:
-        search_filter = or_(
-            Project.project_name.ilike(f"%{q}%"),
-            Project.project_type.ilike(f"%{q}%"),
-            Project.department.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
+    # Build filters
+    status_enum = ProjectStatus(status) if status else None
+    priority_enum = ProjectPriority(priority) if priority else None
+    filters = ProjectFilters(
+        search=q,
+        status=status_enum,
+        priority=priority_enum,
+        sort_by=sort,
+        sort_dir=dir,
+    )
+    pagination = PaginationParams(page=page, limit=per_page)
 
-    # Filters
-    if status:
-        query = query.filter(Project.status == status)
-    if priority:
-        query = query.filter(Project.priority == priority)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_column = getattr(Project, sort, Project.project_name)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
-
-    # Paginate
-    offset = (page - 1) * per_page
-    projects = query.offset(offset).limit(per_page).all()
+    result = service.list_projects(filters, pagination)
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["projects"] = projects
+    context["projects"] = result.items
     context["search_query"] = q or ""
     context["current_status"] = status
     context["current_priority"] = priority
@@ -150,7 +150,7 @@ async def projects_list(
     context["priority_options"] = get_priority_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -200,14 +200,8 @@ async def project_new(
     db: DB,
 ):
     """New project form page."""
-    # Get customer accounts for dropdown
-    customers = (
-        db.query(CustomerAccount)
-        .join(Party, CustomerAccount.party_id == Party.id)
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
+    lookup = ProjectsLookupService(db)
+    customers = lookup.list_customers()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -248,13 +242,8 @@ async def project_create(
         errors["project_name"] = "Project name is required"
 
     if errors:
-        customers = (
-            db.query(CustomerAccount)
-            .join(Party, CustomerAccount.party_id == Party.id)
-            .order_by(Party.name)
-            .limit(100)
-            .all()
-        )
+        lookup = ProjectsLookupService(db)
+        customers = lookup.list_customers()
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -279,26 +268,26 @@ async def project_create(
     expected_start = _form_date(form, "expected_start_date")
     expected_end = _form_date(form, "expected_end_date")
 
-    # Create project
-    project = Project(
+    # Parse status and priority
+    status_str = _form_str(form, "status", ProjectStatus.OPEN.value)
+    priority_str = _form_str(form, "priority", ProjectPriority.MEDIUM.value)
+
+    # Create project using service
+    service = ProjectService(db)
+    data = ProjectCreateData(
         project_name=project_name,
         project_type=_form_str(form, "project_type") or None,
-        status=_form_str(form, "status", ProjectStatus.OPEN.value),
-        priority=_form_str(form, "priority", ProjectPriority.MEDIUM.value),
+        status=ProjectStatus(status_str),
+        priority=ProjectPriority(priority_str),
         department=_form_str(form, "department") or None,
         expected_start_date=expected_start,
         expected_end_date=expected_end,
         notes=_form_str(form, "notes") or None,
+        customer_account_id=_form_int(form, "customer_account_id", 0) or None,
     )
 
-    # Link customer account if provided
-    customer_account_id = _form_int(form, "customer_account_id", 0)
-    if customer_account_id:
-        project.customer_account_id = customer_account_id
-
-    db.add(project)
+    project = service.create_project(data)
     db.commit()
-    db.refresh(project)
 
     set_flash(response, f"Project '{project.project_name}' created successfully.", "success")
     return RedirectResponse(url=f"/projects/{project.id}", status_code=303)
@@ -314,58 +303,31 @@ async def project_detail(
     project_id: int,
 ):
     """Project detail page."""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.is_deleted == False,
-    ).first()
+    service = ProjectService(db)
+    milestone_service = MilestoneService(db)
 
-    if not project:
+    try:
+        project = service.get_project(project_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Get milestones
-    milestones = db.query(Milestone).filter(
-        Milestone.project_id == project_id,
-        Milestone.is_deleted == False,
-    ).order_by(Milestone.idx).all()
+    # Get milestones using service
+    milestone_filters = MilestoneFilters()
+    milestones_result = milestone_service.list_project_milestones(project_id, milestone_filters)
+    milestones = milestones_result.items
 
-    # Load project manager
-    from app.models.employee import Employee
+    lookup = ProjectsLookupService(db)
+
+    project_manager_info = service.get_manager_info(project)
     project_manager = None
-    if project.project_manager_id:
-        project_manager = db.query(Employee).filter(
-            Employee.id == project.project_manager_id
-        ).first()
+    if project_manager_info:
+        project_manager = lookup.get_employee(project_manager_info["id"])
 
-    # Load related service orders
-    from app.models.field_service import ServiceOrder
-    related_service_orders = db.query(ServiceOrder).filter(
-        ServiceOrder.project_id == project_id,
-    ).order_by(ServiceOrder.created_at.desc()).limit(10).all()
+    related_service_orders = lookup.list_related_service_orders(project_id)
+    service_order_stats = lookup.get_service_order_stats(project_id)
 
-    service_order_stats = {
-        "total": db.query(func.count(ServiceOrder.id)).filter(
-            ServiceOrder.project_id == project_id,
-        ).scalar() or 0,
-    }
-
-    # Load related tickets
-    from app.models.unified_ticket import UnifiedTicket
-    related_tickets = db.query(UnifiedTicket).filter(
-        UnifiedTicket.project_name == project.project_name,
-        UnifiedTicket.is_deleted == False,
-    ).order_by(UnifiedTicket.created_at.desc()).limit(10).all()
-
-    ticket_stats = {
-        "total": db.query(func.count(UnifiedTicket.id)).filter(
-            UnifiedTicket.project_name == project.project_name,
-            UnifiedTicket.is_deleted == False,
-        ).scalar() or 0,
-        "open": db.query(func.count(UnifiedTicket.id)).filter(
-            UnifiedTicket.project_name == project.project_name,
-            UnifiedTicket.is_deleted == False,
-            UnifiedTicket.status.in_(["open", "in_progress"]),
-        ).scalar() or 0,
-    }
+    related_tickets = lookup.list_related_tickets(project.project_name)
+    ticket_stats = lookup.get_ticket_stats(project.project_name)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -397,21 +359,14 @@ async def project_edit(
     project_id: int,
 ):
     """Project edit form page."""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.is_deleted == False,
-    ).first()
-
-    if not project:
+    service = ProjectService(db)
+    try:
+        project = service.get_project(project_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    customers = (
-        db.query(CustomerAccount)
-        .join(Party, CustomerAccount.party_id == Party.id)
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
+    lookup = ProjectsLookupService(db)
+    customers = lookup.list_customers()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -444,12 +399,10 @@ async def project_update(
     project_id: int,
 ):
     """Update a project."""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.is_deleted == False,
-    ).first()
-
-    if not project:
+    service = ProjectService(db)
+    try:
+        project = service.get_project(project_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Project not found")
 
     form = await request.form()
@@ -462,13 +415,8 @@ async def project_update(
         errors["project_name"] = "Project name is required"
 
     if errors:
-        customers = (
-            db.query(CustomerAccount)
-            .join(Party, CustomerAccount.party_id == Party.id)
-            .order_by(Party.name)
-            .limit(100)
-            .all()
-        )
+        lookup = ProjectsLookupService(db)
+        customers = lookup.list_customers()
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -493,24 +441,24 @@ async def project_update(
     expected_start = _form_date(form, "expected_start_date")
     expected_end = _form_date(form, "expected_end_date")
 
-    # Update project
-    project.project_name = project_name
-    project.project_type = _form_str(form, "project_type") or None
+    # Parse status and priority
     status_str = _form_str(form, "status", project.status.value if project.status else "")
-    if status_str:
-        project.status = ProjectStatus(status_str)
     priority_str = _form_str(form, "priority", project.priority.value if project.priority else "")
-    if priority_str:
-        project.priority = ProjectPriority(priority_str)
-    project.department = _form_str(form, "department") or None
-    project.expected_start_date = expected_start
-    project.expected_end_date = expected_end
-    project.notes = _form_str(form, "notes") or None
 
-    # Link customer account if provided
-    customer_account_id = _form_int(form, "customer_account_id", 0)
-    project.customer_account_id = customer_account_id or None
+    # Update project using service
+    data = ProjectUpdateData(
+        project_name=project_name,
+        project_type=_form_str(form, "project_type") or None,
+        status=ProjectStatus(status_str) if status_str else None,
+        priority=ProjectPriority(priority_str) if priority_str else None,
+        department=_form_str(form, "department") or None,
+        expected_start_date=expected_start,
+        expected_end_date=expected_end,
+        notes=_form_str(form, "notes") or None,
+        customer_account_id=_form_int(form, "customer_account_id", 0) or None,
+    )
 
+    project = service.update_project(project_id, data)
     db.commit()
 
     set_flash(response, f"Project '{project.project_name}' updated successfully.", "success")
@@ -527,18 +475,13 @@ async def project_delete(
     project_id: int,
 ):
     """Delete a project (soft delete)."""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.is_deleted == False,
-    ).first()
-
-    if not project:
+    service = ProjectService(db)
+    try:
+        project = service.delete_project(project_id)
+        name = project.project_name
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Project not found")
-
-    name = project.project_name
-    project.is_deleted = True
-    project.deleted_at = datetime.utcnow()
-    db.commit()
 
     if is_htmx_request(request):
         htmx_toast(response, f"Project '{name}' deleted.", "success")
@@ -558,12 +501,10 @@ async def project_row(
     project_id: int,
 ):
     """Single project row partial for HTMX updates."""
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.is_deleted == False,
-    ).first()
-
-    if not project:
+    service = ProjectService(db)
+    try:
+        project = service.get_project(project_id)
+    except NotFoundError:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -586,65 +527,24 @@ async def projects_dashboard(
     db: DB,
 ):
     """Projects Dashboard with overview stats."""
-    today = datetime.utcnow().date()
-    week_from_now = today + timedelta(days=7)
+    # Use service for all dashboard data (single call, optimized queries)
+    analytics_service = ProjectsAnalyticsService(db)
+    dashboard_data = analytics_service.get_dashboard_data()
 
-    # Project Stats
-    total_active = db.query(func.count(Project.id)).filter(
-        Project.is_deleted == False,
-        Project.status.in_(["open", "working", "in_progress"])
-    ).scalar() or 0
+    # Map stats to template format
+    stats = {
+        "total_active": dashboard_data.stats.active_projects,
+        "total_completed": dashboard_data.stats.completed_projects,
+        "overdue_projects": dashboard_data.stats.overdue_projects,
+        "open_tasks": dashboard_data.stats.total_open_tasks,
+        "overdue_tasks": dashboard_data.stats.overdue_tasks,
+    }
 
-    total_completed = db.query(func.count(Project.id)).filter(
-        Project.is_deleted == False,
-        Project.status == "completed"
-    ).scalar() or 0
-
-    overdue_projects = db.query(func.count(Project.id)).filter(
-        Project.is_deleted == False,
-        Project.expected_end_date < today,
-        Project.status.notin_(["completed", "cancelled"])
-    ).scalar() or 0
-
-    # Task Stats
-    open_tasks = db.query(func.count(Task.id)).filter(
-        Task.status.in_(["open", "working", "pending_review"])
-    ).scalar() or 0
-
-    overdue_tasks = db.query(func.count(Task.id)).filter(
-        Task.exp_end_date < today,
-        Task.status.notin_(["completed", "cancelled"])
-    ).scalar() or 0
-
-    # Projects by status
-    status_counts = db.query(
-        Project.status,
-        func.count(Project.id).label("count")
-    ).filter(Project.is_deleted == False).group_by(Project.status).all()
-
+    # Status distribution for chart
     status_distribution = [
-        {"status": s[0], "count": s[1]}
-        for s in status_counts
+        {"status": s.status, "count": s.count}
+        for s in dashboard_data.status_distribution
     ]
-
-    # Recent projects
-    recent_projects = db.query(Project).filter(
-        Project.is_deleted == False
-    ).order_by(Project.updated_at.desc()).limit(10).all()
-
-    # Upcoming milestones
-    upcoming_milestones = db.query(Milestone).filter(
-        Milestone.is_deleted == False,
-        Milestone.planned_end_date >= today,
-        Milestone.planned_end_date <= week_from_now,
-        Milestone.status != MilestoneStatus.COMPLETED
-    ).order_by(Milestone.planned_end_date).limit(5).all()
-
-    # Overdue tasks
-    overdue_task_list = db.query(Task).filter(
-        Task.exp_end_date < today,
-        Task.status.notin_(["completed", "cancelled"])
-    ).order_by(Task.exp_end_date).limit(5).all()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -654,18 +554,12 @@ async def projects_dashboard(
         {"label": "Projects"},
     ])
 
-    context["stats"] = {
-        "total_active": total_active,
-        "total_completed": total_completed,
-        "overdue_projects": overdue_projects,
-        "open_tasks": open_tasks,
-        "overdue_tasks": overdue_tasks,
-    }
+    context["stats"] = stats
     context["status_distribution"] = status_distribution
-    context["recent_projects"] = recent_projects
-    context["upcoming_milestones"] = upcoming_milestones
-    context["overdue_task_list"] = overdue_task_list
-    context["today"] = today
+    context["recent_projects"] = dashboard_data.recent_projects
+    context["upcoming_milestones"] = dashboard_data.upcoming_milestones
+    context["overdue_task_list"] = dashboard_data.overdue_tasks
+    context["today"] = datetime.utcnow().date()
 
     template = templates.get_template("modules/projects/templates/pages/dashboard.html")
     return HTMLResponse(template.render(context))
@@ -706,55 +600,29 @@ async def tasks_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Tasks list page."""
-    query = db.query(Task)
+    task_service = TaskService(db)
 
-    # Search
-    if q:
-        query = query.filter(
-            or_(
-                Task.subject.ilike(f"%{q}%"),
-                Task.description.ilike(f"%{q}%"),
-            )
-        )
+    # Build filters
+    status_enum = TaskStatus(status) if status else None
+    priority_enum = TaskPriority(priority) if priority else None
+    filters = TaskFilters(
+        search=q,
+        status=status_enum,
+        priority=priority_enum,
+        project_id=project_id,
+    )
+    pagination = PaginationParams(page=page, limit=per_page)
 
-    # Filters
-    if status:
-        query = query.filter(Task.status == status)
-    if priority:
-        query = query.filter(Task.priority == priority)
-    if project_id:
-        query = query.filter(Task.project_id == project_id)
+    result = task_service.list_tasks(filters, pagination)
 
-    # Count total
-    total = query.count()
+    lookup = ProjectsLookupService(db)
+    projects = lookup.list_active_projects()
 
-    # Sort
-    query = query.order_by(Task.exp_end_date.asc().nullslast(), Task.priority.desc())
-
-    # Paginate
-    offset = (page - 1) * per_page
-    tasks = query.offset(offset).limit(per_page).all()
-
-    # Get projects for filter
-    projects = db.query(Project).filter(
-        Project.is_deleted == False,
-        Project.status.notin_(["completed", "cancelled"])
-    ).order_by(Project.project_name).all()
-
-    # Stats
     today = datetime.utcnow().date()
-    stats = {
-        "open": db.query(func.count(Task.id)).filter(Task.status == TaskStatus.OPEN).scalar() or 0,
-        "working": db.query(func.count(Task.id)).filter(Task.status == TaskStatus.WORKING).scalar() or 0,
-        "overdue": db.query(func.count(Task.id)).filter(
-            Task.exp_end_date < today,
-            Task.status.notin_(["completed", "cancelled"])
-        ).scalar() or 0,
-        "completed": db.query(func.count(Task.id)).filter(Task.status == TaskStatus.COMPLETED).scalar() or 0,
-    }
+    stats = task_service.get_status_counts()
 
     context = get_base_context(request, response, user, csrf_token)
-    context["tasks"] = tasks
+    context["tasks"] = result.items
     context["projects"] = projects
     context["stats"] = stats
     context["search_query"] = q or ""
@@ -763,7 +631,7 @@ async def tasks_list(
     context["current_project_id"] = project_id
     context["status_options"] = get_task_status_options()
     context["priority_options"] = get_task_priority_options()
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
     context["today"] = today
 
     if is_htmx_request(request):
@@ -792,24 +660,24 @@ async def task_detail(
     task_id: int,
 ):
     """Task detail page."""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task_service = TaskService(db)
 
-    if not task:
+    try:
+        task = task_service.get_task(task_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Task not found")
 
     # Get sub-tasks
-    sub_tasks = db.query(Task).filter(Task.parent_task_id == task_id).all()
+    sub_tasks = task_service.get_sub_tasks(task_id)
 
     # Get dependencies
     dependencies = task.depends_on
 
     # Load assigned employee
-    from app.models.employee import Employee
     assigned_employee = None
     if task.assigned_to_id:
-        assigned_employee = db.query(Employee).filter(
-            Employee.id == task.assigned_to_id
-        ).first()
+        lookup = ProjectsLookupService(db)
+        assigned_employee = lookup.get_employee(task.assigned_to_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -841,19 +709,19 @@ async def task_update_status(
     task_id: int,
 ):
     """Quick task status update via HTMX."""
-    task = db.query(Task).filter(Task.id == task_id).first()
+    task_service = TaskService(db)
 
-    if not task:
+    try:
+        task = task_service.get_task(task_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Task not found")
 
     form = await request.form()
     new_status = _form_str(form, "status")
 
     if new_status:
-        task.status = TaskStatus(new_status)
-        if new_status == "completed":
-            task.completed_on = datetime.utcnow().date()
-            task.progress = Decimal("100")
+        data = TaskUpdateData(status=TaskStatus(new_status))
+        task = task_service.update_task(task_id, data)
         db.commit()
 
         htmx_toast(response, f"Task status updated to {new_status.replace('_', ' ').title()}", "success")
@@ -893,60 +761,26 @@ async def milestones_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Milestones list page."""
-    query = db.query(Milestone).filter(Milestone.is_deleted == False)
+    milestone_service = MilestoneService(db)
 
-    # Search
-    if q:
-        query = query.filter(
-            or_(
-                Milestone.name.ilike(f"%{q}%"),
-                Milestone.description.ilike(f"%{q}%"),
-            )
-        )
+    status_enum = MilestoneStatus(status) if status else None
+    filters = MilestoneFilters(
+        search=q,
+        status=status_enum,
+        project_id=project_id,
+        sort_by="planned_end_date",
+        sort_dir="asc",
+    )
+    pagination = PaginationParams(page=page, limit=per_page)
 
-    # Filters
-    if status:
-        query = query.filter(Milestone.status == status)
-    if project_id:
-        query = query.filter(Milestone.project_id == project_id)
+    result = milestone_service.list_milestones(filters, pagination)
+    milestones = result.items
 
-    # Count total
-    total = query.count()
+    lookup = ProjectsLookupService(db)
+    projects = lookup.list_active_projects()
 
-    # Sort
-    query = query.order_by(Milestone.planned_end_date.asc().nullslast())
-
-    # Paginate
-    offset = (page - 1) * per_page
-    milestones = query.offset(offset).limit(per_page).all()
-
-    # Get projects for filter
-    projects = db.query(Project).filter(
-        Project.is_deleted == False,
-        Project.status.notin_(["completed", "cancelled"])
-    ).order_by(Project.project_name).all()
-
-    # Stats
     today = datetime.utcnow().date()
-    stats = {
-        "pending": db.query(func.count(Milestone.id)).filter(
-            Milestone.is_deleted == False,
-            Milestone.status == MilestoneStatus.PLANNED
-        ).scalar() or 0,
-        "in_progress": db.query(func.count(Milestone.id)).filter(
-            Milestone.is_deleted == False,
-            Milestone.status == MilestoneStatus.IN_PROGRESS
-        ).scalar() or 0,
-        "overdue": db.query(func.count(Milestone.id)).filter(
-            Milestone.is_deleted == False,
-            Milestone.planned_end_date < today,
-            Milestone.status != MilestoneStatus.COMPLETED
-        ).scalar() or 0,
-        "completed": db.query(func.count(Milestone.id)).filter(
-            Milestone.is_deleted == False,
-            Milestone.status == MilestoneStatus.COMPLETED
-        ).scalar() or 0,
-    }
+    stats = milestone_service.get_status_counts()
 
     context = get_base_context(request, response, user, csrf_token)
     context["milestones"] = milestones
@@ -956,7 +790,7 @@ async def milestones_list(
     context["current_status"] = status
     context["current_project_id"] = project_id
     context["status_options"] = get_milestone_status_options()
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
     context["today"] = today
 
     if is_htmx_request(request):
@@ -985,21 +819,18 @@ async def milestone_detail(
     milestone_id: int,
 ):
     """Milestone detail page."""
-    milestone = db.query(Milestone).filter(
-        Milestone.id == milestone_id,
-        Milestone.is_deleted == False
-    ).first()
+    milestone_service = MilestoneService(db)
 
-    if not milestone:
+    try:
+        milestone, tasks = milestone_service.get_milestone_with_tasks(milestone_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Milestone not found")
 
-    # Get tasks linked to this milestone
-    tasks = db.query(Task).filter(Task.milestone_id == milestone_id).all()
-
-    # Calculate progress
-    total_tasks = len(tasks)
-    completed_tasks = len([t for t in tasks if t.status == TaskStatus.COMPLETED])
-    progress = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+    # Calculate progress using service
+    progress_data = milestone_service.calculate_progress(milestone_id)
+    total_tasks = progress_data.total_tasks
+    completed_tasks = progress_data.completed_tasks
+    progress = float(progress_data.percent_complete)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -1031,19 +862,20 @@ async def milestone_update_status(
     milestone_id: int,
 ):
     """Quick milestone status update via HTMX."""
-    milestone = db.query(Milestone).filter(
-        Milestone.id == milestone_id,
-        Milestone.is_deleted == False
-    ).first()
+    milestone_service = MilestoneService(db)
 
-    if not milestone:
+    try:
+        milestone = milestone_service.get_milestone(milestone_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Milestone not found")
 
     form = await request.form()
     new_status = _form_str(form, "status")
 
     if new_status:
-        milestone.status = MilestoneStatus(new_status)
+        milestone = milestone_service.update_milestone(
+            milestone_id, MilestoneUpdateData(status=MilestoneStatus(new_status))
+        )
         db.commit()
 
         htmx_toast(response, f"Milestone status updated to {new_status.replace('_', ' ').title()}", "success")

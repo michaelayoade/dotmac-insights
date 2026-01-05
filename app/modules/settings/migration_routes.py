@@ -13,8 +13,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, desc
-
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
     get_base_context,
@@ -24,16 +22,12 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.migration import (
-    MigrationJob,
-    MigrationRecord,
     MigrationStatus,
-    EntityType,
-    DedupStrategy,
     RecordAction,
 )
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.modules.settings.routes import get_settings_nav
-from app.utils.datetime_utils import utc_now
+from app.services.settings_migration_service import SettingsMigrationService
 
 # Import migration service and registry
 from app.services.migration.service import MigrationService
@@ -112,33 +106,20 @@ async def migration_dashboard(
     """Migration dashboard - list all jobs with stats."""
     per_page = 20
 
-    # Build query
-    query = db.query(MigrationJob).order_by(desc(MigrationJob.created_at))
-
+    status_enum = None
     if status_filter:
         try:
             status_enum = MigrationStatus(status_filter)
-            query = query.filter(MigrationJob.status == status_enum)
         except ValueError:
-            pass
+            status_enum = None
 
-    # Get total and paginate
-    total = query.count()
-    jobs = query.offset((page - 1) * per_page).limit(per_page).all()
-
-    # Calculate stats
-    stats = {
-        "total": db.query(func.count(MigrationJob.id)).scalar() or 0,
-        "running": db.query(func.count(MigrationJob.id)).filter(
-            MigrationJob.status == MigrationStatus.RUNNING
-        ).scalar() or 0,
-        "completed": db.query(func.count(MigrationJob.id)).filter(
-            MigrationJob.status == MigrationStatus.COMPLETED
-        ).scalar() or 0,
-        "failed": db.query(func.count(MigrationJob.id)).filter(
-            MigrationJob.status == MigrationStatus.FAILED
-        ).scalar() or 0,
-    }
+    service = SettingsMigrationService(db)
+    jobs, total = service.list_jobs(
+        status_filter=status_enum,
+        page=page,
+        per_page=per_page,
+    )
+    stats = service.get_job_stats()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -255,7 +236,8 @@ async def job_detail(
     job_id: int,
 ):
     """Job detail page with workflow steps."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -530,7 +512,8 @@ async def get_progress(
     job_id: int,
 ):
     """Get progress partial for HTMX polling."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -554,47 +537,27 @@ async def records_list(
     page: int = Query(1, ge=1),
 ):
     """Records list for a migration job."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     per_page = 50
 
-    # Build query
-    query = db.query(MigrationRecord).filter(
-        MigrationRecord.job_id == job_id
-    ).order_by(MigrationRecord.row_number)
-
+    action_enum = None
     if action:
         try:
             action_enum = RecordAction(action)
-            query = query.filter(MigrationRecord.action == action_enum)
         except ValueError:
-            pass
+            action_enum = None
 
-    # Get total and paginate
-    total = query.count()
-    records = query.offset((page - 1) * per_page).limit(per_page).all()
-
-    # Get action counts
-    action_counts = {
-        "created": db.query(func.count(MigrationRecord.id)).filter(
-            MigrationRecord.job_id == job_id,
-            MigrationRecord.action == RecordAction.CREATED
-        ).scalar() or 0,
-        "updated": db.query(func.count(MigrationRecord.id)).filter(
-            MigrationRecord.job_id == job_id,
-            MigrationRecord.action == RecordAction.UPDATED
-        ).scalar() or 0,
-        "skipped": db.query(func.count(MigrationRecord.id)).filter(
-            MigrationRecord.job_id == job_id,
-            MigrationRecord.action == RecordAction.SKIPPED
-        ).scalar() or 0,
-        "failed": db.query(func.count(MigrationRecord.id)).filter(
-            MigrationRecord.job_id == job_id,
-            MigrationRecord.action == RecordAction.FAILED
-        ).scalar() or 0,
-    }
+    records, total = service.list_records(
+        job_id=job_id,
+        action=action_enum,
+        page=page,
+        per_page=per_page,
+    )
+    action_counts = service.get_record_action_counts(job_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -630,7 +593,8 @@ async def cancel_job(
     job_id: int,
 ):
     """Cancel a running migration job."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -638,11 +602,7 @@ async def cancel_job(
         set_flash(response, "Can only cancel running jobs.", "error")
         return RedirectResponse(url=f"/settings/migration/jobs/{job_id}", status_code=303)
 
-    # Cancel the job
-    job.status = MigrationStatus.CANCELLED
-    job.error_message = "Cancelled by user"
-    job.completed_at = utc_now()
-    db.commit()
+    service.cancel_job(job)
 
     if is_htmx_request(request):
         htmx_toast(response, "Migration job cancelled.", "success")
@@ -663,7 +623,8 @@ async def rollback_preview(
     job_id: int,
 ):
     """Preview rollback for a completed migration job."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -672,15 +633,7 @@ async def rollback_preview(
         return RedirectResponse(url=f"/settings/migration/jobs/{job_id}", status_code=303)
 
     # Get records that would be affected by rollback
-    created_records = db.query(MigrationRecord).filter(
-        MigrationRecord.job_id == job_id,
-        MigrationRecord.action == RecordAction.CREATED
-    ).count()
-
-    updated_records = db.query(MigrationRecord).filter(
-        MigrationRecord.job_id == job_id,
-        MigrationRecord.action == RecordAction.UPDATED
-    ).count()
+    created_records, updated_records = service.get_rollback_counts(job_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -782,20 +735,19 @@ async def duplicates_report(
     page: int = Query(1, ge=1),
 ):
     """View duplicate records found during migration."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
     per_page = 50
 
     # Get skipped records (duplicates)
-    query = db.query(MigrationRecord).filter(
-        MigrationRecord.job_id == job_id,
-        MigrationRecord.action == RecordAction.SKIPPED
-    ).order_by(MigrationRecord.row_number)
-
-    total = query.count()
-    duplicates = query.offset((page - 1) * per_page).limit(per_page).all()
+    duplicates, total = service.list_duplicates(
+        job_id=job_id,
+        page=page,
+        per_page=per_page,
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -826,7 +778,8 @@ async def delete_job(
     job_id: int,
 ):
     """Delete a migration job."""
-    job = db.query(MigrationJob).filter(MigrationJob.id == job_id).first()
+    service = SettingsMigrationService(db)
+    job = service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -842,8 +795,7 @@ async def delete_job(
         os.remove(job.source_file_path)
 
     # Delete job (cascades to records)
-    db.delete(job)
-    db.commit()
+    service.delete_job(job)
 
     if is_htmx_request(request):
         htmx_toast(response, "Migration job deleted.", "success")

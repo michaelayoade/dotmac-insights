@@ -358,7 +358,7 @@ class QueueService:
         [
             {"field": "status", "operator": "in", "value": ["open", "pending"]},
             {"field": "priority", "operator": "equals", "value": "high"},
-            {"field": "assigned_agent_id", "operator": "is_null"},
+            {"field": "assigned_to_party_id", "operator": "is_null"},
         ]
 
         Args:
@@ -472,7 +472,7 @@ class QueueService:
             {
                 "name": "Unassigned",
                 "description": "Tickets without an assigned agent",
-                "filters": [{"field": "assigned_agent_id", "operator": "is_null"}],
+                "filters": [{"field": "assigned_to_party_id", "operator": "is_null"}],
                 "icon": "user-x",
                 "display_order": 2,
             },

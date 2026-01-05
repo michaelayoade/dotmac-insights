@@ -25,6 +25,7 @@ from app.models.service_transaction import ServiceTransaction
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
 
 from .subscriber_types import (
     SubscriberFilters,
@@ -328,6 +329,16 @@ class SubscriberService:
             self.db.add(account)
 
         self.db.flush()
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="crm.party.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="party",
+            entity_id=str(party.id),
+            summary=f"Created subscriber {party.name}",
+            metadata={"customer_account": bool(data.create_account or data.customer_account_id)},
+        )
         return party
 
     def update_subscriber(
@@ -406,6 +417,15 @@ class SubscriberService:
                     db_field = "tier" if field_name == "account_tier" else field_name
                     setattr(account, db_field, value)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="crm.party.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="party",
+            entity_id=str(party.id),
+            summary=f"Updated subscriber {party.name}",
+        )
         return party
 
     def delete_subscriber(self, party_id: int) -> None:
@@ -440,6 +460,16 @@ class SubscriberService:
         for role in party.roles:
             if role.role in [self.SUBSCRIBER_ROLE, self.CUSTOMER_ROLE] and role.until is None:
                 role.until = datetime.now(timezone.utc)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="crm.party.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="party",
+            entity_id=str(party.id),
+            summary=f"Deactivated subscriber {party.name}",
+        )
 
     # -------------------------------------------------------------------------
     # 360 View

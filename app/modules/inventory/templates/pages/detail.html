@@ -61,6 +61,37 @@
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <!-- Main content -->
     <div class="lg:col-span-2 space-y-6">
+        {% if validation_issues %}
+        <div class="bg-amber-50/60 rounded-2xl ring-1 ring-amber-200/70 overflow-hidden" data-testid="warehouse-validation-issues">
+            <div class="px-6 py-4 border-b border-amber-200/70 flex items-center justify-between">
+                <h3 class="text-sm font-semibold text-amber-900">Validation Warnings</h3>
+                <span class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                    {{ validation_issues | length }} issue{% if validation_issues | length != 1 %}s{% endif %}
+                </span>
+            </div>
+            <div class="px-6 py-4 space-y-3">
+                {% for issue in validation_issues %}
+                {% set severity_styles = {
+                    'critical': 'bg-red-100 text-red-700 ring-red-200',
+                    'warning': 'bg-amber-100 text-amber-800 ring-amber-200',
+                    'info': 'bg-blue-100 text-blue-700 ring-blue-200'
+                } %}
+                <div class="flex items-start gap-3 rounded-xl bg-white/70 p-3 ring-1 ring-amber-100">
+                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 ring-inset {{ severity_styles.get(issue.severity, 'bg-gray-100 text-gray-700 ring-gray-200') }}">
+                        {{ issue.severity | upper if issue.severity else 'WARN' }}
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-gray-900">{{ issue.message }}</p>
+                        <p class="text-xs text-gray-500">
+                            {{ issue.field or 'General' }} · {{ issue.code }}
+                        </p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Warehouse Information -->
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="warehouse-info-card">
             <div class="px-6 py-5 border-b border-gray-100">

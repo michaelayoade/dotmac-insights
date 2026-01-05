@@ -50,7 +50,7 @@
 </div>
 
 {% if payment_terms %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50/50">
@@ -68,7 +68,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
                 {% for terms in payment_terms %}
-                <tr class="hover:bg-gray-50/50 transition-colors duration-150">
+                <tr class="hover:bg-surface-50/50 transition-colors duration-150">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="text-sm font-semibold text-gray-900">{{ terms.template_name }}</span>
                     </td>

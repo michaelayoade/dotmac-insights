@@ -25,6 +25,7 @@ from app.models.inventory import (
 
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     TransferFilters,
@@ -121,7 +122,12 @@ class TransferRequestService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_transfer(self, transfer_id: int, include_items: bool = True) -> TransferRequest:
         """Get a single transfer request by ID.
@@ -241,8 +247,10 @@ class TransferRequestService:
                 idx=idx,
             )
             self.db.add(item)
+            SoftValidationService(self.db).validate_and_store(item)
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
         return transfer
 
@@ -271,6 +279,7 @@ class TransferRequestService:
             transfer.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
         return transfer
 
@@ -305,6 +314,7 @@ class TransferRequestService:
             transfer.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
         return transfer
 
@@ -371,6 +381,7 @@ class TransferRequestService:
             transfer.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
         return transfer
 
@@ -399,6 +410,7 @@ class TransferRequestService:
             transfer.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
         return transfer
 
@@ -437,6 +449,7 @@ class TransferRequestService:
             transfer.updated_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
         return transfer
 
@@ -463,6 +476,7 @@ class TransferRequestService:
             transfer.deleted_by_id = self.principal.id
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(transfer)
 
     # -------------------------------------------------------------------------
     # Aggregations

@@ -117,12 +117,12 @@ class ModuleRegistry:
                 logger.info(f"Discovered module: {name} ({config.name})")
 
             except ImportError as e:
-                logger.debug(f"Could not import module {name}: {e}")
+                logger.warning(f"Module import failed: app.modules.{name} ({e})")
             except Exception as e:
                 logger.warning(f"Error loading module {name}: {e}")
 
         cls._discovered = True
-        logger.info(f"Module discovery complete: {discovered_count} modules registered")
+        logger.warning(f"Module discovery complete: {discovered_count} modules registered")
         return discovered_count
 
     @classmethod

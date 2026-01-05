@@ -19,7 +19,9 @@
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
     <div>
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Map Dispatch</h1>
-        <p class="mt-1.5 text-gray-500 font-body">{{ map_date.strftime('%A, %B %d, %Y') }} - {{ orders | length }} service orders</p>
+        <p class="mt-1.5 text-gray-500 font-body">
+            {{ map_date.strftime('%A, %B %d, %Y') }} - {{ orders | length }} orders ({{ orders_with_coords | length }} on map)
+        </p>
     </div>
     <div class="flex items-center gap-3">
         <div class="flex items-center rounded-xl bg-surface-50 p-1">
@@ -67,10 +69,10 @@
     <a href="/field-service" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
         List
     </a>
-    <a href="/field-service/calendar" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+    <a href="/field-service/calendar?start={{ map_date.isoformat() }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
         Calendar
     </a>
-    <a href="/field-service/dispatch?date={{ map_date.isoformat() }}" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
+    <a href="/field-service/dispatch?date={{ map_date.isoformat() }}{% if technician_id %}&technician_id={{ technician_id }}{% endif %}{% if team_id %}&team_id={{ team_id }}{% endif %}{% if zone_id %}&zone_id={{ zone_id }}{% endif %}" class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-primary-600 rounded-lg hover:bg-surface-50 transition-colors">
         Dispatch
     </a>
     <a href="/field-service/map?date={{ map_date.isoformat() }}" class="px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-lg">

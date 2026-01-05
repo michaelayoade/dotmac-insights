@@ -36,6 +36,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Back Office",
     order=28,
     scopes=["reports:read"],
+    enabled=False,
     prefixes=["/reports"],
 )
 

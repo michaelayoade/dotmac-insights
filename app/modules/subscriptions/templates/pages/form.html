@@ -23,6 +23,7 @@
     action="{% if subscription %}/subscriptions/{{ subscription.id }}{% else %}/subscriptions{% endif %}"
     class="max-w-4xl"
     data-testid="subscription-form"
+    novalidate
 >
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
@@ -59,6 +60,7 @@
                         id="party_id"
                         name="party_id"
                         class="w-full rounded-xl border-gray-200 shadow-sm focus:border-primary-500 focus:ring-primary-500 font-body {{ 'border-red-300 focus:border-red-500 focus:ring-red-500' if errors.party_id else '' }}"
+                        data-testid="party-select"
                         required
                     >
                         <option value="">Select a customer...</option>
@@ -117,6 +119,7 @@
                             name="tariff_id"
                             class="w-full rounded-xl border-gray-200 shadow-sm focus:border-primary-500 focus:ring-primary-500 font-body"
                             onchange="updateFromTariff(this)"
+                            data-testid="tariff-select"
                         >
                             <option value="">Select a tariff (optional)...</option>
                             {% for tariff in tariffs %}

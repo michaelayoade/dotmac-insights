@@ -7,18 +7,18 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request, Response, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Request, Response, Depends, UploadFile
 from fastapi.responses import HTMLResponse
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import get_base_context, get_navigation_context, build_breadcrumbs
 from app.templates.environment import get_template_env
-from app.core.security import is_htmx_request, set_flash
+from app.core.security import set_flash
 from app.models.books_settings import (
-    BooksSettings, DocumentNumberFormat, CurrencySettings,
     DocumentType, ResetFrequency, RoundingMethod, NegativeFormat,
     SymbolPosition, DateFormatType, NumberFormatType
 )
+from app.services.settings_books_service import SettingsBooksService
 
 # Permission dependencies
 RequireBooksSettingsRead = Depends(require_scope("books:settings:read"))
@@ -93,10 +93,8 @@ async def books_settings_index(
     context["books_tabs"] = BOOKS_TABS
     context["current_tab"] = "general"
 
-    # Get or create settings
-    settings = db.query(BooksSettings).filter(BooksSettings.company == None).first()
-    if not settings:
-        settings = BooksSettings()
+    service = SettingsBooksService(db)
+    settings = service.get_settings()
 
     context["page_title"] = "Books Settings"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -131,38 +129,31 @@ async def save_books_settings(
     """Save books settings."""
     form = await request.form()
 
-    settings = db.query(BooksSettings).filter(BooksSettings.company == None).first()
-    if not settings:
-        settings = BooksSettings()
-        db.add(settings)
-
-    settings_any: Any = settings
-
-    # Update fields
-    settings_any.base_currency = _form_str(form, "base_currency", "NGN")
-    settings_any.currency_precision = _form_int(form, "currency_precision", 2)
-    settings_any.quantity_precision = _form_int(form, "quantity_precision", 2)
-    settings_any.rate_precision = _form_int(form, "rate_precision", 4)
-    settings_any.exchange_rate_precision = _form_int(form, "exchange_rate_precision", 6)
-    settings_any.rounding_method = RoundingMethod(_form_str(form, "rounding_method", RoundingMethod.ROUND_HALF_UP.value))
-
-    settings_any.fiscal_year_start_month = _form_int(form, "fiscal_year_start_month", 1)
-    settings_any.fiscal_year_start_day = _form_int(form, "fiscal_year_start_day", 1)
-    settings_any.auto_create_fiscal_years = _form_bool(form, "auto_create_fiscal_years")
-    settings_any.auto_create_fiscal_periods = _form_bool(form, "auto_create_fiscal_periods")
-
-    settings_any.date_format = DateFormatType(_form_str(form, "date_format", DateFormatType.DD_MM_YYYY.value))
-    settings_any.number_format = NumberFormatType(_form_str(form, "number_format", NumberFormatType.COMMA_DOT.value))
-    settings_any.negative_format = NegativeFormat(_form_str(form, "negative_format", NegativeFormat.MINUS.value))
-    settings_any.currency_symbol_position = SymbolPosition(
-        _form_str(form, "currency_symbol_position", SymbolPosition.BEFORE.value)
-    )
-
-    settings_any.backdating_days_allowed = _form_int(form, "backdating_days_allowed", 0)
-    settings_any.future_posting_days_allowed = _form_int(form, "future_posting_days_allowed", 0)
-    settings_any.require_posting_in_open_period = _form_bool(form, "require_posting_in_open_period")
-
-    db.commit()
+    service = SettingsBooksService(db)
+    values: dict[str, Any] = {
+        "base_currency": _form_str(form, "base_currency", "NGN"),
+        "currency_precision": _form_int(form, "currency_precision", 2),
+        "quantity_precision": _form_int(form, "quantity_precision", 2),
+        "rate_precision": _form_int(form, "rate_precision", 4),
+        "exchange_rate_precision": _form_int(form, "exchange_rate_precision", 6),
+        "rounding_method": RoundingMethod(
+            _form_str(form, "rounding_method", RoundingMethod.ROUND_HALF_UP.value)
+        ),
+        "fiscal_year_start_month": _form_int(form, "fiscal_year_start_month", 1),
+        "fiscal_year_start_day": _form_int(form, "fiscal_year_start_day", 1),
+        "auto_create_fiscal_years": _form_bool(form, "auto_create_fiscal_years"),
+        "auto_create_fiscal_periods": _form_bool(form, "auto_create_fiscal_periods"),
+        "date_format": DateFormatType(_form_str(form, "date_format", DateFormatType.DD_MM_YYYY.value)),
+        "number_format": NumberFormatType(_form_str(form, "number_format", NumberFormatType.COMMA_DOT.value)),
+        "negative_format": NegativeFormat(_form_str(form, "negative_format", NegativeFormat.MINUS.value)),
+        "currency_symbol_position": SymbolPosition(
+            _form_str(form, "currency_symbol_position", SymbolPosition.BEFORE.value)
+        ),
+        "backdating_days_allowed": _form_int(form, "backdating_days_allowed", 0),
+        "future_posting_days_allowed": _form_int(form, "future_posting_days_allowed", 0),
+        "require_posting_in_open_period": _form_bool(form, "require_posting_in_open_period"),
+    }
+    service.save_settings(values)
 
     set_flash(response, "Books settings saved successfully.", "success")
 
@@ -185,7 +176,8 @@ async def document_formats_list(
     context["books_tabs"] = BOOKS_TABS
     context["current_tab"] = "documents"
 
-    formats = db.query(DocumentNumberFormat).order_by(DocumentNumberFormat.document_type).all()
+    service = SettingsBooksService(db)
+    formats = service.list_document_formats()
 
     context["page_title"] = "Document Number Formats"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -218,7 +210,8 @@ async def currencies_list(
     context["books_tabs"] = BOOKS_TABS
     context["current_tab"] = "currencies"
 
-    currencies = db.query(CurrencySettings).order_by(CurrencySettings.currency_code).all()
+    service = SettingsBooksService(db)
+    currencies = service.list_currencies()
 
     context["page_title"] = "Currency Settings"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -243,15 +236,14 @@ async def payment_terms_list(
     db: DB,
 ):
     """Payment terms configuration."""
-    from app.models.payment_terms import PaymentTermsTemplate
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "books")
     context["books_tabs"] = BOOKS_TABS
     context["current_tab"] = "payment-terms"
 
-    terms = db.query(PaymentTermsTemplate).order_by(PaymentTermsTemplate.template_name).all()
+    service = SettingsBooksService(db)
+    terms = service.list_payment_terms()
 
     context["page_title"] = "Payment Terms"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -276,15 +268,14 @@ async def payment_modes_list(
     db: DB,
 ):
     """Payment modes configuration."""
-    from app.models.accounting import ModeOfPayment
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "books")
     context["books_tabs"] = BOOKS_TABS
     context["current_tab"] = "payment-modes"
 
-    modes = db.query(ModeOfPayment).order_by(ModeOfPayment.mode_of_payment).all()
+    service = SettingsBooksService(db)
+    modes = service.list_payment_modes()
 
     context["page_title"] = "Payment Modes"
     context["breadcrumbs"] = build_breadcrumbs([

@@ -5,15 +5,12 @@ Permission Requirements:
 - hr:read - View job openings, applicants, offers, interviews
 - hr:write - Manage recruitment
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -24,7 +21,6 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.core.security import is_htmx_request, htmx_toast, set_flash
-from app.models.hr import Department, Designation
 from app.models.hr_recruitment import (
     Interview,
     JobApplicant,
@@ -32,18 +28,26 @@ from app.models.hr_recruitment import (
     JobOpeningStatus,
 )
 from app.services.hr.recruitment import RecruitmentService
+from app.services.hr.organization import OrganizationService
 from app.services.hr.recruitment_types import (
+    ApplicantFilters,
     ApplicantPipelineMove,
+    InterviewFilters,
     InterviewScheduleData,
     InterviewUpdateData,
     JobOfferCreateData,
+    JobOfferFilters,
     JobOfferUpdateData,
     JobOpeningCreateData,
+    JobOpeningFilters,
     JobOpeningUpdateData,
 )
+from app.services.types import PaginationParams
 from app.services.hr.errors import (
     ApplicantNotFoundError,
     ApplicantPipelineError,
+    DepartmentNotFoundError,
+    DesignationNotFoundError,
     InterviewNotFoundError,
     JobOfferNotFoundError,
     JobOpeningNotFoundError,
@@ -169,17 +173,23 @@ def _applicant_status(value: str) -> Optional[JobApplicantStatus]:
 
 
 def get_department_options(db):
-    departments = db.query(Department).order_by(Department.department_name).all()
+    service = OrganizationService(db)
+    result = service.list_departments(pagination=PaginationParams(offset=0, limit=500))
+    departments = sorted(result.items, key=lambda d: d.department_name or "")
     return [{"value": str(d.id), "label": d.department_name} for d in departments]
 
 
 def get_designation_options(db):
-    designations = db.query(Designation).order_by(Designation.designation_name).all()
+    service = OrganizationService(db)
+    result = service.list_designations(pagination=PaginationParams(offset=0, limit=500))
+    designations = sorted(result.items, key=lambda d: d.designation_name or "")
     return [{"value": str(d.id), "label": d.designation_name} for d in designations]
 
 
 def get_applicant_options(db):
-    applicants = db.query(JobApplicant).order_by(JobApplicant.applicant_name).all()
+    service = RecruitmentService(db)
+    result = service.list_applicants(pagination=PaginationParams(offset=0, limit=500))
+    applicants = sorted(result.items, key=lambda a: a.applicant_name or "")
     return [{"value": str(a.id), "label": a.applicant_name} for a in applicants]
 
 
@@ -357,36 +367,26 @@ async def job_openings_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Job openings list page."""
-    try:
-        from app.models.hr_recruitment import JobOpening
-        query = db.query(JobOpening)
-        if q:
-            query = query.filter(or_(
-                JobOpening.job_title.ilike(f"%{q}%"),
-                JobOpening.designation.ilike(f"%{q}%"),
-            ))
-        if status:
-            status_enum = _job_opening_status(status)
-            if status_enum:
-                query = query.filter(JobOpening.status == status_enum)
-        if department:
-            department_id = _form_int({"department": department}, "department")
-            if department_id:
-                query = query.filter(JobOpening.department_id == department_id)
-        total = query.count()
-        offset = (page - 1) * per_page
-        openings = query.order_by(JobOpening.created_at.desc()).offset(offset).limit(per_page).all()
-    except Exception:
-        openings = []
-        total = 0
+    service = RecruitmentService(db, user)
+
+    # Build filters
+    filters = JobOpeningFilters(
+        search=q,
+        status=_job_opening_status(status) if status else None,
+        department_id=_form_int({"department": department}, "department") if department else None,
+    )
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+
+    # Get openings via service
+    result = service.list_job_openings(filters=filters, pagination=pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["openings"] = openings
+    context["openings"] = result.items
     context["search_query"] = q or ""
     context["status"] = status
     context["department"] = department
     context["department_options"] = get_department_options(db)
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/hr/templates/recruitment/partials/openings_table.html")
@@ -453,12 +453,21 @@ async def job_opening_create(
 
     department_id = _form_int(form, "department")
     designation_id = _form_int(form, "designation")
-    department = db.query(Department).filter(Department.id == department_id).first() if department_id else None
-    designation = db.query(Designation).filter(Designation.id == designation_id).first() if designation_id else None
-    if department_id and not department:
-        errors["department"] = "Department not found"
-    if designation_id and not designation:
-        errors["designation"] = "Designation not found"
+    org_service = OrganizationService(db, user)
+    department = None
+    designation = None
+    if department_id:
+        try:
+            department = org_service.get_department(department_id)
+        except DepartmentNotFoundError:
+            department = None
+            errors["department"] = "Department not found"
+    if designation_id:
+        try:
+            designation = org_service.get_designation(designation_id)
+        except DesignationNotFoundError:
+            designation = None
+            errors["designation"] = "Designation not found"
 
     if errors:
         return _render_opening_form(
@@ -512,12 +521,21 @@ async def job_opening_update(
 
     department_id = _form_int(form, "department")
     designation_id = _form_int(form, "designation")
-    department = db.query(Department).filter(Department.id == department_id).first() if department_id else None
-    designation = db.query(Designation).filter(Designation.id == designation_id).first() if designation_id else None
-    if department_id and not department:
-        errors["department"] = "Department not found"
-    if designation_id and not designation:
-        errors["designation"] = "Designation not found"
+    org_service = OrganizationService(db, user)
+    department = None
+    designation = None
+    if department_id:
+        try:
+            department = org_service.get_department(department_id)
+        except DepartmentNotFoundError:
+            department = None
+            errors["department"] = "Department not found"
+    if designation_id:
+        try:
+            designation = org_service.get_designation(designation_id)
+        except DesignationNotFoundError:
+            designation = None
+            errors["designation"] = "Designation not found"
 
     if errors:
         service = RecruitmentService(db, user)
@@ -612,25 +630,19 @@ async def applicants_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Job applicants list page."""
-    try:
-        from app.models.hr_recruitment import JobApplicant
-        query = db.query(JobApplicant)
-        if q:
-            query = query.filter(or_(
-                JobApplicant.applicant_name.ilike(f"%{q}%"),
-                JobApplicant.email_id.ilike(f"%{q}%"),
-            ))
-        total = query.count()
-        offset = (page - 1) * per_page
-        applicants = query.order_by(JobApplicant.created_at.desc()).offset(offset).limit(per_page).all()
-    except Exception:
-        applicants = []
-        total = 0
+    service = RecruitmentService(db, user)
+
+    # Build filters
+    filters = ApplicantFilters(search=q) if q else None
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+
+    # Get applicants via service
+    result = service.list_applicants(filters=filters, pagination=pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["applicants"] = applicants
+    context["applicants"] = result.items
     context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/hr/templates/recruitment/partials/applicants_table.html")
@@ -663,12 +675,11 @@ async def applicant_detail(
     except ApplicantNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-    interviews = (
-        db.query(Interview)
-        .filter(Interview.job_applicant_id == applicant_id)
-        .order_by(Interview.scheduled_date.desc())
-        .all()
+    interviews_result = service.list_interviews(
+        filters=InterviewFilters(job_applicant_id=applicant_id),
+        pagination=PaginationParams(offset=0, limit=200),
     )
+    interviews = interviews_result.items
     for interview in interviews:
         _enrich_interview_display(interview, applicant)
 
@@ -747,29 +758,20 @@ async def offers_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Job offers list page."""
-    try:
-        from app.models.hr_recruitment import JobOffer
-        query = db.query(JobOffer)
-        if q:
-            query = query.filter(or_(
-                JobOffer.applicant_name.ilike(f"%{q}%"),
-                JobOffer.designation.ilike(f"%{q}%"),
-            ))
-        total = query.count()
-        offset = (page - 1) * per_page
-        offers = query.order_by(JobOffer.offer_date.desc()).offset(offset).limit(per_page).all()
-    except Exception:
-        offers = []
-        total = 0
-    else:
-        applicant_ids = [offer.job_applicant_id for offer in offers if offer.job_applicant_id]
-        applicants = (
-            db.query(JobApplicant)
-            .filter(JobApplicant.id.in_(applicant_ids))
-            .all()
-            if applicant_ids
-            else []
-        )
+    service = RecruitmentService(db, user)
+
+    # Build filters
+    filters = JobOfferFilters(search=q) if q else None
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+
+    # Get offers via service
+    result = service.list_job_offers(filters=filters, pagination=pagination)
+    offers = result.items
+
+    # Enrich display data
+    applicant_ids = [offer.job_applicant_id for offer in offers if offer.job_applicant_id]
+    if applicant_ids:
+        applicants = service.get_applicants_by_ids(applicant_ids)
         applicants_map = {applicant.id: applicant for applicant in applicants}
         for offer in offers:
             _enrich_offer_display(offer, applicants_map.get(offer.job_applicant_id))
@@ -777,7 +779,7 @@ async def offers_list(
     context = get_base_context(request, response, user, csrf_token)
     context["offers"] = offers
     context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/hr/templates/recruitment/partials/offers_table.html")
@@ -806,24 +808,20 @@ async def interviews_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Interviews list page."""
-    try:
-        from app.models.hr_recruitment import Interview
-        query = db.query(Interview)
-        total = query.count()
-        offset = (page - 1) * per_page
-        interviews = query.order_by(Interview.scheduled_date.desc()).offset(offset).limit(per_page).all()
-    except Exception:
-        interviews = []
-        total = 0
-    else:
-        applicant_ids = [interview.job_applicant_id for interview in interviews if interview.job_applicant_id]
-        applicants = (
-            db.query(JobApplicant)
-            .filter(JobApplicant.id.in_(applicant_ids))
-            .all()
-            if applicant_ids
-            else []
-        )
+    service = RecruitmentService(db, user)
+
+    # Build filters
+    filters = InterviewFilters(search=q) if q else None
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+
+    # Get interviews via service
+    result = service.list_interviews(filters=filters, pagination=pagination)
+    interviews = result.items
+
+    # Enrich display data
+    applicant_ids = [interview.job_applicant_id for interview in interviews if interview.job_applicant_id]
+    if applicant_ids:
+        applicants = service.get_applicants_by_ids(applicant_ids)
         applicants_map = {applicant.id: applicant for applicant in applicants}
         for interview in interviews:
             _enrich_interview_display(interview, applicants_map.get(interview.job_applicant_id))
@@ -831,7 +829,7 @@ async def interviews_list(
     context = get_base_context(request, response, user, csrf_token)
     context["interviews"] = interviews
     context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/hr/templates/recruitment/partials/interviews_table.html")
@@ -895,7 +893,13 @@ async def interview_create(
     if not scheduled_date:
         errors["scheduled_date"] = "Scheduled date is required"
 
-    applicant = db.query(JobApplicant).filter(JobApplicant.id == applicant_id).first() if applicant_id else None
+    service = RecruitmentService(db, user)
+    applicant = None
+    if applicant_id:
+        try:
+            applicant = service.get_applicant(applicant_id)
+        except ApplicantNotFoundError:
+            applicant = None
     if applicant_id and not applicant:
         errors["applicant_id"] = "Applicant not found"
 
@@ -911,7 +915,6 @@ async def interview_create(
             applicant_id=applicant_id,
         )
 
-    service = RecruitmentService(db, user)
     try:
         interview = service.schedule_interview(
             InterviewScheduleData(
@@ -963,11 +966,12 @@ async def interview_detail(
     except InterviewNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-    applicant = (
-        db.query(JobApplicant)
-        .filter(JobApplicant.id == interview.job_applicant_id)
-        .first()
-    )
+    applicant = None
+    if interview.job_applicant_id:
+        try:
+            applicant = service.get_applicant(interview.job_applicant_id)
+        except ApplicantNotFoundError:
+            applicant = None
     _enrich_interview_display(interview, applicant)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -1121,7 +1125,13 @@ async def offer_create(
     if not offer_date:
         errors["offer_date"] = "Offer date is required"
 
-    applicant = db.query(JobApplicant).filter(JobApplicant.id == applicant_id).first() if applicant_id else None
+    service = RecruitmentService(db, user)
+    applicant = None
+    if applicant_id:
+        try:
+            applicant = service.get_applicant(applicant_id)
+        except ApplicantNotFoundError:
+            applicant = None
     if applicant_id and not applicant:
         errors["applicant_id"] = "Applicant not found"
 
@@ -1140,7 +1150,6 @@ async def offer_create(
             applicant_id=applicant_id,
         )
 
-    service = RecruitmentService(db, user)
     try:
         offer = service.create_job_offer(
             JobOfferCreateData(
@@ -1194,11 +1203,12 @@ async def offer_detail(
     except JobOfferNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
-    applicant = (
-        db.query(JobApplicant)
-        .filter(JobApplicant.id == offer.job_applicant_id)
-        .first()
-    )
+    applicant = None
+    if offer.job_applicant_id:
+        try:
+            applicant = service.get_applicant(offer.job_applicant_id)
+        except ApplicantNotFoundError:
+            applicant = None
     _enrich_offer_display(offer, applicant)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -1325,21 +1335,16 @@ async def job_opening_detail(
     opening_id: int,
 ):
     """Job opening detail page."""
-    try:
-        from app.models.hr_recruitment import JobOpening, JobApplicant
-        opening = db.query(JobOpening).filter(JobOpening.id == opening_id).first()
-    except Exception:
-        opening = None
+    service = RecruitmentService(db, user)
 
-    if not opening:
+    try:
+        opening = service.get_job_opening(opening_id)
+    except JobOpeningNotFoundError:
         raise HTTPException(status_code=404, detail="Job opening not found")
 
-    applicants = (
-        db.query(JobApplicant)
-        .filter(JobApplicant.job_opening_id == opening_id)
-        .order_by(JobApplicant.created_at.desc())
-        .all()
-    )
+    # Get applicants for this opening
+    applicant_filters = ApplicantFilters(job_opening_id=opening_id)
+    applicants_result = service.list_applicants(filters=applicant_filters)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -1350,7 +1355,7 @@ async def job_opening_detail(
         {"label": opening.job_title},
     ])
     context["opening"] = opening
-    context["applicants"] = applicants
+    context["applicants"] = applicants_result.items
 
     template = templates.get_template("modules/hr/templates/recruitment/pages/opening_detail.html")
     return HTMLResponse(template.render(context))

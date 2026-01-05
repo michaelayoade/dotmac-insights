@@ -14,7 +14,7 @@ Permission Requirements:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, Any, NoReturn
+from typing import Optional, Any, NoReturn, Sequence
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -31,6 +31,7 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.inventory import StockEntryType
+from app.models.validation import FinanceValidationIssue
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginationParams
@@ -98,6 +99,46 @@ def _handle_service_error(e: Exception) -> NoReturn:
     raise HTTPException(status_code=500, detail=str(e))
 
 
+def _get_validation_issue_counts(
+    db: Session,
+    model_name: str,
+    record_ids: Sequence[int],
+    scope: str,
+) -> dict[int, int]:
+    if not record_ids:
+        return {}
+    rows = (
+        db.query(FinanceValidationIssue.record_id, FinanceValidationIssue.issues)
+        .filter(
+            FinanceValidationIssue.model_name == model_name,
+            FinanceValidationIssue.record_id.in_(record_ids),
+            FinanceValidationIssue.scope == scope,
+        )
+        .all()
+    )
+    return {record_id: len(issues or []) for record_id, issues in rows if issues}
+
+
+def _get_validation_issues(
+    db: Session,
+    model_name: str,
+    record_id: int,
+    scope: str,
+) -> list[dict]:
+    row = (
+        db.query(FinanceValidationIssue.issues)
+        .filter(
+            FinanceValidationIssue.model_name == model_name,
+            FinanceValidationIssue.record_id == record_id,
+            FinanceValidationIssue.scope == scope,
+        )
+        .first()
+    )
+    if not row:
+        return []
+    return row[0] or []
+
+
 def get_warehouse_type_options():
     """Get warehouse type options."""
     return [
@@ -147,10 +188,18 @@ async def warehouses_list(
 
     # Get warehouses from service
     result = service.list_warehouses(filters, pagination)
+    warehouse_ids = [warehouse.id for warehouse in result.items]
+    warehouse_issue_counts = _get_validation_issue_counts(
+        db,
+        model_name="Warehouse",
+        record_ids=warehouse_ids,
+        scope="inventory",
+    )
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
     context["warehouses"] = result.items
+    context["warehouse_issue_counts"] = warehouse_issue_counts
     context["search_query"] = q or ""
     context["current_type"] = type
     context["type_options"] = get_warehouse_type_options()
@@ -315,6 +364,13 @@ async def warehouse_detail(
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Warehouse not found")
 
+    validation_issues = _get_validation_issues(
+        db,
+        model_name="Warehouse",
+        record_id=warehouse_id,
+        scope="inventory",
+    )
+
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = warehouse.warehouse_name
@@ -324,6 +380,7 @@ async def warehouse_detail(
         {"label": warehouse.warehouse_name},
     ])
     context["warehouse"] = warehouse
+    context["validation_issues"] = validation_issues
 
     template = templates.get_template("modules/inventory/templates/pages/detail.html")
     return HTMLResponse(template.render(context))
@@ -529,10 +586,18 @@ async def stock_entries_list(
 
     # Get entries from service
     result = service.list_entries(filters, pagination)
+    entry_ids = [entry.id for entry in result.items]
+    entry_issue_counts = _get_validation_issue_counts(
+        db,
+        model_name="StockEntry",
+        record_ids=entry_ids,
+        scope="inventory",
+    )
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
     context["entries"] = result.items
+    context["entry_issue_counts"] = entry_issue_counts
     context["search_query"] = q or ""
     context["current_type"] = type
     context["type_options"] = get_stock_entry_type_options()
@@ -719,6 +784,13 @@ async def stock_entry_detail(
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Stock entry not found")
 
+    validation_issues = _get_validation_issues(
+        db,
+        model_name="StockEntry",
+        record_id=entry_id,
+        scope="inventory",
+    )
+
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = f"Stock Entry - {entry.stock_entry_type.replace('_', ' ').title() if entry.stock_entry_type else 'Entry'}"
@@ -729,6 +801,7 @@ async def stock_entry_detail(
         {"label": f"#{entry.id}"},
     ])
     context["entry"] = entry
+    context["validation_issues"] = validation_issues
 
     template = templates.get_template("modules/inventory/templates/pages/stock_entry_detail.html")
     return HTMLResponse(template.render(context))

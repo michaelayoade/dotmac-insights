@@ -46,7 +46,7 @@
             'urgent': 'bg-orange-50 text-orange-700 ring-orange-600/20',
             'critical': 'bg-red-50 text-red-700 ring-red-600/20'
         } %}
-        <span class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ priority_styles.get(ticket.priority.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="ticket-priority-{{ ticket.id }}">
+        <span class="priority inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ priority_styles.get(ticket.priority.value, 'bg-gray-50 text-gray-600 ring-gray-500/20') }}" data-testid="ticket-priority-{{ ticket.id }}" data-priority="{{ ticket.priority.value }}">
             {% if ticket.priority.value in ['urgent', 'critical'] %}
             <svg class="w-3 h-3 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
@@ -105,7 +105,9 @@
         <div class="flex items-center gap-2">
             {% include "modules/support/templates/partials/inline_status.html" %}
             {% if ticket.response_sla_breached %}
-            <span class="text-xs text-red-600 font-medium">SLA Breached</span>
+            <span class="sla-indicator text-xs text-red-600 font-medium" data-sla="breached">SLA Breached</span>
+            {% elif ticket.response_by or ticket.resolution_by %}
+            <span class="sla-indicator text-xs text-amber-600 font-medium" data-sla="at_risk">SLA Due</span>
             {% endif %}
         </div>
         {% else %}
@@ -118,12 +120,14 @@
             'closed': 'bg-gray-400',
             'reopened': 'bg-red-500'
         } %}
-        <span class="inline-flex items-center gap-1.5 text-sm text-gray-700 font-body" data-testid="ticket-status-{{ ticket.id }}">
+        <span class="badge inline-flex items-center gap-1.5 text-sm text-gray-700 font-body" data-testid="ticket-status-{{ ticket.id }}" data-status="{{ ticket.status.value }}">
             <span class="w-2 h-2 rounded-full {{ status_styles.get(ticket.status.value, 'bg-gray-400') }}"></span>
             {{ ticket.status.value | replace('_', ' ') | title }}
         </span>
         {% if ticket.response_sla_breached %}
-        <span class="ml-2 text-xs text-red-600 font-medium">SLA Breached</span>
+        <span class="sla-indicator ml-2 text-xs text-red-600 font-medium" data-sla="breached">SLA Breached</span>
+        {% elif ticket.response_by or ticket.resolution_by %}
+        <span class="sla-indicator ml-2 text-xs text-amber-600 font-medium" data-sla="at_risk">SLA Due</span>
         {% endif %}
         {% endif %}
     </td>

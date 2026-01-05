@@ -16,7 +16,7 @@
     data-testid="login-form"
     x-data="{ emailFocused: false, passwordFocused: false, loading: false }"
 >
-    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <input type="hidden" name="next" value="{{ next_url | default('/') }}">
 
     <!-- Email field -->

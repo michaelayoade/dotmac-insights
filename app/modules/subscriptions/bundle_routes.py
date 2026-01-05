@@ -12,10 +12,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.database import get_db
 from app.auth import get_current_user_or_none
-from app.templates import templates
+from app.templates.environment import get_template_env
 from app.modules.subscriptions._deps import get_context, BreadcrumbItem
-from app.modules.subscriptions._services import SubscriptionServiceFacade
 from app.services.subscriptions.data_bundles import DataBundleService
+from app.services.subscriptions.bundles_web_service import DataBundlesWebService
 from app.services.subscriptions.data_bundle_types import (
     BundleProductCreate,
     BundleProductUpdate,
@@ -25,6 +25,7 @@ from app.services.subscriptions.data_bundle_types import (
 )
 
 router = APIRouter(prefix="/bundles", tags=["bundles-web"])
+templates = get_template_env()
 
 
 # =============================================================================
@@ -51,9 +52,11 @@ async def bundles_list(
             BreadcrumbItem(label="Subscriptions", url="/subscriptions"),
             BreadcrumbItem(label="Data Bundles"),
         ],
+        user=current_user,
     )
 
     service = DataBundleService(db)
+    web_service = DataBundlesWebService(db)
 
     offset = (page - 1) * per_page
     products, total = await service.list_products(
@@ -105,6 +108,7 @@ async def product_form_new(
             BreadcrumbItem(label="Data Bundles", url="/subscriptions/bundles"),
             BreadcrumbItem(label="New Product"),
         ],
+        user=current_user,
     )
 
     # Get existing products for auto-renew dropdown
@@ -147,6 +151,7 @@ async def product_form_edit(
             BreadcrumbItem(label="Data Bundles", url="/subscriptions/bundles"),
             BreadcrumbItem(label=product.name),
         ],
+        user=current_user,
     )
 
     # Get existing products for auto-renew dropdown
@@ -216,8 +221,7 @@ async def product_create(
             customer_portal_visible=customer_portal_visible,
         )
 
-        product = await service.create_product(data)
-        await db.commit()
+        product = await web_service.create_product(data)
 
         return RedirectResponse(
             url=f"/subscriptions/bundles/products/{product.id}",
@@ -233,6 +237,7 @@ async def product_create(
                 BreadcrumbItem(label="Data Bundles", url="/subscriptions/bundles"),
                 BreadcrumbItem(label="New Product"),
             ],
+            user=current_user,
         )
 
         products, _ = await service.list_products(active_only=True, limit=100)
@@ -294,6 +299,7 @@ async def product_update(
 ):
     """Update an existing bundle product."""
     service = DataBundleService(db)
+    web_service = DataBundlesWebService(db)
 
     try:
         data = BundleProductUpdate(
@@ -316,10 +322,9 @@ async def product_update(
             customer_portal_visible=customer_portal_visible,
         )
 
-        product = await service.update_product(product_id, data)
+        product = await web_service.update_product(product_id, data)
         if not product:
             raise HTTPException(status_code=404, detail="Product not found")
-        await db.commit()
 
         return RedirectResponse(
             url=f"/subscriptions/bundles/products/{product.id}",
@@ -342,6 +347,7 @@ async def product_detail(
 ):
     """Show bundle product details and stats."""
     service = DataBundleService(db)
+    web_service = DataBundlesWebService(db)
     product = await service.get_product(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -354,6 +360,7 @@ async def product_detail(
             BreadcrumbItem(label="Data Bundles", url="/subscriptions/bundles"),
             BreadcrumbItem(label=product.name),
         ],
+        user=current_user,
     )
 
     # Get revenue for this product (last 30 days)
@@ -387,8 +394,7 @@ async def product_toggle(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    await service.update_product(product_id, BundleProductUpdate(is_active=not product.is_active))
-    await db.commit()
+    await web_service.toggle_product(product_id, not product.is_active)
 
     return RedirectResponse(
         url=request.headers.get("HX-Current-URL", "/subscriptions/bundles"),
@@ -405,11 +411,11 @@ async def product_delete(
 ):
     """Delete a bundle product."""
     service = DataBundleService(db)
+    web_service = DataBundlesWebService(db)
     try:
-        deleted = await service.delete_product(product_id)
+        deleted = await web_service.delete_product(product_id)
         if not deleted:
             raise HTTPException(status_code=404, detail="Product not found")
-        await db.commit()
         return HTMLResponse(content="", status_code=200)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -434,6 +440,7 @@ async def bundles_dashboard(
             BreadcrumbItem(label="Data Bundles", url="/subscriptions/bundles"),
             BreadcrumbItem(label="Dashboard"),
         ],
+        user=current_user,
     )
 
     service = DataBundleService(db)

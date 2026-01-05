@@ -28,6 +28,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Infrastructure",
     order=15,
     scopes=["subscriptions:read"],
+    enabled=True,
     prefixes=["/subscriptions"],
 )
 

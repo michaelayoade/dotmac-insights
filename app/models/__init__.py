@@ -160,6 +160,7 @@ from app.models.tax_ng import (
     EInvoiceLine,
 )
 from app.models.accounting_ext import FiscalPeriod
+from app.models.activity_log import ActivityLog
 from app.models.settings import SettingGroup, SettingsAuditLog
 from app.models.inventory import (
     Warehouse,
@@ -267,7 +268,7 @@ from app.models.performance import (
     ScorecardInstanceStatus,
     OverrideReason,
 )
-from app.models.agent import Agent, Team, TeamMember
+from app.models.agent import Team, TeamMember
 from app.models.omni import (
     OmniChannel,
     OmniChannelType,
@@ -406,6 +407,68 @@ from app.models.snmp_metrics import (
     InterfaceMetricRollup,
     MetricAggregation,
     SubscriptionUsageMetric,
+)
+from app.models.traffic_metrics import (
+    TrafficMetric,
+    TrafficThreshold,
+    TrafficAlert,
+)
+from app.models.network_incident import (
+    NetworkIncident,
+    IncidentUpdate,
+    IncidentAffectedSubscription,
+    IncidentSeverity,
+    IncidentStatus,
+)
+from app.models.upselling import (
+    UpsellOpportunity,
+    UpsellAnalysisRun,
+    UpsellConversionEvent,
+    UpsellTriggerType,
+    UpsellStatus,
+)
+from app.models.alerts import (
+    AlertRule,
+    Alert,
+    AlertEscalation,
+    AlertSuppression,
+    AlertType,
+    AlertSeverity,
+    AlertStatus,
+)
+from app.models.cleaning_operation import (
+    CleaningOperation,
+    CleaningOperationType,
+    CleaningOperationStatus,
+)
+from app.models.marketing import (
+    MarketingCampaign,
+    MarketingCampaignType,
+    MarketingCampaignStatus,
+    JourneyTemplate,
+    CustomerJourney,
+    JourneyStep,
+    JourneyEnrollment,
+    SocialAccount,
+    SocialPost,
+    EmailTemplate,
+    EmailCampaign,
+    EmailSend,
+    MarketingAudience,
+    MarketingIntegration,
+    MarketingConsent,
+    SuppressionEntry,
+    MarketingWebhookEvent,
+    JourneyStatus,
+    JourneyStepType,
+    JourneyEnrollmentStatus,
+    SocialPlatform,
+    SocialPostStatus,
+    EmailCampaignStatus,
+    EmailSendStatus,
+    ConsentChannel,
+    ConsentStatus,
+    MarketingIntegrationStatus,
 )
 
 __all__ = [
@@ -648,8 +711,7 @@ __all__ = [
     "PerformanceSnapshot",
     "ScorecardInstanceStatus",
     "OverrideReason",
-    # Agent/Team models
-    "Agent",
+    # Team models (Agent deprecated - use Party with support_agent role)
     "Team",
     "TeamMember",
     # Omni models
@@ -777,4 +839,59 @@ __all__ = [
     "InterfaceMetricRollup",
     "MetricAggregation",
     "SubscriptionUsageMetric",
+    # Traffic Monitoring models
+    "TrafficMetric",
+    "TrafficThreshold",
+    "TrafficAlert",
+    # Network Incident models
+    "NetworkIncident",
+    "IncidentUpdate",
+    "IncidentAffectedSubscription",
+    "IncidentSeverity",
+    "IncidentStatus",
+    # Upselling models
+    "UpsellOpportunity",
+    "UpsellAnalysisRun",
+    "UpsellConversionEvent",
+    "UpsellTriggerType",
+    "UpsellStatus",
+    # Alert models
+    "AlertRule",
+    "Alert",
+    "AlertEscalation",
+    "AlertSuppression",
+    "AlertType",
+    "AlertSeverity",
+    "AlertStatus",
+    # Cleaning operations
+    "CleaningOperation",
+    "CleaningOperationType",
+    "CleaningOperationStatus",
+    "MarketingCampaign",
+    "MarketingCampaignType",
+    "MarketingCampaignStatus",
+    "JourneyTemplate",
+    "CustomerJourney",
+    "JourneyStep",
+    "JourneyEnrollment",
+    "SocialAccount",
+    "SocialPost",
+    "EmailTemplate",
+    "EmailCampaign",
+    "EmailSend",
+    "MarketingAudience",
+    "MarketingIntegration",
+    "MarketingConsent",
+    "SuppressionEntry",
+    "MarketingWebhookEvent",
+    "JourneyStatus",
+    "JourneyStepType",
+    "JourneyEnrollmentStatus",
+    "SocialPlatform",
+    "SocialPostStatus",
+    "EmailCampaignStatus",
+    "EmailSendStatus",
+    "ConsentChannel",
+    "ConsentStatus",
+    "MarketingIntegrationStatus",
 ]

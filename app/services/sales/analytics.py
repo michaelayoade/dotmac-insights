@@ -22,9 +22,11 @@ from sqlalchemy.orm import Session
 from app.models.sales import (
     Quotation,
     QuotationStatus,
-    QuotationItem,
     SalesOrder,
     SalesOrderStatus,
+)
+from app.models.document_lines import (
+    QuotationItem,
     SalesOrderItem,
 )
 from app.models.party import Party

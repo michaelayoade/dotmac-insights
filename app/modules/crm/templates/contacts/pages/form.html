@@ -1,0 +1,154 @@
+{% extends "layouts/module.html" %}
+
+{% set is_edit = contact is defined and contact.id %}
+
+{% block module_content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <a
+            href="/crm/contacts"
+            class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">
+                {{ "Edit Contact" if is_edit else "New Contact" }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ "Update contact details" if is_edit else "Add a new contact to CRM" }}
+            </p>
+        </div>
+    </div>
+
+    <form
+        action="{{ '/crm/contacts/' ~ contact.id if is_edit else '/crm/contacts' }}"
+        method="POST"
+        class="space-y-6"
+        data-testid="contact-form"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {% if errors and errors.form %}
+        <div class="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm" data-testid="form-error">
+            {{ errors.form }}
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Contact Details</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="sm:col-span-2">
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value="{{ form_data.name or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors and errors.name else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm"
+                    >
+                    {% if errors and errors.name %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="name">{{ errors.name }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Email
+                    </label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value="{{ form_data.email or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="phone" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Phone
+                    </label>
+                    <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        value="{{ form_data.phone or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="contact_type" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Type
+                    </label>
+                    <select
+                        id="contact_type"
+                        name="contact_type"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select type</option>
+                        {% for opt in type_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if form_data.contact_type == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="category" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Category
+                    </label>
+                    <select
+                        id="category"
+                        name="category"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select category</option>
+                        {% for opt in category_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if form_data.category == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="company_name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Company
+                    </label>
+                    <input
+                        type="text"
+                        id="company_name"
+                        name="company_name"
+                        value="{{ form_data.company_name or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <a
+                href="/crm/contacts"
+                class="inline-flex items-center px-4 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors"
+                data-testid="contact-cancel-button"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 transition-all duration-200"
+                data-testid="contact-submit-button"
+            >
+                {{ "Save Changes" if is_edit else "Create Contact" }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

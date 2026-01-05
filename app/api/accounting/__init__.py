@@ -43,6 +43,7 @@ from .notes import router as notes_router
 from .attachments import router as attachments_router
 from .payment_modes import router as payment_modes_router
 from .invoices import router as invoices_router
+from .soft_validation import router as soft_validation_router
 
 router = APIRouter(tags=["accounting"])
 
@@ -66,6 +67,7 @@ router.include_router(notes_router, tags=["Accounting - Credit/Debit Notes"])
 router.include_router(attachments_router, tags=["Accounting - Attachments"])
 router.include_router(payment_modes_router, tags=["Accounting - Payment Modes"])
 router.include_router(invoices_router, tags=["Accounting - Invoices"])
+router.include_router(soft_validation_router, tags=["Accounting - Validation"])
 
 # Re-export common items for convenience
 from .helpers import (

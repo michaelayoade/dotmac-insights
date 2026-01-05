@@ -2,9 +2,7 @@ from fastapi import APIRouter
 from app.api import (
     sync,
     analytics,
-    data_explorer,
     admin,
-    insights,
     finance,
     hr,
     support,
@@ -39,6 +37,8 @@ from app.api.admin_sync import router as admin_sync_router
 from app.api.reports import router as reports_router
 from app.api.search import router as search_router
 from app.api.subscriptions import router as subscriptions_router
+from app.api.marketing import router as marketing_router
+from app.api.marketing import public_router as public_marketing_router
 
 api_router = APIRouter()
 
@@ -62,8 +62,7 @@ api_router.include_router(asset_settings_router, prefix="/v1", tags=["asset-sett
 api_router.include_router(crm_router, prefix="/v1", tags=["crm"])
 api_router.include_router(inbox_router, prefix="/v1", tags=["inbox"])
 api_router.include_router(analytics.router, prefix="/v1/analytics", tags=["analytics"])
-api_router.include_router(insights.router, prefix="/v1/insights", tags=["insights"])
-api_router.include_router(data_explorer.router, prefix="/v1/explore", tags=["data-explorer"])
+# Note: insights and data_explorer removed - use internal services instead
 api_router.include_router(hr.router, prefix="/v1/hr", tags=["hr"])
 api_router.include_router(projects.router, prefix="/v1/projects", tags=["projects"])
 api_router.include_router(field_service_router, prefix="/v1")
@@ -78,9 +77,11 @@ api_router.include_router(zoho_import.router, prefix="/v1")
 api_router.include_router(migration_router, prefix="/v1")
 api_router.include_router(reports_router, prefix="/v1")
 api_router.include_router(search_router, tags=["search"])
+api_router.include_router(marketing_router, prefix="/v1")
 
 # Public (unauthenticated) routers
 public_api_router = APIRouter()
 public_api_router.include_router(auth_router.router)
 public_api_router.include_router(public_integrations_router)
 public_api_router.include_router(public_omni_router)
+public_api_router.include_router(public_marketing_router)

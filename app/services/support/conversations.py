@@ -24,11 +24,12 @@ from app.models.omni import (
     OmniParticipant,
     InboxContact,
 )
-from app.models.agent import Agent, Team
+from app.models.agent import Team
 from app.models.ticket import Ticket, TicketStatus, TicketPriority
 from app.models.party import Party, PartyRole
 from app.services.base import paginate
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     ConversationFilters,
@@ -97,7 +98,7 @@ class ConversationService:
         """
         query = self.db.query(OmniConversation).options(
             joinedload(OmniConversation.channel),
-            joinedload(OmniConversation.assigned_agent),
+            joinedload(OmniConversation.assigned_party),
             joinedload(OmniConversation.assigned_team),
         )
 
@@ -140,14 +141,14 @@ class ConversationService:
             query = query.join(OmniChannel).filter(OmniChannel.type == filters.channel_type)
 
         if filters.assigned_agent_id:
-            query = query.filter(OmniConversation.assigned_agent_id == filters.assigned_agent_id)
+            query = query.filter(OmniConversation.assigned_party_id == filters.assigned_agent_id)
 
         if filters.assigned_team_id:
             query = query.filter(OmniConversation.assigned_team_id == filters.assigned_team_id)
 
         if filters.unassigned_only:
             query = query.filter(
-                OmniConversation.assigned_agent_id.is_(None),
+                OmniConversation.assigned_party_id.is_(None),
                 OmniConversation.assigned_team_id.is_(None),
             )
 
@@ -201,7 +202,7 @@ class ConversationService:
             self.db.query(OmniConversation)
             .options(
                 joinedload(OmniConversation.channel),
-                joinedload(OmniConversation.assigned_agent),
+                joinedload(OmniConversation.assigned_party),
                 joinedload(OmniConversation.assigned_team),
             )
             .filter(OmniConversation.id == conversation_id)
@@ -286,7 +287,7 @@ class ConversationService:
 
         unassigned_count = (
             base_query.filter(
-                OmniConversation.assigned_agent_id.is_(None),
+                OmniConversation.assigned_party_id.is_(None),
                 OmniConversation.assigned_team_id.is_(None),
                 OmniConversation.status.in_(["open", "pending"]),
             ).scalar()
@@ -305,7 +306,7 @@ class ConversationService:
         if agent_id:
             my_conversations = (
                 base_query.filter(
-                    OmniConversation.assigned_agent_id == agent_id,
+                    OmniConversation.assigned_party_id == agent_id,
                     OmniConversation.status.in_(["open", "pending"]),
                 ).scalar()
                 or 0
@@ -352,7 +353,7 @@ class ConversationService:
             party_id=data.party_id,
             ticket_id=data.ticket_id,
             lead_id=data.lead_id,
-            assigned_agent_id=data.assigned_agent_id,
+            assigned_party_id=data.assigned_agent_id,
             assigned_team_id=data.assigned_team_id,
             contact_name=data.contact_name,
             contact_email=data.contact_email,
@@ -364,6 +365,7 @@ class ConversationService:
         )
         self.db.add(conv)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     def update(
@@ -405,7 +407,7 @@ class ConversationService:
             conv.tags = data.tags if data.tags else None
 
         if data.assigned_agent_id is not None:
-            conv.assigned_agent_id = data.assigned_agent_id if data.assigned_agent_id > 0 else None
+            conv.assigned_party_id = data.assigned_agent_id if data.assigned_agent_id > 0 else None
 
         if data.assigned_team_id is not None:
             conv.assigned_team_id = data.assigned_team_id if data.assigned_team_id > 0 else None
@@ -433,6 +435,7 @@ class ConversationService:
 
         conv.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     def update_status(
@@ -468,6 +471,7 @@ class ConversationService:
 
         conv.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     def star(self, conversation_id: int, starred: bool) -> OmniConversation:
@@ -487,6 +491,7 @@ class ConversationService:
         conv.is_starred = starred
         conv.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     def add_tag(self, conversation_id: int, tag: str) -> OmniConversation:
@@ -509,6 +514,7 @@ class ConversationService:
             conv.tags = current_tags
             conv.updated_at = datetime.now(timezone.utc)
             self.db.flush()
+            SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     def remove_tag(self, conversation_id: int, tag: str) -> OmniConversation:
@@ -531,6 +537,7 @@ class ConversationService:
             conv.tags = current_tags if current_tags else None
             conv.updated_at = datetime.now(timezone.utc)
             self.db.flush()
+            SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     # -------------------------------------------------------------------------
@@ -561,12 +568,21 @@ class ConversationService:
 
         if agent_id is not None:
             if agent_id > 0:
-                agent = self.db.query(Agent).filter(Agent.id == agent_id).first()
+                # agent_id is now party_id after Agent → Party unification
+                agent = (
+                    self.db.query(Party)
+                    .join(PartyRole, PartyRole.party_id == Party.id)
+                    .filter(
+                        Party.id == agent_id,
+                        PartyRole.role == "support_agent",
+                    )
+                    .first()
+                )
                 if not agent:
                     raise ConversationAssignmentError(f"Agent not found: {agent_id}")
-                conv.assigned_agent_id = agent_id
+                conv.assigned_party_id = agent_id
             else:
-                conv.assigned_agent_id = None
+                conv.assigned_party_id = None
 
         if team_id is not None:
             if team_id > 0:
@@ -577,13 +593,14 @@ class ConversationService:
             else:
                 conv.assigned_team_id = None
 
-        if conv.assigned_agent_id or conv.assigned_team_id:
+        if conv.assigned_party_id or conv.assigned_team_id:
             conv.assigned_at = datetime.now(timezone.utc)
         else:
             conv.assigned_at = None
 
         conv.updated_at = datetime.now(timezone.utc)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
         return conv
 
     def unassign(self, conversation_id: int) -> OmniConversation:
@@ -860,7 +877,7 @@ class ConversationService:
                     conv.priority = data.priority
 
                 if data.assigned_agent_id is not None:
-                    conv.assigned_agent_id = data.assigned_agent_id if data.assigned_agent_id > 0 else None
+                    conv.assigned_party_id = data.assigned_agent_id if data.assigned_agent_id > 0 else None
 
                 if data.assigned_team_id is not None:
                     conv.assigned_team_id = data.assigned_team_id if data.assigned_team_id > 0 else None

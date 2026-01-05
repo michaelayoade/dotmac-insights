@@ -21,6 +21,7 @@ from app.models.asset import Asset, AssetCategory, AssetCategoryFinanceBook, Ass
 from app.models.accounting import Account, JournalEntry, JournalEntryItem
 
 from app.services.errors import NotFoundError, ValidationError
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     DisposalType,
@@ -158,6 +159,7 @@ class AssetDisposalService:
             )
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
 
         return DisposalResult(
             asset_id=asset.id,
@@ -204,6 +206,7 @@ class AssetDisposalService:
         asset.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
 
         return DisposalResult(
             asset_id=asset.id,
@@ -247,6 +250,7 @@ class AssetDisposalService:
         asset.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
 
         return DisposalResult(
             asset_id=asset.id,

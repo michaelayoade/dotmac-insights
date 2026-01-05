@@ -434,6 +434,26 @@ class SLAService:
 
         return calendars, total
 
+    def get_calendar_usage(self, calendar_ids: Optional[List[int]] = None) -> Dict[int, int]:
+        """Get SLA policy counts per calendar.
+
+        Args:
+            calendar_ids: Optional list of calendar IDs to filter.
+
+        Returns:
+            Dict mapping calendar_id to policy count.
+        """
+        query = self.db.query(
+            SLAPolicy.calendar_id,
+            func.count(SLAPolicy.id),
+        ).filter(SLAPolicy.calendar_id.isnot(None))
+
+        if calendar_ids:
+            query = query.filter(SLAPolicy.calendar_id.in_(calendar_ids))
+
+        rows = query.group_by(SLAPolicy.calendar_id).all()
+        return {calendar_id: count for calendar_id, count in rows}
+
     def get_calendar(self, calendar_id: int) -> Optional[BusinessCalendar]:
         """Get a business calendar by ID."""
         return self.db.query(BusinessCalendar).filter(
@@ -680,6 +700,30 @@ class SLAService:
         return self.db.query(SLATarget).filter(
             SLATarget.policy_id == policy_id
         ).order_by(SLATarget.target_type, SLATarget.priority).all()
+
+    def list_targets_for_policies(self, policy_ids: List[int]) -> Dict[int, List[SLATarget]]:
+        """List targets for multiple policies in a single query.
+
+        Args:
+            policy_ids: Policy IDs to fetch targets for.
+
+        Returns:
+            Dict mapping policy_id to list of targets.
+        """
+        if not policy_ids:
+            return {}
+
+        targets = (
+            self.db.query(SLATarget)
+            .filter(SLATarget.policy_id.in_(policy_ids))
+            .order_by(SLATarget.policy_id, SLATarget.priority)
+            .all()
+        )
+
+        target_map: Dict[int, List[SLATarget]] = {}
+        for target in targets:
+            target_map.setdefault(target.policy_id, []).append(target)
+        return target_map
 
     def get_target(self, target_id: int) -> Optional[SLATarget]:
         """Get an SLA target by ID."""

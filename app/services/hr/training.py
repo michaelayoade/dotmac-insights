@@ -254,6 +254,14 @@ class TrainingService:
                     )
                 )
 
+            # Filter by enrolled employee
+            if filters.employee_id is not None:
+                from app.models.hr_training import TrainingEventEmployee
+                enrolled_event_ids = select(TrainingEventEmployee.parent_id).where(
+                    TrainingEventEmployee.employee_id == filters.employee_id
+                )
+                conditions.append(TrainingEvent.id.in_(enrolled_event_ids))
+
             if conditions:
                 query = query.where(and_(*conditions))
 

@@ -3,37 +3,28 @@ Projects Endpoints
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_, or_, desc, asc
+from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional, List
-from datetime import datetime, date, timedelta, timezone
+from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.auth import Require
+from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
 from app.models import (
     Project,
     ProjectStatus,
     ProjectPriority,
-    ProjectType,
-    ProjectUser,
-    ProjectComment,
-    ProjectActivity,
-    ProjectActivityType,
-    ProjectTemplate,
-    TaskTemplate,
-    MilestoneTemplate,
     Task,
     TaskStatus,
-    TaskPriority,
-    TaskDependency,
-    Milestone,
-    MilestoneStatus,
 )
-from app.models.party import CustomerAccount
-from app.models.employee import Employee
+from app.services.projects import (
+    ProjectService,
+    ProjectFilters,
+)
+from app.services.projects.errors import ProjectNotFoundError
+from app.services.types import PaginationParams
 
 router = APIRouter()
 
@@ -55,83 +46,71 @@ async def list_projects(
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """List projects with filtering and pagination."""
-    query = db.query(Project).filter(Project.is_deleted == False)
+    # Parse status and priority enums
+    status_enum = None
+    priority_enum = None
 
     if status:
         try:
             status_enum = ProjectStatus(status)
-            query = query.filter(Project.status == status_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
 
     if priority:
         try:
             priority_enum = ProjectPriority(priority)
-            query = query.filter(Project.priority == priority_enum)
         except ValueError:
             raise HTTPException(status_code=400, detail=f"Invalid priority: {priority}")
 
-    if customer_account_id:
-        query = query.filter(Project.customer_account_id == customer_account_id)
+    # Build filters
+    filters = ProjectFilters(
+        status=status_enum,
+        priority=priority_enum,
+        customer_account_id=customer_account_id,
+        project_type=project_type,
+        department=department,
+        search=search,
+        overdue_only=overdue_only,
+        start_date=datetime.fromisoformat(start_date) if start_date else None,
+        end_date=datetime.fromisoformat(end_date) if end_date else None,
+    )
+    pagination = PaginationParams(limit=limit, offset=offset)
 
-    if project_type:
-        query = query.filter(Project.project_type == project_type)
-
-    if department:
-        query = query.filter(Project.department.ilike(f"%{department}%"))
-
-    if search:
-        search_term = f"%{search}%"
-        query = query.filter(
-            or_(
-                Project.project_name.ilike(search_term),
-                Project.erpnext_id.ilike(search_term),
-            )
-        )
-
-    if overdue_only:
-        query = query.filter(
-            Project.expected_end_date < datetime.now(timezone.utc),
-            Project.status == ProjectStatus.OPEN
-        )
-
-    if start_date:
-        query = query.filter(Project.created_at >= datetime.fromisoformat(start_date))
-
-    if end_date:
-        query = query.filter(Project.created_at <= datetime.fromisoformat(end_date))
-
-    total = query.count()
-    projects = query.order_by(Project.created_at.desc()).offset(offset).limit(limit).all()
+    # Use service
+    service = ProjectService(db, principal)
+    result = service.list_projects(filters, pagination)
 
     return {
-        "total": total,
-        "limit": limit,
-        "offset": offset,
-        "data": [
-            {
-                "id": p.id,
-                "erpnext_id": p.erpnext_id,
-                "project_name": p.project_name,
-                "project_type": p.project_type,
-                "status": p.status.value if p.status else None,
-                "priority": p.priority.value if p.priority else None,
-                "department": p.department,
-                "customer_account_id": p.customer_account_id,
-                "percent_complete": float(p.percent_complete) if p.percent_complete else 0,
-                "expected_start_date": p.expected_start_date.isoformat() if p.expected_start_date else None,
-                "expected_end_date": p.expected_end_date.isoformat() if p.expected_end_date else None,
-                "estimated_costing": float(p.estimated_costing) if p.estimated_costing else 0,
-                "total_billed_amount": float(p.total_billed_amount) if p.total_billed_amount else 0,
-                "is_overdue": p.is_overdue,
-                "task_count": len(p.tasks),
-                "created_at": p.created_at.isoformat() if p.created_at else None,
-                "write_back_status": getattr(p, "write_back_status", None),
-            }
-            for p in projects
-        ],
+        "total": result.total,
+        "limit": result.limit,
+        "offset": result.offset,
+        "data": [_serialize_project_list(p) for p in result.items],
+    }
+
+
+def _serialize_project_list(p: Project) -> Dict[str, Any]:
+    """Serialize a project for list view."""
+    return {
+        "id": p.id,
+        "erpnext_id": p.erpnext_id,
+        "project_name": p.project_name,
+        "project_type": p.project_type,
+        "status": p.status.value if p.status else None,
+        "priority": p.priority.value if p.priority else None,
+        "department": p.department,
+        "customer_account_id": p.customer_account_id,
+        "percent_complete": float(p.percent_complete) if p.percent_complete else 0,
+        "expected_start_date": p.expected_start_date.isoformat() if p.expected_start_date else None,
+        "expected_end_date": p.expected_end_date.isoformat() if p.expected_end_date else None,
+        "estimated_costing": float(p.estimated_costing) if p.estimated_costing else 0,
+        "total_billed_amount": float(p.total_billed_amount) if p.total_billed_amount else 0,
+        "is_overdue": p.is_overdue,
+        "task_count": len(p.tasks),
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+        "write_back_status": getattr(p, "write_back_status", None),
     }
 
 
@@ -139,36 +118,31 @@ async def list_projects(
 async def get_project(
     project_id: int,
     db: Session = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Get detailed project information with all child tables."""
-    project = db.query(Project).filter(Project.id == project_id, Project.is_deleted == False).first()
+    service = ProjectService(db, principal)
 
-    if not project:
+    try:
+        project = service.get_project(project_id)
+    except ProjectNotFoundError:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Get customer info
-    customer = None
-    if project.customer_account_id:
-        account = db.query(CustomerAccount).filter(CustomerAccount.id == project.customer_account_id).first()
-        if account and account.party:
-            customer = {
-                "id": account.id,
-                "party_id": account.party_id,
-                "name": account.party.name,
-                "email": account.party.primary_email,
-            }
+    # Use service methods to get related info
+    customer = service.get_customer_info(project)
+    manager = service.get_manager_info(project)
+    task_stats = service.get_project_task_stats(project_id)
 
-    # Get project manager info
-    manager = None
-    if project.project_manager_id:
-        emp = db.query(Employee).filter(Employee.id == project.project_manager_id).first()
-        if emp:
-            manager = {
-                "id": emp.id,
-                "name": emp.name,
-                "email": emp.email,
-            }
+    return _serialize_project_detail(project, customer, manager, task_stats)
 
+
+def _serialize_project_detail(
+    project: Project,
+    customer: Optional[Dict[str, Any]],
+    manager: Optional[Dict[str, Any]],
+    task_stats,
+) -> Dict[str, Any]:
+    """Serialize a project for detail view."""
     # Build users list (team members)
     users = [
         {
@@ -214,14 +188,6 @@ async def get_project(
         }
         for e in project.expenses
     ]
-
-    # Calculate task statistics
-    task_stats = {
-        "total": len(tasks),
-        "completed": sum(1 for t in project.tasks if t.status == TaskStatus.COMPLETED),
-        "open": sum(1 for t in project.tasks if t.status in [TaskStatus.OPEN, TaskStatus.WORKING]),
-        "overdue": sum(1 for t in project.tasks if t.is_overdue),
-    }
 
     return {
         "id": project.id,
@@ -270,7 +236,12 @@ async def get_project(
         "project_manager": manager,
         "users": users,
         "tasks": tasks,
-        "task_stats": task_stats,
+        "task_stats": {
+            "total": task_stats.total,
+            "completed": task_stats.completed,
+            "open": task_stats.open,
+            "overdue": task_stats.overdue,
+        },
         "expenses": expenses,
         "write_back_status": getattr(project, "write_back_status", None),
     }

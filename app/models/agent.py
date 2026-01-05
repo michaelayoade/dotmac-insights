@@ -3,44 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import String, Integer, Boolean, ForeignKey, JSON
+from sqlalchemy import String, Integer, Boolean, ForeignKey, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.employee import Employee
-
-
-class Agent(Base):
-    """Unified agent identity across support/sales/projects."""
-
-    __tablename__ = "agents"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
-
-    email: Mapped[Optional[str]] = mapped_column(String(255), unique=True, nullable=True, index=True)
-    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-
-    # Capability & routing metadata
-    domains: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # e.g., {"support": true, "sales": true}
-    skills: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)   # e.g., {"network": 3, "billing": 2}
-    channel_caps: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)  # e.g., {"email": true, "whatsapp": true}
-    routing_weight: Mapped[int] = mapped_column(Integer, default=1)
-    capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-
-    created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    team_memberships: Mapped[List["TeamMember"]] = relationship(back_populates="agent", cascade="all, delete-orphan")
-    employee: Mapped[Optional["Employee"]] = relationship(foreign_keys=[employee_id])
-
-    def __repr__(self) -> str:
-        return f"<Agent {self.display_name or self.email or self.id}>"
+    from app.models.party import Party
 
 
 class Team(Base):
@@ -70,14 +39,23 @@ class Team(Base):
 
 
 class TeamMember(Base):
-    """Membership linking agents to teams."""
+    """Membership linking parties (support agents) to teams.
+
+    After Agent → Party unification, team membership is now based on Party.
+    A Party must have PartyRole(role="support_agent") to be a valid team member.
+    """
 
     __tablename__ = "team_members"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False, index=True)
-    agent_id: Mapped[int] = mapped_column(ForeignKey("agents.id"), nullable=False, index=True)
+    party_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     role: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)  # lead/member
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -85,7 +63,7 @@ class TeamMember(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     team: Mapped["Team"] = relationship(back_populates="members")
-    agent: Mapped["Agent"] = relationship(back_populates="team_memberships")
+    party: Mapped["Party"] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
-        return f"<TeamMember team={self.team_id} agent={self.agent_id}>"
+        return f"<TeamMember team={self.team_id} party={self.party_id}>"

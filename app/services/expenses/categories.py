@@ -106,7 +106,12 @@ class ExpenseCategoryService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_category(self, category_id: int) -> ExpenseCategory:
         """Get a single expense category by ID.

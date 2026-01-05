@@ -1,0 +1,42 @@
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow">
+    <div class="flex items-start justify-between gap-3">
+        <div>
+            <p class="text-xs uppercase tracking-wider text-gray-500">{{ journey.category | default('') }}</p>
+            <h3 class="text-lg font-display font-semibold text-gray-900 mt-1">{{ journey.name | default('') }}</h3>
+        </div>
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+            {% if journey.status == 'active' %}bg-emerald-50 text-emerald-700
+            {% elif journey.status == 'paused' %}bg-amber-50 text-amber-700
+            {% elif journey.status == 'draft' %}bg-gray-100 text-gray-600
+            {% else %}bg-slate-100 text-slate-600{% endif %}">
+            {{ journey.status | default('') | replace('_', ' ') | title }}
+        </span>
+    </div>
+    <div class="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div class="bg-surface-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500 uppercase tracking-wide">Steps</p>
+            <p class="text-lg font-semibold text-gray-900">{{ journey.step_count | default(0) }}</p>
+        </div>
+        <div class="bg-surface-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500 uppercase tracking-wide">Active</p>
+            <p class="text-lg font-semibold text-gray-900">{{ journey.active_count | default(0) }}</p>
+        </div>
+        <div class="bg-surface-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500 uppercase tracking-wide">Conversion</p>
+            <p class="text-lg font-semibold text-gray-900">{{ journey.conversion_rate | default('--') }}</p>
+        </div>
+        <div class="bg-surface-50 rounded-xl p-3">
+            <p class="text-xs text-gray-500 uppercase tracking-wide">Updated</p>
+            <p class="text-sm font-medium text-gray-700">{{ journey.updated_at | default('--') }}</p>
+        </div>
+    </div>
+    <div class="mt-4 flex items-center justify-between text-sm">
+        <div class="flex items-center gap-2 text-gray-500">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10m-12 8h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            <span>{{ journey.window | default('--') }}</span>
+        </div>
+        <a href="{{ journey.href | default('/marketing/journeys') }}" class="text-primary-600 hover:text-primary-700 font-medium">Open</a>
+    </div>
+</div>

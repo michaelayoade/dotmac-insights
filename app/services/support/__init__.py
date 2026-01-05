@@ -22,6 +22,7 @@ This module contains business logic for:
 # Core services
 from .tickets import TicketService
 from .conversations import ConversationService
+from .legacy_conversations import LegacyConversationService
 from .messages import MessageService
 from .channels import ChannelService
 from .webhooks import WebhookService
@@ -73,6 +74,8 @@ from .types import (
     RoutingMatch,
     RoutingRuleCreate,
     RoutingRuleUpdate,
+    TicketRoutingRuleCreate,
+    TicketRoutingRuleUpdate,
     # SLA types
     BusinessCalendarCreate,
     BusinessCalendarUpdate,
@@ -90,19 +93,27 @@ from .types import (
     AgentFilters,
     AgentUpdate,
     AgentWorkload,
+    AgentDetailStats,
+    AgentDetailResult,
     TeamCreate,
     TeamUpdate,
     TeamWorkload,
     # Canned response types
     CannedResponseCreate,
     CannedResponseUpdate,
+    CannedResponseFilters,
+    CannedResponseStats,
+    CannedListResult,
     # Knowledge base types
     KBArticleCreate,
+    KBArticleFilters,
+    KBArticleStats,
     KBArticleUpdate,
     KBAttachmentData,
     KBCategoryCreate,
     KBCategoryUpdate,
     KBHelpfulnessStats,
+    KBListResult,
     # CSAT types
     CSATMetrics,
     CSATSurveyCreate,
@@ -218,6 +229,7 @@ __all__ = [
     # Core Services
     "TicketService",
     "ConversationService",
+    "LegacyConversationService",
     "MessageService",
     "ChannelService",
     "WebhookService",
@@ -262,6 +274,8 @@ __all__ = [
     "RoutingRuleCreate",
     "RoutingRuleUpdate",
     "RoutingMatch",
+    "TicketRoutingRuleCreate",
+    "TicketRoutingRuleUpdate",
     # Types - SLA
     "BusinessCalendarCreate",
     "BusinessCalendarUpdate",
@@ -285,17 +299,25 @@ __all__ = [
     "TeamCreate",
     "TeamUpdate",
     "AgentWorkload",
+    "AgentDetailStats",
+    "AgentDetailResult",
     "TeamWorkload",
     # Types - Canned Response
     "CannedResponseCreate",
     "CannedResponseUpdate",
+    "CannedResponseFilters",
+    "CannedResponseStats",
+    "CannedListResult",
     # Types - Knowledge Base
+    "KBArticleFilters",
+    "KBArticleStats",
     "KBCategoryCreate",
     "KBCategoryUpdate",
     "KBArticleCreate",
     "KBArticleUpdate",
     "KBAttachmentData",
     "KBHelpfulnessStats",
+    "KBListResult",
     # Types - CSAT
     "CSATSurveyCreate",
     "CSATSurveyUpdate",

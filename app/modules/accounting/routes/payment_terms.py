@@ -12,6 +12,7 @@ from ._deps import (
     is_htmx_request, HTTPException, set_flash, validate_csrf, form_str, form_int, form_decimal,
 )
 from app.services.accounting import PaymentTermsService
+from app.services.accounting.web_services import AccountingPaymentTermsWebService
 from app.services.accounting.payment_terms_types import (
     PaymentTermsFilters,
     PaymentTermsCreateData,
@@ -26,6 +27,10 @@ router = APIRouter()
 
 def _get_service(db: DB, user: SessionUser) -> PaymentTermsService:
     return PaymentTermsService(db, user)
+
+
+def _get_web_service(db: DB, user: SessionUser) -> AccountingPaymentTermsWebService:
+    return AccountingPaymentTermsWebService(db, _get_service(db, user))
 
 
 @router.get("/payment-terms", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -68,7 +73,6 @@ async def payment_terms_list(
         page=page,
         per_page=per_page,
         total=total,
-        base_url="/accounting/payment-terms",
     )
 
     if is_htmx_request(request):
@@ -247,8 +251,8 @@ async def payment_terms_create(
             description=description,
             schedules=schedules,
         )
-        terms = service.create_payment_terms(create_data)
-        db.commit()
+        web_service = _get_web_service(db, user)
+        terms = web_service.create_payment_terms(create_data)
 
         set_flash(response, "Payment terms created successfully", "success")
         return RedirectResponse(
@@ -256,7 +260,7 @@ async def payment_terms_create(
             status_code=303,
         )
     except ValidationError as e:
-        db.rollback()
+        web_service.rollback()
         set_flash(response, str(e), "error")
         return RedirectResponse(
             url="/accounting/payment-terms/new",
@@ -306,8 +310,8 @@ async def payment_terms_update(
             is_active=is_active,
             schedules=schedules if schedules else None,
         )
-        service.update_payment_terms(terms_id, update_data)
-        db.commit()
+        web_service = _get_web_service(db, user)
+        web_service.update_payment_terms(terms_id, update_data)
 
         set_flash(response, "Payment terms updated successfully", "success")
         return RedirectResponse(
@@ -317,7 +321,7 @@ async def payment_terms_update(
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Payment terms not found")
     except ValidationError as e:
-        db.rollback()
+        web_service.rollback()
         set_flash(response, str(e), "error")
         return RedirectResponse(
             url=f"/accounting/payment-terms/{terms_id}/edit",
@@ -337,11 +341,10 @@ async def payment_terms_delete(
     """Delete (deactivate) payment terms."""
     await validate_csrf(request, csrf_protect)
 
-    service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
 
     try:
-        service.delete_payment_terms(terms_id)
-        db.commit()
+        web_service.delete_payment_terms(terms_id)
         set_flash(response, "Payment terms deactivated successfully", "success")
     except NotFoundError:
         set_flash(response, "Payment terms not found", "error")

@@ -36,7 +36,7 @@
                 hx-get="/inbox/table?page={{ pagination.page - 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_channel %}&channel={{ current_channel }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}"
                 hx-target="#conversations-container"
                 hx-push-url="true"
-                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 transition-colors"
             >
                 Previous
             </button>
@@ -46,7 +46,7 @@
                 hx-get="/inbox/table?page={{ pagination.page + 1 }}{% if search_query %}&q={{ search_query }}{% endif %}{% if current_status %}&status={{ current_status }}{% endif %}{% if current_channel %}&channel={{ current_channel }}{% endif %}{% if current_priority %}&priority={{ current_priority }}{% endif %}"
                 hx-target="#conversations-container"
                 hx-push-url="true"
-                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-surface-50 transition-colors"
             >
                 Next
             </button>

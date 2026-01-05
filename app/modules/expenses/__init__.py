@@ -24,6 +24,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Back Office",
     order=25,
     scopes=["expenses:read"],
+    enabled=False,
     prefixes=["/expenses"],
 )
 

@@ -1,0 +1,21 @@
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+    <h2 class="text-base font-display font-semibold text-gray-900 mb-4">Contact Information</h2>
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Email</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ contact.primary_email or "-" }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Phone</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ contact.primary_phone or "-" }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Company</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ contact.custom_fields.company_name if contact.custom_fields else "-" }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Category</dt>
+            <dd class="mt-1 text-sm text-gray-900">{{ contact.custom_fields.category if contact.custom_fields else "-" }}</dd>
+        </div>
+    </dl>
+</div>

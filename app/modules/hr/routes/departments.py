@@ -7,8 +7,6 @@ Permission Requirements:
 
 Uses OrganizationService for all business logic.
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
@@ -28,6 +26,8 @@ from app.services.hr.organization_types import (
     DepartmentCreateData,
     DepartmentUpdateData,
 )
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import EmployeeFilters
 from app.services.types import PaginationParams
 from app.services.hr.errors import DepartmentNotFoundError, ValidationError as HRValidationError
 from app.core.security import is_htmx_request, htmx_toast, set_flash
@@ -298,12 +298,12 @@ async def department_detail(
     # Get headcount for the department
     headcount = service.get_department_headcount(department_id)
 
-    # For employees preview, we still need to query directly (service doesn't have this method)
-    from app.models.employee import Employee
-    employees = db.query(Employee).filter(
-        Employee.department_id == department_id,
-        Employee.is_deleted == False
-    ).order_by(Employee.name).limit(10).all()
+    employee_service = EmployeeService(db, user)
+    employees_result = employee_service.list_employees(
+        filters=EmployeeFilters(department_id=department_id),
+        pagination=PaginationParams(offset=0, limit=10),
+    )
+    employees = employees_result.items
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)

@@ -1,4 +1,4 @@
-<div class="overflow-x-auto">
+<div class="overflow-x-auto" data-testid="opportunities-table">
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
@@ -14,7 +14,7 @@
         <tbody class="bg-white divide-y divide-gray-200">
             {% if opportunities %}
                 {% for opp in opportunities %}
-                <tr class="hover:bg-gray-50 cursor-pointer" onclick="window.location='/crm/opportunities/{{ opp.id }}'">
+                <tr class="hover:bg-surface-50 cursor-pointer" onclick="window.location='/crm/opportunities/{{ opp.id }}'">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="text-sm font-medium text-gray-900">{{ opp.name }}</div>
                         {% if opp.party %}
@@ -55,7 +55,7 @@
                 {% endfor %}
             {% else %}
             <tr>
-                <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                <td colspan="7" class="px-6 py-12 text-center text-gray-500" data-testid="opportunities-empty-state">
                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                     </svg>
@@ -70,23 +70,19 @@
 
 <!-- Pagination -->
 {% if total_pages > 1 %}
-<div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-        <div>
-            <p class="text-sm text-gray-700">
-                Showing <span class="font-medium">{{ (page - 1) * per_page + 1 }}</span> to <span class="font-medium">{{ [page * per_page, total]|min }}</span> of <span class="font-medium">{{ total }}</span>
-            </p>
-        </div>
-        <div>
-            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                {% if page > 1 %}
-                <a href="?page={{ page - 1 }}" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">Previous</a>
-                {% endif %}
-                {% if page < total_pages %}
-                <a href="?page={{ page + 1 }}" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">Next</a>
-                {% endif %}
-            </nav>
-        </div>
-    </div>
-</div>
+{% set pagination = {
+    "page": page,
+    "per_page": per_page,
+    "total": total,
+    "total_pages": total_pages,
+    "has_prev": page > 1,
+    "has_next": page < total_pages,
+    "prev_page": (page - 1) if page > 1 else None,
+    "next_page": (page + 1) if page < total_pages else None,
+    "start_item": ((page - 1) * per_page) + 1,
+    "end_item": [page * per_page, total]|min
+} %}
+{% with pagination=pagination, base_url="/crm/opportunities" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 {% endif %}

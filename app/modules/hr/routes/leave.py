@@ -7,8 +7,6 @@ Permission Requirements:
 - hr:read - View leave applications, types, allocations
 - hr:write - Create, update, manage leave
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import date
 
@@ -24,12 +22,14 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.hr_leave import LeaveApplicationStatus
-from app.models.employee import Employee
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import EmployeeFilters
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.services.hr.leave import LeaveService
 from app.services.hr.leave_types import ApplicationFilters, ApplicationCreateData, AllocationFilters
 from app.services.types import PaginationParams
 from app.services.hr.errors import (
+    EmployeeNotFoundError,
     LeaveApplicationNotFoundError,
     LeaveTypeNotFoundError,
     LeaveStatusTransitionError,
@@ -89,8 +89,13 @@ def get_leave_type_options(db):
 
 
 def get_employee_options(db):
-    """Get employees - still uses direct DB as EmployeeService would be used here."""
-    employees = db.query(Employee).filter(Employee.is_deleted == False).order_by(Employee.name).all()
+    """Get employees using EmployeeService."""
+    service = EmployeeService(db)
+    result = service.list_employees(
+        filters=EmployeeFilters(),
+        pagination=PaginationParams(offset=0, limit=500),
+    )
+    employees = sorted(result.items, key=lambda e: e.name or "")
     return [{"value": str(e.id), "label": e.name} for e in employees]
 
 
@@ -248,8 +253,11 @@ async def leave_application_create(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Resolve employee and leave type
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee:
+    employee_service = EmployeeService(db)
+    try:
+        employee = employee_service.get_employee(employee_id)
+    except EmployeeNotFoundError:
+        employee = None
         errors["employee_id"] = "Employee not found"
 
     try:

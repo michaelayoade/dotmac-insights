@@ -102,19 +102,21 @@
 
     <!-- Pagination -->
     {% if total_pages > 1 %}
-    <div class="flex items-center justify-between">
-        <p class="text-sm text-gray-700">
-            Showing <span class="font-medium">{{ (page - 1) * per_page + 1 }}</span> to <span class="font-medium">{{ [page * per_page, total]|min }}</span> of <span class="font-medium">{{ total }}</span>
-        </p>
-        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-            {% if page > 1 %}
-            <a href="?page={{ page - 1 }}" class="btn btn-secondary">Previous</a>
-            {% endif %}
-            {% if page < total_pages %}
-            <a href="?page={{ page + 1 }}" class="btn btn-secondary ml-2">Next</a>
-            {% endif %}
-        </nav>
-    </div>
+    {% set pagination = {
+        "page": page,
+        "per_page": per_page,
+        "total": total,
+        "total_pages": total_pages,
+        "has_prev": page > 1,
+        "has_next": page < total_pages,
+        "prev_page": (page - 1) if page > 1 else None,
+        "next_page": (page + 1) if page < total_pages else None,
+        "start_item": ((page - 1) * per_page) + 1,
+        "end_item": [page * per_page, total]|min
+    } %}
+    {% with pagination=pagination, base_url="/crm/campaigns" %}
+    {% include "components/ui/pagination.html" %}
+    {% endwith %}
     {% endif %}
 </div>
 {% endblock %}

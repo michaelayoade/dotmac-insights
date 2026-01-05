@@ -7,6 +7,7 @@ from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, List
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 
 # ============= TAX CODE =============
@@ -24,7 +25,7 @@ class RoundingMethod(enum.Enum):
     CEIL = "ceil"
 
 
-class TaxCode(Base):
+class TaxCode(SoftValidationMixin, Base):
     """
     Tax codes for line-level tax calculation.
 
@@ -92,7 +93,7 @@ class TaxCode(Base):
 
 
 # ============= TAX CATEGORY =============
-class TaxCategory(Base):
+class TaxCategory(SoftValidationMixin, Base):
     """Tax categories from ERPNext for VAT classification."""
 
     __tablename__ = "tax_categories"
@@ -118,7 +119,7 @@ class TaxCategory(Base):
 
 
 # ============= SALES TAX TEMPLATE =============
-class SalesTaxTemplate(Base):
+class SalesTaxTemplate(SoftValidationMixin, Base):
     """Sales Taxes and Charges Template from ERPNext."""
 
     __tablename__ = "sales_tax_templates"
@@ -149,7 +150,7 @@ class SalesTaxTemplate(Base):
         return f"<SalesTaxTemplate {self.template_name}>"
 
 
-class SalesTaxTemplateDetail(Base):
+class SalesTaxTemplateDetail(SoftValidationMixin, Base):
     """Individual tax lines within a Sales Tax Template."""
 
     __tablename__ = "sales_tax_template_details"
@@ -180,7 +181,7 @@ class SalesTaxTemplateDetail(Base):
 
 
 # ============= PURCHASE TAX TEMPLATE =============
-class PurchaseTaxTemplate(Base):
+class PurchaseTaxTemplate(SoftValidationMixin, Base):
     """Purchase Taxes and Charges Template from ERPNext."""
 
     __tablename__ = "purchase_tax_templates"
@@ -211,7 +212,7 @@ class PurchaseTaxTemplate(Base):
         return f"<PurchaseTaxTemplate {self.template_name}>"
 
 
-class PurchaseTaxTemplateDetail(Base):
+class PurchaseTaxTemplateDetail(SoftValidationMixin, Base):
     """Individual tax lines within a Purchase Tax Template."""
 
     __tablename__ = "purchase_tax_template_details"
@@ -243,7 +244,7 @@ class PurchaseTaxTemplateDetail(Base):
 
 
 # ============= ITEM TAX TEMPLATE =============
-class ItemTaxTemplate(Base):
+class ItemTaxTemplate(SoftValidationMixin, Base):
     """Item-specific tax templates from ERPNext."""
 
     __tablename__ = "item_tax_templates"
@@ -270,7 +271,7 @@ class ItemTaxTemplate(Base):
         return f"<ItemTaxTemplate {self.template_name}>"
 
 
-class ItemTaxTemplateDetail(Base):
+class ItemTaxTemplateDetail(SoftValidationMixin, Base):
     """Tax rates per account within an Item Tax Template."""
 
     __tablename__ = "item_tax_template_details"
@@ -293,7 +294,7 @@ class ItemTaxTemplateDetail(Base):
 
 
 # ============= TAX WITHHOLDING CATEGORY =============
-class TaxWithholdingCategory(Base):
+class TaxWithholdingCategory(SoftValidationMixin, Base):
     """Tax Withholding Categories from ERPNext."""
 
     __tablename__ = "tax_withholding_categories"
@@ -321,7 +322,7 @@ class TaxWithholdingCategory(Base):
 
 
 # ============= TAX RULE =============
-class TaxRule(Base):
+class TaxRule(SoftValidationMixin, Base):
     """Tax Rules from ERPNext for automatic tax application."""
 
     __tablename__ = "tax_rules"
@@ -400,7 +401,7 @@ class TaxFilingType(enum.Enum):
     OTHER = "other"
 
 
-class TaxFilingPeriod(Base):
+class TaxFilingPeriod(SoftValidationMixin, Base):
     """Tax filing period for tracking tax obligations and payments."""
 
     __tablename__ = "tax_filing_periods"
@@ -449,7 +450,7 @@ class TaxFilingPeriod(Base):
         return self.status == TaxFilingStatus.OPEN and date.today() > self.due_date
 
 
-class TaxPayment(Base):
+class TaxPayment(SoftValidationMixin, Base):
     """Record of tax payment made for a filing period."""
 
     __tablename__ = "tax_payments"

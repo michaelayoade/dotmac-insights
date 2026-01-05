@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.asset import Asset, AssetStatus
 
 from app.services.errors import NotFoundError, ValidationError
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     MaintenanceFilters,
@@ -142,6 +143,7 @@ class AssetMaintenanceService:
         asset.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     def complete_maintenance(
@@ -201,6 +203,7 @@ class AssetMaintenanceService:
             asset.asset_value = (asset.asset_value or Decimal("0")) + data.maintenance_cost
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     def mark_maintenance_required(self, asset_id: int, required: bool = True) -> Asset:
@@ -226,6 +229,7 @@ class AssetMaintenanceService:
         asset.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     # -------------------------------------------------------------------------

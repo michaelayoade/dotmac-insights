@@ -19,6 +19,8 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.core.security import is_htmx_request, set_flash
+from app.services.admin_settings_service import AdminSettingsService
+from app.services.activity_logger import ActivityLogger
 
 # Permission dependencies
 RequireAdminRead = Depends(require_scope("admin:read"))
@@ -84,6 +86,7 @@ ADMIN_TABS = [
     {"id": "tokens", "label": "Service Tokens", "href": "/settings/admin/tokens"},
     {"id": "webhooks", "label": "Webhooks", "href": "/settings/admin/webhooks"},
     {"id": "audit", "label": "Audit Log", "href": "/settings/admin/audit"},
+    {"id": "activity", "label": "Activity Log", "href": "/settings/admin/activity"},
 ]
 
 
@@ -116,31 +119,14 @@ async def users_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """User management list."""
-    from sqlalchemy import or_
-    from app.models.auth import User
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "users"
 
-    # Build query
-    query = db.query(User)
-
-    if q:
-        search_filter = or_(
-            User.email.ilike(f"%{q}%"),
-            User.name.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    if status:
-        query = query.filter(User.is_active == (status == "active"))
-
-    # Count and paginate
-    total = query.count()
-    users = query.order_by(User.email).offset((page - 1) * per_page).limit(per_page).all()
+    users, total = service.list_users(q=q, status=status, page=page, per_page=per_page)
 
     context["page_title"] = "Users"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -171,10 +157,8 @@ async def user_detail(
     user_id: str,
 ):
     """User detail/edit page."""
-    from app.models.auth import User
-    from app.models.rbac import Role
-
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -193,7 +177,7 @@ async def user_detail(
     ])
 
     # Get all roles for assignment
-    roles = db.query(Role).order_by(Role.name).all()
+    roles = service.list_roles()
 
     context["target_user"] = target_user
     context["all_roles"] = roles
@@ -214,26 +198,47 @@ async def update_user(
     _csrf: CSRFProtect,
 ):
     """Update user (activate/deactivate, assign roles)."""
-    from app.models.auth import User
-    from app.models.rbac import Role
-
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
     form = await request.form()
+    change_meta = {}
+    did_update = False
 
     # Update status
     if "is_active" in form:
-        target_user.is_active = _form_str(form, "is_active") in ("true", "on", "1")
+        target_user = service.update_user(
+            target_user,
+            is_active=_form_str(form, "is_active") in ("true", "on", "1"),
+        )
+        change_meta["is_active"] = target_user.is_active
+        did_update = True
 
     # Update roles
     role_ids = _form_list(form, "roles")
     if role_ids:
-        roles = db.query(Role).filter(Role.id.in_(role_ids)).all()
-        target_user.roles = roles
+        target_user = service.update_user(
+            target_user,
+            role_ids=role_ids,
+            update_roles=True,
+        )
+        change_meta["role_ids"] = role_ids
+        did_update = True
 
-    db.commit()
+    if did_update:
+        activity_logger = ActivityLogger(db)
+        activity_logger.log(
+            action="rbac.user.update",
+            user_id=user.id,
+            entity_type="user",
+            entity_id=str(target_user.id),
+            summary=f"Updated user {target_user.email}",
+            metadata=change_meta,
+            request=request,
+        )
+        db.commit()
 
     set_flash(response, f"User {target_user.email} updated successfully.", "success")
 
@@ -254,13 +259,23 @@ async def toggle_user_status(
     user_id: str,
 ):
     """Toggle user active status via HTMX."""
-    from app.models.auth import User
-
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    target_user.is_active = not target_user.is_active
+    target_user = service.toggle_user_status(target_user)
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.user.update",
+        user_id=user.id,
+        entity_type="user",
+        entity_id=str(target_user.id),
+        summary=f"Toggled user status for {target_user.email}",
+        metadata={"is_active": target_user.is_active, "toggle": True},
+        request=request,
+    )
     db.commit()
 
     # Return updated row
@@ -282,15 +297,14 @@ async def roles_list(
     db: DB,
 ):
     """Role management list."""
-    from app.models.rbac import Role
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "roles"
 
-    roles = db.query(Role).order_by(Role.is_system.desc(), Role.name).all()
+    roles = service.list_roles(system_first=True)
 
     context["page_title"] = "Roles"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -314,15 +328,14 @@ async def new_role_form(
     db: DB,
 ):
     """New role creation form."""
-    from app.models.rbac import Permission
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "roles"
 
-    permissions = db.query(Permission).order_by(Permission.category, Permission.name).all()
+    permissions = service.list_permissions()
 
     # Group permissions by category
     permission_groups: dict[str, list[Permission]] = {}
@@ -357,8 +370,6 @@ async def create_role(
     _csrf: CSRFProtect,
 ):
     """Create new role."""
-    from app.models.rbac import Role, Permission
-
     form = await request.form()
     name = _form_str(form, "name")
     description = _form_str(form, "description")
@@ -369,28 +380,30 @@ async def create_role(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/settings/admin/roles/new", status_code=303)
 
-    # Check for duplicate
-    existing = db.query(Role).filter(Role.name == name).first()
-    if existing:
+    service = AdminSettingsService(db)
+    role = service.create_role(
+        name=name,
+        description=description,
+        permission_ids=permission_ids,
+    )
+    if not role:
         set_flash(response, f"Role '{name}' already exists.", "error")
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/settings/admin/roles/new", status_code=303)
 
-    # Get permissions
-    permissions = []
-    if permission_ids:
-        permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
-
-    role = Role(
-        name=name,
-        description=description,
-        is_system=False,
-        permissions=permissions,
-    )
-    db.add(role)
-    db.commit()
-
     set_flash(response, f"Role '{name}' created successfully.", "success")
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.role.create",
+        user_id=user.id,
+        entity_type="role",
+        entity_id=str(role.id),
+        summary=f"Created role '{role.name}'",
+        metadata={"permission_ids": permission_ids},
+        request=request,
+    )
+    db.commit()
 
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/settings/admin/roles", status_code=303)
@@ -406,9 +419,8 @@ async def role_detail(
     role_id: str,
 ):
     """Role detail/edit form."""
-    from app.models.rbac import Role, Permission
-
-    role = db.query(Role).filter(Role.id == role_id).first()
+    service = AdminSettingsService(db)
+    role = service.get_role(role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
 
@@ -418,7 +430,7 @@ async def role_detail(
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "roles"
 
-    permissions = db.query(Permission).order_by(Permission.category, Permission.name).all()
+    permissions = service.list_permissions()
 
     # Group permissions by category
     permission_groups: dict[str, list[Permission]] = {}
@@ -459,9 +471,8 @@ async def update_role(
     _csrf: CSRFProtect,
 ):
     """Update role."""
-    from app.models.rbac import Role, Permission
-
-    role = db.query(Role).filter(Role.id == role_id).first()
+    service = AdminSettingsService(db)
+    role = service.get_role(role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
 
@@ -475,15 +486,26 @@ async def update_role(
     role.description = _form_str(form, "description")
 
     permission_ids = _form_list(form, "permissions")
-    if permission_ids:
-        permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
-        role.permissions = permissions
-    else:
-        role.permissions = []
-
-    db.commit()
+    service.update_role(
+        role,
+        name=role.name,
+        description=role.description,
+        permission_ids=permission_ids,
+    )
 
     set_flash(response, f"Role '{role.name}' updated successfully.", "success")
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.role.update",
+        user_id=user.id,
+        entity_type="role",
+        entity_id=str(role.id),
+        summary=f"Updated role '{role.name}'",
+        metadata={"permission_ids": permission_ids},
+        request=request,
+    )
+    db.commit()
 
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/settings/admin/roles", status_code=303)
@@ -498,9 +520,8 @@ async def delete_role(
     role_id: str,
 ):
     """Delete role."""
-    from app.models.rbac import Role
-
-    role = db.query(Role).filter(Role.id == role_id).first()
+    service = AdminSettingsService(db)
+    role = service.get_role(role_id)
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
 
@@ -508,7 +529,17 @@ async def delete_role(
         raise HTTPException(status_code=400, detail="System roles cannot be deleted")
 
     role_name = role.name
-    db.delete(role)
+    service.delete_role(role)
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.role.delete",
+        user_id=user.id,
+        entity_type="role",
+        entity_id=str(role_id),
+        summary=f"Deleted role '{role_name}'",
+        request=request,
+    )
     db.commit()
 
     if is_htmx_request(request):
@@ -533,15 +564,14 @@ async def tokens_list(
     db: DB,
 ):
     """Service tokens list."""
-    from app.models.rbac import ServiceToken
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "tokens"
 
-    tokens = db.query(ServiceToken).order_by(ServiceToken.created_at.desc()).all()
+    tokens = service.list_tokens()
 
     context["page_title"] = "Service Tokens"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -566,10 +596,6 @@ async def create_token(
     _csrf: CSRFProtect,
 ):
     """Create service token."""
-    from app.models.rbac import ServiceToken
-    import secrets
-    from datetime import datetime, timedelta
-
     form = await request.form()
     name = _form_str(form, "name")
     scopes = _form_str(form, "scopes")
@@ -580,20 +606,13 @@ async def create_token(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/settings/admin/tokens", status_code=303)
 
-    # Generate token
-    token_value = secrets.token_urlsafe(32)
-    token_prefix = token_value[:8]
-
-    token = ServiceToken(
+    service = AdminSettingsService(db)
+    _, token_value = service.create_token(
         name=name,
-        token_prefix=token_prefix,
-        token_hash=token_value,  # In production, this should be hashed
         scopes=scopes.split(",") if scopes else [],
-        expires_at=datetime.utcnow() + timedelta(days=expires_days),
+        expires_days=expires_days,
         created_by_id=user.id,
     )
-    db.add(token)
-    db.commit()
 
     # Show the token once
     set_flash(
@@ -615,15 +634,12 @@ async def revoke_token(
     token_id: str,
 ):
     """Revoke service token."""
-    from app.models.rbac import ServiceToken
-
-    token = db.query(ServiceToken).filter(ServiceToken.id == token_id).first()
+    service = AdminSettingsService(db)
+    token = service.revoke_token(token_id)
     if not token:
         raise HTTPException(status_code=404, detail="Token not found")
 
     token_name = token.name
-    db.delete(token)
-    db.commit()
 
     if is_htmx_request(request):
         response.headers["HX-Trigger"] = "tokenRevoked"
@@ -652,27 +668,20 @@ async def audit_log(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """Audit log viewer."""
-    from app.models.settings import SettingsAuditLog
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "audit"
 
-    # Build query
-    query = db.query(SettingsAuditLog)
-
-    if q:
-        query = query.filter(SettingsAuditLog.user_email.ilike(f"%{q}%"))
-    if group:
-        query = query.filter(SettingsAuditLog.group_name == group)
-    if action:
-        query = query.filter(SettingsAuditLog.action == action)
-
-    # Count and paginate
-    total = query.count()
-    entries = query.order_by(SettingsAuditLog.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+    entries, total = service.list_audit_log(
+        q=q,
+        group=group,
+        action=action,
+        page=page,
+        per_page=per_page,
+    )
 
     context["page_title"] = "Audit Log"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -699,6 +708,195 @@ async def audit_log(
 
 
 # ============================================================================
+# ACTIVITY LOG
+# ============================================================================
+
+@router.get("/activity", response_class=HTMLResponse, dependencies=[RequireAdminRead])
+async def activity_log(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None, description="Search by user email or summary"),
+    action: Optional[str] = Query(None, description="Filter by action"),
+    entity_type: Optional[str] = Query(None, description="Filter by entity type"),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=10, le=100),
+):
+    """Activity log viewer."""
+    service = AdminSettingsService(db)
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["settings_nav"] = get_settings_nav(user, "admin")
+    context["admin_tabs"] = ADMIN_TABS
+    context["current_tab"] = "activity"
+
+    entries, total = service.list_activity_log(
+        q=q,
+        action=action,
+        entity_type=entity_type,
+        page=page,
+        per_page=per_page,
+    )
+
+    context["page_title"] = "Activity Log"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Settings", "href": "/settings"},
+        {"label": "Admin", "href": "/settings/admin"},
+        {"label": "Activity Log"},
+    ])
+    context["entries"] = entries
+    context["search_query"] = q or ""
+    context["current_action"] = action
+    context["current_entity_type"] = entity_type
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    context["action_options"] = [
+        "login",
+        "logout",
+        "session.revoke",
+        "session.revoke_all",
+        "rbac.user.create",
+        "rbac.user.update",
+        "rbac.role.create",
+        "rbac.role.update",
+        "rbac.role.delete",
+        "rbac.group.create",
+        "rbac.group.update",
+        "rbac.group.delete",
+        "rbac.group.member.add",
+        "rbac.group.member.remove",
+        "rbac.permission.assign",
+        "rbac.permission.revoke",
+        "settings.create",
+        "settings.update",
+        "settings.delete",
+        "settings.test",
+        "approval.submit",
+        "approval.approve",
+        "approval.reject",
+        "approval.post",
+        "approval.cancel",
+        "finance.invoice.create",
+        "finance.invoice.update",
+        "finance.invoice.delete",
+        "finance.invoice.submit",
+        "finance.invoice.post",
+        "finance.invoice.cancel",
+        "finance.payment.create",
+        "finance.payment.update",
+        "finance.payment.delete",
+        "finance.payment.approve",
+        "finance.payment.post",
+        "finance.payment.allocate",
+        "finance.supplier_payment.create",
+        "finance.supplier_payment.update",
+        "finance.supplier_payment.delete",
+        "finance.supplier_payment.allocate",
+        "finance.supplier_payment.approve",
+        "finance.supplier_payment.reject",
+        "finance.supplier_payment.post",
+        "finance.journal_entry.create",
+        "finance.journal_entry.update",
+        "finance.journal_entry.delete",
+        "finance.journal_entry.post",
+        "finance.bank_reconciliation.start",
+        "finance.bank_reconciliation.match",
+        "finance.bank_reconciliation.auto_match",
+        "finance.bank_reconciliation.complete",
+        "finance.bank_reconciliation.import",
+        "finance.expense_claim.create",
+        "finance.expense_claim.submit",
+        "finance.expense_claim.approve",
+        "finance.expense_claim.reject",
+        "finance.expense_claim.return",
+        "finance.expense_claim.recall",
+        "crm.party.create",
+        "crm.party.update",
+        "crm.party.delete",
+        "support.ticket.create",
+        "support.ticket.update",
+        "support.ticket.delete",
+        "support.message.inbound",
+        "support.message.outbound",
+        "support.message.note",
+        "subscriptions.create",
+        "subscriptions.update",
+        "subscriptions.delete",
+        "subscriptions.status.change",
+        "subscriptions.provisioning.configure",
+        "subscriptions.provisioning.mark",
+        "subscriptions.plan.upgrade",
+        "subscriptions.plan.downgrade",
+        "inventory.stock_entry.create",
+        "inventory.stock_entry.update",
+        "inventory.stock_entry.submit",
+        "inventory.stock_entry.cancel",
+        "inventory.stock_entry.delete",
+        "hr.employee.create",
+        "hr.employee.update",
+        "hr.employee.delete",
+        "hr.employee.status.activate",
+        "hr.employee.status.deactivate",
+        "hr.employee.status.terminate",
+        "hr.payroll.entry.create",
+        "hr.payroll.entry.update",
+        "hr.payroll.entry.delete",
+        "hr.payroll.slips.generate",
+        "hr.payroll.slips.submit",
+        "projects.project.create",
+        "projects.project.update",
+        "projects.project.delete",
+        "projects.task.create",
+        "projects.task.update",
+        "projects.task.delete",
+        "ops.import.csv",
+        "ops.import.rows",
+        "ops.data_cleanup.bulk_update",
+        "ops.data_cleanup.normalize_phones",
+        "ops.data_cleanup.normalize_emails",
+        "ops.data_cleanup.merge_duplicates",
+        "ops.data_cleanup.link_orphans",
+    ]
+    context["entity_type_options"] = [
+        "auth",
+        "session",
+        "user",
+        "role",
+        "group",
+        "permission",
+        "settings",
+        "approval",
+        "invoice",
+        "payment",
+        "supplier_payment",
+        "journal_entry",
+        "bank_reconciliation",
+        "bank_transaction",
+        "expense_claim",
+        "party",
+        "ticket",
+        "message",
+        "subscription",
+        "stock_entry",
+        "employee",
+        "payroll_entry",
+        "project",
+        "task",
+        "import",
+        "data_cleanup",
+    ]
+
+    if is_htmx_request(request):
+        template = templates.get_template("modules/settings/templates/partials/activity_log_table.html")
+    else:
+        template = templates.get_template("modules/settings/templates/pages/admin/activity_log.html")
+
+    return HTMLResponse(template.render(context))
+
+
+# ============================================================================
 # WEBHOOK MANAGEMENT
 # ============================================================================
 
@@ -715,33 +913,19 @@ async def webhooks_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Webhook configurations list."""
-    from app.models.notification import WebhookConfig
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "webhooks"
 
-    # Build query
-    query = db.query(WebhookConfig).filter(WebhookConfig.is_deleted == False)
-
-    if q:
-        from sqlalchemy import or_
-        search_filter = or_(
-            WebhookConfig.name.ilike(f"%{q}%"),
-            WebhookConfig.url.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    if status == "active":
-        query = query.filter(WebhookConfig.is_active == True)
-    elif status == "inactive":
-        query = query.filter(WebhookConfig.is_active == False)
-
-    # Count and paginate
-    total = query.count()
-    webhooks = query.order_by(WebhookConfig.name).offset((page - 1) * per_page).limit(per_page).all()
+    webhooks, total = service.list_webhooks(
+        q=q,
+        status=status,
+        page=page,
+        per_page=per_page,
+    )
 
     context["page_title"] = "Webhooks"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -806,9 +990,6 @@ async def create_webhook(
     _csrf: CSRFProtect,
 ):
     """Create new webhook."""
-    from app.models.notification import WebhookConfig
-    import secrets as py_secrets
-
     form = await request.form()
     name = _form_str(form, "name")
     url = _form_str(form, "url")
@@ -825,23 +1006,18 @@ async def create_webhook(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/settings/admin/webhooks/new", status_code=303)
 
-    # Generate signing secret
-    signing_secret = py_secrets.token_urlsafe(32)
-
-    webhook = WebhookConfig(
+    service = AdminSettingsService(db)
+    _, signing_secret = service.create_webhook(
         name=name,
-        description=description,
         url=url,
         method=method,
         auth_type=auth_type,
         auth_header=auth_header,
+        description=description,
         event_types=event_types,
         max_retries=max_retries,
-        signing_secret=signing_secret,
         created_by_id=user.id,
     )
-    db.add(webhook)
-    db.commit()
 
     set_flash(
         response,
@@ -863,20 +1039,15 @@ async def webhook_detail(
     webhook_id: int,
 ):
     """Webhook detail/edit form."""
-    from app.models.notification import WebhookConfig, WebhookDelivery, NotificationEventType
+    from app.models.notification import NotificationEventType
 
-    webhook = db.query(WebhookConfig).filter(
-        WebhookConfig.id == webhook_id,
-        WebhookConfig.is_deleted == False
-    ).first()
+    service = AdminSettingsService(db)
+    webhook = service.get_webhook(webhook_id)
 
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    # Get recent deliveries
-    deliveries = db.query(WebhookDelivery).filter(
-        WebhookDelivery.webhook_id == webhook_id
-    ).order_by(WebhookDelivery.created_at.desc()).limit(20).all()
+    deliveries = service.list_webhook_deliveries(webhook_id, limit=20)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -914,28 +1085,26 @@ async def update_webhook(
     _csrf: CSRFProtect,
 ):
     """Update webhook."""
-    from app.models.notification import WebhookConfig
-
-    webhook = db.query(WebhookConfig).filter(
-        WebhookConfig.id == webhook_id,
-        WebhookConfig.is_deleted == False
-    ).first()
+    service = AdminSettingsService(db)
+    webhook = service.get_webhook(webhook_id)
 
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
     form = await request.form()
-    webhook.name = _form_str(form, "name", webhook.name) or webhook.name
-    webhook.url = _form_str(form, "url", webhook.url) or webhook.url
-    webhook.method = _form_str(form, "method", webhook.method) or webhook.method
-    webhook.auth_type = _form_str(form, "auth_type", webhook.auth_type)
-    webhook.auth_header = _form_str(form, "auth_header") or None
-    webhook.description = _form_str(form, "description") or None
-    webhook.event_types = _form_list(form, "event_types")
-    webhook.max_retries = _form_int(form, "max_retries", webhook.max_retries)
-    webhook.is_active = _form_str(form, "is_active") in ("true", "on", "1")
-
-    db.commit()
+    service.update_webhook(
+        webhook,
+        name=_form_str(form, "name", webhook.name) or webhook.name,
+        url=_form_str(form, "url", webhook.url) or webhook.url,
+        method=_form_str(form, "method", webhook.method) or webhook.method,
+        auth_type=_form_str(form, "auth_type", webhook.auth_type),
+        auth_header=_form_str(form, "auth_header") or None,
+        description=_form_str(form, "description") or None,
+        event_types=_form_list(form, "event_types"),
+        max_retries=_form_int(form, "max_retries", webhook.max_retries),
+        is_active=_form_str(form, "is_active") in ("true", "on", "1"),
+        updated_by_id=user.id,
+    )
 
     set_flash(response, f"Webhook '{webhook.name}' updated successfully.", "success")
 
@@ -952,18 +1121,13 @@ async def toggle_webhook(
     webhook_id: int,
 ):
     """Toggle webhook active status."""
-    from app.models.notification import WebhookConfig
-
-    webhook = db.query(WebhookConfig).filter(
-        WebhookConfig.id == webhook_id,
-        WebhookConfig.is_deleted == False
-    ).first()
+    service = AdminSettingsService(db)
+    webhook = service.get_webhook(webhook_id)
 
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
-    webhook.is_active = not webhook.is_active
-    db.commit()
+    webhook = service.toggle_webhook(webhook)
 
     if is_htmx_request(request):
         context = {"webhook": webhook, "can_edit": True}
@@ -983,19 +1147,14 @@ async def delete_webhook(
     webhook_id: int,
 ):
     """Delete (soft) webhook."""
-    from app.models.notification import WebhookConfig
-
-    webhook = db.query(WebhookConfig).filter(
-        WebhookConfig.id == webhook_id,
-        WebhookConfig.is_deleted == False
-    ).first()
+    service = AdminSettingsService(db)
+    webhook = service.get_webhook(webhook_id)
 
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
 
     webhook_name = webhook.name
-    webhook.is_deleted = True
-    db.commit()
+    service.delete_webhook(webhook, deleted_by_id=user.id)
 
     if is_htmx_request(request):
         response.headers["HX-Trigger"] = "webhookDeleted"
@@ -1015,14 +1174,11 @@ async def test_webhook(
     webhook_id: int,
 ):
     """Send test webhook."""
-    from app.models.notification import WebhookConfig
     import httpx
     from datetime import datetime
 
-    webhook = db.query(WebhookConfig).filter(
-        WebhookConfig.id == webhook_id,
-        WebhookConfig.is_deleted == False
-    ).first()
+    service = AdminSettingsService(db)
+    webhook = service.get_webhook(webhook_id)
 
     if not webhook:
         raise HTTPException(status_code=404, detail="Webhook not found")
@@ -1081,28 +1237,14 @@ async def groups_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Group management list."""
-    from sqlalchemy import or_
-    from app.models.auth import Group
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "groups"
 
-    # Build query
-    query = db.query(Group)
-
-    if q:
-        search_filter = or_(
-            Group.name.ilike(f"%{q}%"),
-            Group.description.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Count and paginate
-    total = query.count()
-    groups = query.order_by(Group.name).offset((page - 1) * per_page).limit(per_page).all()
+    groups, total = service.list_groups(q=q, page=page, per_page=per_page)
 
     context["page_title"] = "Groups"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -1132,15 +1274,14 @@ async def new_group_form(
     db: DB,
 ):
     """New group creation form."""
-    from app.models.rbac import Role
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "groups"
 
-    roles = db.query(Role).order_by(Role.name).all()
+    roles = service.list_roles()
 
     context["page_title"] = "New Group"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -1167,9 +1308,6 @@ async def create_group(
     _csrf: CSRFProtect,
 ):
     """Create new group."""
-    from app.models.auth import Group
-    from app.models.rbac import Role
-
     form = await request.form()
     name = _form_str(form, "name")
     description = _form_str(form, "description")
@@ -1180,40 +1318,31 @@ async def create_group(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/settings/admin/groups/new", status_code=303)
 
-    # Check for duplicate
-    existing = db.query(Group).filter(Group.name == name).first()
-    if existing:
+    service = AdminSettingsService(db)
+    group = service.create_group(
+        name=name,
+        description=description,
+        role_ids=role_ids,
+        created_by_id=user.id,
+    )
+    if not group:
         set_flash(response, f"Group '{name}' already exists.", "error")
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url="/settings/admin/groups/new", status_code=303)
 
-    # Get roles
-    roles = []
-    if role_ids:
-        roles = db.query(Role).filter(Role.id.in_(role_ids)).all()
-
-    group = Group(
-        name=name,
-        description=description,
-        is_active=True,
-        created_by_id=user.id,
-    )
-    db.add(group)
-    db.flush()
-
-    # Assign roles to group
-    from app.models.auth import GroupRole
-    for role in roles:
-        group_role = GroupRole(
-            group_id=group.id,
-            role_id=role.id,
-            assigned_by_id=user.id,
-        )
-        db.add(group_role)
-
-    db.commit()
-
     set_flash(response, f"Group '{name}' created successfully.", "success")
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.group.create",
+        user_id=user.id,
+        entity_type="group",
+        entity_id=str(group.id),
+        summary=f"Created group '{group.name}'",
+        metadata={"role_ids": role_ids},
+        request=request,
+    )
+    db.commit()
 
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/settings/admin/groups", status_code=303)
@@ -1229,10 +1358,8 @@ async def group_detail(
     group_id: int,
 ):
     """Group detail/edit page."""
-    from app.models.auth import Group, User
-    from app.models.rbac import Role
-
-    group = db.query(Group).filter(Group.id == group_id).first()
+    service = AdminSettingsService(db)
+    group = service.get_group(group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
@@ -1243,17 +1370,13 @@ async def group_detail(
     context["current_tab"] = "groups"
 
     # Get all roles for assignment
-    roles = db.query(Role).order_by(Role.name).all()
+    roles = service.list_roles()
 
     # Get current role IDs
     group_role_ids = {str(gr.role_id) for gr in group.group_roles}
 
     # Get available users (not already in group)
-    member_ids = [m.user_id for m in group.members]
-    available_users = db.query(User).filter(
-        User.is_active == True,
-        ~User.id.in_(member_ids) if member_ids else True
-    ).order_by(User.email).limit(100).all()
+    available_users = service.list_available_group_users(group)
 
     context["page_title"] = f"Group: {group.name}"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -1284,38 +1407,36 @@ async def update_group(
     _csrf: CSRFProtect,
 ):
     """Update group."""
-    from app.models.auth import Group, GroupRole
-    from app.models.rbac import Role
-
-    group = db.query(Group).filter(Group.id == group_id).first()
+    service = AdminSettingsService(db)
+    group = service.get_group(group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
     form = await request.form()
-    group.name = _form_str(form, "name", group.name) or group.name
-    group.description = _form_str(form, "description")
-    group.is_active = _form_str(form, "is_active") in ("true", "on", "1")
-
-    # Update roles
+    is_active = _form_str(form, "is_active") in ("true", "on", "1")
     role_ids = _form_list(form, "roles")
-
-    # Remove existing group roles
-    db.query(GroupRole).filter(GroupRole.group_id == group_id).delete()
-
-    # Add new roles
-    if role_ids:
-        roles = db.query(Role).filter(Role.id.in_(role_ids)).all()
-        for role in roles:
-            group_role = GroupRole(
-                group_id=group.id,
-                role_id=role.id,
-                assigned_by_id=user.id,
-            )
-            db.add(group_role)
-
-    db.commit()
+    service.update_group(
+        group,
+        name=_form_str(form, "name", group.name) or group.name,
+        description=_form_str(form, "description"),
+        is_active=is_active,
+        role_ids=role_ids,
+        updated_by_id=user.id,
+    )
 
     set_flash(response, f"Group '{group.name}' updated successfully.", "success")
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.group.update",
+        user_id=user.id,
+        entity_type="group",
+        entity_id=str(group.id),
+        summary=f"Updated group '{group.name}'",
+        metadata={"role_ids": role_ids, "is_active": is_active},
+        request=request,
+    )
+    db.commit()
 
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"/settings/admin/groups/{group_id}", status_code=303)
@@ -1331,9 +1452,8 @@ async def add_group_member(
     _csrf: CSRFProtect,
 ):
     """Add member to group."""
-    from app.models.auth import Group, GroupMember
-
-    group = db.query(Group).filter(Group.id == group_id).first()
+    service = AdminSettingsService(db)
+    group = service.get_group(group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
@@ -1345,23 +1465,26 @@ async def add_group_member(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=f"/settings/admin/groups/{group_id}", status_code=303)
 
-    # Check if already a member
-    existing = db.query(GroupMember).filter(
-        GroupMember.group_id == group_id,
-        GroupMember.user_id == user_id
-    ).first()
-
-    if existing:
+    added = service.add_group_member(
+        group_id=group_id,
+        user_id=user_id,
+        added_by_id=user.id,
+    )
+    if not added:
         set_flash(response, "User is already a member of this group.", "warning")
     else:
-        member = GroupMember(
-            group_id=group_id,
-            user_id=user_id,
-            added_by_id=user.id,
-        )
-        db.add(member)
-        db.commit()
         set_flash(response, "Member added successfully.", "success")
+        activity_logger = ActivityLogger(db)
+        activity_logger.log(
+            action="rbac.group.member.add",
+            user_id=user.id,
+            entity_type="group",
+            entity_id=str(group_id),
+            summary=f"Added member to group '{group.name}'",
+            metadata={"member_user_id": user_id},
+            request=request,
+        )
+        db.commit()
 
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"/settings/admin/groups/{group_id}", status_code=303)
@@ -1377,22 +1500,36 @@ async def remove_group_member(
     member_user_id: int,
 ):
     """Remove member from group."""
-    from app.models.auth import GroupMember
-
-    member = db.query(GroupMember).filter(
-        GroupMember.group_id == group_id,
-        GroupMember.user_id == member_user_id
-    ).first()
-
-    if member:
-        db.delete(member)
-        db.commit()
+    service = AdminSettingsService(db)
+    service.remove_group_member(group_id=group_id, user_id=member_user_id)
 
     if is_htmx_request(request):
+        activity_logger = ActivityLogger(db)
+        activity_logger.log(
+            action="rbac.group.member.remove",
+            user_id=user.id,
+            entity_type="group",
+            entity_id=str(group_id),
+            summary="Removed member from group",
+            metadata={"member_user_id": member_user_id},
+            request=request,
+        )
+        db.commit()
         response.headers["HX-Trigger"] = "memberRemoved"
         return HTMLResponse("")
 
     set_flash(response, "Member removed.", "success")
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.group.member.remove",
+        user_id=user.id,
+        entity_type="group",
+        entity_id=str(group_id),
+        summary="Removed member from group",
+        metadata={"member_user_id": member_user_id},
+        request=request,
+    )
+    db.commit()
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"/settings/admin/groups/{group_id}", status_code=303)
 
@@ -1406,21 +1543,39 @@ async def delete_group(
     group_id: int,
 ):
     """Delete group."""
-    from app.models.auth import Group
-
-    group = db.query(Group).filter(Group.id == group_id).first()
+    service = AdminSettingsService(db)
+    group = service.get_group(group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
     group_name = group.name
-    db.delete(group)
-    db.commit()
+    service.delete_group(group)
 
     if is_htmx_request(request):
+        activity_logger = ActivityLogger(db)
+        activity_logger.log(
+            action="rbac.group.delete",
+            user_id=user.id,
+            entity_type="group",
+            entity_id=str(group_id),
+            summary=f"Deleted group '{group_name}'",
+            request=request,
+        )
+        db.commit()
         response.headers["HX-Trigger"] = "groupDeleted"
         return HTMLResponse("")
 
     set_flash(response, f"Group '{group_name}' deleted.", "success")
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.group.delete",
+        user_id=user.id,
+        entity_type="group",
+        entity_id=str(group_id),
+        summary=f"Deleted group '{group_name}'",
+        request=request,
+    )
+    db.commit()
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/settings/admin/groups", status_code=303)
 
@@ -1439,9 +1594,7 @@ async def permissions_browser(
     category: Optional[str] = Query(None, description="Filter by category"),
 ):
     """Browse all permissions organized by category."""
-    from app.models.rbac import Permission
-    from app.models.auth import PermissionCategory
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
@@ -1449,19 +1602,8 @@ async def permissions_browser(
     context["current_tab"] = "permissions"
 
     # Get all categories
-    categories = db.query(PermissionCategory).order_by(
-        PermissionCategory.display_order,
-        PermissionCategory.name
-    ).all()
-
-    # Get permissions
-    query = db.query(Permission)
-    if category:
-        cat = db.query(PermissionCategory).filter(PermissionCategory.name == category).first()
-        if cat:
-            query = query.filter(Permission.category_id == cat.id)
-
-    permissions = query.order_by(Permission.category, Permission.name).all()
+    categories = service.list_permission_categories()
+    permissions = service.list_permissions_for_category(category)
 
     # Group permissions by category (fallback to string category if no category_id)
     permission_groups: dict[str, list] = {}
@@ -1505,36 +1647,14 @@ async def sessions_list(
     per_page: int = Query(50, ge=10, le=100),
 ):
     """List all active sessions."""
-    from sqlalchemy import and_
-    from app.models.auth import UserSession, User
-    from app.utils.datetime_utils import utc_now
-
+    service = AdminSettingsService(db)
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "admin")
     context["admin_tabs"] = ADMIN_TABS
     context["current_tab"] = "sessions"
 
-    now = utc_now()
-
-    # Build query for active sessions
-    query = db.query(UserSession).filter(
-        and_(
-            UserSession.is_active == True,
-            UserSession.expires_at > now,
-            UserSession.revoked_at.is_(None),
-        )
-    )
-
-    if q:
-        # Join with user to filter by email
-        query = query.join(User).filter(User.email.ilike(f"%{q}%"))
-
-    # Count and paginate
-    total = query.count()
-    sessions = query.order_by(UserSession.last_activity_at.desc()).offset(
-        (page - 1) * per_page
-    ).limit(per_page).all()
+    sessions, total = service.list_active_sessions(q=q, page=page, per_page=per_page)
 
     context["page_title"] = "Active Sessions"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -1564,18 +1684,26 @@ async def revoke_session(
     session_id: str,
 ):
     """Revoke a user session."""
-    from app.services.session_service import SessionService
-
-    session_service = SessionService(db)
-    success = session_service.revoke_session(
+    service = AdminSettingsService(db)
+    success = service.revoke_session(
         session_id=session_id,
         revoked_by_id=user.id,
         reason="Revoked by administrator"
     )
-    db.commit()
 
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="session.revoke",
+        user_id=user.id,
+        entity_type="session",
+        entity_id=session_id,
+        summary="Revoked a user session",
+        request=request,
+    )
+    db.commit()
 
     if is_htmx_request(request):
         response.headers["HX-Trigger"] = "sessionRevoked"
@@ -1596,10 +1724,10 @@ async def user_sessions(
     user_id: int,
 ):
     """List sessions for a specific user."""
-    from app.models.auth import User
     from app.services.session_service import SessionService
 
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -1638,18 +1766,26 @@ async def revoke_all_user_sessions(
     user_id: int,
 ):
     """Revoke all sessions for a user."""
-    from app.models.auth import User
-    from app.services.session_service import SessionService
-
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    session_service = SessionService(db)
-    count = session_service.revoke_all_sessions(
+    count = service.revoke_all_sessions(
         user_id=user_id,
         revoked_by_id=user.id,
         reason="All sessions revoked by administrator"
+    )
+
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="session.revoke_all",
+        user_id=user.id,
+        entity_type="session",
+        entity_id=str(user_id),
+        summary=f"Revoked all sessions for {target_user.email}",
+        metadata={"revoked_count": count, "target_user_id": user_id},
+        request=request,
     )
     db.commit()
 
@@ -1673,12 +1809,11 @@ async def user_permissions(
     user_id: int,
 ):
     """View and manage direct permissions for a user."""
-    from app.models.auth import User, UserPermission
-    from app.models.rbac import Permission
     from app.services.rbac_service import RBACService
     from app.feature_flags import feature_flags
 
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -1695,12 +1830,10 @@ async def user_permissions(
         effective_permissions = await rbac_service.get_effective_permissions(user_id)
 
     # Get direct permissions
-    direct_permissions = db.query(UserPermission).filter(
-        UserPermission.user_id == user_id
-    ).all()
+    direct_permissions = service.list_user_permissions(user_id)
 
     # Get all available permissions
-    all_permissions = db.query(Permission).order_by(Permission.category, Permission.name).all()
+    all_permissions = service.list_permissions()
 
     # Group permissions by category
     permission_groups: dict[str, list] = {}
@@ -1739,10 +1872,8 @@ async def add_user_permission(
     _csrf: CSRFProtect,
 ):
     """Add direct permission to user."""
-    from app.models.auth import User, UserPermission
-    from app.models.rbac import Permission
-
-    target_user = db.query(User).filter(User.id == user_id).first()
+    service = AdminSettingsService(db)
+    target_user = service.get_user(user_id)
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -1756,27 +1887,28 @@ async def add_user_permission(
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=f"/settings/admin/users/{user_id}/permissions", status_code=303)
 
-    # Check if already granted
-    existing = db.query(UserPermission).filter(
-        UserPermission.user_id == user_id,
-        UserPermission.permission_id == permission_id
-    ).first()
-
-    if existing:
-        existing.grant_type = grant_type
-        existing.reason = reason
-        set_flash(response, "Permission updated.", "success")
-    else:
-        perm = UserPermission(
-            user_id=user_id,
-            permission_id=permission_id,
-            grant_type=grant_type,
-            reason=reason,
-            created_by_id=user.id,
-        )
-        db.add(perm)
+    created = service.add_user_permission(
+        user_id=user_id,
+        permission_id=permission_id,
+        grant_type=grant_type,
+        reason=reason,
+        created_by_id=user.id,
+    )
+    if created:
         set_flash(response, "Permission added.", "success")
+    else:
+        set_flash(response, "Permission updated.", "success")
 
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.permission.assign",
+        user_id=user.id,
+        entity_type="permission",
+        entity_id=str(permission_id),
+        summary=f"Assigned permission to {target_user.email}",
+        metadata={"target_user_id": user_id, "grant_type": grant_type, "reason": reason},
+        request=request,
+    )
     db.commit()
 
     from fastapi.responses import RedirectResponse
@@ -1793,21 +1925,35 @@ async def remove_user_permission(
     permission_id: int,
 ):
     """Remove direct permission from user."""
-    from app.models.auth import UserPermission
-
-    perm = db.query(UserPermission).filter(
-        UserPermission.user_id == user_id,
-        UserPermission.permission_id == permission_id
-    ).first()
-
-    if perm:
-        db.delete(perm)
-        db.commit()
+    service = AdminSettingsService(db)
+    service.remove_user_permission(user_id=user_id, permission_id=permission_id)
 
     if is_htmx_request(request):
+        activity_logger = ActivityLogger(db)
+        activity_logger.log(
+            action="rbac.permission.revoke",
+            user_id=user.id,
+            entity_type="permission",
+            entity_id=str(permission_id),
+            summary=f"Removed permission from user {user_id}",
+            metadata={"target_user_id": user_id},
+            request=request,
+        )
+        db.commit()
         response.headers["HX-Trigger"] = "permissionRemoved"
         return HTMLResponse("")
 
     set_flash(response, "Permission removed.", "success")
+    activity_logger = ActivityLogger(db)
+    activity_logger.log(
+        action="rbac.permission.revoke",
+        user_id=user.id,
+        entity_type="permission",
+        entity_id=str(permission_id),
+        summary=f"Removed permission from user {user_id}",
+        metadata={"target_user_id": user_id},
+        request=request,
+    )
+    db.commit()
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url=f"/settings/admin/users/{user_id}/permissions", status_code=303)

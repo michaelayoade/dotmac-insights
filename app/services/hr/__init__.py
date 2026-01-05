@@ -294,6 +294,11 @@ from app.services.hr.settings_types import (
 from app.services.hr.analytics import HRAnalyticsService
 from app.services.hr.analytics_types import (
     HRDashboardSummary,
+    HRDashboardData,
+    HRDashboardStats,
+    DepartmentStat,
+    WorkAnniversary,
+    NextPayroll,
     ModuleSummary,
     HeadcountByDepartment,
     DepartmentHeadcountTrend,
@@ -568,6 +573,11 @@ __all__ = [
     "DeductionConfigUpdateData",
     # Analytics types
     "HRDashboardSummary",
+    "HRDashboardData",
+    "HRDashboardStats",
+    "DepartmentStat",
+    "WorkAnniversary",
+    "NextPayroll",
     "ModuleSummary",
     "HeadcountByDepartment",
     "DepartmentHeadcountTrend",

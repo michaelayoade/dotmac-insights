@@ -7,10 +7,11 @@
         action="{% if project %}/projects/{{ project.id }}{% else %}/projects{% endif %}"
         class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden"
         data-testid="project-form"
+        novalidate
         x-data="{ submitting: false }"
         @submit="submitting = true"
     >
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <!-- Header -->
         <div class="px-6 py-5 border-b border-gray-100">

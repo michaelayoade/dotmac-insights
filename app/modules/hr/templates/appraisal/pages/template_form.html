@@ -3,7 +3,7 @@
 {% block content %}
 <div class="max-w-2xl mx-auto">
     <form method="POST" action="{{ '/hr/appraisal/templates/' ~ template.id if template else '/hr/appraisal/templates' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
-        <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="px-6 py-5 border-b border-gray-100">
             <h3 class="text-lg font-display font-semibold text-gray-900">{{ 'Edit Appraisal Template' if template else 'New Appraisal Template' }}</h3>
             <p class="mt-1 text-sm text-gray-500">{{ 'Update template details' if template else 'Create a new appraisal template' }}</p>

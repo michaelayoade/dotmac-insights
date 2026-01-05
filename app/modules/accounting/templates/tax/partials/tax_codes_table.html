@@ -1,4 +1,4 @@
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="tax-codes-table">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50/50">
@@ -16,7 +16,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-gray-100">
                 {% for tc in tax_codes %}
-                <tr class="hover:bg-gray-50/50 transition-colors duration-150">
+                <tr class="hover:bg-surface-50/50 transition-colors duration-150">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <a href="/accounting/tax-codes/{{ tc.id }}" class="text-sm font-semibold text-primary-600 hover:text-primary-700">
                             {{ tc.code }}
@@ -55,7 +55,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="7" class="px-6 py-12 text-center">
+                    <td colspan="7" class="px-6 py-12 text-center" data-testid="tax-codes-empty-state">
                         <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                         </svg>

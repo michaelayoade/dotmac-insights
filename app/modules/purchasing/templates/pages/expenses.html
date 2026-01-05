@@ -7,7 +7,7 @@
             <h1 class="text-2xl font-display font-bold text-gray-900">Expenses</h1>
             <p class="mt-1 text-sm text-gray-500">Company expenses and categorization</p>
         </div>
-        <a href="/purchasing/dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+        <a href="/purchasing/dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
             Dashboard
         </a>
     </div>
@@ -52,13 +52,21 @@
                     {% endfor %}
                 </div>
                 {% if total_pages > 1 %}
-                <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                    <span class="text-sm text-gray-500">Page {{ page }} of {{ total_pages }}</span>
-                    <div class="flex gap-2">
-                        {% if page > 1 %}<a href="?page={{ page - 1 }}" class="px-3 py-1 text-sm bg-white ring-1 ring-gray-200 rounded-lg hover:bg-gray-50">Previous</a>{% endif %}
-                        {% if page < total_pages %}<a href="?page={{ page + 1 }}" class="px-3 py-1 text-sm bg-white ring-1 ring-gray-200 rounded-lg hover:bg-gray-50">Next</a>{% endif %}
-                    </div>
-                </div>
+                {% set pagination = {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "total_pages": total_pages,
+                    "has_prev": page > 1,
+                    "has_next": page < total_pages,
+                    "prev_page": (page - 1) if page > 1 else None,
+                    "next_page": (page + 1) if page < total_pages else None,
+                    "start_item": ((page - 1) * per_page) + 1,
+                    "end_item": [page * per_page, total]|min
+                } %}
+                {% with pagination=pagination, base_url="/purchasing/expenses" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
                 {% endif %}
             </div>
         </div>

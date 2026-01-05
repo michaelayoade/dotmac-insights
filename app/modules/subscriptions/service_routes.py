@@ -18,8 +18,6 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Request, Response, Depends, Query, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy.orm import joinedload
-
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
     get_base_context,
@@ -29,11 +27,10 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.core.security import is_htmx_request, htmx_toast, set_flash
-from app.models.invoice import Invoice
-from app.models.subscription import Subscription
 from app.services.types import PaginationParams
 from app.services.subscriptions import (
     SubscriptionReportsService,
+    SubscriptionService,
     UsageService,
     SessionService,
     ProvisioningService,
@@ -46,6 +43,7 @@ from app.services.subscriptions import (
     RADIUSCredentialConfigService,
     ServiceTypeConfig,
 )
+from app.services.accounting.invoices import InvoiceService
 from app.services.subscriptions.subscription_types import (
     UsageFilters,
     SessionFilters,
@@ -201,13 +199,41 @@ async def subscriptions_usage(
     subscription_ids = {item.subscription_id for item in result.items}
     subscriptions = {}
     if subscription_ids:
-        subs = (
-            db.query(Subscription)
-            .options(joinedload(Subscription.party))
-            .filter(Subscription.id.in_(subscription_ids))
-            .all()
+        subscription_service = SubscriptionService(db, principal=user)
+        subs = subscription_service.list_subscriptions_by_ids(
+            list(subscription_ids),
+            include_relations=True,
         )
         subscriptions = {sub.id: sub for sub in subs}
+
+    # Compute stats from usage records
+    total_download_gb = sum(r.download_gb for r in result.items)
+    total_upload_gb = sum(r.upload_gb for r in result.items)
+    total_gb = total_download_gb + total_upload_gb
+    unique_subscribers = len({r.subscription_id for r in result.items})
+
+    stats = {
+        "total_download_gb": total_download_gb,
+        "total_upload_gb": total_upload_gb,
+        "total_gb": total_gb,
+        "unique_subscribers": unique_subscribers,
+    }
+
+    # Prepare chart data - aggregate by date
+    date_usage: dict[str, dict[str, float]] = {}
+    for record in result.items:
+        date_str = str(record.usage_date)
+        if date_str not in date_usage:
+            date_usage[date_str] = {"download": 0.0, "upload": 0.0}
+        date_usage[date_str]["download"] += float(record.download_gb)
+        date_usage[date_str]["upload"] += float(record.upload_gb)
+
+    sorted_dates = sorted(date_usage.keys())
+    chart_data = {
+        "labels": sorted_dates,
+        "download": [date_usage[d]["download"] for d in sorted_dates],
+        "upload": [date_usage[d]["upload"] for d in sorted_dates],
+    }
 
     context = _build_service_context(
         request,
@@ -220,6 +246,8 @@ async def subscriptions_usage(
     )
     context["usage_records"] = result.items
     context["subscriptions_lookup"] = subscriptions
+    context["stats"] = stats
+    context["chart_data"] = chart_data
     context["filters"] = {
         "subscription_id": subscription_id,
         "party_id": party_id,
@@ -566,13 +594,10 @@ async def subscriptions_finance(
     churn_summary = reports.get_churn_summary()
 
     finance = SubscriptionFinanceService(db, principal=user)
-    recent_invoices = (
-        db.query(Invoice)
-        .filter(Invoice.is_deleted == False)
-        .order_by(Invoice.invoice_date.desc())
-        .limit(20)
-        .all()
-    )
+    invoice_service = InvoiceService(db, principal=user)
+    recent_invoices = invoice_service.list_invoices(
+        pagination=PaginationParams(offset=0, limit=20)
+    ).items
 
     ar_balance = None
     subscription_summary = None

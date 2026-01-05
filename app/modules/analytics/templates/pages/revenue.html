@@ -66,7 +66,7 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for t in territories %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-surface-50">
                     <td class="px-4 py-3 text-sm text-gray-900">{{ t.territory | default("Unknown") }}</td>
                     <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ "{:,}".format(t.customer_count | default(0)) }}</td>
                     <td class="px-4 py-3 text-sm font-medium text-gray-900 text-right">{{ "{:,.0f}".format(t.mrr | default(0)) }}</td>

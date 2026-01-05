@@ -91,7 +91,7 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for agent in agents[:10] %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-surface-50">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ agent.name }}</td>
                     <td class="px-4 py-3 text-sm text-gray-600">{{ agent.department | default("-") }}</td>
                     <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ agent.total_tickets }}</td>

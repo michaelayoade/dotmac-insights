@@ -28,6 +28,7 @@ from app.models.asset import (
 from app.services.base import paginate, safe_filter, scoped_query
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     AssetFilters,
@@ -250,6 +251,10 @@ class AssetService:
 
         # Create finance books
         self._create_finance_books(asset, data.finance_books, category)
+        validator = SoftValidationService(self.db)
+        for fb in asset.finance_books:
+            validator.validate_and_store(fb)
+        validator.validate_and_store(asset)
 
         return asset
 
@@ -388,6 +393,7 @@ class AssetService:
 
         asset.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     def delete_asset(self, asset_id: int) -> None:
@@ -461,6 +467,7 @@ class AssetService:
         asset.updated_at = datetime.utcnow()
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     def _generate_depreciation_schedule(self, asset: Asset) -> None:
@@ -489,6 +496,7 @@ class AssetService:
                     depreciation_booked=False,
                 )
                 self.db.add(schedule)
+                SoftValidationService(self.db).validate_and_store(schedule)
 
         self.db.flush()
 
@@ -520,6 +528,7 @@ class AssetService:
         asset.status = AssetStatus.IN_MAINTENANCE
         asset.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     def complete_maintenance(self, asset_id: int) -> Asset:
@@ -558,6 +567,7 @@ class AssetService:
 
         asset.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(asset)
         return asset
 
     # -------------------------------------------------------------------------

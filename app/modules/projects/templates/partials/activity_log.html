@@ -55,3 +55,36 @@
     </div>
     {% endif %}
 </div>
+
+{% if activities %}
+<div class="mt-4 flex items-center justify-between text-sm">
+    {% set prev_offset = (activity_offset - activity_limit) if activity_offset and activity_offset >= activity_limit else 0 %}
+    {% set next_offset = (activity_offset + activity_limit) if activity_limit else 0 %}
+    <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-gray-600 hover:bg-surface-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        hx-get="/projects/{{ project_id }}/activity?limit={{ activity_limit }}&offset={{ prev_offset }}"
+        hx-target="#activity-log"
+        hx-swap="outerHTML"
+        {% if not activity_offset or activity_offset <= 0 %}disabled{% endif %}
+    >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        <span>Newer</span>
+    </button>
+    <button
+        type="button"
+        class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-1.5 text-gray-600 hover:bg-surface-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        hx-get="/projects/{{ project_id }}/activity?limit={{ activity_limit }}&offset={{ next_offset }}"
+        hx-target="#activity-log"
+        hx-swap="outerHTML"
+        {% if activities|length < activity_limit %}disabled{% endif %}
+    >
+        <span>Older</span>
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+    </button>
+</div>
+{% endif %}

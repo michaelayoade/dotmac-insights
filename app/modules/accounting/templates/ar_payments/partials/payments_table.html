@@ -18,7 +18,7 @@
 } %}
 
 {% if payments %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="payments-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
@@ -74,7 +74,7 @@
                     {{ payment.payment_date.strftime('%b %d, %Y') if payment.payment_date else '-' }}
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm">
-                    <span class="inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(payment.status.value.upper() if payment.status else 'PENDING', status_colors['PENDING']) }}">
+                    <span class="badge inline-flex items-center rounded-lg px-2 py-1 text-xs font-medium ring-1 ring-inset {{ status_colors.get(payment.status.value.upper() if payment.status else 'PENDING', status_colors['PENDING']) }}" data-status="{{ payment.status.value if payment.status else 'pending' }}">
                         {{ payment.status.value.title() if payment.status else 'Pending' }}
                     </span>
                 </td>
@@ -109,7 +109,7 @@
 {% endif %}
 {% else %}
 <!-- Empty State -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="empty-state bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center data-testid="payments-empty-state"> data-testid="empty-state">
     <div class="mx-auto w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-6">
         <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>

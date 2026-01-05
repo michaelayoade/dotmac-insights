@@ -17,6 +17,7 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.accounting import FiscalYear, Account, JournalEntry
@@ -83,7 +84,7 @@ class ExchangeRateSource(enum.Enum):
 # FISCAL PERIOD
 # =============================================================================
 
-class FiscalPeriod(Base):
+class FiscalPeriod(SoftValidationMixin, Base):
     """Fiscal period for period-based closing and posting control."""
 
     __tablename__ = "fiscal_periods"
@@ -378,7 +379,7 @@ class AuditLog(Base):
 # EXCHANGE RATE
 # =============================================================================
 
-class ExchangeRate(Base):
+class ExchangeRate(SoftValidationMixin, Base):
     """Exchange rate history for multi-currency support."""
 
     __tablename__ = "exchange_rates"

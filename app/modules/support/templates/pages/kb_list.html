@@ -32,7 +32,7 @@
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                     <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -45,7 +45,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
                     <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,7 +58,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,7 +75,7 @@
     </div>
 
     <!-- Search and Filters -->
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <div class="flex flex-col lg:flex-row gap-4">
             <!-- Search -->
             <div class="flex-1">
@@ -107,6 +107,9 @@
                         @click="open = !open"
                         @click.outside="open = false"
                         type="button"
+                        :aria-expanded="open"
+                        aria-controls="kb-status-filter"
+                        aria-haspopup="menu"
                         class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_status else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -125,6 +128,7 @@
                         x-transition:leave="transition ease-in duration-75"
                         x-transition:leave-start="opacity-100 scale-100"
                         x-transition:leave-end="opacity-0 scale-95"
+                        id="kb-status-filter"
                         class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-100 py-1"
                         style="display: none;"
                     >
@@ -155,6 +159,9 @@
                         @click="open = !open"
                         @click.outside="open = false"
                         type="button"
+                        :aria-expanded="open"
+                        aria-controls="kb-category-filter"
+                        aria-haspopup="menu"
                         class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_category_id else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -177,6 +184,7 @@
                         x-transition:leave="transition ease-in duration-75"
                         x-transition:leave-start="opacity-100 scale-100"
                         x-transition:leave-end="opacity-0 scale-95"
+                        id="kb-category-filter"
                         class="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-xl bg-white shadow-lg ring-1 ring-gray-100 py-1 max-h-64 overflow-y-auto"
                         style="display: none;"
                     >

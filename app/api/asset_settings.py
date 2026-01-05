@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.auth import Require
 from app.models.asset_settings import AssetSettings
+from app.services.validation.soft_validation_service import SoftValidationService
 
 router = APIRouter(prefix="/assets/settings", tags=["asset-settings"])
 
@@ -79,6 +80,7 @@ def get_asset_settings(
             insurance_alert_days=30,
         )
         db.add(settings)
+        SoftValidationService(db).validate_and_store(settings)
         db.commit()
         db.refresh(settings)
 
@@ -106,6 +108,7 @@ def update_asset_settings(
     for field, value in update_data.items():
         setattr(settings, field, value)
 
+    SoftValidationService(db).validate_and_store(settings)
     db.commit()
     db.refresh(settings)
 

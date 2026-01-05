@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from sqlalchemy import func
+from sqlalchemy import Integer, func
 from sqlalchemy.orm import Session
 
 from app.models.omni import OmniConversation
@@ -463,8 +463,8 @@ class AutomationService:
                 message="No agent_id provided",
             )
 
-        if hasattr(entity, "assigned_agent_id"):
-            entity.assigned_agent_id = int(agent_id)
+        if hasattr(entity, "assigned_party_id"):
+            entity.assigned_party_id = int(agent_id)
             if hasattr(entity, "assigned_at"):
                 entity.assigned_at = datetime.now(timezone.utc)
             self.db.flush()
@@ -477,7 +477,7 @@ class AutomationService:
         return ActionResult(
             action_type="assign_agent",
             success=False,
-            message="Entity has no assigned_agent_id field",
+            message="Entity has no assigned_party_id field",
         )
 
     def _handle_assign_team(
@@ -577,6 +577,103 @@ class AutomationService:
         )
 
         return rules, total
+
+    def get_rule_execution_stats(
+        self,
+        start_date: datetime,
+    ) -> Dict[int, Dict[str, int]]:
+        """Get execution stats per rule starting from a date.
+
+        Args:
+            start_date: Only include logs from this datetime.
+
+        Returns:
+            Dict mapping rule_id to {"total": int, "success": int}.
+        """
+        rows = (
+            self.db.query(
+                AutomationLogModel.rule_id,
+                func.count(AutomationLogModel.id).label("total"),
+                func.sum(func.cast(AutomationLogModel.success, Integer)).label("success"),
+            )
+            .filter(AutomationLogModel.created_at >= start_date)
+            .group_by(AutomationLogModel.rule_id)
+            .all()
+        )
+
+        return {
+            row.rule_id: {
+                "total": row.total or 0,
+                "success": row.success or 0,
+            }
+            for row in rows
+        }
+
+    def get_rule_log_stats(
+        self,
+        rule_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, float]:
+        """Get aggregated log stats for a specific rule.
+
+        Args:
+            rule_id: Automation rule ID.
+            start_date: Optional start datetime filter.
+            end_date: Optional end datetime filter.
+
+        Returns:
+            Dict with total, success, and avg_time_ms.
+        """
+        query = self.db.query(
+            func.count(AutomationLogModel.id).label("total"),
+            func.sum(func.cast(AutomationLogModel.success, Integer)).label("success"),
+            func.avg(AutomationLogModel.execution_time_ms).label("avg_time"),
+        ).filter(AutomationLogModel.rule_id == rule_id)
+
+        if start_date:
+            query = query.filter(AutomationLogModel.created_at >= start_date)
+        if end_date:
+            query = query.filter(AutomationLogModel.created_at <= end_date)
+
+        stats = query.first()
+        return {
+            "total": stats.total if stats else 0,
+            "success": stats.success or 0 if stats else 0,
+            "avg_time_ms": float(stats.avg_time or 0) if stats else 0.0,
+        }
+
+    def get_logs_stats(
+        self,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, float]:
+        """Get aggregated stats for automation logs.
+
+        Args:
+            start_date: Optional start datetime filter.
+            end_date: Optional end datetime filter.
+
+        Returns:
+            Dict with total, success, and avg_time_ms.
+        """
+        query = self.db.query(
+            func.count(AutomationLogModel.id).label("total"),
+            func.sum(func.cast(AutomationLogModel.success, Integer)).label("success"),
+            func.avg(AutomationLogModel.execution_time_ms).label("avg_time"),
+        )
+
+        if start_date:
+            query = query.filter(AutomationLogModel.created_at >= start_date)
+        if end_date:
+            query = query.filter(AutomationLogModel.created_at <= end_date)
+
+        stats = query.first()
+        return {
+            "total": stats.total if stats else 0,
+            "success": stats.success or 0 if stats else 0,
+            "avg_time_ms": float(stats.avg_time or 0) if stats else 0.0,
+        }
 
     def get_db_rule(self, rule_id: int) -> Optional[AutomationRuleModel]:
         """Get an automation rule by ID.
@@ -800,6 +897,16 @@ class AutomationService:
         )
 
         return logs, total
+
+    def list_distinct_triggers(self) -> List[str]:
+        """List distinct automation triggers from logs."""
+        rows = (
+            self.db.query(AutomationLogModel.trigger)
+            .distinct()
+            .order_by(AutomationLogModel.trigger)
+            .all()
+        )
+        return [row[0] for row in rows if row[0]]
 
     def get_logs_summary(
         self,

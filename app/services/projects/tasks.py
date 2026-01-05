@@ -13,12 +13,13 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.project import Project, ProjectActivityType
 from app.models.task import Task, TaskStatus, TaskPriority, TaskDependency
 from app.models.employee import Employee
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
 
 from .activities import ActivityService
 from .activity_types import ActivityCreateData
@@ -163,6 +164,38 @@ class TaskService:
             limit=pagination.limit,
         )
 
+    def list_active_tasks_for_employee(
+        self,
+        employee_id: int,
+        limit: int = 10,
+    ) -> List[Task]:
+        """List active tasks assigned to an employee."""
+        return (
+            self.db.query(Task)
+            .filter(
+                Task.assigned_to_id == employee_id,
+                Task.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
+            )
+            .order_by(Task.exp_end_date)
+            .limit(limit)
+            .all()
+        )
+
+    def list_tasks_with_dependencies(
+        self,
+        project_id: int,
+        limit: int = 1000,
+    ) -> List[Task]:
+        """List tasks for a project with dependencies eager-loaded."""
+        return (
+            self.db.query(Task)
+            .options(joinedload(Task.depends_on))
+            .filter(Task.project_id == project_id)
+            .order_by(Task.created_at)
+            .limit(limit)
+            .all()
+        )
+
     def get_task(self, task_id: int) -> Task:
         """Get a task by ID.
 
@@ -215,6 +248,19 @@ class TaskService:
             .order_by(Task.created_at)
             .all()
         )
+
+    def get_status_counts(self) -> dict:
+        """Get overall task status counts for dashboards."""
+        today = date.today()
+        return {
+            "open": self.db.query(Task).filter(Task.status == TaskStatus.OPEN).count(),
+            "working": self.db.query(Task).filter(Task.status == TaskStatus.WORKING).count(),
+            "overdue": self.db.query(Task).filter(
+                Task.exp_end_date < today,
+                Task.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
+            ).count(),
+            "completed": self.db.query(Task).filter(Task.status == TaskStatus.COMPLETED).count(),
+        }
 
     # -------------------------------------------------------------------------
     # Mutation Methods
@@ -306,6 +352,16 @@ class TaskService:
             company=task.company,
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="projects.task.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="task",
+            entity_id=str(task.id),
+            summary=f"Created task {task.subject}",
+            metadata={"status": task.status.value if task.status else None},
+        )
         return task
 
     def update_task(self, task_id: int, data: TaskUpdateData) -> Task:
@@ -481,6 +537,16 @@ class TaskService:
                 company=task.company,
             )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="projects.task.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="task",
+            entity_id=str(task.id),
+            summary=f"Updated task {task.subject}",
+            metadata={"changed_fields": changed_fields, "status": task.status.value},
+        )
         return task
 
     def delete_task(self, task_id: int) -> None:
@@ -493,6 +559,15 @@ class TaskService:
             TaskNotFoundError: If task does not exist
         """
         task = self.get_task(task_id)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="projects.task.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="task",
+            entity_id=str(task.id),
+            summary=f"Deleted task {task.subject}",
+        )
         self.db.delete(task)
 
     # -------------------------------------------------------------------------

@@ -7,13 +7,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Request, Response, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Request, Response, Depends, UploadFile
 from fastapi.responses import HTMLResponse
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import get_base_context, get_navigation_context, build_breadcrumbs
 from app.templates.environment import get_template_env
-from app.core.security import is_htmx_request, set_flash
+from app.core.security import set_flash
+from app.services.settings_hr_service import SettingsHRService
 
 # Permission dependencies
 RequireHRSettingsRead = Depends(require_scope("hr:settings:read"))
@@ -81,18 +82,14 @@ async def hr_settings_index(
     db: DB,
 ):
     """HR settings - general configuration with collapsible sections."""
-    from app.models.hr_settings import HRSettings
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "hr")
     context["hr_tabs"] = HR_TABS
     context["current_tab"] = "general"
 
-    # Get or create settings
-    settings = db.query(HRSettings).filter(HRSettings.company == None).first()
-    if not settings:
-        settings = HRSettings()
+    service = SettingsHRService(db)
+    settings = service.get_settings()
 
     context["page_title"] = "HR Settings"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -118,49 +115,38 @@ async def save_hr_settings(
     _csrf: CSRFProtect,
 ):
     """Save HR settings."""
-    from app.models.hr_settings import HRSettings
-
     form = await request.form()
 
-    settings = db.query(HRSettings).filter(HRSettings.company == None).first()
-    if not settings:
-        settings = HRSettings()
-        db.add(settings)
-
-    settings_any: Any = settings
-
-    # Update leave policy fields
-    settings_any.max_carryforward_days = _form_int(form, "max_carryforward_days", 5)
-    settings_any.min_leave_notice_days = _form_int(form, "min_leave_notice_days", 1)
-    settings_any.allow_negative_leave_balance = _form_bool(form, "allow_negative_leave_balance")
-    settings_any.sick_leave_auto_approve_days = _form_int(form, "sick_leave_auto_approve_days", 0)
-    settings_any.medical_certificate_required_after_days = _form_int(form, "medical_certificate_required_after_days", 2)
-
-    # Attendance fields
-    settings_any.late_entry_grace_minutes = _form_int(form, "late_entry_grace_minutes", 15)
-    settings_any.half_day_hours_threshold = _form_float(form, "half_day_hours_threshold", 4.0)
-    settings_any.geolocation_required = _form_bool(form, "geolocation_required")
-    settings_any.geolocation_radius_meters = _form_int(form, "geolocation_radius_meters", 100)
-
-    # Payroll fields
-    settings_any.salary_payment_day = _form_int(form, "salary_payment_day", 25)
-    settings_any.payroll_cutoff_day = _form_int(form, "payroll_cutoff_day", 20)
-    settings_any.allow_salary_advance = _form_bool(form, "allow_salary_advance")
-    settings_any.max_advance_percent = _form_int(form, "max_advance_percent", 50)
-
-    # Benefits fields
-    settings_any.gratuity_enabled = _form_bool(form, "gratuity_enabled")
-    settings_any.pension_enabled = _form_bool(form, "pension_enabled")
-    settings_any.pension_employer_percent = _form_float(form, "pension_employer_percent", 10.0)
-    settings_any.pension_employee_percent = _form_float(form, "pension_employee_percent", 8.0)
-
-    # Compliance fields
-    settings_any.standard_work_hours_per_day = _form_float(form, "standard_work_hours_per_day", 8.0)
-    settings_any.max_work_hours_per_day = _form_float(form, "max_work_hours_per_day", 12.0)
-    settings_any.default_probation_months = _form_int(form, "default_probation_months", 3)
-    settings_any.default_notice_period_days = _form_int(form, "default_notice_period_days", 30)
-
-    db.commit()
+    service = SettingsHRService(db)
+    values: dict[str, Any] = {
+        # Leave policy fields
+        "max_carryforward_days": _form_int(form, "max_carryforward_days", 5),
+        "min_leave_notice_days": _form_int(form, "min_leave_notice_days", 1),
+        "allow_negative_leave_balance": _form_bool(form, "allow_negative_leave_balance"),
+        "sick_leave_auto_approve_days": _form_int(form, "sick_leave_auto_approve_days", 0),
+        "medical_certificate_required_after_days": _form_int(form, "medical_certificate_required_after_days", 2),
+        # Attendance fields
+        "late_entry_grace_minutes": _form_int(form, "late_entry_grace_minutes", 15),
+        "half_day_hours_threshold": _form_float(form, "half_day_hours_threshold", 4.0),
+        "geolocation_required": _form_bool(form, "geolocation_required"),
+        "geolocation_radius_meters": _form_int(form, "geolocation_radius_meters", 100),
+        # Payroll fields
+        "salary_payment_day": _form_int(form, "salary_payment_day", 25),
+        "payroll_cutoff_day": _form_int(form, "payroll_cutoff_day", 20),
+        "allow_salary_advance": _form_bool(form, "allow_salary_advance"),
+        "max_advance_percent": _form_int(form, "max_advance_percent", 50),
+        # Benefits fields
+        "gratuity_enabled": _form_bool(form, "gratuity_enabled"),
+        "pension_enabled": _form_bool(form, "pension_enabled"),
+        "pension_employer_percent": _form_float(form, "pension_employer_percent", 10.0),
+        "pension_employee_percent": _form_float(form, "pension_employee_percent", 8.0),
+        # Compliance fields
+        "standard_work_hours_per_day": _form_float(form, "standard_work_hours_per_day", 8.0),
+        "max_work_hours_per_day": _form_float(form, "max_work_hours_per_day", 12.0),
+        "default_probation_months": _form_int(form, "default_probation_months", 3),
+        "default_notice_period_days": _form_int(form, "default_notice_period_days", 30),
+    }
+    service.save_settings(values)
 
     set_flash(response, "HR settings saved successfully.", "success")
 
@@ -177,15 +163,14 @@ async def leave_policies_list(
     db: DB,
 ):
     """Leave encashment policies."""
-    from app.models.hr_settings import LeaveEncashmentPolicy
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "hr")
     context["hr_tabs"] = HR_TABS
     context["current_tab"] = "leave"
 
-    policies = db.query(LeaveEncashmentPolicy).order_by(LeaveEncashmentPolicy.leave_type_id).all()
+    service = SettingsHRService(db)
+    policies = service.list_leave_policies()
 
     context["page_title"] = "Leave Policies"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -210,15 +195,14 @@ async def holidays_list(
     db: DB,
 ):
     """Holiday calendars."""
-    from app.models.hr_settings import HolidayCalendar
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "hr")
     context["hr_tabs"] = HR_TABS
     context["current_tab"] = "holidays"
 
-    calendars = db.query(HolidayCalendar).order_by(HolidayCalendar.name).all()
+    service = SettingsHRService(db)
+    calendars = service.list_holiday_calendars()
 
     context["page_title"] = "Holiday Calendars"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -243,15 +227,14 @@ async def salary_bands_list(
     db: DB,
 ):
     """Salary bands."""
-    from app.models.hr_settings import SalaryBand
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "hr")
     context["hr_tabs"] = HR_TABS
     context["current_tab"] = "salary"
 
-    bands = db.query(SalaryBand).order_by(SalaryBand.grade).all()
+    service = SettingsHRService(db)
+    bands = service.list_salary_bands()
 
     context["page_title"] = "Salary Bands"
     context["breadcrumbs"] = build_breadcrumbs([
@@ -276,15 +259,14 @@ async def deductions_list(
     db: DB,
 ):
     """Employment type deduction configurations."""
-    from app.models.hr_settings import EmploymentTypeDeductionConfig
-
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
     context["settings_nav"] = get_settings_nav(user, "hr")
     context["hr_tabs"] = HR_TABS
     context["current_tab"] = "deductions"
 
-    configs = db.query(EmploymentTypeDeductionConfig).order_by(EmploymentTypeDeductionConfig.employment_type).all()
+    service = SettingsHRService(db)
+    configs = service.list_deduction_configs()
 
     context["page_title"] = "Deduction Configurations"
     context["breadcrumbs"] = build_breadcrumbs([

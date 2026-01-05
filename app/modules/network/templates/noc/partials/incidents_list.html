@@ -1,0 +1,71 @@
+{# Active Incidents List #}
+<div class="divide-y divide-gray-100">
+{% for incident in incidents %}
+    <a href="/network/noc/incidents/{{ incident.incident_id }}"
+       class="block px-4 py-3 hover:bg-surface-50 transition-colors">
+        <div class="flex items-start gap-3">
+            {# Severity Badge #}
+            <div class="flex-shrink-0 mt-0.5">
+                {% if incident.severity == 'critical' %}
+                <span class="inline-flex items-center px-2 py-1 text-xs font-bold bg-red-100 text-red-700 rounded-full">
+                    CRITICAL
+                </span>
+                {% elif incident.severity == 'major' %}
+                <span class="inline-flex items-center px-2 py-1 text-xs font-bold bg-orange-100 text-orange-700 rounded-full">
+                    MAJOR
+                </span>
+                {% elif incident.severity == 'minor' %}
+                <span class="inline-flex items-center px-2 py-1 text-xs font-bold bg-amber-100 text-amber-700 rounded-full">
+                    MINOR
+                </span>
+                {% else %}
+                <span class="inline-flex items-center px-2 py-1 text-xs font-bold bg-blue-100 text-blue-700 rounded-full">
+                    MAINT
+                </span>
+                {% endif %}
+            </div>
+
+            {# Incident Details #}
+            <div class="flex-1 min-w-0">
+                <h4 class="text-sm font-medium text-gray-900 truncate">{{ incident.title }}</h4>
+                <div class="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                    <span>{{ incident.affected_count }} affected</span>
+                    <span class="text-gray-300">•</span>
+                    <span>{{ incident.duration_minutes }}m</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                    {% if incident.status == 'investigating' %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">
+                        Investigating
+                    </span>
+                    {% elif incident.status == 'identified' %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">
+                        Identified
+                    </span>
+                    {% elif incident.status == 'monitoring' %}
+                    <span class="inline-flex items-center px-1.5 py-0.5 text-xs font-medium bg-cyan-100 text-cyan-700 rounded">
+                        Monitoring
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Arrow Icon #}
+            <div class="flex-shrink-0 text-gray-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </div>
+        </div>
+    </a>
+{% else %}
+    <div class="px-4 py-8 text-center">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <p class="text-sm text-gray-500">No active incidents</p>
+    </div>
+{% endfor %}
+</div>

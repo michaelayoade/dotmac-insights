@@ -12,6 +12,7 @@ from ._deps import (
     is_htmx_request, HTTPException, set_flash, validate_csrf, form_str, form_int,
 )
 from app.services.accounting import FiscalService
+from app.services.accounting.web_services import AccountingCostCentersWebService
 from app.services.accounting.fiscal_types import CostCenterCreateData, CostCenterUpdateData
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginationParams
@@ -21,6 +22,10 @@ router = APIRouter()
 
 def _get_fiscal_service(db: DB, user: SessionUser) -> FiscalService:
     return FiscalService(db, user)
+
+
+def _get_cost_center_web_service(db: DB, user: SessionUser) -> AccountingCostCentersWebService:
+    return AccountingCostCentersWebService(db, _get_fiscal_service(db, user))
 
 
 def get_parent_cost_center_options(service: FiscalService, exclude_id: Optional[int] = None) -> list:
@@ -175,7 +180,8 @@ async def cost_center_create(
             parent_name = None
 
     service = _get_fiscal_service(db, user)
-    cost_center = service.create_cost_center(
+    web_service = _get_cost_center_web_service(db, user)
+    cost_center = web_service.create_cost_center(
         CostCenterCreateData(
             cost_center_name=form_str(form, "cost_center_name"),
             cost_center_number=form_str(form, "cost_center_code") or None,
@@ -183,8 +189,6 @@ async def cost_center_create(
             disabled=not bool(form_str(form, "is_active")),
         )
     )
-    db.commit()
-
     set_flash(response, "Cost center created successfully", "success")
     return RedirectResponse(url="/accounting/cost-centers", status_code=303)
 
@@ -267,7 +271,8 @@ async def cost_center_update(
         except NotFoundError:
             parent_name = None
 
-    service.update_cost_center(
+    web_service = _get_cost_center_web_service(db, user)
+    web_service.update_cost_center(
         cc_id,
         CostCenterUpdateData(
             cost_center_name=form_str(form, "cost_center_name"),
@@ -276,7 +281,5 @@ async def cost_center_update(
             disabled=not bool(form_str(form, "is_active")),
         ),
     )
-    db.commit()
-
     set_flash(response, "Cost center updated successfully", "success")
     return RedirectResponse(url="/accounting/cost-centers", status_code=303)

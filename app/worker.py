@@ -31,6 +31,8 @@ celery_app = Celery(
         "app.tasks.provisioning_tasks",
         "app.tasks.bundle_tasks",
         "app.tasks.monitoring_tasks",
+        "app.tasks.marketing_tasks",
+        "app.tasks.validation_tasks",
     ],
 )
 
@@ -239,5 +241,45 @@ celery_app.conf.beat_schedule = {
     "monitoring-cleanup-metrics": {
         "task": "monitoring.cleanup_metrics",
         "schedule": crontab(hour=3, minute=30),  # Daily at 3:30 AM
+    },
+    # Marketing module tasks
+    "marketing-process-journey-steps": {
+        "task": "app.tasks.marketing_tasks.process_journey_steps",
+        "schedule": crontab(minute="*"),
+        "kwargs": {"batch_size": 100},
+    },
+    "marketing-publish-scheduled-posts": {
+        "task": "app.tasks.marketing_tasks.publish_scheduled_posts",
+        "schedule": crontab(minute="*"),
+        "kwargs": {"batch_size": 50},
+    },
+    "marketing-sync-social-metrics": {
+        "task": "app.tasks.marketing_tasks.sync_social_metrics",
+        "schedule": crontab(minute="*/15"),
+        "kwargs": {"batch_size": 50},
+    },
+    "marketing-refresh-audiences": {
+        "task": "app.tasks.marketing_tasks.refresh_audience_segments",
+        "schedule": crontab(hour="*/4", minute=5),
+    },
+    "marketing-sync-social-tokens": {
+        "task": "app.tasks.marketing_tasks.sync_social_account_tokens",
+        "schedule": crontab(hour="*/6", minute=10),
+        "kwargs": {"batch_size": 25},
+    },
+    "marketing-sync-email-metrics": {
+        "task": "app.tasks.marketing_tasks.sync_email_metrics",
+        "schedule": crontab(minute="*/30"),
+        "kwargs": {"batch_size": 200},
+    },
+    "marketing-refresh-integration-tokens": {
+        "task": "app.tasks.marketing_tasks.refresh_marketing_integration_tokens",
+        "schedule": crontab(hour="*/6", minute=20),
+        "kwargs": {"refresh_window_hours": 24},
+    },
+    "finance-validation-backfill": {
+        "task": "app.tasks.validation_tasks.audit_finance_validation",
+        "schedule": crontab(hour=2, minute=35),
+        "kwargs": {"batch_size": 500},
     },
 }

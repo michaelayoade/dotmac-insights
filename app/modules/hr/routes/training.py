@@ -5,15 +5,11 @@ Permission Requirements:
 - hr:read - View training programs, events, results
 - hr:write - Manage training
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 from datetime import datetime
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import or_
-
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
     get_base_context,
@@ -23,14 +19,16 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.core.security import is_htmx_request, set_flash
-from app.models.hr_training import TrainingProgram, TrainingEventStatus
+from app.models.hr_training import TrainingEventStatus, TrainingProgram
 from app.services.hr.training import TrainingService
 from app.services.hr.training_types import (
     TrainingEventCreateData,
+    TrainingEventFilters,
     TrainingEventUpdateData,
     TrainingProgramCreateData,
     TrainingProgramUpdateData,
 )
+from app.services.types import PaginationParams
 from app.services.hr.errors import (
     TrainingEventNotFoundError,
     TrainingProgramNotFoundError,
@@ -74,7 +72,9 @@ def _form_int(form: Any, key: str) -> Optional[int]:
 
 
 def get_program_options(db):
-    programs = db.query(TrainingProgram).order_by(TrainingProgram.training_program_name).all()
+    service = TrainingService(db)
+    result = service.list_programs(pagination=PaginationParams(offset=0, limit=500))
+    programs = sorted(result.items, key=lambda p: p.training_program_name or "")
     return [{"value": str(p.id), "label": p.training_program_name} for p in programs]
 
 
@@ -129,20 +129,13 @@ async def training_events_list(
 ):
     """Training events list page."""
     try:
-        from app.models.hr_training import TrainingEvent
-        query = db.query(TrainingEvent)
-        if q:
-            query = query.filter(or_(
-                TrainingEvent.event_name.ilike(f"%{q}%"),
-                TrainingEvent.course.ilike(f"%{q}%"),
-            ))
-        if status:
-            status_enum = _training_status(status)
-            if status_enum:
-                query = query.filter(TrainingEvent.status == status_enum)
-        total = query.count()
-        offset = (page - 1) * per_page
-        events = query.order_by(TrainingEvent.start_time.desc()).offset(offset).limit(per_page).all()
+        service = TrainingService(db, user)
+        status_enum = _training_status(status) if status else None
+        filters = TrainingEventFilters(search=q, status=status_enum)
+        pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+        result = service.list_events(filters=filters, pagination=pagination)
+        events = result.items
+        total = result.total
     except Exception:
         events = []
         total = 0
@@ -255,7 +248,11 @@ async def training_event_create(
     program_id = _form_int(form, "training_program")
     program = None
     if program_id:
-        program = db.query(TrainingProgram).filter(TrainingProgram.id == program_id).first()
+        service = TrainingService(db, user)
+        try:
+            program = service.get_program(program_id)
+        except TrainingProgramNotFoundError:
+            program = None
         if not program:
             errors["training_program"] = "Training program not found"
 
@@ -342,7 +339,11 @@ async def training_event_update(
     program_id = _form_int(form, "training_program")
     program = None
     if program_id:
-        program = db.query(TrainingProgram).filter(TrainingProgram.id == program_id).first()
+        service = TrainingService(db, user)
+        try:
+            program = service.get_program(program_id)
+        except TrainingProgramNotFoundError:
+            program = None
         if not program:
             errors["training_program"] = "Training program not found"
 
@@ -434,13 +435,13 @@ async def training_programs_list(
 ):
     """Training programs list page."""
     try:
-        from app.models.hr_training import TrainingProgram
-        query = db.query(TrainingProgram)
-        if q:
-            query = query.filter(TrainingProgram.training_program_name.ilike(f"%{q}%"))
-        total = query.count()
-        offset = (page - 1) * per_page
-        programs = query.order_by(TrainingProgram.training_program_name).offset(offset).limit(per_page).all()
+        from app.services.hr.training_types import TrainingProgramFilters
+        service = TrainingService(db, user)
+        filters = TrainingProgramFilters(search=q) if q else TrainingProgramFilters()
+        pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+        result = service.list_programs(filters=filters, pagination=pagination)
+        programs = result.items
+        total = result.total
     except Exception:
         programs = []
         total = 0

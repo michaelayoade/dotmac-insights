@@ -12,10 +12,12 @@ from .quotations import QuotationService
 from .orders import SalesOrderService
 from .analytics import SalesAnalyticsService
 from .dashboard import SalesDashboardService
+from .module_dashboard import SalesModuleDashboardService
 
 __all__ = [
     "QuotationService",
     "SalesOrderService",
     "SalesAnalyticsService",
     "SalesDashboardService",
+    "SalesModuleDashboardService",
 ]

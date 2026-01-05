@@ -46,6 +46,7 @@ class ServiceOrderFilters:
     search: Optional[str] = None
     order_type: Optional[str] = None  # installation, repair, maintenance, etc.
     status: Optional[str] = None
+    statuses: Optional[List[str]] = None
     priority: Optional[str] = None
     customer_account_id: Optional[int] = None
     technician_id: Optional[int] = None
@@ -56,6 +57,8 @@ class ServiceOrderFilters:
     is_billable: Optional[bool] = None
     is_billed: Optional[bool] = None
     city: Optional[str] = None
+    sort_by: str = "scheduled_date"
+    sort_dir: str = "desc"
 
 
 @dataclass

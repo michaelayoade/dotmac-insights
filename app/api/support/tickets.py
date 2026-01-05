@@ -15,8 +15,8 @@ from app.models.ticket import (
     Ticket, TicketStatus, TicketPriority,
     HDTicketComment, HDTicketActivity, TicketCommunication, HDTicketDependency
 )
-from app.models.party import Party, CustomerAccount
-from app.models.agent import Agent, Team, TeamMember
+from app.models.party import Party, PartyRole, CustomerAccount
+from app.models.agent import Team, TeamMember
 from app.models.auth import User
 from app.models.support_tags import TicketTag, TicketCustomField, CustomFieldType
 from app.auth import Principal, Require, get_current_principal
@@ -783,17 +783,23 @@ async def get_ticket_full_detail(
     # Assignee info
     assignee = None
     if ticket.assigned_to:
-        agent = db.query(Agent).filter(
-            or_(
-                Agent.display_name == ticket.assigned_to,
-                Agent.email == ticket.assigned_to,
+        agent = (
+            db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                PartyRole.role == "support_agent",
+                or_(
+                    Party.name == ticket.assigned_to,
+                    Party.primary_email == ticket.assigned_to,
+                ),
             )
-        ).first()
+            .first()
+        )
         if agent:
             assignee = {
                 "id": agent.id,
-                "name": agent.display_name or agent.email,
-                "email": agent.email,
+                "name": agent.name or agent.primary_email,
+                "email": agent.primary_email,
                 "avatar_url": None,
                 "team": ticket.resolution_team,
             }

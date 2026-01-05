@@ -31,7 +31,7 @@
 </div>
 
 <!-- Date Filter -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-6">
     <form method="GET" class="flex flex-wrap items-center gap-4">
         <label class="text-sm font-medium text-gray-700">Period:</label>
         <input
@@ -58,19 +58,19 @@
 
 <!-- Summary Cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Opening Balance</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 font-mono">{{ '{:,.2f}'.format(opening_balance) }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Cash Inflows</p>
         <p class="mt-1 text-2xl font-bold text-emerald-600 font-mono">{{ '{:,.2f}'.format(cash_inflows) }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Cash Outflows</p>
         <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(cash_outflows) }}</p>
     </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Closing Balance</p>
         <p class="mt-1 text-2xl font-bold text-gray-900 font-mono">{{ '{:,.2f}'.format(closing_balance) }}</p>
     </div>
@@ -103,7 +103,7 @@
 
 <!-- Cash Accounts -->
 {% if cash_accounts %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
     <div class="px-6 py-4 border-b border-gray-100">
         <h2 class="text-lg font-display font-semibold text-gray-900">Cash & Bank Accounts</h2>
     </div>
@@ -126,7 +126,7 @@
 {% endif %}
 
 <!-- Cash Summary Table -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden mb-6">
     <div class="px-6 py-4 border-b border-gray-100">
         <h2 class="text-lg font-display font-semibold text-gray-900">Cash Flow Summary</h2>
     </div>
@@ -160,9 +160,37 @@
     </div>
 </div>
 
+<!-- Activity Sections -->
+<div class="space-y-6 mb-6">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900" data-section="operating">Operating Activities</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-500">Operating activity breakdown is not available yet.</p>
+        </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900" data-section="investing">Investing Activities</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-500">Investing activity breakdown is not available yet.</p>
+        </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900" data-section="financing">Financing Activities</h2>
+        </div>
+        <div class="p-6">
+            <p class="text-sm text-gray-500">Financing activity breakdown is not available yet.</p>
+        </div>
+    </div>
+</div>
+
 <!-- Recent Cash Transactions -->
 {% if transactions %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
     <div class="px-6 py-4 border-b border-gray-100">
         <h2 class="text-lg font-display font-semibold text-gray-900">Recent Cash Transactions</h2>
         <p class="text-sm text-gray-500">Last 50 transactions</p>
@@ -201,7 +229,7 @@
     </div>
 </div>
 {% else %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-12 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-12 text-center">
     <p class="text-sm text-gray-500">No cash transactions found for this period</p>
 </div>
 {% endif %}

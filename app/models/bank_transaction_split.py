@@ -7,12 +7,13 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.accounting import BankTransaction
 
 
-class BankTransactionSplit(Base):
+class BankTransactionSplit(SoftValidationMixin, Base):
     """
     Split line for bank transactions.
 

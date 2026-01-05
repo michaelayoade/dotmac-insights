@@ -2,20 +2,26 @@
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-    <div>
+    <div class="min-w-0">
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">
-            Good {{ 'morning' if now.hour < 12 else 'afternoon' if now.hour < 17 else 'evening' }}, {{ user.name.split()[0] if user.name else user.email.split('@')[0] }}
+            Good {{ 'morning' if now.hour < 12 else 'afternoon' if now.hour < 17 else 'evening' }}, {{ user.name.split()[0] if user.name else (user.email.split('@')[0] if user.email else "there") }}
         </h1>
         <p class="mt-1.5 text-gray-500 font-body">
             Here's what's happening with your business today.
         </p>
     </div>
     <div class="flex items-center gap-3">
+        <span class="inline-flex sm:hidden items-center gap-2 px-3 py-2 rounded-lg bg-surface-100 text-xs text-gray-500 font-body">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            {{ now | format_date("%b %d") if now else "" }}
+        </span>
         <span class="hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-100 text-sm text-gray-500 font-body">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
-            {{ "now" | format_date("%B %d, %Y") if "now" | format_date else "" }}
+            {{ now | format_date("%B %d, %Y") if now else "" }}
         </span>
     </div>
 </div>
@@ -24,23 +30,20 @@
 {% block content %}
 <!-- Stats Grid -->
 <div id="dashboard-stats"
-     class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-10"
+     class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4 mb-10"
      data-testid="stats-grid"
      hx-get="/dashboard/stats"
      hx-trigger="every 60s"
      hx-swap="innerHTML"
-     hx-indicator="#stats-refresh-indicator">
-    <div id="stats-refresh-indicator" class="htmx-indicator absolute top-2 right-2">
-        <span class="text-xs text-gray-400 animate-pulse">Updating...</span>
-    </div>
+     hx-indicator="#page-loader">
     {% if stats %}
         {% for stat in stats %}
-        <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{{ stat.key | default(loop.index) }}">
+        <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{{ stat.key | default(loop.index) }}">
             <div class="flex items-start justify-between">
-                <div class="flex-1">
+                <div class="flex-1 min-w-0">
                     <dt class="text-sm font-medium text-gray-500 font-body">{{ stat.label }}</dt>
                     <dd class="mt-2 flex items-baseline gap-2">
-                        <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">{{ stat.value }}</span>
+                        <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight break-words">{{ stat.value }}</span>
                         {% if stat.change %}
                         <span class="inline-flex items-center gap-0.5 text-sm font-medium {{ 'text-emerald-600' if stat.change > 0 else 'text-red-600' }}">
                             <svg class="w-4 h-4 {{ 'rotate-180' if stat.change < 0 else '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,23 +59,23 @@
                 </div>
                 <div class="flex-shrink-0 p-3 rounded-xl {{ stat.icon_bg | default('bg-primary-50') }} {{ stat.icon_color | default('text-primary-600') }} group-hover:scale-110 transition-transform duration-300">
                     {% if stat.icon == 'users' %}
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                     </svg>
                     {% elif stat.icon == 'ticket' %}
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
                     </svg>
                     {% elif stat.icon == 'currency' %}
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     {% elif stat.icon == 'invoice' %}
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                     </svg>
                     {% else %}
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                     {% endif %}
@@ -84,17 +87,17 @@
         {% endfor %}
     {% else %}
     <!-- Placeholder stats when no data -->
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-contacts">
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-contacts">
         <div class="flex items-start justify-between">
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Total Contacts</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                    <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
                 </dd>
                 <p class="mt-1 text-xs text-gray-400 font-body">Leads & customers</p>
             </div>
             <div class="flex-shrink-0 p-3 rounded-xl bg-primary-50 text-primary-600 group-hover:scale-110 transition-transform duration-300">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
             </div>
@@ -102,17 +105,17 @@
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
 
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-tickets">
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-tickets">
         <div class="flex items-start justify-between">
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Open Tickets</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                    <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
                 </dd>
                 <p class="mt-1 text-xs text-gray-400 font-body">Awaiting response</p>
             </div>
             <div class="flex-shrink-0 p-3 rounded-xl bg-amber-50 text-amber-600 group-hover:scale-110 transition-transform duration-300">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/>
                 </svg>
             </div>
@@ -120,17 +123,17 @@
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
 
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-revenue">
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-revenue">
         <div class="flex items-start justify-between">
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Revenue (MTD)</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                    <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
                 </dd>
                 <p class="mt-1 text-xs text-gray-400 font-body">{{ base_currency }} this month</p>
             </div>
             <div class="flex-shrink-0 p-3 rounded-xl bg-emerald-50 text-emerald-600 group-hover:scale-110 transition-transform duration-300">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
             </div>
@@ -138,17 +141,17 @@
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
 
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-invoices">
+    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-invoices">
         <div class="flex items-start justify-between">
-            <div class="flex-1">
+            <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Pending Invoices</dt>
                 <dd class="mt-2 flex items-baseline gap-2">
-                    <span class="text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                    <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
                 </dd>
                 <p class="mt-1 text-xs text-gray-400 font-body">Awaiting payment</p>
             </div>
             <div class="flex-shrink-0 p-3 rounded-xl bg-red-50 text-red-600 group-hover:scale-110 transition-transform duration-300">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                 </svg>
             </div>
@@ -156,7 +159,51 @@
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-red-400 to-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
     {% endif %}
+    <div class="htmx-indicator pointer-events-none absolute inset-0 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4" aria-hidden="true">
+        {% for _ in range(4) %}
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 animate-pulse">
+            <div class="flex items-start justify-between">
+                <div class="flex-1 space-y-3">
+                    <div class="h-3 w-24 bg-gray-200 rounded"></div>
+                    <div class="h-8 w-32 bg-gray-200 rounded"></div>
+                    <div class="h-3 w-28 bg-gray-200 rounded"></div>
+                </div>
+                <div class="h-12 w-12 rounded-xl bg-gray-200"></div>
+            </div>
+            <div class="mt-6 h-1 w-full bg-gray-200 rounded-full"></div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
+
+{% if module_registry %}
+<!-- Module hub -->
+<div class="mt-8">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-display font-semibold text-gray-900">Modules</h2>
+        <span class="text-xs text-gray-500 font-body">All modules</span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="modules-grid">
+        {% for module in module_registry %}
+        <a
+            href="{{ module.href }}"
+            class="group bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-200"
+            data-testid="module-card-{{ module.id }}"
+        >
+            <div class="flex items-center gap-3">
+                <span class="w-11 h-11 rounded-xl bg-surface-100 text-gray-700 flex items-center justify-center group-hover:bg-primary-50 group-hover:text-primary-600 transition-colors">
+                    {% include "components/icons/" ~ module.icon ~ ".html" ignore missing %}
+                </span>
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-900 truncate">{{ module.label }}</p>
+                    <p class="text-xs text-gray-500 truncate">Open {{ module.label }}</p>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <!-- Two Column Layout: Activity + Quick Actions -->
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">

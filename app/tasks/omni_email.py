@@ -19,7 +19,6 @@ from app.models.omni import (
     OmniMessage,
     OmniAttachment,
 )
-from app.models.agent import Agent
 from app.worker import celery_app
 from app.core.crypto import decrypt_sensitive_value
 

@@ -33,7 +33,8 @@
             {{ payment.receipt_number or ('REC-' ~ payment.id) }}
         </h1>
         <p class="mt-1.5 text-gray-500 font-body">
-            {{ '{:,.2f}'.format(payment.amount) }} {{ payment.currency }} received on {{ payment.payment_date.strftime('%B %d, %Y') if payment.payment_date else '-' }}
+            <span class="payment-amount" data-testid="payment-amount">{{ '{:,.2f}'.format(payment.amount) }} {{ payment.currency }}</span>
+            received on {{ payment.payment_date.strftime('%B %d, %Y') if payment.payment_date else '-' }}
         </p>
     </div>
     <div class="flex items-center gap-3">
@@ -72,7 +73,7 @@
         {% endif %}
         <a
             href="/accounting/ar-payments/{{ payment.id }}/edit"
-            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-gray-50 transition-colors"
+            class="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-warm-sm ring-1 ring-inset ring-gray-200 hover:bg-surface-50 transition-colors"
         >
             Edit
         </a>
@@ -85,7 +86,7 @@
     <!-- Main Content -->
     <div class="lg:col-span-2 space-y-6">
         <!-- Payment Details -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Payment Details</h2>
             </div>
@@ -131,7 +132,7 @@
         </div>
 
         <!-- Allocations -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Allocations</h2>
                 {% if payment.unallocated_amount and payment.unallocated_amount > 0 %}
@@ -205,13 +206,13 @@
     <!-- Sidebar -->
     <div class="space-y-6">
         <!-- Status Card -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Status</h2>
             </div>
             <div class="p-6">
                 <div class="text-center mb-4">
-                    <span class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset {{ status_colors.get(payment.status.value.upper() if payment.status else 'PENDING', status_colors['PENDING']) }}">
+                    <span class="inline-flex items-center rounded-lg px-3 py-1.5 text-sm font-medium ring-1 ring-inset {{ status_colors.get(payment.status.value.upper() if payment.status else 'PENDING', status_colors['PENDING']) }}" data-testid="payment-status">
                         {{ payment.status.value.title() if payment.status else 'Pending' }}
                     </span>
                 </div>
@@ -236,7 +237,7 @@
         </div>
 
         <!-- Customer Info -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Customer</h2>
             </div>
@@ -260,7 +261,7 @@
         </div>
 
         <!-- Metadata -->
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Info</h2>
             </div>

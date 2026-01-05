@@ -9,26 +9,39 @@ Provides UI pages for:
 """
 from fastapi import APIRouter, Query
 from datetime import date, datetime
+from decimal import Decimal
 
 from ._deps import (
     Request, Response, HTMLResponse, RedirectResponse, Optional,
-    SessionUser, CSRFToken, DB,
+    SessionUser, CSRFToken, CSRFProtect, DB,
     RequireAccountingRead, RequireAccountingWrite,
     templates,
     get_base_context, get_navigation_context, build_breadcrumbs, build_pagination_context,
-    is_htmx_request, HTTPException, set_flash, validate_csrf, form_str, form_decimal,
+    is_htmx_request, HTTPException, set_flash, validate_csrf, form_str, form_decimal, form_int,
 )
 from app.services.accounting import TaxService
-from app.services.accounting.tax_types import TaxCodeFilters, TaxFilingCreateData, TaxFilingFilters, TaxPaymentCreateData
+from app.services.accounting.web_services import AccountingTaxWebService
+from app.services.accounting.tax_types import (
+    TaxCodeCreateData,
+    TaxCodeFilters,
+    TaxCodeUpdateData,
+    TaxFilingCreateData,
+    TaxFilingFilters,
+    TaxPaymentCreateData,
+)
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginationParams
-from app.models.tax import TaxFilingType
+from app.models.tax import TaxFilingType, TaxType, RoundingMethod
 
 router = APIRouter()
 
 
 def _get_tax_service(db: DB, user: SessionUser) -> TaxService:
     return TaxService(db, user)
+
+
+def _get_tax_web_service(db: DB, user: SessionUser) -> AccountingTaxWebService:
+    return AccountingTaxWebService(db, _get_tax_service(db, user))
 
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
@@ -38,6 +51,22 @@ def _parse_date(value: Optional[str]) -> Optional[date]:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+
+def _tax_type_options() -> list:
+    return [
+        {"value": TaxType.SALES.value, "label": "Sales"},
+        {"value": TaxType.PURCHASE.value, "label": "Purchase"},
+        {"value": TaxType.BOTH.value, "label": "Both"},
+    ]
+
+
+def _rounding_method_options() -> list:
+    return [
+        {"value": RoundingMethod.ROUND.value, "label": "Round"},
+        {"value": RoundingMethod.FLOOR.value, "label": "Floor"},
+        {"value": RoundingMethod.CEIL.value, "label": "Ceil"},
+    ]
 
 
 # =============================================================================
@@ -60,6 +89,7 @@ async def tax_codes_list(
 ):
     """Tax codes list page."""
     service = _get_tax_service(db, user)
+    web_service = _get_tax_web_service(db, user)
     active_filter = None
     if is_active is not None:
         active_filter = is_active == "true"
@@ -161,6 +191,201 @@ async def tax_code_detail(
 
     template = templates.get_template("modules/accounting/templates/tax/pages/code_detail.html")
     return HTMLResponse(template.render(context))
+
+
+@router.get("/tax-codes/new", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def tax_code_form_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New tax code form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting"},
+        {"label": "Tax Codes", "href": "/accounting/tax-codes"},
+        {"label": "New", "href": None},
+    ])
+    context["page_title"] = "New Tax Code"
+    context["tax_code"] = None
+    context["tax_type_options"] = _tax_type_options()
+    context["rounding_method_options"] = _rounding_method_options()
+    context["is_edit"] = False
+
+    template = templates.get_template("modules/accounting/templates/tax/pages/code_form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/tax-codes/{tc_id}/edit", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def tax_code_form_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    tc_id: int,
+):
+    """Edit tax code form."""
+    service = _get_tax_service(db, user)
+    try:
+        tax_code = service.get_tax_code(tc_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Accounting", "href": "/accounting"},
+        {"label": "Tax Codes", "href": "/accounting/tax-codes"},
+        {"label": tax_code.code, "href": f"/accounting/tax-codes/{tc_id}"},
+        {"label": "Edit", "href": None},
+    ])
+    context["page_title"] = f"Edit: {tax_code.code}"
+    context["tax_code"] = tax_code
+    context["tax_type_options"] = _tax_type_options()
+    context["rounding_method_options"] = _rounding_method_options()
+    context["is_edit"] = True
+
+    template = templates.get_template("modules/accounting/templates/tax/pages/code_form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/tax-codes", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def tax_code_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf_protect: CSRFProtect,
+    db: DB,
+):
+    """Create a tax code."""
+    await validate_csrf(request, csrf_protect)
+
+    form = await request.form()
+    web_service = _get_tax_web_service(db, user)
+
+    code = form_str(form, "code")
+    name = form_str(form, "name")
+    description = form_str(form, "description") or None
+    rate = form_decimal(form, "rate", default=Decimal("0")) or Decimal("0")
+    tax_type = form_str(form, "tax_type") or TaxType.BOTH.value
+    rounding_method = form_str(form, "rounding_method") or RoundingMethod.ROUND.value
+    rounding_precision = form_int(form, "rounding_precision", default=2) or 2
+    is_tax_inclusive = form_str(form, "is_tax_inclusive") == "on"
+    is_active = form_str(form, "is_active") == "on"
+    jurisdiction = form_str(form, "jurisdiction") or None
+    country = form_str(form, "country") or None
+    account_head = form_str(form, "account_head") or None
+    cost_center = form_str(form, "cost_center") or None
+    company = form_str(form, "company") or None
+    valid_from = _parse_date(form_str(form, "valid_from"))
+    valid_to = _parse_date(form_str(form, "valid_to"))
+
+    try:
+        create_data = TaxCodeCreateData(
+            code=code,
+            name=name,
+            description=description,
+            rate=rate,
+            tax_type=tax_type,
+            is_tax_inclusive=is_tax_inclusive,
+            rounding_method=rounding_method,
+            rounding_precision=rounding_precision,
+            jurisdiction=jurisdiction,
+            country=country,
+            account_head=account_head,
+            cost_center=cost_center,
+            valid_from=valid_from,
+            valid_to=valid_to,
+            company=company,
+        )
+        tax_code = web_service.create_tax_code(create_data, user_id=user.id)
+        if not is_active:
+            web_service.update_tax_code(
+                tax_code.id,
+                TaxCodeUpdateData(is_active=False),
+            )
+        set_flash(response, "Tax code created successfully", "success")
+        return RedirectResponse(
+            url=f"/accounting/tax-codes/{tax_code.id}",
+            status_code=303,
+        )
+    except ValidationError as exc:
+        web_service.rollback()
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url="/accounting/tax-codes/new", status_code=303)
+
+
+@router.post("/tax-codes/{tc_id}", response_class=HTMLResponse, dependencies=[RequireAccountingWrite])
+async def tax_code_update(
+    tc_id: int,
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf_protect: CSRFProtect,
+    db: DB,
+):
+    """Update a tax code."""
+    await validate_csrf(request, csrf_protect)
+
+    form = await request.form()
+    web_service = _get_tax_web_service(db, user)
+
+    name = form_str(form, "name") or None
+    description = form_str(form, "description") or None
+    rate = form_decimal(form, "rate", default=None)
+    tax_type = form_str(form, "tax_type") or None
+    rounding_method = form_str(form, "rounding_method") or None
+    rounding_precision = form_int(form, "rounding_precision", default=None)
+    is_tax_inclusive = form_str(form, "is_tax_inclusive") == "on"
+    is_active = form_str(form, "is_active") == "on"
+    jurisdiction = form_str(form, "jurisdiction") or None
+    country = form_str(form, "country") or None
+    account_head = form_str(form, "account_head") or None
+    cost_center = form_str(form, "cost_center") or None
+    company = form_str(form, "company") or None
+    valid_from = _parse_date(form_str(form, "valid_from"))
+    valid_to = _parse_date(form_str(form, "valid_to"))
+
+    update_data = TaxCodeUpdateData(
+        name=name,
+        description=description,
+        rate=rate,
+        tax_type=tax_type,
+        is_tax_inclusive=is_tax_inclusive,
+        rounding_method=rounding_method,
+        rounding_precision=rounding_precision,
+        jurisdiction=jurisdiction,
+        country=country,
+        account_head=account_head,
+        cost_center=cost_center,
+        valid_from=valid_from,
+        valid_to=valid_to,
+        company=company,
+        is_active=is_active,
+    )
+
+    try:
+        web_service.update_tax_code(tc_id, update_data)
+        set_flash(response, "Tax code updated successfully", "success")
+        return RedirectResponse(
+            url=f"/accounting/tax-codes/{tc_id}",
+            status_code=303,
+        )
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValidationError as exc:
+        web_service.rollback()
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(
+            url=f"/accounting/tax-codes/{tc_id}/edit",
+            status_code=303,
+        )
 
 
 # =============================================================================
@@ -297,7 +522,7 @@ async def tax_filing_create(
         return RedirectResponse(url="/accounting/tax/filing/new", status_code=303)
 
     try:
-        period = service.create_filing_period(
+        period = web_service.create_filing_period(
             TaxFilingCreateData(
                 tax_type=form_str(form_data, "tax_type"),
                 period_name=form_str(form_data, "period_name"),
@@ -313,7 +538,6 @@ async def tax_filing_create(
         set_flash(response, str(exc), "warning")
         return RedirectResponse(url="/accounting/tax/filing/new", status_code=303)
 
-    db.commit()
     set_flash(response, "Tax filing period created", "success")
     return RedirectResponse(url=f"/accounting/tax/filing/{period.id}", status_code=303)
 
@@ -329,6 +553,7 @@ async def tax_filing_detail(
 ):
     """Tax filing period detail page."""
     service = _get_tax_service(db, user)
+    web_service = _get_tax_web_service(db, user)
     try:
         period = service.get_filing_period(period_id)
     except NotFoundError as exc:
@@ -403,7 +628,7 @@ async def tax_filing_record_payment(
         return RedirectResponse(url=f"/accounting/tax/filing/{period_id}/pay", status_code=303)
 
     try:
-        service.record_payment(
+        web_service.record_payment(
             period_id,
             TaxPaymentCreateData(
                 payment_date=payment_date,
@@ -420,7 +645,6 @@ async def tax_filing_record_payment(
         set_flash(response, str(exc), "warning")
         return RedirectResponse(url=f"/accounting/tax/filing/{period_id}/pay", status_code=303)
 
-    db.commit()
     set_flash(response, "Tax payment recorded", "success")
     return RedirectResponse(url=f"/accounting/tax/filing/{period_id}", status_code=303)
 
@@ -436,9 +660,9 @@ async def tax_filing_mark_filed(
 ):
     """Mark a tax filing period as filed."""
     service = _get_tax_service(db, user)
+    web_service = _get_tax_web_service(db, user)
     try:
-        period = service.file_period(period_id, user_id=user.id)
-        db.commit()
+        period = web_service.file_period(period_id, user_id=user.id)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValidationError as exc:

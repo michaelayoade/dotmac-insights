@@ -36,6 +36,11 @@ from app.models.hr_lifecycle import (
 
 from .analytics_types import (
     HRDashboardSummary,
+    HRDashboardData,
+    HRDashboardStats,
+    DepartmentStat,
+    WorkAnniversary,
+    NextPayroll,
     ModuleSummary,
     HeadcountByDepartment,
     DepartmentHeadcountTrend,
@@ -61,6 +66,220 @@ class HRAnalyticsService:
     def __init__(self, db: Session, principal: Optional["Principal"] = None) -> None:
         self.db = db
         self.principal = principal
+
+    # =========================================================================
+    # Dashboard
+    # =========================================================================
+
+    def get_dashboard_data(
+        self,
+        company: Optional[str] = None,
+        as_at: Optional[date] = None,
+    ) -> HRDashboardData:
+        """Get complete HR dashboard data in a single optimized call.
+
+        Args:
+            company: Filter by company name
+            as_at: View data as at this date (defaults to today)
+        """
+        view_date = as_at or date.today()
+
+        # Get stats with single optimized query using conditional aggregation
+        stats = self._get_dashboard_stats(view_date, company)
+
+        # Department counts (as at the view date - employees active on that date)
+        department_stats = self._get_department_stats(company, view_date)
+
+        # Recent leave requests (pending as of view date)
+        recent_leave = (
+            self.db.query(LeaveApplication)
+            .filter(
+                LeaveApplication.status == LeaveApplicationStatus.OPEN,
+                LeaveApplication.posting_date <= view_date,
+            )
+            .order_by(LeaveApplication.posting_date.desc())
+            .limit(5)
+            .all()
+        )
+
+        # Work anniversaries for the view date's month
+        anniversaries = self._get_work_anniversaries(view_date)
+
+        # Next payroll due (relative to view date)
+        next_payroll = self._get_next_payroll(view_date)
+
+        return HRDashboardData(
+            stats=stats,
+            department_stats=department_stats,
+            recent_leave_requests=recent_leave,
+            anniversaries=anniversaries,
+            next_payroll=next_payroll,
+        )
+
+    def _get_dashboard_stats(
+        self,
+        view_date: date,
+        company: Optional[str] = None,
+    ) -> HRDashboardStats:
+        """Get dashboard stat card values using conditional aggregation.
+
+        Args:
+            view_date: The date to view stats for
+            company: Optional company filter
+        """
+        from app.models.hr_attendance import AttendanceStatus
+
+        # Total employees active as at view_date
+        # (joined before or on view_date, not relieved before view_date)
+        emp_query = self.db.query(func.count(Employee.id)).filter(
+            Employee.is_deleted == False,
+            Employee.status.in_([EmploymentStatus.ACTIVE, EmploymentStatus.ON_LEAVE]),
+            Employee.date_of_joining <= view_date,
+            (Employee.date_of_leaving.is_(None)) | (Employee.date_of_leaving > view_date),
+        )
+        if company:
+            emp_query = emp_query.filter(Employee.company.ilike(f"%{company}%"))
+        total_employees = emp_query.scalar() or 0
+
+        # Attendance on view_date (present count)
+        present_count = (
+            self.db.query(func.count(Attendance.id))
+            .filter(
+                func.date(Attendance.attendance_date) == view_date,
+                Attendance.status == AttendanceStatus.PRESENT,
+            )
+            .scalar()
+            or 0
+        )
+
+        # On leave on view_date
+        on_leave_count = (
+            self.db.query(func.count(LeaveApplication.id))
+            .filter(
+                LeaveApplication.status == LeaveApplicationStatus.APPROVED,
+                LeaveApplication.from_date <= view_date,
+                LeaveApplication.to_date >= view_date,
+            )
+            .scalar()
+            or 0
+        )
+
+        # Pending leave requests as at view_date
+        pending_leave = (
+            self.db.query(func.count(LeaveApplication.id))
+            .filter(
+                LeaveApplication.status == LeaveApplicationStatus.OPEN,
+                LeaveApplication.posting_date <= view_date,
+            )
+            .scalar()
+            or 0
+        )
+
+        return HRDashboardStats(
+            total_employees=total_employees,
+            present_today=present_count,
+            on_leave_today=on_leave_count,
+            pending_leave=pending_leave,
+        )
+
+    def _get_department_stats(
+        self,
+        company: Optional[str] = None,
+        view_date: Optional[date] = None,
+    ) -> List[DepartmentStat]:
+        """Get employee count per department as at a specific date."""
+        check_date = view_date or date.today()
+
+        query = (
+            self.db.query(
+                Department.department_name,
+                func.count(Employee.id).label("count"),
+            )
+            .outerjoin(
+                Employee,
+                and_(
+                    Employee.department_id == Department.id,
+                    Employee.is_deleted == False,
+                    Employee.status.in_([EmploymentStatus.ACTIVE, EmploymentStatus.ON_LEAVE]),
+                    Employee.date_of_joining <= check_date,
+                    (Employee.date_of_leaving.is_(None)) | (Employee.date_of_leaving > check_date),
+                ),
+            )
+            .group_by(Department.id, Department.department_name)
+            .order_by(func.count(Employee.id).desc())
+            .limit(8)
+        )
+
+        if company:
+            query = query.filter(Department.company.ilike(f"%{company}%"))
+
+        return [
+            DepartmentStat(name=row[0], count=row[1] or 0)
+            for row in query.all()
+        ]
+
+    def _get_work_anniversaries(
+        self,
+        today: date,
+    ) -> List[WorkAnniversary]:
+        """Get employees with work anniversaries this month."""
+        try:
+            anniversary_employees = (
+                self.db.query(Employee)
+                .filter(
+                    Employee.is_deleted == False,
+                    Employee.status == EmploymentStatus.ACTIVE,
+                    func.extract("month", Employee.date_of_joining) == today.month,
+                    Employee.date_of_joining < today.replace(year=today.year),
+                )
+                .order_by(func.extract("day", Employee.date_of_joining))
+                .limit(5)
+                .all()
+            )
+
+            result: List[WorkAnniversary] = []
+            for emp in anniversary_employees:
+                if emp.date_of_joining:
+                    years = today.year - emp.date_of_joining.year
+                    if years > 0:
+                        result.append(
+                            WorkAnniversary(
+                                id=emp.id,
+                                name=emp.name or "",
+                                date=emp.date_of_joining,
+                                years=years,
+                            )
+                        )
+            return result
+        except Exception:
+            return []
+
+    def _get_next_payroll(self, view_date: Optional[date] = None) -> Optional[NextPayroll]:
+        """Get next upcoming payroll entry relative to the view date."""
+        from app.models.hr_payroll import PayrollEntry
+
+        check_date = view_date or date.today()
+
+        try:
+            # Find payroll entries with end_date >= view_date that are still draft
+            upcoming = (
+                self.db.query(PayrollEntry)
+                .filter(
+                    PayrollEntry.docstatus == 0,
+                    PayrollEntry.end_date >= check_date,
+                )
+                .order_by(PayrollEntry.end_date.asc())
+                .first()
+            )
+            if upcoming:
+                return NextPayroll(
+                    id=upcoming.id,
+                    name=f"Payroll #{upcoming.id}",
+                    date=upcoming.end_date,
+                )
+        except Exception:
+            pass
+        return None
 
     # =========================================================================
     # Organization Analytics
@@ -138,7 +357,7 @@ class HRAnalyticsService:
     ) -> DepartmentHeadcountTrend:
         """Get headcount trend for a department over time.
 
-        Uses employee date_of_joining and relieving_date to calculate
+        Uses employee date_of_joining and date_of_leaving to calculate
         historical headcount.
         """
         department = (
@@ -170,8 +389,8 @@ class HRAnalyticsService:
                     Employee.department == department.department_name,
                     Employee.is_deleted == False,
                     Employee.date_of_joining <= month_end,
-                    (Employee.relieving_date.is_(None))
-                    | (Employee.relieving_date >= current),
+                    (Employee.date_of_leaving.is_(None))
+                    | (Employee.date_of_leaving >= current),
                 )
                 .scalar()
                 or 0
@@ -335,7 +554,7 @@ class HRAnalyticsService:
             self.db.query(func.count(Employee.id))
             .filter(
                 *base_filter,
-                Employee.relieving_date >= thirty_days_ago,
+                Employee.date_of_leaving >= thirty_days_ago,
             )
             .scalar()
             or 0
@@ -401,8 +620,8 @@ class HRAnalyticsService:
             query = self.db.query(func.count(Employee.id)).filter(
                 Employee.is_deleted == False,
                 Employee.date_of_joining <= month_end,
-                (Employee.relieving_date.is_(None))
-                | (Employee.relieving_date >= current),
+                (Employee.date_of_leaving.is_(None))
+                | (Employee.date_of_leaving >= current),
             )
 
             if company:
@@ -470,8 +689,8 @@ class HRAnalyticsService:
             .filter(
                 *emp_filter,
                 Employee.date_of_joining <= to_date,
-                (Employee.relieving_date.is_(None))
-                | (Employee.relieving_date >= from_date),
+                (Employee.date_of_leaving.is_(None))
+                | (Employee.date_of_leaving >= from_date),
             )
             .scalar()
             or 0

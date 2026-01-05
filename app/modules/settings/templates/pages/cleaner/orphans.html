@@ -1,0 +1,159 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Link Orphans</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Find and link records with missing relationships</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/settings/data-cleaner"
+            class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 transition-colors"
+        >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+            </svg>
+            Back
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<div x-data="{
+    selectedTable: '',
+    selectedFk: '',
+    loading: false,
+    hasResults: false,
+    fkOptions: {{ fk_options | tojson }}
+}">
+    <!-- Configuration Form -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Scan Configuration</h2>
+
+        <form
+            hx-post="/settings/data-cleaner/orphans/scan"
+            hx-target="#orphan-results"
+            hx-indicator="#scan-spinner"
+            @htmx:before-request="loading = true"
+            @htmx:after-request="loading = false; hasResults = true"
+            class="space-y-6"
+        >
+            <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Table Selection -->
+                <div>
+                    <label for="table" class="block text-sm font-medium text-gray-700 mb-2">
+                        Select Table
+                    </label>
+                    <select
+                        id="table"
+                        name="table"
+                        x-model="selectedTable"
+                        @change="selectedFk = ''"
+                        required
+                        class="w-full rounded-xl border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500"
+                    >
+                        <option value="">Choose a table...</option>
+                        {% for table in tables %}
+                        {% if table.value in fk_options %}
+                        <option value="{{ table.value }}">{{ table.label }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- FK Field Selection -->
+                <div>
+                    <label for="fk_field" class="block text-sm font-medium text-gray-700 mb-2">
+                        Foreign Key Field
+                    </label>
+                    <select
+                        id="fk_field"
+                        name="fk_field"
+                        x-model="selectedFk"
+                        :disabled="!selectedTable"
+                        required
+                        class="w-full rounded-xl border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    >
+                        <option value="">Choose a field...</option>
+                        <template x-for="option in fkOptions[selectedTable] || []" :key="option.value">
+                            <option :value="option.value" x-text="option.label"></option>
+                        </template>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex items-center gap-4 pt-2">
+                <button
+                    type="submit"
+                    :disabled="!selectedTable || !selectedFk || loading"
+                    class="inline-flex items-center gap-2 px-6 py-3 bg-amber-600 text-white rounded-xl font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                    <span id="scan-spinner" class="htmx-indicator">
+                        <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                    <svg x-show="!loading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <span x-text="loading ? 'Scanning...' : 'Scan for Orphans'"></span>
+                </button>
+                <span x-show="!selectedTable || !selectedFk" class="text-sm text-gray-500">
+                    Select a table and FK field to scan
+                </span>
+            </div>
+        </form>
+    </div>
+
+    <!-- Info Card -->
+    <div class="bg-amber-50 rounded-2xl ring-1 ring-amber-100 p-6 mb-6" x-show="!hasResults">
+        <div class="flex items-start gap-4">
+            <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <h3 class="font-semibold text-amber-900 mb-2">What Are Orphan Records?</h3>
+                <ul class="text-sm text-amber-700 space-y-2">
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Records with NULL foreign key values that should reference another table
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        Can occur after data imports or when parent records are deleted
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        The linker tries to match orphans to targets using email, phone, or name
+                    </li>
+                    <li class="flex items-start gap-2">
+                        <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        All linking operations can be rolled back
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Container -->
+    <div id="orphan-results">
+        <!-- HTMX will load orphans_table.html partial here -->
+    </div>
+</div>
+{% endblock %}

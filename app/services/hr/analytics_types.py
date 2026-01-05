@@ -13,6 +13,11 @@ from typing import Dict, List, Optional, Any
 __all__ = [
     # Dashboard Types
     "HRDashboardSummary",
+    "HRDashboardStats",
+    "HRDashboardData",
+    "DepartmentStat",
+    "WorkAnniversary",
+    "NextPayroll",
     "ModuleSummary",
     # Organization Analytics
     "HeadcountByDepartment",
@@ -55,6 +60,54 @@ class HRDashboardSummary:
     payroll_summary: ModuleSummary
     training_summary: ModuleSummary
     appraisal_summary: ModuleSummary
+
+
+@dataclass
+class DepartmentStat:
+    """Employee count by department."""
+
+    name: str
+    count: int
+
+
+@dataclass
+class WorkAnniversary:
+    """Employee work anniversary info."""
+
+    id: int
+    name: str
+    date: date
+    years: int
+
+
+@dataclass
+class NextPayroll:
+    """Next payroll due info."""
+
+    id: int
+    name: str
+    date: Optional[date] = None
+
+
+@dataclass
+class HRDashboardStats:
+    """Stats for HR dashboard cards."""
+
+    total_employees: int = 0
+    present_today: int = 0
+    on_leave_today: int = 0
+    pending_leave: int = 0
+
+
+@dataclass
+class HRDashboardData:
+    """Complete data for HR dashboard."""
+
+    stats: HRDashboardStats = field(default_factory=HRDashboardStats)
+    department_stats: List[DepartmentStat] = field(default_factory=list)
+    recent_leave_requests: List[Any] = field(default_factory=list)
+    anniversaries: List[WorkAnniversary] = field(default_factory=list)
+    next_payroll: Optional[NextPayroll] = None
 
 
 # ==============================================================================

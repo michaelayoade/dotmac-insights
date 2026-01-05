@@ -27,6 +27,8 @@ from app.models.accounting import (
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .journal_entry_types import (
     JECreateData,
@@ -306,6 +308,11 @@ class JournalEntryService:
             acc.idx = idx
             self.db.add(acc)
 
+        validator = SoftValidationService(self.db)
+        for acc in je_accounts:
+            validator.validate_and_store(acc)
+        validator.validate_and_store(je)
+
         # Audit log
         audit = AuditLogger(self.db)
         audit.log_create(
@@ -315,6 +322,16 @@ class JournalEntryService:
             new_values=serialize_for_audit(je),
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.journal_entry.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="journal_entry",
+            entity_id=str(je.id),
+            summary=f"Created journal entry {je.id}",
+            metadata={"total_debit": float(je.total_debit), "total_credit": float(je.total_credit)},
+        )
         return je
 
     def update_entry(self, entry_id: int, data: JEUpdateData) -> JournalEntry:
@@ -364,6 +381,17 @@ class JournalEntryService:
             new_values=serialize_for_audit(je),
         )
 
+        SoftValidationService(self.db).validate_and_store(je)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.journal_entry.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="journal_entry",
+            entity_id=str(je.id),
+            summary=f"Updated journal entry {je.id}",
+        )
         return je
 
     def update_entry_with_lines(self, entry_id: int, data: JECreateData) -> JournalEntry:
@@ -450,6 +478,11 @@ class JournalEntryService:
             acc.idx = idx
             self.db.add(acc)
 
+        validator = SoftValidationService(self.db)
+        for acc in je_accounts:
+            validator.validate_and_store(acc)
+        validator.validate_and_store(je)
+
         # Audit log
         audit = AuditLogger(self.db)
         audit.log_update(
@@ -460,6 +493,16 @@ class JournalEntryService:
             new_values=serialize_for_audit(je),
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.journal_entry.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="journal_entry",
+            entity_id=str(je.id),
+            summary=f"Updated journal entry {je.id}",
+            metadata={"with_lines": True},
+        )
         return je
 
     def delete_entry(self, entry_id: int) -> None:
@@ -490,6 +533,15 @@ class JournalEntryService:
             old_values=old_values,
         )
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.journal_entry.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="journal_entry",
+            entity_id=str(je.id),
+            summary=f"Deleted journal entry {je.id}",
+        )
         self.db.delete(je)
 
     # -------------------------------------------------------------------------
@@ -616,6 +668,16 @@ class JournalEntryService:
             )
             # Update JE docstatus to posted
             je.docstatus = 1
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.journal_entry.post",
+                user_id=self.principal.id if self.principal else None,
+                user_email=getattr(self.principal, "email", None),
+                entity_type="journal_entry",
+                entity_id=str(je.id),
+                summary=f"Posted journal entry {je.id}",
+                metadata={"remarks": remarks},
+            )
             return je
         except ApprovalError as e:
             raise ValidationError(str(e)) from e

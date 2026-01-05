@@ -24,7 +24,6 @@ from app.utils.datetime_utils import utc_now, ensure_utc
 
 if TYPE_CHECKING:
     from app.models.party import Party
-    from app.models.employee import Employee
     from app.models.ticket import Ticket
     from app.models.conversation import Conversation
     from app.models.agent import Team
@@ -177,13 +176,13 @@ class UnifiedTicket(SoftDeleteMixin, Base):
     contact_phone: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     # ==========================================================================
-    # ASSIGNMENT & OWNERSHIP
+    # ASSIGNMENT & OWNERSHIP (Party-based after Agent → Party unification)
     # ==========================================================================
 
-    assigned_to_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("employees.id"),
+    assigned_to_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
         nullable=True,
-        index=True
+        index=True,
     )
     assigned_team: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)  # TEXT for display
     assigned_team_id: Mapped[Optional[int]] = mapped_column(
@@ -331,9 +330,8 @@ class UnifiedTicket(SoftDeleteMixin, Base):
     party: Mapped[Optional["Party"]] = relationship(
         foreign_keys=[party_id]
     )
-    assigned_to: Mapped[Optional["Employee"]] = relationship(
-        back_populates="assigned_unified_tickets",
-        foreign_keys=[assigned_to_id]
+    assigned_to_party: Mapped[Optional["Party"]] = relationship(
+        foreign_keys=[assigned_to_party_id]
     )
     assigned_team_rel: Mapped[Optional["Team"]] = relationship(
         "Team",
@@ -372,7 +370,7 @@ class UnifiedTicket(SoftDeleteMixin, Base):
     __table_args__ = (
         # Composite indexes for common queries
         Index("ix_unified_tickets_status_priority", "status", "priority"),
-        Index("ix_unified_tickets_assigned_status", "assigned_to_id", "status"),
+        Index("ix_unified_tickets_assigned_party_status", "assigned_to_party_id", "status"),
         Index("ix_unified_tickets_party_status", "party_id", "status"),
         Index("ix_unified_tickets_source_status", "source", "status"),
         Index("ix_unified_tickets_created_status", "created_at", "status"),
@@ -443,9 +441,9 @@ class UnifiedTicket(SoftDeleteMixin, Base):
             return self.resolution_time_seconds / 3600
         return None
 
-    def assign(self, employee_id: int, team: Optional[str] = None) -> None:
-        """Assign ticket to an agent."""
-        self.assigned_to_id = employee_id
+    def assign(self, party_id: int, team: Optional[str] = None) -> None:
+        """Assign ticket to a party (support agent)."""
+        self.assigned_to_party_id = party_id
         if team:
             self.assigned_team = team
         self.assigned_at = datetime.utcnow()

@@ -69,7 +69,7 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for cat in expenses.by_category %}
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-surface-50">
                     <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ cat.category }}</td>
                     <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ cat.count }}</td>
                     <td class="px-4 py-3 text-sm font-medium text-gray-900 text-right">{{ "{:,.0f}".format(cat.total) }}</td>

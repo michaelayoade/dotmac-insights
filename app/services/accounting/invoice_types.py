@@ -27,6 +27,7 @@ class InvoiceFilters:
     search: Optional[str] = None
     customer_account_id: Optional[int] = None
     status: Optional[InvoiceStatus] = None
+    status_in: Optional[List[InvoiceStatus]] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     overdue_only: bool = False

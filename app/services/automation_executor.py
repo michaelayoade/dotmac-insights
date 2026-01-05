@@ -21,7 +21,8 @@ from app.models.support_automation import (
     ConditionOperator,
 )
 from app.models.ticket import Ticket, TicketStatus, TicketPriority
-from app.models.agent import Agent, Team
+from app.models.agent import Team
+from app.models.party import Party, PartyRole
 
 logger = structlog.get_logger()
 
@@ -389,10 +390,19 @@ class AutomationExecutor:
         elif action_type == AutomationActionType.ASSIGN_AGENT.value:
             old_assignee: Optional[str] = ticket.assigned_to
             agent_id = params.get("agent_id")
-            agent = self.db.query(Agent).filter(Agent.id == agent_id).first()
+            # agent_id is now party_id after Agent → Party unification
+            agent = (
+                self.db.query(Party)
+                .join(PartyRole, PartyRole.party_id == Party.id)
+                .filter(
+                    Party.id == agent_id,
+                    PartyRole.role == "support_agent",
+                )
+                .first()
+            )
             if not agent:
                 raise ValueError(f"Agent not found: {agent_id}")
-            ticket.assigned_to = agent.display_name or agent.email or f"agent-{agent.id}"
+            ticket.assigned_to = agent.display_name or agent.primary_email or f"agent-{agent.id}"
             return {
                 "action": "assign_agent",
                 "old": old_assignee,

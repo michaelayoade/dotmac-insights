@@ -104,6 +104,15 @@ SETTINGS_CATEGORIES = [
         "scope": "admin:read",
         "color": "teal",
     },
+    {
+        "id": "data-cleaner",
+        "name": "Data Cleaner",
+        "description": "Bulk edit, normalize, and merge data records",
+        "icon": "edit-3",
+        "href": "/settings/data-cleaner",
+        "scope": "admin:read",
+        "color": "indigo",
+    },
 ]
 
 
@@ -153,6 +162,7 @@ from app.modules.settings.assets_routes import router as assets_router
 from app.modules.settings.sync_routes import router as sync_router
 from app.modules.settings.cleanup_routes import router as cleanup_router
 from app.modules.settings.migration_routes import router as migration_router
+from app.modules.settings.cleaner_routes import router as cleaner_router
 
 router.include_router(general_router)
 router.include_router(admin_router)
@@ -163,6 +173,7 @@ router.include_router(assets_router)
 router.include_router(sync_router)
 router.include_router(cleanup_router)
 router.include_router(migration_router)
+router.include_router(cleaner_router)
 
 
 # Redirect for workflow tasks - consolidated under settings

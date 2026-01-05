@@ -13,6 +13,7 @@ from ._deps import (
     ApprovalStatus,
 )
 from app.services.accounting import ApprovalsService
+from app.services.accounting.web_services import AccountingApprovalsWebService
 from app.services.accounting.approvals_types import (
     ApprovalListFilters,
     ControlsUpdateData,
@@ -44,6 +45,10 @@ def get_approval_doctype_options():
 
 def _get_approvals_service(db: DB, user: SessionUser) -> ApprovalsService:
     return ApprovalsService(db, user)
+
+
+def _get_approvals_web_service(db: DB, user: SessionUser) -> AccountingApprovalsWebService:
+    return AccountingApprovalsWebService(db, _get_approvals_service(db, user))
 
 
 # --- Pending Approvals ---
@@ -156,10 +161,9 @@ async def approve_document(
     await validate_csrf(request)
 
     remarks = form_str(form_data, "remarks")
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     try:
-        service.approve_document(doctype, document_id, user.id, remarks)
-        db.commit()
+        web_service.approve_document(doctype, document_id, user.id, remarks)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -182,10 +186,9 @@ async def reject_document(
     await validate_csrf(request)
 
     remarks = form_str(form_data, "remarks")
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     try:
-        service.reject_document(doctype, document_id, user.id, remarks)
-        db.commit()
+        web_service.reject_document(doctype, document_id, user.id, remarks)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -210,7 +213,7 @@ async def workflows_list(
     per_page: int = Query(20, ge=10, le=100),
 ):
     """Workflow configuration list page."""
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     filters = WorkflowFilters(query=q, doctype=doctype, status=status)
     pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
     result = service.list_workflows(filters, pagination)
@@ -300,8 +303,7 @@ async def workflow_create(
         escalation_enabled=bool(form_str(form_data, "escalation_enabled")),
         escalation_hours=form_int(form_data, "escalation_hours", 24) or 24,
     )
-    workflow = service.create_workflow(data, user.id)
-    db.commit()
+    workflow = web_service.create_workflow(data, user.id)
 
     set_flash(response, f"Workflow '{workflow.workflow_name}' created", "success")
     return RedirectResponse(url=f"/accounting/workflows/{workflow.id}", status_code=303)
@@ -318,7 +320,7 @@ async def workflow_detail(
     _: None = RequireAccountingRead,
 ):
     """Workflow detail page."""
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     try:
         workflow = service.get_workflow(workflow_id, include_steps=True)
     except NotFoundError as exc:
@@ -392,8 +394,7 @@ async def workflow_update(
         escalation_hours=form_int(form_data, "escalation_hours", 24) or 24,
     )
     try:
-        workflow = service.update_workflow(workflow_id, data)
-        db.commit()
+        workflow = web_service.update_workflow(workflow_id, data)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -414,10 +415,9 @@ async def workflow_toggle(
     form_data = await request.form()
     await validate_csrf(request)
 
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     try:
-        workflow = service.toggle_workflow(workflow_id)
-        db.commit()
+        workflow = web_service.toggle_workflow(workflow_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -439,7 +439,7 @@ async def workflow_add_step(
     form_data = await request.form()
     await validate_csrf(request)
 
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     data = WorkflowStepCreateData(
         step_order=form_int(form_data, "step_order", 1) or 1,
         step_name=form_str(form_data, "step_name"),
@@ -450,8 +450,7 @@ async def workflow_add_step(
         amount_threshold_max=form_decimal(form_data, "amount_threshold_max"),
     )
     try:
-        step = service.add_step(workflow_id, data)
-        db.commit()
+        step = web_service.add_step(workflow_id, data)
     except (NotFoundError, ValidationError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -473,10 +472,9 @@ async def workflow_delete_step(
     form_data = await request.form()
     await validate_csrf(request)
 
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     try:
-        service.delete_step(workflow_id, step_id)
-        db.commit()
+        web_service.delete_step(workflow_id, step_id)
     except NotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -496,7 +494,7 @@ async def controls_form(
     _: None = RequireAccountingWrite,
 ):
     """Accounting controls configuration form."""
-    service = _get_approvals_service(db, user)
+    web_service = _get_approvals_web_service(db, user)
     controls = service.get_controls()
 
     context = get_base_context(request, response, user, csrf_token)
@@ -525,8 +523,7 @@ async def controls_update(
         require_approval_payment=bool(form_str(form_data, "require_payment_approval")),
         backdating_days_allowed=form_int(form_data, "max_backdate_days", 30) or 30,
     )
-    service.update_controls(data, user.id)
-    db.commit()
+    web_service.update_controls(data, user.id)
 
     set_flash(response, "Accounting controls updated", "success")
     return RedirectResponse(url="/accounting/controls", status_code=303)

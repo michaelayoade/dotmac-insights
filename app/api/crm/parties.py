@@ -27,6 +27,9 @@ from .party_schemas import (
     PartyListResponse,
     PartyRoleCreate,
     PartyRoleResponse,
+    PartyMergeRequest,
+    PartyMergePreviewRequest,
+    PartyMergePreviewResponse,
 )
 
 router = APIRouter()
@@ -193,6 +196,59 @@ def delete_party(
         db.commit()
         return Response(status_code=204)
     except NotFoundError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+
+
+@router.post(
+    "/{party_id}/merge/preview",
+    response_model=PartyMergePreviewResponse,
+    dependencies=[Depends(Require("crm:write"))],
+)
+def preview_merge_party(
+    party_id: int,
+    payload: PartyMergePreviewRequest,
+    db: Session = Depends(get_db),
+    service: PartyService = Depends(get_party_service),
+) -> PartyMergePreviewResponse:
+    try:
+        return service.preview_merge(
+            primary_id=party_id,
+            duplicate_id=payload.duplicate_party_id,
+            auto_select_primary=payload.auto_select_primary,
+        )
+    except (NotFoundError, ConflictError) as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+
+
+@router.post(
+    "/{party_id}/merge",
+    response_model=PartyResponse,
+    dependencies=[Depends(Require("crm:write"))],
+)
+def merge_party(
+    party_id: int,
+    payload: PartyMergeRequest,
+    db: Session = Depends(get_db),
+    service: PartyService = Depends(get_party_service),
+) -> PartyResponse:
+    try:
+        party = service.merge_parties(
+            primary_id=party_id,
+            duplicate_id=payload.duplicate_party_id,
+            deactivate_duplicate=payload.deactivate_duplicate,
+            reason=payload.reason,
+            auto_select_primary=payload.auto_select_primary,
+        )
+        db.commit()
+        db.refresh(party)
+        return party
+    except (NotFoundError, ConflictError) as exc:
+        db.rollback()
+        raise HTTPException(status_code=exc.http_code, detail=exc.message)
+    except ValidationError as exc:
+        db.rollback()
         raise HTTPException(status_code=exc.http_code, detail=exc.message)
 
 

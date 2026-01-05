@@ -152,7 +152,7 @@ class SalesDashboardService:
 
         # Items sold
         items_sold = (
-            self.db.query(func.sum(SalesOrderItem.qty))
+            self.db.query(func.sum(SalesOrderItem.quantity))
             .join(SalesOrder)
             .filter(SalesOrder.transaction_date >= period_start)
             .scalar()
@@ -692,7 +692,7 @@ class SalesDashboardService:
                 SalesOrderItem.item_code,
                 SalesOrderItem.item_name,
                 SalesOrderItem.item_group,
-                func.sum(SalesOrderItem.qty).label("quantity"),
+                func.sum(SalesOrderItem.quantity).label("quantity"),
                 func.sum(SalesOrderItem.amount).label("revenue"),
                 func.count(func.distinct(SalesOrderItem.sales_order_id)).label("order_count"),
             )

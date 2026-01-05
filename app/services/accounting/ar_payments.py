@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func, or_
 
 from app.models.payment import Payment, PaymentMethod, PaymentSource, PaymentStatus
@@ -27,6 +27,8 @@ from app.services.payment_allocation_service import (
     PaymentAllocationService,
 )
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
+from app.services.activity_logger import ActivityLogger
 
 from .ar_payment_types import AllocationData, PaymentCreateData, PaymentFilters, PaymentUpdateData
 
@@ -78,7 +80,10 @@ class ARPaymentService:
         if pagination is None:
             pagination = PaginationParams()
 
-        query = self.db.query(Payment)
+        query = (
+            self.db.query(Payment)
+            .options(joinedload(Payment.customer_account).joinedload(CustomerAccount.party))
+        )
         query = scoped_query(query, self.principal)
 
         # Apply simple equality filters
@@ -276,6 +281,21 @@ class ARPaymentService:
             self._process_allocations(payment.id, data.allocations)
             self.db.refresh(payment)
 
+        validator = SoftValidationService(self.db)
+        for allocation in self.get_payment_allocations(payment.id):
+            validator.validate_and_store(allocation)
+        validator.validate_and_store(payment)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.payment.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+            summary=f"Created payment {payment.receipt_number or payment.id}",
+            metadata={"amount": float(payment.amount), "customer_account_id": payment.customer_account_id},
+        )
         return payment
 
     def update_payment(self, payment_id: int, data: PaymentUpdateData) -> Payment:
@@ -342,6 +362,21 @@ class ARPaymentService:
 
         payment.updated_by_id = self.principal.id if self.principal else None
 
+        validator = SoftValidationService(self.db)
+        for allocation in self.get_payment_allocations(payment.id):
+            validator.validate_and_store(allocation)
+        validator.validate_and_store(payment)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.payment.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+            summary=f"Updated payment {payment.receipt_number or payment.id}",
+            metadata={"status": payment.status.value if payment.status else None},
+        )
         return payment
 
     def delete_payment(self, payment_id: int) -> None:
@@ -370,11 +405,30 @@ class ARPaymentService:
         payment.deleted_at = datetime.now(timezone.utc)
         payment.deleted_by_id = self.principal.id if self.principal else None
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.payment.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+            summary=f"Deleted payment {payment.receipt_number or payment.id}",
+        )
+
     def approve_payment(self, payment_id: int) -> Payment:
         """Approve a payment."""
         payment = self.get_payment(payment_id)
         payment.status = PaymentStatus.APPROVED
         payment.updated_by_id = self.principal.id if self.principal else None
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.payment.approve",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+            summary=f"Approved payment {payment.receipt_number or payment.id}",
+        )
         return payment
 
     def post_payment(self, payment_id: int) -> Payment:
@@ -382,6 +436,15 @@ class ARPaymentService:
         payment = self.get_payment(payment_id)
         payment.status = PaymentStatus.POSTED
         payment.updated_by_id = self.principal.id if self.principal else None
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.payment.post",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+            summary=f"Posted payment {payment.receipt_number or payment.id}",
+        )
         return payment
 
     # -------------------------------------------------------------------------
@@ -407,6 +470,20 @@ class ARPaymentService:
         payment = self.get_payment(payment_id)
         self._process_allocations(payment_id, allocations)
         self.db.refresh(payment)
+        validator = SoftValidationService(self.db)
+        for allocation in self.get_payment_allocations(payment.id):
+            validator.validate_and_store(allocation)
+        validator.validate_and_store(payment)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.payment.allocate",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="payment",
+            entity_id=str(payment.id),
+            summary=f"Allocated payment {payment.receipt_number or payment.id}",
+            metadata={"allocation_count": len(allocations)},
+        )
         return payment
 
     def _process_allocations(

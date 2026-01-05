@@ -116,7 +116,7 @@
                             </svg>
                             Plan Name
                         </dt>
-                        <dd class="mt-1.5 text-sm text-gray-900 font-body font-semibold">
+                        <dd class="mt-1.5 text-sm text-gray-900 font-body font-semibold" data-testid="subscription-plan-name">
                             {{ subscription.plan_name }}
                         </dd>
                     </div>
@@ -128,7 +128,7 @@
                             </svg>
                             Tariff
                         </dt>
-                        <dd class="mt-1.5 text-sm text-gray-900 font-body">
+                        <dd class="mt-1.5 text-sm text-gray-900 font-body" data-testid="subscription-tariff">
                             <a href="/subscriptions/tariffs/{{ subscription.tariff.id }}" class="hover:text-primary-600 transition-colors">
                                 {{ subscription.tariff.title }}
                             </a>
@@ -142,7 +142,7 @@
                             </svg>
                             Price
                         </dt>
-                        <dd class="mt-1.5 text-sm text-gray-900 font-body">
+                        <dd class="mt-1.5 text-sm text-gray-900 font-body" data-testid="subscription-price">
                             <span class="font-display font-bold text-lg">{{ subscription.currency }} {{ "{:,.0f}".format(subscription.price) }}</span>
                             <span class="text-gray-500">/ {{ subscription.billing_cycle }}</span>
                         </dd>
@@ -333,6 +333,7 @@
                     </div>
                     {% endif %}
                 </div>
+                <div class="text-xs text-gray-400" data-provision-status></div>
 
                 <!-- Access Details -->
                 <dl class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -392,7 +393,7 @@
                             class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
                             hx-post="/subscriptions/{{ subscription.id }}/provision"
                             hx-swap="none"
-                            data-testid="provision-button"
+                            data-testid="provision-btn"
                         >
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -442,12 +443,28 @@
                     </div>
                 </div>
                 {% elif not subscription.router_id %}
-                <div class="text-sm text-gray-500 italic">
+                <div class="flex items-center gap-3 text-sm text-gray-500 italic">
                     Assign a router to enable provisioning actions.
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg"
+                        data-testid="provision-btn"
+                        disabled
+                    >
+                        Provision
+                    </button>
                 </div>
                 {% elif not subscription.access_method %}
-                <div class="text-sm text-gray-500 italic">
+                <div class="flex items-center gap-3 text-sm text-gray-500 italic">
                     Configure an access method to enable provisioning actions.
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-gray-400 bg-gray-50 border border-gray-200 rounded-lg"
+                        data-testid="provision-btn"
+                        disabled
+                    >
+                        Provision
+                    </button>
                 </div>
                 {% endif %}
             </div>
@@ -584,6 +601,7 @@
                         hx-get="/subscriptions/{{ subscription.id }}/renew-modal"
                         hx-target="#modal-container"
                         hx-swap="innerHTML"
+                        data-testid="renew-btn"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -650,7 +668,7 @@
         </div>
 
         <!-- Status Actions -->
-        {% if status_transitions %}
+                {% if status_transitions %}
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="status-actions-card">
             <div class="px-6 py-5 border-b border-gray-100">
                 <h3 class="text-base font-display font-semibold text-gray-900">Status Actions</h3>
@@ -673,7 +691,7 @@
                     hx-get="/subscriptions/{{ subscription.id }}/status-modal?target_status={{ transition.status }}"
                     hx-target="#modal-container"
                     hx-swap="innerHTML"
-                    data-testid="status-{{ transition.status }}-button"
+                    data-testid="{% if transition.status == 'suspended' %}suspend-btn{% else %}status-{{ transition.status }}-button{% endif %}"
                 >
                     <div class="w-8 h-8 rounded-lg {{ icon_colors.get(transition.color, 'bg-gray-100 text-gray-600') }} flex items-center justify-center">
                         {% if transition.status == 'active' %}
@@ -690,7 +708,13 @@
                         </svg>
                         {% endif %}
                     </div>
-                    <span>{{ transition.label }}</span>
+                    <span>
+                        {% if transition.status == 'suspended' %}
+                        Suspend
+                        {% else %}
+                        {{ transition.label }}
+                        {% endif %}
+                    </span>
                 </button>
                 {% endfor %}
             </div>

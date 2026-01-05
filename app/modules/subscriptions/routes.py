@@ -31,6 +31,7 @@ from ._deps import (
     NotFoundError, ValidationError, ConflictError,
     SubscriptionService, ServiceTypeConfigService, SubscriptionFilters,
     SubscriptionCreateData, SubscriptionUpdateData, NetworkAssignmentData, ProvisioningConfigData,
+    PartyService,
     # Form helpers
     _form_str, _form_int, _form_decimal, _form_bool, _form_date,
     # Option helpers
@@ -47,6 +48,7 @@ from ._deps import (
 )
 
 from ._services import SubscriptionWebService
+from app.services.subscriptions.web_services import SubscriptionCommitService
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
@@ -73,6 +75,7 @@ async def subscriptions_list(
 ):
     """Subscriptions list page with stats and filters."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     # Build filters
     filters = SubscriptionFilters(
@@ -81,14 +84,14 @@ async def subscriptions_list(
         service_type=service_type,
         party_id=party_id,
     )
-    pagination = PaginationParams(page=page, per_page=per_page)
+    # Convert page/per_page to offset/limit
+    offset = (page - 1) * per_page
+    pagination = PaginationParams(offset=offset, limit=per_page)
 
     # Get subscriptions with pagination
     result = svc.list_subscriptions(
         filters=filters,
         pagination=pagination,
-        sort_by=sort,
-        sort_dir=dir,
     )
 
     # Compute stats
@@ -226,7 +229,11 @@ async def subscription_new(
     # Pre-selected party if provided
     selected_customer = None
     if party_id:
-        selected_customer = db.query(Party).filter(Party.id == party_id).first()
+        party_service = PartyService(db, principal=user)
+        try:
+            selected_customer = party_service.get_party(party_id)
+        except NotFoundError:
+            selected_customer = None
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -333,8 +340,7 @@ async def subscription_create(
     )
 
     try:
-        subscription = svc.create_subscription(create_data)
-        db.commit()
+        subscription = commit_svc.create_subscription(create_data)
     except ValidationError as exc:
         errors["_general"] = str(exc)
         # Return form with errors
@@ -379,6 +385,7 @@ async def subscription_edit(
 ):
     """Subscription edit form page."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -497,8 +504,7 @@ async def subscription_update(
     )
 
     try:
-        subscription = svc.update_subscription(subscription_id, update_data)
-        db.commit()
+        subscription = commit_svc.update_subscription(subscription_id, update_data)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
@@ -522,6 +528,7 @@ async def subscription_status_modal(
 ):
     """Status change confirmation modal."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -575,17 +582,15 @@ async def subscription_status_change(
 
         if new_status == SubscriptionStatus.ACTIVE:
             if old_status == SubscriptionStatus.SUSPENDED:
-                subscription = svc.reactivate(subscription_id)
+                subscription = commit_svc.reactivate(subscription_id)
             else:
-                subscription = svc.activate(subscription_id)
+                subscription = commit_svc.activate(subscription_id)
         elif new_status == SubscriptionStatus.SUSPENDED:
-            subscription = svc.suspend(subscription_id)
+            subscription = commit_svc.suspend(subscription_id)
         elif new_status == SubscriptionStatus.CANCELLED:
-            subscription = svc.cancel(subscription_id)
+            subscription = commit_svc.cancel(subscription_id)
         else:
-            subscription = svc.change_status(subscription_id, new_status.value)
-
-        db.commit()
+            subscription = commit_svc.change_status(subscription_id, new_status.value)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ConflictError as exc:
@@ -621,29 +626,18 @@ async def subscription_plan_change_modal(
         mode = "upgrade"
 
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
 
-    # Get available tariffs
-    all_tariffs = db.query(Tariff).filter(
-        Tariff.enabled == True,
-        Tariff.available_for_services == True,
-    ).order_by(Tariff.price.asc()).all()
+    # Use service methods to get plan change options (avoids direct db queries)
+    upgrade_tariffs = svc.get_tariffs_for_upgrade(subscription_id)
+    downgrade_tariffs = svc.get_tariffs_for_downgrade(subscription_id)
 
-    upgrade_tariffs = [
-        t for t in all_tariffs
-        if t.id != subscription.tariff_id and t.price > subscription.price
-    ]
-    downgrade_tariffs = [
-        t for t in all_tariffs
-        if t.id != subscription.tariff_id and t.price < subscription.price
-    ]
-
-    config_service = ServiceTypeConfigService(db, principal=user)
-    config = config_service.get_config()
+    config = svc.get_service_type_config()
 
     context = get_base_context(request, response, user, csrf_token)
     context["subscription"] = subscription
@@ -681,13 +675,12 @@ async def subscription_upgrade(
 
     svc = SubscriptionWebService(db, principal=user)
     try:
-        result = svc.execute_upgrade(
+        result = commit_svc.execute_upgrade(
             subscription_id=subscription_id,
             new_tariff_id=new_tariff_id,
             effective=effective,
             prorate=prorate,
         )
-        db.commit()
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ValidationError as exc:
@@ -726,14 +719,14 @@ async def subscription_downgrade(
     prorate = _form_bool(form, "prorate")
 
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
     try:
-        result = svc.execute_downgrade(
+        result = commit_svc.execute_downgrade(
             subscription_id=subscription_id,
             new_tariff_id=new_tariff_id,
             effective=effective,
             prorate=prorate,
         )
-        db.commit()
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ValidationError as exc:
@@ -760,6 +753,7 @@ async def subscription_renew_modal(
 ):
     """Renewal modal for subscriptions."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -796,12 +790,11 @@ async def subscription_renew(
 
     svc = SubscriptionWebService(db, principal=user)
     try:
-        result = svc.execute_renewal(
+        result = commit_svc.execute_renewal(
             subscription_id=subscription_id,
             periods=periods,
             new_end_date=new_end_date,
         )
-        db.commit()
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ValidationError as exc:
@@ -828,6 +821,7 @@ async def subscription_grace_modal(
 ):
     """Grace period extension modal."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -866,12 +860,11 @@ async def subscription_extend_grace(
 
     svc = SubscriptionWebService(db, principal=user)
     try:
-        svc.extend_grace_period(
+        commit_svc.extend_grace_period(
             subscription_id=subscription_id,
             days=days,
             reason=reason,
         )
-        db.commit()
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ValidationError as exc:
@@ -902,6 +895,7 @@ async def subscription_network_modal(
 ):
     """Network assignment modal."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -939,8 +933,7 @@ async def subscription_network_update(
     )
 
     try:
-        subscription = svc.assign_network(subscription_id, network_data)
-        db.commit()
+        subscription = commit_svc.assign_network(subscription_id, network_data)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ValidationError as exc:
@@ -970,6 +963,7 @@ async def subscription_delete(
 ):
     """Delete a subscription (cancel and mark as deleted)."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -979,8 +973,7 @@ async def subscription_delete(
     name = subscription.plan_name
     try:
         if subscription.status != SubscriptionStatus.CANCELLED:
-            svc.cancel(subscription_id)
-        db.commit()
+            commit_svc.cancel(subscription_id)
     except ConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except ValidationError as exc:
@@ -1010,6 +1003,7 @@ async def subscription_row(
 ):
     """Single subscription row partial for HTMX updates."""
     svc = SubscriptionWebService(db, principal=user)
+    commit_svc = SubscriptionCommitService(db, svc)
 
     try:
         subscription = svc.get_subscription(subscription_id)
@@ -1264,8 +1258,7 @@ async def subscription_provisioning_update(
     )
 
     try:
-        subscription = svc.configure_provisioning(subscription_id, provisioning_data)
-        db.commit()
+        subscription = commit_svc.configure_provisioning(subscription_id, provisioning_data)
     except NotFoundError:
         raise HTTPException(status_code=404, detail="Subscription not found")
     except ValidationError as exc:

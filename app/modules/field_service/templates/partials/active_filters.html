@@ -1,0 +1,84 @@
+{% if current_status or current_priority or current_type or search_query %}
+<div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2">
+    <span class="text-xs text-gray-500 font-body">Active filters:</span>
+    {% if search_query %}
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+        <span>"{{ search_query }}"</span>
+        <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            hx-get="/field-service/table"
+            hx-target="#orders-table-container"
+            hx-include="[name='status'], [name='priority'], [name='type'], [name='sort'], [name='dir']"
+            hx-push-url="true"
+            onclick="document.querySelector('[name=q]').value = ''"
+        >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </span>
+    {% endif %}
+    {% if current_status %}
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+        <span>Status: {{ current_status | replace('_', ' ') | title }}</span>
+        <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            hx-get="/field-service/table"
+            hx-target="#orders-table-container"
+            hx-include="[name='q'], [name='priority'], [name='type'], [name='sort'], [name='dir']"
+            hx-push-url="true"
+        >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </span>
+    {% endif %}
+    {% if current_priority %}
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+        <span>Priority: {{ current_priority | title }}</span>
+        <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            hx-get="/field-service/table"
+            hx-target="#orders-table-container"
+            hx-include="[name='q'], [name='status'], [name='type'], [name='sort'], [name='dir']"
+            hx-push-url="true"
+        >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </span>
+    {% endif %}
+    {% if current_type %}
+    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+        <span>Type: {{ current_type | title }}</span>
+        <button
+            type="button"
+            class="text-gray-400 hover:text-gray-600"
+            hx-get="/field-service/table"
+            hx-target="#orders-table-container"
+            hx-include="[name='q'], [name='status'], [name='priority'], [name='sort'], [name='dir']"
+            hx-push-url="true"
+        >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
+    </span>
+    {% endif %}
+    <button
+        type="button"
+        class="text-xs text-primary-600 hover:text-primary-500 font-medium transition-colors"
+        hx-get="/field-service/table"
+        hx-target="#orders-table-container"
+        hx-push-url="/field-service"
+        onclick="document.querySelector('[name=q]').value = ''"
+    >
+        Clear all
+    </button>
+</div>
+{% endif %}

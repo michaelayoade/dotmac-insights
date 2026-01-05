@@ -13,11 +13,16 @@ from ._deps import (
     FiscalPeriodStatus,
 )
 from app.services.accounting import FiscalService
+from app.services.accounting.web_services import AccountingFiscalPeriodsWebService
 from app.services.accounting.fiscal_types import FiscalPeriodFilters
 from app.services.errors import NotFoundError, ValidationError
 from app.services.period_manager import PeriodManager, PeriodError
 
 router = APIRouter()
+
+
+def _get_fiscal_web_service(db: DB, user: SessionUser) -> AccountingFiscalPeriodsWebService:
+    return AccountingFiscalPeriodsWebService(db, FiscalService(db, user))
 
 
 @router.get("/fiscal-periods", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -121,13 +126,12 @@ async def fiscal_period_close(
         set_flash(response, "This period is permanently closed and cannot be modified.", "error")
         return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
 
-    manager = PeriodManager(db)
+    web_service = _get_fiscal_web_service(db, user)
     try:
-        manager.close_period(period_id, user.id, soft_close=True)
+        web_service.close_period(period_id, user.id, soft_close=True)
     except PeriodError as exc:
         set_flash(response, str(exc), "error")
         return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
-    db.commit()
 
     set_flash(response, f"Period {period.period_name} has been closed.", "success")
     return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
@@ -158,13 +162,12 @@ async def fiscal_period_reopen(
         set_flash(response, "This period is already open.", "warning")
         return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
 
-    manager = PeriodManager(db)
+    web_service = _get_fiscal_web_service(db, user)
     try:
-        manager.reopen_period(period_id, user.id)
+        web_service.reopen_period(period_id, user.id)
     except PeriodError as exc:
         set_flash(response, str(exc), "error")
         return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)
-    db.commit()
 
     set_flash(response, f"Period {period.period_name} has been reopened.", "success")
     return RedirectResponse(url=f"/accounting/fiscal-periods/{period_id}", status_code=303)

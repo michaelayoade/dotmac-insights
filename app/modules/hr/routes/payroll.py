@@ -7,12 +7,10 @@ Permission Requirements:
 
 Uses PayrollService for all business logic.
 """
-from __future__ import annotations
-
 from decimal import Decimal
-from typing import List, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Form, Request, Response, Query, HTTPException, Depends
+from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
@@ -35,7 +33,7 @@ from app.services.hr.payroll_types import (
     StructureDeductionData,
 )
 from app.services.types import PaginationParams
-from app.services.hr.errors import SalarySlipNotFoundError, SalaryStructureNotFoundError, PayrollEntryNotFoundError
+from app.services.hr.errors import SalarySlipNotFoundError, SalaryStructureNotFoundError
 from app.models.hr_payroll import SalaryComponentType
 
 RequireHRRead = Depends(require_scope("hr:read"))

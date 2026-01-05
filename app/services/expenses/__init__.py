@@ -6,20 +6,18 @@ The services are implemented in standalone files for now but can be
 refactored into this package structure over time.
 
 Usage:
-    from app.services.expenses import ExpenseService, ExpensePostingService
+    from app.services.expense_service import ExpenseService
+    from app.services.expenses import ExpenseClaimFilters
 
     def my_route(db: Session = Depends(get_db)):
         expense_service = ExpenseService(db)
         claim = expense_service.create_claim(data)
         db.commit()
-"""
-# Re-export existing services from parent directory
-from app.services.expense_service import ExpenseService
-from app.services.expense_posting_service import ExpensePostingService
-from app.services.expense_policy_service import ExpensePolicyService, PolicyViolation
-from app.services.cash_advance_service import CashAdvanceService
 
-# Services from this package
+Note: Services are imported from the parent directory directly to avoid
+circular imports. This package primarily exports type definitions.
+"""
+# Services from this package only (no parent imports to avoid circular deps)
 from .categories import ExpenseCategoryService
 
 # Type definitions from this package
@@ -41,12 +39,7 @@ from .types import (
 )
 
 __all__ = [
-    # Services
-    "ExpenseService",
-    "ExpensePostingService",
-    "ExpensePolicyService",
-    "PolicyViolation",
-    "CashAdvanceService",
+    # Services from this package
     "ExpenseCategoryService",
     # Enums
     "ClaimStatus",

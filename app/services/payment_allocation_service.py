@@ -16,6 +16,7 @@ from app.models.accounting import PurchaseInvoice
 from app.models.credit_note import CreditNote
 from app.models.books_settings import DebitNote
 from app.models.party import CustomerAccount, Party
+from app.services.validation.soft_validation_service import SoftValidationService
 
 
 @dataclass
@@ -245,6 +246,10 @@ class PaymentAllocationService:
             else:
                 payment.total_allocated = (payment.total_allocated or Decimal("0")) + total_allocating
                 payment.unallocated_amount = payment.amount - payment.total_allocated
+
+            validator = SoftValidationService(self.db)
+            for allocation in created_allocations:
+                validator.validate_and_store(allocation)
 
             return created_allocations
 

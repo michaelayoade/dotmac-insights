@@ -18,6 +18,7 @@ from ._deps import (
     # Dependencies
     SessionUser, CSRFToken, CSRFProtect, DB,
     RequireProjectsRead, RequireProjectsWrite,
+    PaginationParams,
     # Templates
     templates,
     # Models
@@ -47,7 +48,7 @@ async def project_gantt(
     project_id: int,
 ):
     """Display Gantt chart for a project."""
-    service = ProjectsWebService(db, user_id=user.id)
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
     gantt_data = service.get_gantt_data(project_id)
 
     if not gantt_data:
@@ -74,6 +75,46 @@ async def project_gantt(
     return HTMLResponse(template.render(context))
 
 
+@router.get("/gantt", response_class=HTMLResponse, dependencies=[RequireProjectsRead])
+async def gantt_index(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Gantt landing page - redirect to first project or show empty state."""
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
+    result = service.project_service.list_projects(
+        pagination=PaginationParams(offset=0, limit=1),
+    )
+    if result.items:
+        return RedirectResponse(url=f"/projects/{result.items[0].id}/gantt", status_code=302)
+
+    empty_gantt = {
+        "project": {"id": 0, "name": "Projects"},
+        "tasks": [],
+        "milestones": [],
+        "date_range": {"min_date": None, "max_date": None},
+    }
+
+    context = {
+        **get_base_context(request, response, user, csrf_token),
+        "page_title": "Gantt Chart",
+        "breadcrumbs": build_breadcrumbs([
+            {"label": "Projects", "url": "/projects"},
+            {"label": "Gantt Chart"},
+        ]),
+        "project_id": 0,
+        "project_name": "No projects available",
+        "gantt_data": empty_gantt,
+        "gantt_json": json.dumps(empty_gantt),
+    }
+
+    template = templates.get_template("modules/projects/templates/pages/gantt.html")
+    return HTMLResponse(template.render(context))
+
+
 @router.get("/{project_id}/gantt-data", dependencies=[RequireProjectsRead])
 async def project_gantt_data(
     request: Request,
@@ -82,7 +123,7 @@ async def project_gantt_data(
     project_id: int,
 ):
     """Return Gantt data as JSON for HTMX/JS consumption."""
-    service = ProjectsWebService(db, user_id=user.id)
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
     gantt_data = service.get_gantt_data(project_id)
 
     if not gantt_data:
@@ -110,7 +151,7 @@ async def entity_comments(
     if entity_type not in ("project", "task", "milestone"):
         raise HTTPException(status_code=400, detail="Invalid entity type")
 
-    service = ProjectsWebService(db, user_id=user.id)
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
     result = service.list_comments(entity_type, entity_id)
 
     context = {
@@ -147,15 +188,11 @@ async def create_comment(
         htmx_toast(response, "Comment cannot be empty", "error")
         return Response(status_code=204)
 
-    service = ProjectsWebService(db, user_id=user.id)
-    author_name = user.name or user.email or "Unknown"
-    author_email = user.email or ""
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
     service.create_comment(
         entity_type=entity_type,
         entity_id=entity_id,
         content=content,
-        author_name=author_name,
-        author_email=author_email,
     )
 
     # Return updated comments list
@@ -187,7 +224,7 @@ async def delete_comment(
     comment_id: int,
 ):
     """Delete a comment."""
-    service = ProjectsWebService(db, user_id=user.id)
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
     success = service.delete_comment(comment_id)
 
     if success:
@@ -228,7 +265,7 @@ async def entity_attachments(
     if entity_type not in ("project", "task"):
         raise HTTPException(status_code=400, detail="Invalid entity type")
 
-    service = ProjectsWebService(db, user_id=user.id)
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
     attachments = service.list_attachments(entity_type, entity_id)
 
     context = {
@@ -255,15 +292,18 @@ async def project_activity(
     db: DB,
     project_id: int,
     limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
     """List activity log for a project."""
-    service = ProjectsWebService(db, user_id=user.id)
-    activities = service.list_activity(project_id, limit)
+    service = ProjectsWebService(db, user_id=user.id, principal=user)
+    activities = service.list_activity(project_id, limit, offset)
 
     context = {
         **get_base_context(request, response, user, csrf_token),
         "project_id": project_id,
         "activities": activities,
+        "activity_limit": limit,
+        "activity_offset": offset,
     }
 
     template = templates.get_template("modules/projects/templates/partials/activity_log.html")

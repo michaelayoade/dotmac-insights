@@ -36,6 +36,7 @@ from .milestone_types import (
     MilestoneUpdateData,
     MilestoneProgress,
 )
+from app.services.types import PaginatedResult, PaginationParams
 
 if TYPE_CHECKING:
     from app.auth import Principal
@@ -150,6 +151,51 @@ class MilestoneService:
 
         return query.all()
 
+    def list_milestones(
+        self,
+        filters: Optional[MilestoneFilters] = None,
+        pagination: Optional[PaginationParams] = None,
+    ) -> PaginatedResult[Milestone]:
+        """List milestones with filters and pagination."""
+        if filters is None:
+            filters = MilestoneFilters()
+        if pagination is None:
+            pagination = PaginationParams()
+
+        query = self.db.query(Milestone).filter(Milestone.is_deleted == False)
+
+        if filters.project_id:
+            query = query.filter(Milestone.project_id == filters.project_id)
+        if filters.status:
+            query = query.filter(Milestone.status == filters.status)
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            query = query.filter(Milestone.name.ilike(search_term))
+
+        if filters.overdue_only:
+            today = date.today()
+            query = query.filter(
+                Milestone.planned_end_date < today,
+                Milestone.status.notin_([MilestoneStatus.COMPLETED]),
+            )
+
+        total = query.count()
+
+        sort_column = getattr(Milestone, filters.sort_by, Milestone.idx)
+        if filters.sort_dir == "desc":
+            query = query.order_by(sort_column.desc())
+        else:
+            query = query.order_by(sort_column.asc(), Milestone.planned_end_date.asc())
+
+        milestones = query.offset(pagination.offset).limit(pagination.limit).all()
+
+        return PaginatedResult(
+            items=milestones,
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
+
     def get_milestone(self, milestone_id: int) -> Milestone:
         """Get a milestone by ID.
 
@@ -223,6 +269,29 @@ class MilestoneService:
             completed_tasks=completed_tasks,
             percent_complete=percent_complete.quantize(Decimal("0.01")),
         )
+
+    def get_status_counts(self) -> dict:
+        """Get overall milestone status counts for dashboards."""
+        today = date.today()
+        return {
+            "pending": self.db.query(Milestone).filter(
+                Milestone.is_deleted == False,
+                Milestone.status == MilestoneStatus.PLANNED,
+            ).count(),
+            "in_progress": self.db.query(Milestone).filter(
+                Milestone.is_deleted == False,
+                Milestone.status == MilestoneStatus.IN_PROGRESS,
+            ).count(),
+            "overdue": self.db.query(Milestone).filter(
+                Milestone.is_deleted == False,
+                Milestone.planned_end_date < today,
+                Milestone.status != MilestoneStatus.COMPLETED,
+            ).count(),
+            "completed": self.db.query(Milestone).filter(
+                Milestone.is_deleted == False,
+                Milestone.status == MilestoneStatus.COMPLETED,
+            ).count(),
+        }
 
     # -------------------------------------------------------------------------
     # Mutation Methods

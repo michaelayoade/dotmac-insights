@@ -14,6 +14,7 @@ from ._deps import (
     get_base_context, validate_csrf, HTTPException,
 )
 from app.services.accounting import DocumentAttachmentService
+from app.services.accounting.web_services import AccountingAttachmentsWebService
 from app.services.accounting.attachments_types import AttachmentUploadData
 from app.services.errors import NotFoundError
 
@@ -22,6 +23,10 @@ router = APIRouter()
 
 def _get_service(db: DB, user: SessionUser) -> DocumentAttachmentService:
     return DocumentAttachmentService(db, user)
+
+
+def _get_web_service(db: DB, user: SessionUser) -> AccountingAttachmentsWebService:
+    return AccountingAttachmentsWebService(db, _get_service(db, user))
 
 
 @router.get("/documents/{doctype}/{doc_id}/attachments", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
@@ -36,6 +41,7 @@ async def get_attachments_panel(
 ):
     """Get attachments panel for a document (HTMX partial)."""
     service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
     attachments = service.list_attachments(doctype, doc_id)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -100,8 +106,7 @@ async def upload_attachment(
         is_primary=is_primary,
     )
 
-    service.create_attachment(upload_data)
-    db.commit()
+    web_service.create_attachment(upload_data)
 
     # Return updated attachments panel
     attachments = service.list_attachments(doctype, doc_id)
@@ -131,11 +136,11 @@ async def delete_attachment(
     await validate_csrf(request, csrf_protect)
 
     service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
 
     try:
         # Delete record and get file path
-        file_path = service.delete_attachment(attachment_id)
-        db.commit()
+        file_path = web_service.delete_attachment(attachment_id)
 
         # Delete file from disk
         if os.path.exists(file_path):
@@ -167,10 +172,10 @@ async def set_primary_attachment(
     await validate_csrf(request, csrf_protect)
 
     service = _get_service(db, user)
+    web_service = _get_web_service(db, user)
 
     try:
-        service.set_primary(attachment_id)
-        db.commit()
+        web_service.set_primary(attachment_id)
 
         # Return updated attachments panel
         attachments = service.list_attachments(doctype, doc_id)

@@ -13,7 +13,6 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.ticket import Ticket
     from app.models.party import Party
-    from app.models.agent import Agent
 
 
 class SurveyTrigger(str, Enum):
@@ -102,8 +101,11 @@ class CSATResponse(Base):
         nullable=True,
         index=True,
     )
-    agent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True
+    agent_party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Chatwoot sync
@@ -133,7 +135,7 @@ class CSATResponse(Base):
     survey: Mapped["CSATSurvey"] = relationship(back_populates="responses")
     ticket: Mapped[Optional["Ticket"]] = relationship(foreign_keys=[ticket_id])
     party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
-    agent: Mapped[Optional["Agent"]] = relationship(foreign_keys=[agent_id])
+    agent_party: Mapped[Optional["Party"]] = relationship(foreign_keys=[agent_party_id])
 
     def __repr__(self) -> str:
         return f"<CSATResponse survey={self.survey_id} rating={self.rating}>"

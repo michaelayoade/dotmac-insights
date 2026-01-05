@@ -1,16 +1,16 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<div class="max-w-screen-2xl mx-auto">
+<div class="max-w-7xl mx-auto">
     {# Page Header #}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8 animate-fade-up">
-        <div class="relative">
+        <div class="relative min-w-0">
             <div class="absolute -left-4 top-1 bottom-1 w-1 bg-gradient-to-b from-primary-500 to-primary-600 rounded-full"></div>
             <h1 class="text-2xl font-bold text-gray-900 tracking-tight font-display">Network Infrastructure</h1>
             <p class="mt-1 text-sm text-gray-500 font-body">ISP infrastructure overview and health monitoring</p>
         </div>
-        <div class="flex gap-2">
-            <a href="/network/pops" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all">
+        <div class="flex flex-wrap gap-2">
+            <a href="/network/pops" class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-all">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -27,7 +27,7 @@
     </div>
 
     {# Infrastructure Stats #}
-    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-4 mb-8" data-testid="stats-grid">
         {# POPs #}
         <a href="/network/pops" class="group relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm hover:shadow-warm-md transition-all duration-300 animate-fade-up" style="animation-delay: 50ms">
             <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary-400 to-primary-600 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>

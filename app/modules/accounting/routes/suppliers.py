@@ -12,6 +12,7 @@ from ._deps import (
     is_htmx_request, HTTPException, set_flash, validate_csrf, form_str,
 )
 from app.services.accounting import AccountingSettingsService, PayablesService
+from app.services.accounting.web_services import AccountingSuppliersWebService
 from app.services.accounting.payables_types import SupplierCreateData, SupplierUpdateData
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginationParams
@@ -22,6 +23,10 @@ router = APIRouter()
 def _get_payables_service(db: DB, user: SessionUser) -> PayablesService:
     settings_service = AccountingSettingsService(db, user)
     return PayablesService(db, settings_service, user)
+
+
+def _get_payables_web_service(db: DB, user: SessionUser) -> AccountingSuppliersWebService:
+    return AccountingSuppliersWebService(db, _get_payables_service(db, user))
 
 
 def get_supplier_group_options(service: PayablesService) -> list:
@@ -191,7 +196,8 @@ async def supplier_create(
         return HTMLResponse(template.render(context), status_code=422)
 
     service = _get_payables_service(db, user)
-    supplier = service.create_supplier(
+    web_service = _get_payables_web_service(db, user)
+    supplier = web_service.create_supplier(
         SupplierCreateData(
             supplier_name=form_str(form, "supplier_name"),
             supplier_group=form_str(form, "supplier_group") or None,
@@ -208,8 +214,6 @@ async def supplier_create(
             disabled=False,
         )
     )
-    db.commit()
-
     set_flash(response, "Supplier created successfully", "success")
     return RedirectResponse(url=f"/accounting/suppliers/{supplier.id}", status_code=303)
 
@@ -325,7 +329,8 @@ async def supplier_update(
         template = templates.get_template("modules/accounting/templates/suppliers/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    service.update_supplier(
+    web_service = _get_payables_web_service(db, user)
+    web_service.update_supplier(
         supplier_id,
         SupplierUpdateData(
             supplier_name=form_str(form, "supplier_name"),
@@ -342,7 +347,5 @@ async def supplier_update(
             is_internal_supplier=form.get("is_internal_supplier") == "on",
         ),
     )
-    db.commit()
-
     set_flash(response, "Supplier updated successfully", "success")
     return RedirectResponse(url=f"/accounting/suppliers/{supplier_id}", status_code=303)

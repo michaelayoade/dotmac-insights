@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 from app.models.document_lines import BillLine
 
 if TYPE_CHECKING:
@@ -261,7 +262,7 @@ class JournalEntryType(enum.Enum):
     EXCHANGE_RATE_REVALUATION = "exchange_rate_revaluation"
 
 
-class JournalEntry(Base):
+class JournalEntry(SoftValidationMixin, Base):
     """Journal entries from ERPNext for double-entry bookkeeping."""
 
     __tablename__ = "journal_entries"
@@ -298,7 +299,7 @@ class JournalEntry(Base):
         return f"<JournalEntry {self.erpnext_id} - {self.total_debit}>"
 
 
-class JournalEntryItem(Base):
+class JournalEntryItem(SoftValidationMixin, Base):
     """Line items for journal entries."""
 
     __tablename__ = "journal_entry_accounts"
@@ -354,7 +355,7 @@ class PurchaseInvoiceStatus(enum.Enum):
     RETURN = "return"
 
 
-class PurchaseInvoice(Base):
+class PurchaseInvoice(SoftValidationMixin, Base):
     """Purchase invoices from ERPNext (vendor bills)."""
 
     __tablename__ = "purchase_invoices"
@@ -461,7 +462,7 @@ class PurchaseInvoice(Base):
 
 
 # ============= GL ENTRY (General Ledger) =============
-class GLEntry(Base):
+class GLEntry(SoftValidationMixin, Base):
     """General Ledger entries from ERPNext - the core of double-entry accounting."""
 
     __tablename__ = "gl_entries"
@@ -541,7 +542,7 @@ class AccountType(enum.Enum):
     EXPENSE = "expense"
 
 
-class Account(Base):
+class Account(SoftValidationMixin, Base):
     """Chart of accounts from ERPNext."""
 
     __tablename__ = "accounts"
@@ -595,7 +596,7 @@ class BankTransactionStatus(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class BankTransaction(Base):
+class BankTransaction(SoftValidationMixin, Base):
     """Bank transactions from ERPNext - imported bank statement lines or manual entries."""
 
     __tablename__ = "bank_transactions"
@@ -681,7 +682,7 @@ class BankTransaction(Base):
         return f"<BankTransaction {self.erpnext_id} - {self.deposit or self.withdrawal}>"
 
 
-class BankTransactionPayment(Base):
+class BankTransactionPayment(SoftValidationMixin, Base):
     """Link table for bank transaction allocations to payment entries."""
 
     __tablename__ = "bank_transaction_payments"
@@ -714,7 +715,7 @@ class BankReconciliationStatus(enum.Enum):
     CANCELLED = "CANCELLED"
 
 
-class BankReconciliation(Base):
+class BankReconciliation(SoftValidationMixin, Base):
     """Bank reconciliation records."""
 
     __tablename__ = "bank_reconciliations"

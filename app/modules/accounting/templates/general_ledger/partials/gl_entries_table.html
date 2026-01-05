@@ -1,5 +1,5 @@
 {% if entries %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="gl-entries-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
@@ -44,7 +44,7 @@
         <!-- Totals Footer -->
         <tfoot class="bg-surface-50">
             <tr>
-                <td colspan="3" class="py-3.5 pl-6 pr-3 text-sm font-semibold text-gray-900">
+                <td colspan="3" class="py-3.5 pl-6 pr-3 text-sm font-semibold text-gray-900" data-testid="gl-entries-empty-state">
                     Page Totals
                 </td>
                 <td class="px-3 py-3.5 text-sm text-right font-mono font-semibold text-blue-600">
@@ -69,7 +69,7 @@
 
 {% else %}
 <!-- Empty State -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
     <div class="mx-auto w-16 h-16 rounded-2xl bg-primary-50 flex items-center justify-center mb-6">
         <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>

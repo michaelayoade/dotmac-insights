@@ -29,7 +29,7 @@
     <div class="flex items-center gap-3">
         <form method="post" action="/subscriptions/bundles/products/{{ product.id }}/toggle" class="inline">
             <button type="submit"
-                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-surface-50">
                 {% if product.is_active %}Disable{% else %}Enable{% endif %}
             </button>
         </form>

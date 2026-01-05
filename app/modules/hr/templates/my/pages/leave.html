@@ -9,7 +9,7 @@
             <p class="mt-1 text-sm text-gray-500">Manage your leave requests</p>
         </div>
         <div class="flex gap-3">
-            <a href="/hr/my/leave/balance" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 font-medium text-sm">
+            <a href="/hr/my/leave/balance" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 rounded-xl ring-1 ring-gray-200 hover:bg-surface-50 font-medium text-sm">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 View Balance
             </a>
@@ -24,7 +24,7 @@
     {% if leave_balances %}
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {% for balance in leave_balances %}
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ balance.leave_type }}</p>
             <p class="text-2xl font-bold text-gray-900 mt-1">{{ balance.new_leaves_allocated or 0 }}</p>
             <p class="text-xs text-gray-500">days allocated</p>
@@ -111,20 +111,16 @@
         </div>
 
         <!-- Pagination -->
-        {% if pagination.pages > 1 %}
-        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-            <p class="text-sm text-gray-500">
-                Showing {{ (pagination.page - 1) * pagination.per_page + 1 }} to {{ [pagination.page * pagination.per_page, pagination.total]|min }} of {{ pagination.total }} results
-            </p>
-            <div class="flex gap-2">
-                {% if pagination.page > 1 %}
-                <a href="?page={{ pagination.page - 1 }}&status={{ current_status or '' }}" class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Previous</a>
-                {% endif %}
-                {% if pagination.page < pagination.pages %}
-                <a href="?page={{ pagination.page + 1 }}&status={{ current_status or '' }}" class="px-3 py-1.5 text-sm rounded-lg border border-gray-200 hover:bg-gray-50">Next</a>
-                {% endif %}
-            </div>
-        </div>
+        {% set total_pages = pagination.total_pages if pagination.total_pages is defined else pagination.pages %}
+        {% if total_pages > 1 %}
+        {% set query_params = [] %}
+        {% if current_status %}
+        {% set _ = query_params.append("status=" ~ current_status) %}
+        {% endif %}
+        {% set base_url = "/hr/my/leave" ~ ("?" ~ query_params | join("&") if query_params else "") %}
+        {% with pagination={ "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "total_pages": total_pages, "has_prev": pagination.page > 1, "has_next": pagination.page < total_pages, "prev_page": pagination.page - 1 if pagination.page > 1 else None, "next_page": pagination.page + 1 if pagination.page < total_pages else None, "start_item": ((pagination.page - 1) * pagination.per_page) + 1, "end_item": [pagination.page * pagination.per_page, pagination.total]|min }, base_url=base_url %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
         {% endif %}
     </div>
 </div>

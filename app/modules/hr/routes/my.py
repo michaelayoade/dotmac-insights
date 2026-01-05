@@ -11,14 +11,11 @@ These routes provide employees with access to their own HR data:
 - /hr/my/appraisals - My performance appraisals
 - /hr/my/training - My training history
 """
-from __future__ import annotations
-
 from typing import Optional, Any
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, and_
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -28,18 +25,25 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.employee import Employee, EmploymentStatus
-from app.models.hr_leave import LeaveApplication, LeaveType, LeaveAllocation, LeaveApplicationStatus
-from app.models.hr_attendance import Attendance, AttendanceStatus
-from app.models.hr_payroll import SalarySlip
-from app.models.hr_appraisal import Appraisal
-from app.models.hr_training import TrainingEvent, TrainingEventEmployee
+from app.models.employee import Employee
+from app.models.hr_leave import LeaveApplicationStatus
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.utils.datetime_utils import utc_now
 from app.services.hr.leave import LeaveService
 from app.services.hr.leave_types import ApplicationCreateData, ApplicationFilters
 from app.services.hr.attendance import AttendanceService
-from app.services.hr.attendance_types import CheckInData, CheckOutData, AttendanceFilters
+from app.services.hr.attendance_types import (
+    CheckInData,
+    CheckOutData,
+    AttendanceFilters,
+)
+from app.services.hr.payroll import PayrollService
+from app.services.hr.payroll_types import SalarySlipFilters
+from app.services.hr.training import TrainingService
+from app.services.hr.training_types import TrainingEventFilters
+from app.services.hr.appraisal import AppraisalService
+from app.services.hr.appraisal_types import AppraisalFilters
+from app.services.types import PaginationParams
 from app.services.hr.errors import (
     ValidationError as HRValidationError,
     CheckInError,
@@ -47,6 +51,7 @@ from app.services.hr.errors import (
     LeaveApplicationNotFoundError,
     LeaveStatusTransitionError,
 )
+from app.services.hr.employees import EmployeeService
 
 RequireHRRead = Depends(require_scope("hr:read"))
 
@@ -87,14 +92,14 @@ def _get_current_employee(db, user) -> Optional[Employee]:
     """Get the employee record for the current user."""
     if not user or not user.email:
         return None
-    return db.query(Employee).filter(
-        Employee.email == user.email,
-        Employee.is_deleted == False,
-    ).first()
+    service = EmployeeService(db, principal=user)
+    return service.get_employee_by_email(user.email)
 
 
 def get_leave_type_options(db):
-    types = db.query(LeaveType).order_by(LeaveType.leave_type_name).all()
+    """Get leave type options using LeaveService."""
+    leave_service = LeaveService(db)
+    types = leave_service.list_leave_types()
     return [{"value": str(t.id), "label": t.leave_type_name} for t in types]
 
 
@@ -118,44 +123,42 @@ async def my_hr_dashboard(
         return RedirectResponse(url="/hr", status_code=303)
 
     today = date.today()
+    leave_service = LeaveService(db)
+    attendance_service = AttendanceService(db)
+    payroll_service = PayrollService(db)
+    training_service = TrainingService(db)
 
-    # Leave balance summary
-    leave_balances = db.query(LeaveAllocation).filter(
-        LeaveAllocation.employee_id == employee.id,
-        LeaveAllocation.from_date <= today,
-        LeaveAllocation.to_date >= today,
-    ).all()
+    # Leave balance summary - use LeaveService
+    leave_balances = leave_service.get_current_allocations(employee.id, today)
 
-    # Pending leave requests
-    pending_leave = db.query(LeaveApplication).filter(
-        LeaveApplication.employee_id == employee.id,
-        LeaveApplication.status == LeaveApplicationStatus.OPEN,
-    ).count()
+    # Pending leave requests - use LeaveService
+    pending_apps = leave_service.list_applications(
+        ApplicationFilters(employee_id=employee.id, status=LeaveApplicationStatus.OPEN),
+        PaginationParams(limit=1),  # Only need count
+    )
+    pending_leave = pending_apps.total
 
-    # Recent attendance
-    recent_attendance = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-    ).order_by(Attendance.attendance_date.desc()).limit(5).all()
+    # Recent attendance - use AttendanceService
+    recent_result = attendance_service.list_attendances(
+        AttendanceFilters(employee_id=employee.id),
+        PaginationParams(limit=5),
+    )
+    recent_attendance = recent_result.items
 
-    # Today's attendance
-    today_attendance = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date == today,
-    ).first()
+    # Today's attendance - use AttendanceService
+    today_attendance = attendance_service.get_attendance_by_employee_date(employee.id, today)
 
-    # Recent payslips
-    recent_payslips = db.query(SalarySlip).filter(
-        SalarySlip.employee_id == employee.id,
-    ).order_by(SalarySlip.posting_date.desc()).limit(3).all()
+    # Recent payslips - use PayrollService
+    payslips_result = payroll_service.list_salary_slips(
+        SalarySlipFilters(employee_id=employee.id),
+        PaginationParams(limit=3),
+    )
+    recent_payslips = payslips_result.items
 
-    # Upcoming training
-    upcoming_training = db.query(TrainingEvent).join(
-        TrainingEventEmployee,
-        TrainingEventEmployee.training_event_id == TrainingEvent.id,
-    ).filter(
-        TrainingEventEmployee.employee_id == employee.id,
-        TrainingEvent.start_date >= today,
-    ).order_by(TrainingEvent.start_date).limit(3).all()
+    # Upcoming training - use TrainingService
+    upcoming_training = training_service.get_events_for_employee(
+        employee.id, include_completed=False
+    )[:3]  # Limit to 3
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -199,30 +202,27 @@ async def my_leave_list(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    query = db.query(LeaveApplication).filter(
-        LeaveApplication.employee_id == employee.id,
-    )
+    leave_service = LeaveService(db)
 
-    # Validate and apply status filter using enum
+    # Build filters for service
+    status_enum = None
     if status:
         try:
             status_enum = LeaveApplicationStatus(status)
-            query = query.filter(LeaveApplication.status == status_enum)
         except ValueError:
-            # Invalid status value - ignore filter
-            pass
+            pass  # Invalid status - ignore filter
 
-    total = query.count()
-    offset = (page - 1) * per_page
-    applications = query.order_by(LeaveApplication.from_date.desc()).offset(offset).limit(per_page).all()
+    # Use LeaveService for applications list
+    result = leave_service.list_applications(
+        ApplicationFilters(employee_id=employee.id, status=status_enum),
+        PaginationParams(offset=(page - 1) * per_page, limit=per_page),
+    )
+    applications = result.items
+    total = result.total
 
-    # Get leave balances
+    # Get leave balances - use LeaveService
     today = date.today()
-    leave_balances = db.query(LeaveAllocation).filter(
-        LeaveAllocation.employee_id == employee.id,
-        LeaveAllocation.from_date <= today,
-        LeaveAllocation.to_date >= today,
-    ).all()
+    leave_balances = leave_service.get_current_allocations(employee.id, today)
 
     context = get_base_context(request, response, user, csrf_token)
     context["applications"] = applications
@@ -267,31 +267,24 @@ async def my_leave_balance(
         return RedirectResponse(url="/hr", status_code=303)
 
     today = date.today()
+    leave_service = LeaveService(db)
 
-    # Get all leave allocations for current period
-    allocations = db.query(LeaveAllocation).filter(
-        LeaveAllocation.employee_id == employee.id,
-        LeaveAllocation.from_date <= today,
-        LeaveAllocation.to_date >= today,
-    ).all()
+    # Get all leave balances using LeaveService
+    balances = leave_service.get_employee_all_balances(employee.id, today)
 
-    # Calculate used leave by type
-    leave_usage = {}
-    for alloc in allocations:
-        used = db.query(func.sum(LeaveApplication.total_leave_days)).filter(
-            LeaveApplication.employee_id == employee.id,
-            LeaveApplication.leave_type_id == alloc.leave_type_id,
-            LeaveApplication.status == LeaveApplicationStatus.APPROVED,
-            LeaveApplication.from_date >= alloc.from_date,
-            LeaveApplication.to_date <= alloc.to_date,
-        ).scalar() or 0
-
-        leave_usage[alloc.leave_type_id] = {
-            "allocation": alloc,
-            "allocated": alloc.new_leaves_allocated or 0,
-            "used": float(used),
-            "remaining": (alloc.new_leaves_allocated or 0) - float(used),
+    # Transform to template-expected format
+    leave_usage = [
+        {
+            "leave_type_name": b.leave_type_name,
+            "allocated": float(b.total_allocated),
+            "used": float(b.used),
+            "remaining": float(b.available),
+            "pending": float(b.pending_approval),
+            "carry_forwarded": float(b.carry_forwarded),
         }
+        for b in balances
+        if b.total_allocated > 0  # Only show types with allocations
+    ]
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -303,7 +296,7 @@ async def my_leave_balance(
         {"label": "Balance"},
     ])
     context["employee"] = employee
-    context["leave_usage"] = leave_usage.values()
+    context["leave_usage"] = leave_usage
 
     template = templates.get_template("modules/hr/templates/my/pages/leave_balance.html")
     return HTMLResponse(template.render(context))
@@ -451,12 +444,13 @@ async def my_leave_detail(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    application = db.query(LeaveApplication).filter(
-        LeaveApplication.id == application_id,
-        LeaveApplication.employee_id == employee.id,
-    ).first()
+    leave_service = LeaveService(db)
+    try:
+        application = leave_service.get_application(application_id)
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
 
-    if not application:
+    if application.employee_id != employee.id:
         raise HTTPException(status_code=404, detail="Leave application not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -492,16 +486,16 @@ async def my_leave_cancel(
         return RedirectResponse(url="/hr", status_code=303)
 
     # Verify ownership
-    application = db.query(LeaveApplication).filter(
-        LeaveApplication.id == application_id,
-        LeaveApplication.employee_id == employee.id,
-    ).first()
+    leave_service = LeaveService(db)
+    try:
+        application = leave_service.get_application(application_id)
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
 
-    if not application:
+    if application.employee_id != employee.id:
         raise HTTPException(status_code=404, detail="Leave application not found")
 
     # Use LeaveService for cancellation (handles status transitions and balance restoration)
-    leave_service = LeaveService(db)
     try:
         leave_service.cancel_application(application_id)
         db.commit()
@@ -561,36 +555,27 @@ async def my_attendance_list(
         start_date = today.replace(day=1)
         end_date = today
 
-    query = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date >= start_date,
-        Attendance.attendance_date <= end_date,
+    attendance_service = AttendanceService(db)
+
+    # Use AttendanceService for main list
+    result = attendance_service.list_attendances(
+        AttendanceFilters(
+            employee_id=employee.id,
+            from_date=start_date,
+            to_date=end_date,
+        ),
+        PaginationParams(offset=(page - 1) * per_page, limit=per_page),
     )
+    records = result.items
+    total = result.total
 
-    total = query.count()
-    offset = (page - 1) * per_page
-    records = query.order_by(Attendance.attendance_date.desc()).offset(offset).limit(per_page).all()
+    # Summary stats - use AttendanceService
+    stats = attendance_service.get_employee_stats(employee.id, start_date, end_date)
+    present_count = stats.present_count
+    absent_count = stats.absent_count
 
-    # Summary stats using AttendanceStatus enum
-    present_count = db.query(func.count(Attendance.id)).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date >= start_date,
-        Attendance.attendance_date <= end_date,
-        Attendance.status == AttendanceStatus.PRESENT,
-    ).scalar() or 0
-
-    absent_count = db.query(func.count(Attendance.id)).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date >= start_date,
-        Attendance.attendance_date <= end_date,
-        Attendance.status == AttendanceStatus.ABSENT,
-    ).scalar() or 0
-
-    # Today's attendance for check-in/out buttons
-    today_attendance = db.query(Attendance).filter(
-        Attendance.employee_id == employee.id,
-        Attendance.attendance_date == today,
-    ).first()
+    # Today's attendance for check-in/out buttons - use service
+    today_attendance = attendance_service.get_attendance_by_employee_date(employee.id, today)
 
     context = get_base_context(request, response, user, csrf_token)
     context["records"] = records
@@ -732,22 +717,24 @@ async def my_payslips_list(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    query = db.query(SalarySlip).filter(
-        SalarySlip.employee_id == employee.id,
-    )
+    payroll_service = PayrollService(db)
 
+    # Build filters - use date range for year filtering
+    from_date = None
+    to_date = None
     if year:
-        query = query.filter(func.extract('year', SalarySlip.posting_date) == year)
+        from_date = date(year, 1, 1)
+        to_date = date(year, 12, 31)
 
-    total = query.count()
-    offset = (page - 1) * per_page
-    payslips = query.order_by(SalarySlip.posting_date.desc()).offset(offset).limit(per_page).all()
+    # Use PayrollService for main list
+    result = payroll_service.list_salary_slips(
+        SalarySlipFilters(employee_id=employee.id, from_date=from_date, to_date=to_date),
+        PaginationParams(offset=(page - 1) * per_page, limit=per_page),
+    )
+    payslips = result.items
+    total = result.total
 
-    # Get available years
-    years = db.query(func.distinct(func.extract('year', SalarySlip.posting_date))).filter(
-        SalarySlip.employee_id == employee.id,
-    ).order_by(func.extract('year', SalarySlip.posting_date).desc()).all()
-    year_options = [int(y[0]) for y in years if y[0]]
+    year_options = payroll_service.list_salary_slip_years(employee.id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["payslips"] = payslips
@@ -788,12 +775,15 @@ async def my_payslip_detail(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    payslip = db.query(SalarySlip).filter(
-        SalarySlip.id == payslip_id,
-        SalarySlip.employee_id == employee.id,
-    ).first()
+    payroll_service = PayrollService(db)
 
-    if not payslip:
+    try:
+        payslip = payroll_service.get_salary_slip(payslip_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Payslip not found")
+
+    # Verify ownership
+    if payslip.employee_id != employee.id:
         raise HTTPException(status_code=404, detail="Payslip not found")
 
     context = get_base_context(request, response, user, csrf_token)
@@ -833,13 +823,15 @@ async def my_appraisals_list(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    query = db.query(Appraisal).filter(
-        Appraisal.employee_id == employee.id,
-    )
+    appraisal_service = AppraisalService(db)
 
-    total = query.count()
-    offset = (page - 1) * per_page
-    appraisals = query.order_by(Appraisal.start_date.desc()).offset(offset).limit(per_page).all()
+    # Use AppraisalService for list
+    result = appraisal_service.list_appraisals(
+        AppraisalFilters(employee_id=employee.id),
+        PaginationParams(offset=(page - 1) * per_page, limit=per_page),
+    )
+    appraisals = result.items
+    total = result.total
 
     context = get_base_context(request, response, user, csrf_token)
     context["appraisals"] = appraisals
@@ -878,12 +870,15 @@ async def my_appraisal_detail(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    appraisal = db.query(Appraisal).filter(
-        Appraisal.id == appraisal_id,
-        Appraisal.employee_id == employee.id,
-    ).first()
+    appraisal_service = AppraisalService(db)
 
-    if not appraisal:
+    try:
+        appraisal = appraisal_service.get_appraisal(appraisal_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Appraisal not found")
+
+    # Verify ownership
+    if appraisal.employee_id != employee.id:
         raise HTTPException(status_code=404, detail="Appraisal not found")
 
     # Safe access for appraisal dates (may be None)
@@ -926,16 +921,15 @@ async def my_training_list(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    query = db.query(TrainingEvent).join(
-        TrainingEventEmployee,
-        TrainingEventEmployee.training_event_id == TrainingEvent.id,
-    ).filter(
-        TrainingEventEmployee.employee_id == employee.id,
-    )
+    training_service = TrainingService(db)
 
-    total = query.count()
-    offset = (page - 1) * per_page
-    events = query.order_by(TrainingEvent.start_date.desc()).offset(offset).limit(per_page).all()
+    # Use TrainingService with employee_id filter
+    result = training_service.list_events(
+        TrainingEventFilters(employee_id=employee.id),
+        PaginationParams(offset=(page - 1) * per_page, limit=per_page),
+    )
+    events = result.items
+    total = result.total
 
     today = date.today()
 
@@ -977,20 +971,22 @@ async def my_training_detail(
         set_flash(response, "No employee record found for your account.", "warning")
         return RedirectResponse(url="/hr", status_code=303)
 
-    # Verify employee is enrolled
-    enrollment = db.query(TrainingEventEmployee).filter(
-        TrainingEventEmployee.training_event_id == event_id,
-        TrainingEventEmployee.employee_id == employee.id,
-    ).first()
+    training_service = TrainingService(db)
 
-    if not enrollment:
+    # Get event using service
+    try:
+        event = training_service.get_event(event_id)
+    except Exception:
         raise HTTPException(status_code=404, detail="Training event not found")
 
-    event = db.query(TrainingEvent).filter(
-        TrainingEvent.id == event_id,
-    ).first()
+    # Verify employee is enrolled - check in loaded employees relationship
+    enrollment = None
+    for emp in event.employees:
+        if emp.employee_id == employee.id:
+            enrollment = emp
+            break
 
-    if not event:
+    if not enrollment:
         raise HTTPException(status_code=404, detail="Training event not found")
 
     context = get_base_context(request, response, user, csrf_token)

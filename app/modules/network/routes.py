@@ -15,8 +15,6 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func, case, or_, and_
-from sqlalchemy.orm import Session, selectinload
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope
 from app.web.context import (
@@ -26,13 +24,6 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.pop import Pop
-from app.models.router import Router
-from app.models.ipv4_network import IPv4Network
-from app.models.ipv4_address import IPv4Address
-from app.models.party import Party
-from app.models.subscription import Subscription, SubscriptionStatus
-from app.models.ticket import Ticket, TicketStatus
 from app.core.security import is_htmx_request
 
 # Import services
@@ -40,7 +31,6 @@ from app.services.network import (
     PopService,
     RouterService,
     IPv4NetworkService,
-    IPv6NetworkService,
     IPAddressService,
     PopFilters,
     RouterFilters,
@@ -48,6 +38,8 @@ from app.services.network import (
     IPv4AddressFilters,
 )
 from app.services.types import PaginationParams
+from app.services.errors import NotFoundError
+from app.services.network.dashboard_service import NetworkDashboardService
 
 # Permission dependencies
 RequireNetworkRead = Depends(require_scope("network:read"))
@@ -63,22 +55,18 @@ templates = get_template_env()
 # =============================================================================
 
 def get_pop_service(db: DB) -> PopService:
-    """Provide PopService instance."""
     return PopService(db)
 
 
 def get_router_service(db: DB) -> RouterService:
-    """Provide RouterService instance."""
     return RouterService(db)
 
 
 def get_ipv4_network_service(db: DB) -> IPv4NetworkService:
-    """Provide IPv4NetworkService instance."""
     return IPv4NetworkService(db)
 
 
 def get_ip_address_service(db: DB) -> IPAddressService:
-    """Provide IPAddressService instance."""
     return IPAddressService(db)
 
 
@@ -95,106 +83,51 @@ async def network_dashboard(
     db: DB,
 ):
     """Network dashboard with infrastructure overview and health metrics."""
-    # POP counts
-    total_pops = db.query(func.count(Pop.id)).scalar() or 0
-    active_pops = db.query(func.count(Pop.id)).filter(Pop.is_active.is_(True)).scalar() or 0
+    pop_service = get_pop_service(db)
+    dashboard_service = NetworkDashboardService(db)
+    router_service = get_router_service(db)
+    ip_service = get_ip_address_service(db)
+    network_service = get_ipv4_network_service(db)
+    dashboard_service = NetworkDashboardService(db)
 
-    # Router counts
-    total_routers = db.query(func.count(Router.id)).scalar() or 0
+    # Use services for stats
+    pop_stats = pop_service.get_overview_stats()
+    router_stats = router_service.get_overview_stats()
+    ip_stats = ip_service.get_stats()
+    network_stats = network_service.get_stats()
 
-    # IP Network stats
-    total_networks = db.query(func.count(IPv4Network.id)).scalar() or 0
-    total_ips = db.query(func.count(IPv4Address.id)).scalar() or 0
-    used_ips = db.query(func.count(IPv4Address.id)).filter(IPv4Address.is_used.is_(True)).scalar() or 0
-
-    # Customer distribution (via active subscriptions)
-    active_subscriptions = db.query(Subscription).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).subquery()
-
-    customers_with_pop = (
-        db.query(func.count(func.distinct(active_subscriptions.c.party_id)))
-        .join(Router, active_subscriptions.c.router_id == Router.id)
-        .filter(Router.pop_id.isnot(None))
-        .scalar()
-        or 0
-    )
-
-    total_customers = (
-        db.query(func.count(func.distinct(active_subscriptions.c.party_id)))
-        .scalar()
-        or 0
-    )
-
-    customers_without_pop = (
-        db.query(func.count(func.distinct(active_subscriptions.c.party_id)))
-        .filter(active_subscriptions.c.router_id.is_(None))
-        .scalar()
-        or 0
-    )
+    # Customer distribution
+    customers_with_pop, total_customers = dashboard_service.get_customer_distribution()
+    customers_without_pop = total_customers - customers_with_pop
 
     # Top 10 POPs by customer count
-    customer_counts = db.query(
-        Router.pop_id.label("pop_id"),
-        func.count(func.distinct(Subscription.party_id)).label("customer_count")
-    ).join(
-        Router, Subscription.router_id == Router.id
-    ).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).group_by(Router.pop_id).subquery()
+    top_pops = dashboard_service.get_top_pops(limit=10)
 
-    top_pops = db.query(
-        Pop.id,
-        Pop.name,
-        Pop.city,
-        func.coalesce(customer_counts.c.customer_count, 0).label("customer_count")
-    ).outerjoin(
-        customer_counts, Pop.id == customer_counts.c.pop_id
-    ).filter(
-        Pop.is_active.is_(True)
-    ).order_by(func.coalesce(customer_counts.c.customer_count, 0).desc()).limit(10).all()
-
-    # Network health - POPs without routers
-    pops_without_routers = db.query(func.count(Pop.id)).filter(
-        Pop.is_active.is_(True),
-        ~Pop.id.in_(db.query(Router.pop_id).filter(Router.pop_id.isnot(None)))
-    ).scalar() or 0
+    # Network health
+    pops_without_routers = pop_stats["total"] - router_stats["with_pop"]
 
     # Network-related tickets
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-    network_tickets = db.query(func.count(Ticket.id)).filter(
-        Ticket.created_at >= thirty_days_ago,
-        Ticket.status.in_([TicketStatus.OPEN, TicketStatus.REPLIED]),
-        or_(
-            Ticket.ticket_type.ilike("%network%"),
-            Ticket.ticket_type.ilike("%connectivity%"),
-            Ticket.issue_type.ilike("%network%"),
-        )
-    ).scalar() or 0
+    network_tickets = dashboard_service.get_network_ticket_count(thirty_days_ago)
 
     # Build recommendations
     recommendations = []
     if pops_without_routers > 0:
         recommendations.append({
-            "priority": "high",
-            "icon": "router",
+            "priority": "high", "icon": "router",
             "title": f"{pops_without_routers} POPs without routers",
             "description": "Active POPs should have at least one router assigned",
         })
-
     if customers_without_pop > total_customers * 0.1 and total_customers > 0:
         pct = round(customers_without_pop / total_customers * 100, 1)
         recommendations.append({
-            "priority": "medium",
-            "icon": "location",
+            "priority": "medium", "icon": "location",
             "title": f"{customers_without_pop} customers without POP",
             "description": f"{pct}% of active customers have no POP assigned",
         })
-
     if network_tickets > 10:
         recommendations.append({
-            "priority": "medium",
-            "icon": "ticket",
+            "priority": "medium", "icon": "ticket",
             "title": f"{network_tickets} network tickets (30d)",
             "description": "Review network infrastructure for common issues",
         })
@@ -203,16 +136,14 @@ async def network_dashboard(
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Network"
     context["breadcrumbs"] = build_breadcrumbs([{"label": "Network"}])
-
-    # Stats
     context["stats"] = {
-        "total_pops": total_pops,
-        "active_pops": active_pops,
-        "total_routers": total_routers,
-        "total_networks": total_networks,
-        "total_ips": total_ips,
-        "used_ips": used_ips,
-        "ip_utilization": round(used_ips / total_ips * 100, 1) if total_ips > 0 else 0,
+        "total_pops": pop_stats["total"],
+        "active_pops": pop_stats["active"],
+        "total_routers": router_stats["total"],
+        "total_networks": network_stats["total_networks"],
+        "total_ips": ip_stats["total_ips"],
+        "used_ips": ip_stats["used_ips"],
+        "ip_utilization": ip_stats["utilization"],
         "customers_with_pop": customers_with_pop,
         "customers_without_pop": customers_without_pop,
         "assignment_rate": round(customers_with_pop / total_customers * 100, 1) if total_customers > 0 else 0,
@@ -236,75 +167,37 @@ async def pops_list(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    q: Optional[str] = Query(None, description="Search query"),
-    city: Optional[str] = Query(None, description="Filter by city"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    q: Optional[str] = Query(None),
+    city: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """POP list page with customer and router counts."""
-    # Subquery for customer counts
-    customer_counts = db.query(
-        Router.pop_id.label("pop_id"),
-        func.count(func.distinct(Subscription.party_id)).label("customer_count")
-    ).join(
-        Router, Subscription.router_id == Router.id
-    ).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).group_by(Router.pop_id).subquery()
+    pop_service = get_pop_service(db)
 
-    # Subquery for router counts
-    router_counts = db.query(
-        Router.pop_id,
-        func.count(Router.id).label("router_count")
-    ).group_by(Router.pop_id).subquery()
-
-    # Main query
-    query = db.query(
-        Pop,
-        func.coalesce(customer_counts.c.customer_count, 0).label("customer_count"),
-        func.coalesce(router_counts.c.router_count, 0).label("router_count"),
-    ).outerjoin(
-        customer_counts, Pop.id == customer_counts.c.pop_id
-    ).outerjoin(
-        router_counts, Pop.id == router_counts.c.pop_id
-    )
-
-    # Filters
-    if q:
-        search_term = f"%{q}%"
-        query = query.filter(or_(
-            Pop.name.ilike(search_term),
-            Pop.code.ilike(search_term),
-            Pop.city.ilike(search_term),
-        ))
-
-    if city:
-        query = query.filter(Pop.city.ilike(f"%{city}%"))
-
+    # Map status filter
+    is_active = None
     if status == "active":
-        query = query.filter(Pop.is_active.is_(True))
+        is_active = True
     elif status == "inactive":
-        query = query.filter(Pop.is_active.is_(False))
+        is_active = False
 
-    # Count total
-    total = query.count()
+    filters = PopFilters(search=q, city=city, is_active=is_active)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = pop_service.list_pops(filters, pagination)
 
-    # Sort and paginate
-    query = query.order_by(func.coalesce(customer_counts.c.customer_count, 0).desc())
-    offset = (page - 1) * per_page
-    pops = query.offset(offset).limit(per_page).all()
+    enriched = dashboard_service.get_pop_enrichment([p.id for p in result.items])
 
-    # Get unique cities for filter
-    cities = db.query(Pop.city).filter(Pop.city.isnot(None)).distinct().order_by(Pop.city).all()
+    cities = pop_service.get_cities()
 
     context = get_base_context(request, response, user, csrf_token)
-    context["pops"] = pops
+    context["pops"] = enriched
     context["search_query"] = q or ""
     context["current_city"] = city
     context["current_status"] = status
-    context["cities"] = [c[0] for c in cities if c[0]]
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["cities"] = cities
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/network/templates/partials/pops_table.html")
@@ -323,15 +216,9 @@ async def pops_list(
 
 @router.get("/pops/table", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
 async def pops_table(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    q: Optional[str] = Query(None),
-    city: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
+    request: Request, response: Response, user: SessionUser, csrf_token: CSRFToken, db: DB,
+    q: Optional[str] = Query(None), city: Optional[str] = Query(None),
+    status: Optional[str] = Query(None), page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """POPs table partial for HTMX."""
@@ -350,28 +237,16 @@ async def pop_detail(
     """POP detail page with metrics, routers, and customers."""
     pop_service = get_pop_service(db)
     router_service = get_router_service(db)
+    dashboard_service = NetworkDashboardService(db)
 
     try:
         pop = pop_service.get_pop(pop_id)
         stats = pop_service.get_pop_stats(pop_id)
         routers = router_service.get_routers_for_pop(pop_id)
-    except Exception:
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="POP not found")
 
-    # Recent customers (UI-specific, keep as direct query)
-    recent_customers = (
-        db.query(Party)
-        .join(Subscription, Subscription.party_id == Party.id)
-        .join(Router, Subscription.router_id == Router.id)
-        .filter(
-            Router.pop_id == pop_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        )
-        .order_by(Party.created_at.desc())
-        .distinct(Party.id)
-        .limit(10)
-        .all()
-    )
+    recent_customers = dashboard_service.get_recent_customers(pop_id, limit=10)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -381,13 +256,12 @@ async def pop_detail(
         {"label": "POPs", "url": "/network/pops"},
         {"label": pop.name},
     ])
-
     context["pop"] = pop
     context["metrics"] = {
         "customer_count": stats.customer_count,
         "mrr": float(stats.mrr),
         "router_count": stats.router_count,
-        "open_tickets": 0,  # TODO: Add to PopStats if needed
+        "open_tickets": 0,
     }
     context["routers"] = routers
     context["recent_customers"] = recent_customers
@@ -407,53 +281,36 @@ async def routers_list(
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    q: Optional[str] = Query(None, description="Search query"),
-    pop_id: Optional[int] = Query(None, description="Filter by POP"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    q: Optional[str] = Query(None),
+    pop_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Router list page."""
-    query = db.query(Router).outerjoin(Pop, Router.pop_id == Pop.id)
+    router_service = get_router_service(db)
+    pop_service = get_pop_service(db)
+    dashboard_service = NetworkDashboardService(db)
 
-    # Filters
-    if q:
-        search_term = f"%{q}%"
-        query = query.filter(or_(
-            Router.title.ilike(search_term),
-            Router.ip.ilike(search_term),
-            Router.nas_ip.ilike(search_term),
-            Router.model.ilike(search_term),
-        ))
-
-    if pop_id:
-        query = query.filter(Router.pop_id == pop_id)
-
-    if status:
-        query = query.filter(Router.status == status)
-
-    # Count total
-    total = query.count()
-
-    # Sort and paginate
-    query = query.order_by(Router.title)
-    offset = (page - 1) * per_page
-    routers = query.offset(offset).limit(per_page).all()
+    filters = RouterFilters(search=q, pop_id=pop_id, status=status)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = router_service.list_routers(filters, pagination, include_pop=True)
 
     # Get POPs for filter dropdown
-    pops = db.query(Pop.id, Pop.name).filter(Pop.is_active.is_(True)).order_by(Pop.name).all()
+    pops_result = pop_service.list_pops(PopFilters(is_active=True), PaginationParams(limit=500))
+    pops = [(p.id, p.name) for p in pops_result.items]
 
-    # Get unique statuses for filter
-    statuses = db.query(Router.status).filter(Router.status.isnot(None)).distinct().all()
+    # Get unique statuses
+    statuses = dashboard_service.get_router_statuses()
 
     context = get_base_context(request, response, user, csrf_token)
-    context["routers"] = routers
+    context["routers"] = result.items
     context["search_query"] = q or ""
     context["current_pop_id"] = pop_id
     context["current_status"] = status
     context["pops"] = pops
-    context["statuses"] = [s[0] for s in statuses if s[0]]
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["statuses"] = statuses
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/network/templates/partials/routers_table.html")
@@ -472,15 +329,9 @@ async def routers_list(
 
 @router.get("/routers/table", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
 async def routers_table(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    q: Optional[str] = Query(None),
-    pop_id: Optional[int] = Query(None),
-    status: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
+    request: Request, response: Response, user: SessionUser, csrf_token: CSRFToken, db: DB,
+    q: Optional[str] = Query(None), pop_id: Optional[int] = Query(None),
+    status: Optional[str] = Query(None), page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Routers table partial for HTMX."""
@@ -497,28 +348,16 @@ async def router_detail(
     router_id: int,
 ):
     """Router detail page with configuration and active sessions."""
-    router_obj = db.query(Router).filter(Router.id == router_id).first()
-    if not router_obj:
+    router_service = get_router_service(db)
+    dashboard_service = NetworkDashboardService(db)
+
+    try:
+        router_obj = router_service.get_router(router_id, include_pop=True)
+        stats = router_service.get_router_stats(router_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Router not found")
 
-    # Get POP info
-    pop = None
-    if router_obj.pop_id:
-        pop = db.query(Pop).filter(Pop.id == router_obj.pop_id).first()
-
-    # Count customers using this router (via subscriptions)
-    customer_count = db.query(func.count(Subscription.id)).filter(
-        Subscription.router_id == router_id,
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).scalar() or 0
-
-    # Get active subscriptions on this router (for sessions view)
-    active_subscriptions = db.query(Subscription).options(
-        selectinload(Subscription.customer)
-    ).filter(
-        Subscription.router_id == router_id,
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).order_by(Subscription.plan_name).limit(50).all()
+    active_subscriptions = dashboard_service.list_active_subscriptions(router_id, limit=50)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -528,10 +367,9 @@ async def router_detail(
         {"label": "Routers", "url": "/network/routers"},
         {"label": router_obj.title},
     ])
-
     context["router"] = router_obj
-    context["pop"] = pop
-    context["customer_count"] = customer_count
+    context["pop"] = router_obj.pop
+    context["customer_count"] = stats.active_subscriptions
     context["active_subscriptions"] = active_subscriptions
 
     template = templates.get_template("modules/network/templates/pages/router_detail.html")
@@ -551,32 +389,15 @@ async def ip_management(
     db: DB,
 ):
     """IP Address management overview."""
-    # Network stats
-    total_networks = db.query(func.count(IPv4Network.id)).scalar() or 0
-    root_networks = db.query(func.count(IPv4Network.id)).filter(
-        IPv4Network.network_type == "rootnet"
-    ).scalar() or 0
-    end_networks = db.query(func.count(IPv4Network.id)).filter(
-        IPv4Network.network_type == "endnet"
-    ).scalar() or 0
+    network_service = get_ipv4_network_service(db)
+    ip_service = get_ip_address_service(db)
+    dashboard_service = NetworkDashboardService(db)
 
-    # IP stats
-    total_ips = db.query(func.count(IPv4Address.id)).scalar() or 0
-    used_ips = db.query(func.count(IPv4Address.id)).filter(IPv4Address.is_used.is_(True)).scalar() or 0
-    available_ips = total_ips - used_ips
+    network_stats = network_service.get_stats()
+    ip_stats = ip_service.get_stats()
 
-    # Networks by usage type
-    networks_by_usage = db.query(
-        IPv4Network.type_of_usage,
-        func.count(IPv4Network.id).label("count")
-    ).filter(
-        IPv4Network.type_of_usage.isnot(None)
-    ).group_by(IPv4Network.type_of_usage).all()
-
-    # Top networks by usage
-    top_networks = db.query(IPv4Network).filter(
-        IPv4Network.network_type == "endnet"
-    ).order_by(IPv4Network.used.desc().nullslast()).limit(10).all()
+    networks_by_usage = dashboard_service.get_networks_by_usage()
+    top_networks = dashboard_service.get_top_networks(limit=10)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -585,38 +406,20 @@ async def ip_management(
         {"label": "Network", "url": "/network"},
         {"label": "IP Management"},
     ])
-
     context["stats"] = {
-        "total_networks": total_networks,
-        "root_networks": root_networks,
-        "end_networks": end_networks,
-        "total_ips": total_ips,
-        "used_ips": used_ips,
-        "available_ips": available_ips,
-        "utilization": round(used_ips / total_ips * 100, 1) if total_ips > 0 else 0,
+        "total_networks": network_stats["total_networks"],
+        "root_networks": network_stats["root_networks"],
+        "end_networks": network_stats["end_networks"],
+        "total_ips": ip_stats["total_ips"],
+        "used_ips": ip_stats["used_ips"],
+        "available_ips": ip_stats["available_ips"],
+        "utilization": ip_stats["utilization"],
     }
     context["networks_by_usage"] = networks_by_usage
     context["top_networks"] = top_networks
 
     template = templates.get_template("modules/network/templates/pages/ip_management.html")
     return HTMLResponse(template.render(context))
-
-
-@router.get("/ip/networks/table", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
-async def ip_networks_table(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    q: Optional[str] = Query(None),
-    network_type: Optional[str] = Query(None),
-    usage_type: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(25, ge=10, le=100),
-):
-    """IPv4 networks table partial for HTMX."""
-    return await ip_networks_list(request, response, user, csrf_token, db, q, network_type, usage_type, page, per_page)
 
 
 @router.get("/ip/networks", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
@@ -633,32 +436,18 @@ async def ip_networks_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """IPv4 networks list."""
-    query = db.query(IPv4Network)
+    network_service = get_ipv4_network_service(db)
 
-    if q:
-        search_term = f"%{q}%"
-        query = query.filter(or_(
-            IPv4Network.network.ilike(search_term),
-            IPv4Network.title.ilike(search_term),
-        ))
-
-    if network_type:
-        query = query.filter(IPv4Network.network_type == network_type)
-
-    if usage_type:
-        query = query.filter(IPv4Network.type_of_usage == usage_type)
-
-    total = query.count()
-    query = query.order_by(IPv4Network.network)
-    offset = (page - 1) * per_page
-    networks = query.offset(offset).limit(per_page).all()
+    filters = IPv4NetworkFilters(search=q, network_type=network_type, type_of_usage=usage_type)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = network_service.list_networks(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["networks"] = networks
+    context["networks"] = result.items
     context["search_query"] = q or ""
     context["current_network_type"] = network_type
     context["current_usage_type"] = usage_type
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/network/templates/partials/networks_table.html")
@@ -676,20 +465,15 @@ async def ip_networks_list(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/ip/addresses/table", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
-async def ip_addresses_table(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    q: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(50, ge=10, le=200),
+@router.get("/ip/networks/table", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
+async def ip_networks_table(
+    request: Request, response: Response, user: SessionUser, csrf_token: CSRFToken, db: DB,
+    q: Optional[str] = Query(None), network_type: Optional[str] = Query(None),
+    usage_type: Optional[str] = Query(None), page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
 ):
-    """IPv4 addresses table partial for HTMX."""
-    return await ip_addresses_list(request, response, user, csrf_token, db, q, status, page, per_page)
+    """IPv4 networks table partial for HTMX."""
+    return await ip_networks_list(request, response, user, csrf_token, db, q, network_type, usage_type, page, per_page)
 
 
 @router.get("/ip/addresses", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
@@ -705,31 +489,23 @@ async def ip_addresses_list(
     per_page: int = Query(50, ge=10, le=200),
 ):
     """IPv4 addresses list."""
-    query = db.query(IPv4Address).outerjoin(Party, IPv4Address.party_id == Party.id)
+    ip_service = get_ip_address_service(db)
 
-    if q:
-        search_term = f"%{q}%"
-        query = query.filter(or_(
-            IPv4Address.ip.ilike(search_term),
-            IPv4Address.hostname.ilike(search_term),
-            IPv4Address.title.ilike(search_term),
-        ))
-
+    is_used = None
     if status == "used":
-        query = query.filter(IPv4Address.is_used.is_(True))
+        is_used = True
     elif status == "available":
-        query = query.filter(IPv4Address.is_used.is_(False))
+        is_used = False
 
-    total = query.count()
-    query = query.order_by(IPv4Address.ip)
-    offset = (page - 1) * per_page
-    addresses = query.offset(offset).limit(per_page).all()
+    filters = IPv4AddressFilters(search=q, is_used=is_used)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
+    result = ip_service.list_addresses(filters, pagination)
 
     context = get_base_context(request, response, user, csrf_token)
-    context["addresses"] = addresses
+    context["addresses"] = result.items
     context["search_query"] = q or ""
     context["current_status"] = status
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/network/templates/partials/addresses_table.html")
@@ -747,6 +523,16 @@ async def ip_addresses_list(
     return HTMLResponse(template.render(context))
 
 
+@router.get("/ip/addresses/table", response_class=HTMLResponse, dependencies=[RequireNetworkRead])
+async def ip_addresses_table(
+    request: Request, response: Response, user: SessionUser, csrf_token: CSRFToken, db: DB,
+    q: Optional[str] = Query(None), status: Optional[str] = Query(None),
+    page: int = Query(1, ge=1), per_page: int = Query(50, ge=10, le=200),
+):
+    """IPv4 addresses table partial for HTMX."""
+    return await ip_addresses_list(request, response, user, csrf_token, db, q, status, page, per_page)
+
+
 # =============================================================================
 # ANALYTICS
 # =============================================================================
@@ -760,96 +546,52 @@ async def network_analytics(
     db: DB,
 ):
     """Network analytics - POP performance and customer distribution."""
+    pop_service = get_pop_service(db)
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    dashboard_service = NetworkDashboardService(db)
 
-    # MRR calculation case
-    mrr_case = case(
-        (Subscription.billing_cycle == "quarterly", Subscription.price / 3),
-        (Subscription.billing_cycle == "yearly", Subscription.price / 12),
-        else_=Subscription.price
-    )
+    # Get all POPs with stats
+    from app.models.pop import Pop
+    pops_result = pop_service.list_pops(None, PaginationParams(limit=500))
 
-    # Customer counts by POP (via subscriptions)
-    customer_data = db.query(
-        Router.pop_id.label("pop_id"),
-        func.count(func.distinct(Subscription.party_id)).label("customer_count"),
-        func.count(func.distinct(case((Subscription.status == SubscriptionStatus.ACTIVE, Subscription.party_id)))).label("active"),
-        func.count(func.distinct(case((Subscription.status != SubscriptionStatus.ACTIVE, Subscription.party_id)))).label("churned"),
-    ).join(
-        Router, Subscription.router_id == Router.id
-    ).group_by(Router.pop_id).subquery()
+    pop_performance = []
+    total_customers = 0
+    total_active = 0
+    total_mrr = 0.0
+    total_tickets = 0
 
-    # MRR by POP
-    mrr_data = db.query(
-        Router.pop_id.label("pop_id"),
-        func.sum(mrr_case).label("mrr"),
-    ).join(
-        Router, Subscription.router_id == Router.id
-    ).filter(
-        Subscription.status == SubscriptionStatus.ACTIVE
-    ).group_by(Router.pop_id).subquery()
+    for pop in pops_result.items:
+        stats = pop_service.get_pop_stats(pop.id)
 
-    # Tickets by POP
-    party_by_pop = db.query(
-        Subscription.party_id.label("party_id"),
-        Router.pop_id.label("pop_id"),
-    ).join(
-        Router, Subscription.router_id == Router.id
-    ).subquery()
+        tickets_30d = dashboard_service.get_pop_ticket_count(pop.id, thirty_days_ago)
 
-    ticket_data = db.query(
-        party_by_pop.c.pop_id,
-        func.count(Ticket.id).label("ticket_count"),
-    ).join(
-        Ticket, Ticket.party_id == party_by_pop.c.party_id
-    ).filter(
-        Ticket.created_at >= thirty_days_ago
-    ).group_by(party_by_pop.c.pop_id).subquery()
+        pop_performance.append({
+            "id": pop.id,
+            "name": pop.name,
+            "city": pop.city,
+            "is_active": pop.is_active,
+            "total_customers": stats.customer_count,
+            "active_customers": stats.customer_count,
+            "churned_customers": 0,
+            "churn_rate": 0,
+            "mrr": float(stats.mrr),
+            "tickets_30d": tickets_30d,
+            "router_count": stats.router_count,
+        })
+        total_customers += stats.customer_count
+        total_active += stats.customer_count
+        total_mrr += float(stats.mrr)
+        total_tickets += tickets_30d
 
-    # Router counts by POP
-    router_data = db.query(
-        Router.pop_id,
-        func.count(Router.id).label("router_count"),
-    ).group_by(Router.pop_id).subquery()
+    # Add customer percentages
+    for p in pop_performance:
+        p["customer_percent"] = round(p["active_customers"] / total_active * 100, 1) if total_active > 0 else 0
 
-    # Combine all
-    pops = db.query(
-        Pop.id,
-        Pop.name,
-        Pop.city,
-        Pop.is_active,
-        func.coalesce(customer_data.c.customer_count, 0).label("total_customers"),
-        func.coalesce(customer_data.c.active, 0).label("active_customers"),
-        func.coalesce(customer_data.c.churned, 0).label("churned_customers"),
-        func.coalesce(mrr_data.c.mrr, 0).label("mrr"),
-        func.coalesce(ticket_data.c.ticket_count, 0).label("tickets_30d"),
-        func.coalesce(router_data.c.router_count, 0).label("router_count"),
-    ).outerjoin(
-        customer_data, Pop.id == customer_data.c.pop_id
-    ).outerjoin(
-        mrr_data, Pop.id == mrr_data.c.pop_id
-    ).outerjoin(
-        ticket_data, Pop.id == ticket_data.c.pop_id
-    ).outerjoin(
-        router_data, Pop.id == router_data.c.pop_id
-    ).order_by(func.coalesce(customer_data.c.customer_count, 0).desc()).all()
-
-    # Aggregate totals
-    total_customers = sum(p.total_customers for p in pops)
-    total_active = sum(p.active_customers for p in pops)
-    total_mrr = sum(float(p.mrr) for p in pops)
-    total_tickets = sum(p.tickets_30d for p in pops)
+    # Sort by customer count
+    pop_performance.sort(key=lambda x: x["total_customers"], reverse=True)
 
     # Customers without POP
-    customers_without_pop = (
-        db.query(func.count(func.distinct(Subscription.party_id)))
-        .filter(
-            Subscription.status == SubscriptionStatus.ACTIVE,
-            Subscription.router_id.is_(None),
-        )
-        .scalar()
-        or 0
-    )
+    customers_without_pop = dashboard_service.get_customers_without_pop()
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -858,34 +600,16 @@ async def network_analytics(
         {"label": "Network", "url": "/network"},
         {"label": "Analytics"},
     ])
-
     context["totals"] = {
         "total_customers": total_customers,
         "active_customers": total_active,
         "total_mrr": total_mrr,
         "total_tickets": total_tickets,
         "customers_without_pop": customers_without_pop,
-        "pop_count": len(pops),
+        "pop_count": len(pop_performance),
         "assignment_rate": round((total_active - customers_without_pop) / total_active * 100, 1) if total_active > 0 else 0,
     }
-
-    context["pop_performance"] = [
-        {
-            "id": p.id,
-            "name": p.name,
-            "city": p.city,
-            "is_active": p.is_active,
-            "total_customers": p.total_customers,
-            "active_customers": p.active_customers,
-            "churned_customers": p.churned_customers,
-            "churn_rate": round(p.churned_customers / p.total_customers * 100, 1) if p.total_customers > 0 else 0,
-            "mrr": float(p.mrr),
-            "tickets_30d": p.tickets_30d,
-            "router_count": p.router_count,
-            "customer_percent": round(p.active_customers / total_active * 100, 1) if total_active > 0 else 0,
-        }
-        for p in pops
-    ]
+    context["pop_performance"] = pop_performance
 
     template = templates.get_template("modules/network/templates/pages/analytics.html")
     return HTMLResponse(template.render(context))
@@ -904,71 +628,23 @@ async def network_health(
     db: DB,
 ):
     """Network health insights - infrastructure issues and recommendations."""
+    pop_service = get_pop_service(db)
+    router_service = get_router_service(db)
+    ip_service = get_ip_address_service(db)
+    dashboard_service = NetworkDashboardService(db)
+
+    pop_stats = pop_service.get_overview_stats()
+    router_stats = router_service.get_overview_stats()
+    ip_stats = ip_service.get_stats()
+
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
-    # POPs without routers
-    pops_without_routers = db.query(Pop).outerjoin(
-        Router, Pop.id == Router.pop_id
-    ).filter(
-        Pop.is_active.is_(True),
-        Router.id.is_(None)
-    ).all()
+    pops_without_routers = dashboard_service.get_pops_without_routers()
+    high_util_networks = dashboard_service.get_high_util_networks(limit=15)
+    routers_no_subs = dashboard_service.get_routers_without_subscriptions(limit=20)
+    customers_no_pop = dashboard_service.get_customers_without_pop()
 
-    # POPs with high ticket counts (potential issues)
-    party_by_pop = db.query(
-        Subscription.party_id.label("party_id"),
-        Router.pop_id.label("pop_id"),
-    ).join(
-        Router, Subscription.router_id == Router.id
-    ).subquery()
-
-    high_ticket_pops = db.query(
-        Pop.id,
-        Pop.name,
-        Pop.city,
-        func.count(Ticket.id).label("ticket_count"),
-        func.count(func.distinct(party_by_pop.c.party_id)).label("customer_count"),
-    ).outerjoin(
-        party_by_pop, party_by_pop.c.pop_id == Pop.id
-    ).outerjoin(
-        Ticket, Ticket.party_id == party_by_pop.c.party_id
-    ).filter(
-        Pop.is_active.is_(True),
-        Ticket.created_at >= thirty_days_ago
-    ).group_by(Pop.id, Pop.name, Pop.city).having(
-        func.count(Ticket.id) > 10
-    ).order_by(func.count(Ticket.id).desc()).limit(10).all()
-
-    # Networks with high utilization (>80%)
-    high_util_networks = db.query(IPv4Network).filter(
-        IPv4Network.network_type == "endnet",
-        IPv4Network.total > 0,
-        IPv4Network.used > 0,
-        (IPv4Network.used * 100 / IPv4Network.total) > 80
-    ).order_by((IPv4Network.used * 100 / IPv4Network.total).desc()).limit(15).all()
-
-    # Routers with no active subscriptions (underutilized)
-    routers_no_subs = db.query(Router).outerjoin(
-        Subscription, and_(
-            Subscription.router_id == Router.id,
-            Subscription.status == SubscriptionStatus.ACTIVE
-        )
-    ).filter(
-        Subscription.id.is_(None)
-    ).limit(20).all()
-
-    # Customers without POP assignment
-    customers_no_pop = (
-        db.query(func.count(func.distinct(Subscription.party_id)))
-        .filter(
-            Subscription.status == SubscriptionStatus.ACTIVE,
-            Subscription.router_id.is_(None),
-        )
-        .scalar()
-        or 0
-    )
-
-    # Overall health score
+    # Build issues list
     issues = []
     if pops_without_routers:
         issues.append({"type": "critical", "message": f"{len(pops_without_routers)} POPs have no routers"})
@@ -979,7 +655,7 @@ async def network_health(
     if routers_no_subs:
         issues.append({"type": "info", "message": f"{len(routers_no_subs)} routers have no active subscriptions"})
 
-    # Calculate health score (simplified)
+    # Health score
     critical_count = sum(1 for i in issues if i["type"] == "critical")
     warning_count = sum(1 for i in issues if i["type"] == "warning")
     health_score = max(0, 100 - (critical_count * 20) - (warning_count * 10))
@@ -991,21 +667,9 @@ async def network_health(
         {"label": "Network", "url": "/network"},
         {"label": "Health"},
     ])
-
     context["health_score"] = health_score
     context["issues"] = issues
     context["pops_without_routers"] = pops_without_routers
-    context["high_ticket_pops"] = [
-        {
-            "id": p.id,
-            "name": p.name,
-            "city": p.city,
-            "ticket_count": p.ticket_count,
-            "customer_count": p.customer_count,
-            "ticket_ratio": round(p.ticket_count / max(p.customer_count, 1), 2),
-        }
-        for p in high_ticket_pops
-    ]
     context["high_util_networks"] = high_util_networks
     context["routers_no_subs"] = routers_no_subs
     context["customers_no_pop"] = customers_no_pop

@@ -3,7 +3,7 @@
     {% if timeline %}
     <ul role="list" class="-mb-8">
         {% for item in timeline %}
-        <li>
+        <li{% if item.type == 'comment' %} class="reply" data-reply="true"{% endif %}>
             <div class="relative pb-8">
                 {% if not loop.last %}
                 <span class="absolute left-4 top-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>

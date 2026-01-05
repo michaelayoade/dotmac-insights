@@ -25,6 +25,7 @@ from .credit_notes_types import (
     CreditNoteUpdateData,
     CreditNoteLineData,
 )
+from app.services.validation.soft_validation_service import SoftValidationService
 
 if TYPE_CHECKING:
     from app.auth import Principal
@@ -190,6 +191,7 @@ class CreditNoteService:
         # Add lines and calculate totals
         total_amount = Decimal("0")
         total_tax = Decimal("0")
+        created_lines = []
 
         for idx, line_data in enumerate(data.lines):
             line = CreditNoteLine(
@@ -209,6 +211,7 @@ class CreditNoteService:
                 idx=idx,
             )
             self.db.add(line)
+            created_lines.append(line)
             total_amount += line_data.amount
             total_tax += line_data.tax_amount
 
@@ -217,6 +220,11 @@ class CreditNoteService:
         note.total_amount = total_amount + total_tax
         note.base_amount = note.amount * note.conversion_rate
         note.base_tax_amount = note.tax_amount * note.conversion_rate
+
+        validator = SoftValidationService(self.db)
+        for line in created_lines:
+            validator.validate_and_store(line)
+        validator.validate_and_store(note)
 
         return note
 
@@ -288,6 +296,12 @@ class CreditNoteService:
             note.total_amount = total_amount + total_tax
             note.base_amount = note.amount * note.conversion_rate
             note.base_tax_amount = note.tax_amount * note.conversion_rate
+
+        validator = SoftValidationService(self.db)
+        if data.lines is not None:
+            for line in self.db.query(CreditNoteLine).filter(CreditNoteLine.credit_note_id == note_id).all():
+                validator.validate_and_store(line)
+        validator.validate_and_store(note)
 
         return note
 

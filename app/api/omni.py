@@ -30,7 +30,8 @@ from app.models.omni import (
     OmniWebhookEvent,
     OmniAttachment,
 )
-from app.models.agent import Agent, Team, TeamMember
+from app.models.party import Party, PartyRole
+from app.models.agent import Team, TeamMember
 import smtplib
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -191,7 +192,7 @@ def _persist_message(
     participant: Optional[OmniParticipant],
     ticket_id: Optional[int],
     channel: Optional[OmniChannel],
-    agent: Optional[Agent],
+    agent: Optional[Party],
     metadata: Optional[Dict[str, Any]] = None,
     attachments: Optional[List[Dict[str, Any]]] = None,
 ) -> OmniMessage:
@@ -203,7 +204,7 @@ def _persist_message(
         participant_id=participant.id if participant else None,
         ticket_id=ticket_id,
         channel_id=channel.id if channel else None,
-        agent_id=agent.id if agent else None,
+        party_id=agent.id if agent else None,
         meta=metadata,
         created_at=datetime.now(timezone.utc),
     )
@@ -781,8 +782,14 @@ async def send_message(
 
     channel = _get_channel_or_404(db, payload["channel"])
     agent = None
-    if payload.get("agent_id"):
-        agent = db.query(Agent).filter(Agent.id == payload["agent_id"]).first()
+    agent_id = payload.get("party_id") or payload.get("agent_id")
+    if agent_id:
+        agent = (
+            db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(Party.id == agent_id, PartyRole.role == "support_agent")
+            .first()
+        )
 
     # Resolve conversation (existing or new)
     conv = None
@@ -886,19 +893,19 @@ async def list_conversations(
     if status:
         query = query.filter(OmniConversation.status == status)
     if agent_id:
-        # conversations with messages by agent_id
+        # conversations with messages by agent (party)
         query = query.filter(
             OmniConversation.id.in_(
-                db.query(OmniMessage.conversation_id).filter(OmniMessage.agent_id == agent_id)
+                db.query(OmniMessage.conversation_id).filter(OmniMessage.party_id == agent_id)
             )
         )
     if team_id:
         # conversations with messages assigned to agents in the team
-        agent_ids = [row.agent_id for row in db.query(TeamMember).filter(TeamMember.team_id == team_id).all()]
-        if agent_ids:
+        party_ids = [row.party_id for row in db.query(TeamMember).filter(TeamMember.team_id == team_id).all()]
+        if party_ids:
             query = query.filter(
                 OmniConversation.id.in_(
-                    db.query(OmniMessage.conversation_id).filter(OmniMessage.agent_id.in_(agent_ids))
+                    db.query(OmniMessage.conversation_id).filter(OmniMessage.party_id.in_(party_ids))
                 )
             )
     if start:
@@ -967,22 +974,23 @@ async def list_messages(
                 "body": m.body,
                 "subject": m.subject,
                 "participant_id": m.participant_id,
-                "agent_id": m.agent_id,
+                "party_id": m.party_id,
+                "agent_id": m.party_id,
                 "delivery_status": m.delivery_status,
                 "provider_message_id": m.provider_message_id,
                 "meta": m.meta,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
-        "attachments": [
-            {
-                "id": att.id,
-                "filename": att.filename,
-                "url": att.url,
-                "mime_type": att.mime_type,
-                "size_bytes": att.size_bytes,
+                "attachments": [
+                    {
+                        "id": att.id,
+                        "filename": att.filename,
+                        "url": att.url,
+                        "mime_type": att.mime_type,
+                        "size_bytes": att.size_bytes,
+                    }
+                    for att in m.attachments
+                ],
             }
-            for att in m.attachments
-        ],
-    }
             for m in messages
         ],
     }

@@ -12,7 +12,7 @@ from sqlalchemy import func, case, and_
 from app.database import get_db
 from app.auth import Require
 from app.models.omni import OmniConversation, OmniMessage, OmniChannel, InboxContact
-from app.models.agent import Agent
+from app.models.party import Party, PartyRole
 
 router = APIRouter()
 
@@ -144,7 +144,7 @@ async def get_analytics_summary(
         db.query(func.count(OmniConversation.id))
         .filter(
             OmniConversation.status.in_(["open", "pending"]),
-            OmniConversation.assigned_agent_id.is_(None),
+            OmniConversation.assigned_party_id.is_(None),
             OmniConversation.assigned_team_id.is_(None),
         )
         .scalar()
@@ -238,17 +238,21 @@ async def get_agent_analytics(
     now = datetime.now(timezone.utc)
     start_date = now - timedelta(days=days)
 
-    # Conversations per agent
+    # Conversations per agent (agents are parties with support_agent role)
     agent_conversations = (
         db.query(
-            Agent.id,
-            Agent.display_name,
-            Agent.email,
+            Party.id,
+            Party.name,
+            Party.primary_email,
             func.count(OmniConversation.id).label("conversation_count"),
         )
-        .join(OmniConversation, OmniConversation.assigned_agent_id == Agent.id)
-        .filter(OmniConversation.assigned_at >= start_date)
-        .group_by(Agent.id, Agent.display_name, Agent.email)
+        .join(PartyRole, Party.id == PartyRole.party_id)
+        .join(OmniConversation, OmniConversation.assigned_party_id == Party.id)
+        .filter(
+            PartyRole.role == "support_agent",
+            OmniConversation.assigned_at >= start_date,
+        )
+        .group_by(Party.id, Party.name, Party.primary_email)
         .order_by(func.count(OmniConversation.id).desc())
         .all()
     )
@@ -256,15 +260,17 @@ async def get_agent_analytics(
     # Messages sent per agent
     agent_messages = (
         db.query(
-            Agent.id,
+            Party.id,
             func.count(OmniMessage.id).label("message_count"),
         )
-        .join(OmniMessage, OmniMessage.agent_id == Agent.id)
+        .join(PartyRole, Party.id == PartyRole.party_id)
+        .join(OmniMessage, OmniMessage.party_id == Party.id)
         .filter(
+            PartyRole.role == "support_agent",
             OmniMessage.created_at >= start_date,
             OmniMessage.direction == "outbound",
         )
-        .group_by(Agent.id)
+        .group_by(Party.id)
         .all()
     )
     messages_by_agent = {a.id: a.message_count for a in agent_messages}
@@ -272,7 +278,7 @@ async def get_agent_analytics(
     # Average first response time per agent
     agent_response_times = (
         db.query(
-            OmniConversation.assigned_agent_id,
+            OmniConversation.assigned_party_id,
             func.avg(
                 func.extract(
                     "epoch",
@@ -282,14 +288,14 @@ async def get_agent_analytics(
         )
         .filter(
             OmniConversation.first_response_at.isnot(None),
-            OmniConversation.assigned_agent_id.isnot(None),
+            OmniConversation.assigned_party_id.isnot(None),
             OmniConversation.created_at >= start_date,
         )
-        .group_by(OmniConversation.assigned_agent_id)
+        .group_by(OmniConversation.assigned_party_id)
         .all()
     )
     response_times_by_agent = {
-        a.assigned_agent_id: round(a.avg_response_seconds / 3600, 1) if a.avg_response_seconds else None
+        a.assigned_party_id: round(a.avg_response_seconds / 3600, 1) if a.avg_response_seconds else None
         for a in agent_response_times
     }
 
@@ -298,7 +304,7 @@ async def get_agent_analytics(
         "agents": [
             {
                 "id": a.id,
-                "name": a.display_name or a.email,
+                "name": a.name or a.primary_email,
                 "conversations": a.conversation_count,
                 "messages_sent": messages_by_agent.get(a.id, 0),
                 "avg_response_time_hours": response_times_by_agent.get(a.id),

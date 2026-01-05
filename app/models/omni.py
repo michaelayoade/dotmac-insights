@@ -8,9 +8,10 @@ from sqlalchemy import String, Integer, Boolean, ForeignKey, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
-    from app.models.agent import Agent, Team
+    from app.models.agent import Team
     from app.models.party import Party
 
 
@@ -23,10 +24,11 @@ class OmniChannelType(str, Enum):
     CUSTOM = "custom"
 
 
-class OmniChannel(Base):
+class OmniChannel(SoftValidationMixin, Base):
     """External channel/account configuration."""
 
     __tablename__ = "omni_channels"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, index=True)
@@ -60,10 +62,11 @@ class ConversationStatus(str, Enum):
     CLOSED = "closed"
 
 
-class OmniConversation(Base):
+class OmniConversation(SoftValidationMixin, Base):
     """Omnichannel conversation/thread."""
 
     __tablename__ = "omni_conversations"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     channel_id: Mapped[int] = mapped_column(ForeignKey("omni_channels.id"), nullable=False, index=True)
@@ -86,8 +89,12 @@ class OmniConversation(Base):
     status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True, default="open")
     priority: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default="medium")
 
-    # Assignment
-    assigned_agent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
+    # Assignment (Party-based after Agent → Party unification)
+    assigned_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     assigned_team_id: Mapped[Optional[int]] = mapped_column(ForeignKey("teams.id"), nullable=True, index=True)
     assigned_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
@@ -113,7 +120,7 @@ class OmniConversation(Base):
 
     # Relationships
     messages: Mapped[List["OmniMessage"]] = relationship(back_populates="conversation", cascade="all, delete-orphan")
-    assigned_agent: Mapped[Optional["Agent"]] = relationship(foreign_keys=[assigned_agent_id])
+    assigned_party: Mapped[Optional["Party"]] = relationship(foreign_keys=[assigned_party_id])
     assigned_team: Mapped[Optional["Team"]] = relationship(foreign_keys=[assigned_team_id])
     party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
@@ -121,10 +128,11 @@ class OmniConversation(Base):
         return f"<OmniConversation {self.id} channel={self.channel_id} status={self.status}>"
 
 
-class OmniParticipant(Base):
+class OmniParticipant(SoftValidationMixin, Base):
     """Contact identity across channels."""
 
     __tablename__ = "omni_participants"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     handle: Mapped[str] = mapped_column(String(255), index=True)  # email/phone/social handle
@@ -149,10 +157,11 @@ class OmniParticipant(Base):
         return f"<OmniParticipant {self.handle} ({self.channel_type})>"
 
 
-class OmniMessage(Base):
+class OmniMessage(SoftValidationMixin, Base):
     """Unified message record across channels."""
 
     __tablename__ = "omni_messages"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     conversation_id: Mapped[int] = mapped_column(ForeignKey("omni_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -161,7 +170,11 @@ class OmniMessage(Base):
     ticket_id: Mapped[Optional[int]] = mapped_column(ForeignKey("tickets.id"), nullable=True, index=True)
     participant_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_participants.id"), nullable=True, index=True)
 
-    agent_id: Mapped[Optional[int]] = mapped_column(ForeignKey("agents.id"), nullable=True, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     channel_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_channels.id"), nullable=True, index=True)
 
     direction: Mapped[str] = mapped_column(String(10), nullable=False)  # inbound|outbound
@@ -186,10 +199,11 @@ class OmniMessage(Base):
         return f"<OmniMessage {self.id} dir={self.direction} conv={self.conversation_id}>"
 
 
-class OmniAttachment(Base):
+class OmniAttachment(SoftValidationMixin, Base):
     """Attachment metadata linked to messages."""
 
     __tablename__ = "omni_attachments"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     message_id: Mapped[int] = mapped_column(ForeignKey("omni_messages.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -207,10 +221,11 @@ class OmniAttachment(Base):
         return f"<OmniAttachment {self.filename or self.id}>"
 
 
-class OmniWebhookEvent(Base):
+class OmniWebhookEvent(SoftValidationMixin, Base):
     """Raw webhook events for audit/idempotency."""
 
     __tablename__ = "omni_webhook_events"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     channel_id: Mapped[Optional[int]] = mapped_column(ForeignKey("omni_channels.id"), nullable=True, index=True)
@@ -227,10 +242,11 @@ class OmniWebhookEvent(Base):
         return f"<OmniWebhookEvent {self.id} provider={self.provider_event_id}>"
 
 
-class InboxRoutingRule(Base):
+class InboxRoutingRule(SoftValidationMixin, Base):
     """Auto-routing rules for inbox conversations."""
 
     __tablename__ = "inbox_routing_rules"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -257,12 +273,13 @@ class InboxRoutingRule(Base):
         return f"<InboxRoutingRule {self.id} {self.name} active={self.is_active}>"
 
 
-class InboxContact(Base):
+class InboxContact(SoftValidationMixin, Base):
     """
     Unified contact directory for inbox - links participants across channels.
     """
 
     __tablename__ = "inbox_contacts"
+    __soft_validation_scope__ = "omnichannel"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 

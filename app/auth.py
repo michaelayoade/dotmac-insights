@@ -33,6 +33,7 @@ from app.database import get_db
 from app.models.auth import User, ServiceToken, TokenDenylist
 from app.middleware.metrics import increment_contacts_auth_failure
 from app.feature_flags import feature_flags
+from app.services.activity_logger import ActivityLogger
 
 logger = structlog.get_logger()
 
@@ -562,6 +563,18 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
         db.commit()
         db.refresh(user)
 
+        activity_logger = ActivityLogger(db)
+        activity_logger.log(
+            action="rbac.user.create",
+            user_id=user.id,
+            user_email=user.email,
+            entity_type="user",
+            entity_id=str(user.id),
+            summary=f"Created user {user.email}",
+            metadata={"external_id": claims.sub, "email": user.email},
+        )
+        db.commit()
+
         if is_first_user:
             logger.warning(
                 "first_user_created_without_superuser",
@@ -733,6 +746,26 @@ def require_auth(principal: Optional[Principal]) -> None:
         )
 
 
+async def get_current_principal_or_none(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Security(
+        HTTPBearer(auto_error=False)
+    ),
+    db: Session = Depends(get_db),
+) -> Optional[Principal]:
+    """Get the current principal if authenticated, or None if not.
+
+    Unlike get_current_principal, this doesn't raise an error for
+    unauthenticated requests - useful for optional auth endpoints.
+    """
+    if not credentials:
+        return None
+    try:
+        return await get_current_principal(request, credentials, db)
+    except HTTPException:
+        return None
+
+
 async def get_current_user(
     principal: Principal = Depends(get_current_principal),
     db: Session = Depends(get_db),
@@ -744,6 +777,18 @@ async def get_current_user(
     user = db.query(User).filter(User.id == principal.id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
+async def get_current_user_or_none(
+    principal: Optional[Principal] = Depends(get_current_principal_or_none),
+    db: Session = Depends(get_db),
+) -> Optional[User]:
+    """Get the current authenticated user, or None if not authenticated."""
+    if principal is None or principal.type != "user":
+        return None
+
+    user = db.query(User).filter(User.id == principal.id).first()
     return user
 
 

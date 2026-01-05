@@ -24,7 +24,8 @@ from app.models.notification import (
     NotificationStatus,
     NotificationChannel,
 )
-from app.models.agent import Team, TeamMember, Agent
+from app.models.agent import Team, TeamMember
+from app.models.party import Party, PartyRole
 from app.models.field_service import FieldTeam, FieldTeamMember
 from app.models.employee import Employee, EmploymentStatus
 from app.models.auth import User
@@ -620,23 +621,23 @@ class NotificationService:
         return [u.id for u in users]
 
     def get_team_user_ids(self, team_id: int) -> List[int]:
-        """Get user IDs for all active members of an agent/support team.
+        """Get user IDs for all active members of a support team.
 
-        Resolves: Team → TeamMember → Agent → Employee → User (via email match)
+        Resolves: Team → TeamMember → Party → (email) → User
+        After Agent → Party unification, TeamMember links to Party directly.
         """
         emails = (
-            self.db.query(Employee.email)
-            .join(Agent, Agent.employee_id == Employee.id)
-            .join(TeamMember, TeamMember.agent_id == Agent.id)
+            self.db.query(Party.email)
+            .join(TeamMember, TeamMember.party_id == Party.id)
             .join(Team, Team.id == TeamMember.team_id)
+            .join(PartyRole, PartyRole.party_id == Party.id)
             .filter(
                 TeamMember.team_id == team_id,
                 TeamMember.is_active == True,
-                Agent.is_active == True,
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
                 Team.is_active == True,
-                Employee.status == EmploymentStatus.ACTIVE,
-                Employee.is_deleted == False,
-                Employee.email.isnot(None),
+                Party.email.isnot(None),
             )
             .distinct()
             .all()
@@ -651,7 +652,7 @@ class NotificationService:
         """
         emails = (
             self.db.query(Employee.email)
-            .join(FieldTeamMember, FieldTeamMember.employee_id == Employee.id)
+            .join(FieldTeamMember, FieldTeamMember.party_id == Employee.party_id)
             .join(FieldTeam, FieldTeam.id == FieldTeamMember.team_id)
             .filter(
                 FieldTeamMember.team_id == team_id,

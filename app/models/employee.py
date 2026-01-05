@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from app.models.expense import Expense
     from app.models.hr import Department, Designation
     from app.models.expense_management import ExpenseClaim, CashAdvance, CorporateCard
-    from app.models.unified_ticket import UnifiedTicket
     from app.models.field_service import (
         ServiceOrder, FieldTeam, FieldTeamMember, TechnicianSkill, ServiceTimeEntry
     )
@@ -23,10 +22,10 @@ if TYPE_CHECKING:
 
 
 class EmploymentStatus(enum.Enum):
-    ACTIVE = "active"
-    INACTIVE = "inactive"
-    TERMINATED = "terminated"
-    ON_LEAVE = "on_leave"
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    TERMINATED = "TERMINATED"
+    ON_LEAVE = "ON_LEAVE"
 
 
 class Employee(Base):
@@ -116,12 +115,6 @@ class Employee(Base):
         foreign_keys="[Ticket.assigned_employee_id]"
     )
 
-    # Unified ticket assignments
-    assigned_unified_tickets: Mapped[List["UnifiedTicket"]] = relationship(
-        "UnifiedTicket",
-        back_populates="assigned_to",
-        foreign_keys="[UnifiedTicket.assigned_to_id]"
-    )
     # Field service relationships
     service_orders: Mapped[List["ServiceOrder"]] = relationship(
         "ServiceOrder",
@@ -136,7 +129,9 @@ class Employee(Base):
     field_team_memberships: Mapped[List["FieldTeamMember"]] = relationship(
         "FieldTeamMember",
         back_populates="employee",
-        foreign_keys="[FieldTeamMember.employee_id]"
+        primaryjoin="Employee.party_id == foreign(FieldTeamMember.party_id)",
+        foreign_keys="[FieldTeamMember.party_id]",
+        viewonly=True,
     )
     technician_skills: Mapped[List["TechnicianSkill"]] = relationship(
         "TechnicianSkill",

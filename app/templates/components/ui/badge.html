@@ -2,13 +2,9 @@
 Badge Component
 
 Usage:
-{% include "components/ui/badge.html" with {
-    label: "Active",
-    variant: "success",  # success, warning, error, info, neutral
-    size: "sm",          # sm, md
-    dot: true,           # Show dot indicator
-    removable: false,    # Show remove button
-} %}
+{% with label="Active", variant="success",  # success, warning, error, info, neutral, size="sm",          # sm, md, dot=true,           # Show dot indicator, removable=false,    # Show remove button %}
+{% include "components/ui/badge.html" %}
+{% endwith %}
 #}
 
 {% set size_classes = {

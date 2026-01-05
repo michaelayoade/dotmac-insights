@@ -1,5 +1,24 @@
 {% extends "layouts/app.html" %}
 
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Support Tickets</h1>
+        <p class="mt-1 text-sm text-gray-500 font-body">Manage customer support requests and issues</p>
+    </div>
+    <a
+        href="/support/tickets/new"
+        class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
+        data-testid="new-ticket-button"
+    >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        New Ticket
+    </a>
+</div>
+{% endblock %}
+
 {% block content %}
 {% set ticket_columns = [
     {'key': 'ticket', 'label': 'Ticket', 'required': True},
@@ -10,27 +29,10 @@
     {'key': 'created', 'label': 'Created'},
 ] %}
 <div class="space-y-6 flex flex-col" x-data="{ ...columnPicker('tickets-table', {{ ticket_columns  | tojson | e }}), ...bulkSelect() }">
-    <!-- Page Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight">Support Tickets</h1>
-            <p class="mt-1 text-sm text-gray-500 font-body">Manage customer support requests and issues</p>
-        </div>
-        <a
-            href="/support/tickets/new"
-            class="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-all duration-200"
-            data-testid="new-ticket-btn"
-        >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            New Ticket
-        </a>
-    </div>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-4">
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+    <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4" data-testid="stats-grid">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -43,7 +45,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center group-hover:bg-amber-100 transition-colors">
                     <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -56,7 +58,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
                     <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +71,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center group-hover:bg-gray-100 transition-colors">
                     <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +84,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
                     <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -95,7 +97,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                     <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -108,7 +110,7 @@
                 </div>
             </div>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 group hover:shadow-warm-md transition-all duration-200">
             <div class="flex items-center gap-3">
                 <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
                     <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,7 +126,7 @@
     </div>
 
     <!-- Search and Filters -->
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
         <div class="flex flex-col lg:flex-row gap-4">
             <!-- Search -->
             <div class="flex-1">
@@ -157,7 +159,7 @@
                         @click="open = !open"
                         @click.outside="open = false"
                         type="button"
-                        class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_status else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
+                        class="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-xl border min-h-[44px] {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_status else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
                         data-testid="status-filter"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,7 +211,7 @@
                         @click="open = !open"
                         @click.outside="open = false"
                         type="button"
-                        class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_priority else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
+                        class="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-xl border min-h-[44px] {{ 'bg-primary-50 border-primary-200 text-primary-700' if current_priority else 'bg-white border-gray-200 text-gray-700 hover:bg-surface-50' }} transition-colors"
                         data-testid="priority-filter"
                     >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -256,7 +258,7 @@
                 </div>
 
                 <!-- My Tickets Toggle -->
-                <label class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border bg-white border-gray-200 text-gray-700 hover:bg-surface-50 cursor-pointer transition-colors">
+                <label class="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium rounded-xl border bg-white border-gray-200 text-gray-700 hover:bg-surface-50 cursor-pointer transition-colors min-h-[44px]">
                     <input
                         type="checkbox"
                         name="assigned"
@@ -276,7 +278,7 @@
                 <div class="relative" @click.away="open = false">
                     <button
                         type="button"
-                        class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors"
+                        class="inline-flex items-center gap-2 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-colors min-h-[44px]"
                         @click="open = !open"
                     >
                         <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -325,7 +327,7 @@
         <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2">
             <span class="text-xs text-gray-500 font-body">Active filters:</span>
             {% if search_query %}
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface-100 text-sm text-gray-700 min-h-[44px]">
                 <span>"{{ search_query }}"</span>
                 <button
                     type="button"
@@ -343,7 +345,7 @@
             </span>
             {% endif %}
             {% if current_status %}
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface-100 text-sm text-gray-700 min-h-[44px]">
                 <span>Status: {{ current_status | replace('_', ' ') | title }}</span>
                 <button
                     type="button"
@@ -360,7 +362,7 @@
             </span>
             {% endif %}
             {% if current_priority %}
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface-100 text-sm text-gray-700 min-h-[44px]">
                 <span>Priority: {{ current_priority | title }}</span>
                 <button
                     type="button"
@@ -377,7 +379,7 @@
             </span>
             {% endif %}
             {% if current_assigned == 'me' %}
-            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-surface-100 text-sm text-gray-700 min-h-[44px]">
                 <span>Assigned: Me</span>
                 <button
                     type="button"
@@ -396,7 +398,7 @@
             {% endif %}
             <button
                 type="button"
-                class="text-xs text-primary-600 hover:text-primary-500 font-medium transition-colors px-2.5 py-1 rounded-lg bg-primary-50 hover:bg-primary-100"
+                class="text-xs text-primary-600 hover:text-primary-500 font-medium transition-colors px-3 py-2 rounded-lg bg-primary-50 hover:bg-primary-100 min-h-[44px]"
                 hx-get="/support/tickets/table"
                 hx-target="#tickets-table-container"
                 hx-push-url="/support/tickets"

@@ -7,7 +7,7 @@
             <h1 class="text-2xl font-display font-bold text-gray-900">Network Health</h1>
             <p class="mt-1 text-sm text-gray-500">Infrastructure health insights and recommendations</p>
         </div>
-        <a href="/network" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+        <a href="/network" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
             Dashboard
         </a>
     </div>
@@ -93,7 +93,7 @@
             </div>
             <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
                 {% for pop in pops_without_routers %}
-                <a href="/network/pops/{{ pop.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-gray-50 block">
+                <a href="/network/pops/{{ pop.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-surface-50 block">
                     <div>
                         <p class="font-medium text-gray-900">{{ pop.name }}</p>
                         <p class="text-sm text-gray-500">{{ pop.city or 'No city' }}</p>
@@ -124,7 +124,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for pop in high_ticket_pops %}
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-surface-50">
                             <td class="px-6 py-3">
                                 <a href="/network/pops/{{ pop.id }}" class="font-medium text-primary-600 hover:text-primary-700">{{ pop.name }}</a>
                                 <p class="text-sm text-gray-500">{{ pop.city or '' }}</p>
@@ -159,7 +159,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {% for net in high_util_networks %}
-                        <tr class="hover:bg-gray-50">
+                        <tr class="hover:bg-surface-50">
                             <td class="px-6 py-3">
                                 <a href="/network/ip/networks" class="font-medium text-primary-600 hover:text-primary-700">{{ net.network }}</a>
                                 <p class="text-sm text-gray-500">{{ net.description or '' }}</p>
@@ -189,7 +189,7 @@
             </div>
             <div class="divide-y divide-gray-100 max-h-80 overflow-y-auto">
                 {% for router in routers_no_subs %}
-                <a href="/network/routers/{{ router.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-gray-50 block">
+                <a href="/network/routers/{{ router.id }}" class="px-6 py-3 flex items-center justify-between hover:bg-surface-50 block">
                     <div>
                         <p class="font-medium text-gray-900">{{ router.name }}</p>
                         <p class="text-sm text-gray-500">{{ router.ip_address or 'No IP' }}</p>

@@ -1,7 +1,7 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<div class="max-w-screen-2xl mx-auto">
+<div class="max-w-7xl mx-auto">
     {# Page Header #}
     <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 mb-8 animate-fade-up">
         <div class="relative flex-1">
@@ -246,7 +246,7 @@
                             </thead>
                             <tbody class="divide-y divide-gray-100">
                                 {% for sub in active_subscriptions[:10] %}
-                                <tr class="hover:bg-gray-50/50 transition-colors">
+                                <tr class="hover:bg-surface-50/50 transition-colors">
                                     <td class="py-3 pr-4">
                                         {% if sub.party %}
                                         <div class="flex items-center gap-2">

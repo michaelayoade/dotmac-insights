@@ -13,6 +13,7 @@ from app.models.sales import ItemGroup
 from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     ItemGroupFilters,
@@ -90,7 +91,12 @@ class ItemGroupService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_item_group(self, group_id: int) -> ItemGroup:
         """Get an item group by ID.
@@ -195,6 +201,7 @@ class ItemGroupService:
         )
         self.db.add(group)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(group)
 
         return group
 
@@ -243,6 +250,7 @@ class ItemGroupService:
             group.rgt = data.rgt
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(group)
         return group
 
     def delete_item_group(self, group_id: int) -> None:

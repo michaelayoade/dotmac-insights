@@ -7,7 +7,7 @@
             <h1 class="text-2xl font-display font-bold text-gray-900">Ticket Tags</h1>
             <p class="mt-1 text-sm text-gray-500">Manage ticket categorization tags</p>
         </div>
-        <a href="/support/dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+        <a href="/support/dashboard" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
             Dashboard
         </a>
     </div>
@@ -36,7 +36,7 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {% for tag in tags %}
-                    <tr class="hover:bg-gray-50">
+                    <tr class="hover:bg-surface-50">
                         <td class="px-6 py-4">
                             <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" style="background-color: {{ tag.color or '#e5e7eb' }}20; color: {{ tag.color or '#374151' }}">
                                 {{ tag.name }}

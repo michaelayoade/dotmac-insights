@@ -31,7 +31,7 @@ export class BasePage {
 
     // UI Elements
     this.loadingIndicator = page.locator('.htmx-indicator, .loading, [data-loading]');
-    this.toast = page.locator('.toast, [role="alert"], .notification');
+    this.toast = page.locator('[data-testid="toast"], .toast, [role="alert"], .notification');
     this.modal = page.locator('[role="dialog"], .modal');
     this.confirmDialog = page.locator('.confirm-dialog, [data-confirm]');
   }
@@ -60,6 +60,25 @@ export class BasePage {
     await expect(this.loadingIndicator).toHaveCount(0, { timeout: 10000 }).catch(() => {});
   }
 
+  async isAccessDenied(): Promise<boolean> {
+    if (this.page.url().includes('/login')) {
+      return true;
+    }
+    const loginForm = this.page.locator('[data-testid="login-form"]');
+    if (await loginForm.count() > 0) {
+      return true;
+    }
+    const errorTitle = this.page.locator('[data-testid="error-title"]');
+    if (await errorTitle.count() > 0) {
+      const text = (await errorTitle.first().textContent()) || '';
+      if (/access denied|forbidden/i.test(text)) {
+        return true;
+      }
+    }
+    const permissionText = this.page.locator('text=/Permission denied|Access Denied|Forbidden/i');
+    return (await permissionText.count()) > 0;
+  }
+
   // =========================================================================
   // HTMX HELPERS
   // =========================================================================
@@ -68,6 +87,26 @@ export class BasePage {
    * Click an HTMX-enabled element and wait for response.
    */
   async htmxClick(locator: Locator): Promise<void> {
+    const navInfo = await locator.evaluate((el) => {
+      const href = el.getAttribute('href');
+      const isAnchor = el.tagName.toLowerCase() === 'a';
+      const hasHtmx = Boolean(
+        el.getAttribute('hx-get')
+          || el.getAttribute('hx-post')
+          || el.getAttribute('hx-put')
+          || el.getAttribute('hx-patch')
+          || el.getAttribute('hx-delete')
+      );
+      return { href, isAnchor, hasHtmx };
+    });
+
+    if (navInfo.isAnchor && navInfo.href && !navInfo.hasHtmx && !navInfo.href.startsWith('#')) {
+      const navPromise = this.page.waitForNavigation({ waitUntil: 'load', timeout: 10000 }).catch(() => null);
+      await locator.click();
+      await navPromise;
+      return;
+    }
+
     await locator.click();
     await this.waitForHtmxComplete();
   }
@@ -121,7 +160,9 @@ export class BasePage {
   }
 
   async expectSuccessToast(message?: string | RegExp): Promise<void> {
-    const successToast = this.toast.filter({ has: this.page.locator('.success, [data-type="success"]') });
+    const successToast = this.page.locator(
+      '[data-testid="toast"][data-toast-type="success"], .toast .success, .toast[data-type="success"], [role="alert"][data-type="success"], .notification.success'
+    );
     if (message) {
       await expect(successToast.filter({ hasText: message })).toBeVisible();
     } else {
@@ -130,7 +171,9 @@ export class BasePage {
   }
 
   async expectErrorToast(message?: string | RegExp): Promise<void> {
-    const errorToast = this.toast.filter({ has: this.page.locator('.error, [data-type="error"]') });
+    const errorToast = this.page.locator(
+      '[data-testid="toast"][data-toast-type="error"], .toast .error, .toast[data-type="error"], [role="alert"][data-type="error"], .notification.error'
+    );
     if (message) {
       await expect(errorToast.filter({ hasText: message })).toBeVisible();
     } else {

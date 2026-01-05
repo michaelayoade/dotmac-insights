@@ -1,4 +1,4 @@
-<div class="overflow-x-auto">
+<div class="overflow-x-auto" data-testid="subscribers-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead>
             <tr class="bg-surface-50">
@@ -102,7 +102,7 @@
             </tr>
             {% else %}
             <tr>
-                <td colspan="6" class="px-6 py-12 text-center">
+                <td colspan="6" class="px-6 py-12 text-center" data-testid="subscribers-empty-state">
                     <div class="flex flex-col items-center justify-center">
                         <div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
                             <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

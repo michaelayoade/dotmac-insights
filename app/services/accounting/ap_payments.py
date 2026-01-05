@@ -26,6 +26,8 @@ from app.services.payment_allocation_service import (
     PaymentAllocationService,
 )
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
+from app.services.activity_logger import ActivityLogger
 
 from .ap_payment_types import (
     APAllocationData,
@@ -216,6 +218,21 @@ class APPaymentService:
             self._process_allocations(payment.id, data.allocations)
             self.db.refresh(payment)
 
+        validator = SoftValidationService(self.db)
+        for allocation in self.get_payment_allocations(payment.id):
+            validator.validate_and_store(allocation)
+        validator.validate_and_store(payment)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.supplier_payment.create",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="supplier_payment",
+            entity_id=str(payment.id),
+            summary=f"Created supplier payment {payment.payment_number or payment.id}",
+            metadata={"supplier_id": payment.supplier_id, "amount": float(payment.paid_amount)},
+        )
         return payment
 
     def update_payment(
@@ -278,6 +295,21 @@ class APPaymentService:
         if data.remarks is not None:
             payment.remarks = data.remarks
 
+        validator = SoftValidationService(self.db)
+        for allocation in self.get_payment_allocations(payment.id):
+            validator.validate_and_store(allocation)
+        validator.validate_and_store(payment)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.supplier_payment.update",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="supplier_payment",
+            entity_id=str(payment.id),
+            summary=f"Updated supplier payment {payment.payment_number or payment.id}",
+            metadata={"status": payment.status.value if payment.status else None},
+        )
         return payment
 
     def delete_payment(self, payment_id: int) -> None:
@@ -310,6 +342,16 @@ class APPaymentService:
         payment.deleted_at = datetime.now(timezone.utc)
         payment.deleted_by_id = self.principal.id if self.principal else None
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.supplier_payment.delete",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="supplier_payment",
+            entity_id=str(payment.id),
+            summary=f"Deleted supplier payment {payment.payment_number or payment.id}",
+        )
+
     # -------------------------------------------------------------------------
     # Allocations
     # -------------------------------------------------------------------------
@@ -340,6 +382,20 @@ class APPaymentService:
 
         self._process_allocations(payment_id, allocations)
         self.db.refresh(payment)
+        validator = SoftValidationService(self.db)
+        for allocation in self.get_payment_allocations(payment.id):
+            validator.validate_and_store(allocation)
+        validator.validate_and_store(payment)
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.supplier_payment.allocate",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="supplier_payment",
+            entity_id=str(payment.id),
+            summary=f"Allocated supplier payment {payment.payment_number or payment.id}",
+            metadata={"allocation_count": len(allocations)},
+        )
         return payment
 
     def remove_allocation(self, payment_id: int, allocation_id: int) -> None:
@@ -475,6 +531,16 @@ class APPaymentService:
             )
             payment.status = SupplierPaymentStatus.APPROVED
             payment.workflow_status = "approved"
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.supplier_payment.approve",
+                user_id=self.principal.id if self.principal else None,
+                user_email=getattr(self.principal, "email", None),
+                entity_type="supplier_payment",
+                entity_id=str(payment.id),
+                summary=f"Approved supplier payment {payment.payment_number or payment.id}",
+                metadata={"remarks": remarks},
+            )
             return payment
         except ApprovalError as e:
             raise ValidationError(str(e)) from e
@@ -507,6 +573,16 @@ class APPaymentService:
             )
             payment.status = SupplierPaymentStatus.DRAFT
             payment.workflow_status = "rejected"
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.supplier_payment.reject",
+                user_id=self.principal.id if self.principal else None,
+                user_email=getattr(self.principal, "email", None),
+                entity_type="supplier_payment",
+                entity_id=str(payment.id),
+                summary=f"Rejected supplier payment {payment.payment_number or payment.id}",
+                metadata={"reason": reason},
+            )
             return payment
         except ApprovalError as e:
             raise ValidationError(str(e)) from e
@@ -539,6 +615,16 @@ class APPaymentService:
             payment.status = SupplierPaymentStatus.POSTED
             payment.workflow_status = "posted"
             payment.journal_entry_id = je.id
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.supplier_payment.post",
+                user_id=self.principal.id if self.principal else None,
+                user_email=getattr(self.principal, "email", None),
+                entity_type="supplier_payment",
+                entity_id=str(payment.id),
+                summary=f"Posted supplier payment {payment.payment_number or payment.id}",
+                metadata={"journal_entry_id": je.id},
+            )
             return payment
         except PostingError as e:
             raise ValidationError(str(e)) from e

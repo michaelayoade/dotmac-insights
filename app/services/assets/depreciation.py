@@ -28,6 +28,7 @@ from app.models.asset import (
 from app.models.accounting import Account, JournalEntry, JournalEntryItem
 
 from app.services.errors import NotFoundError, ValidationError
+from app.services.validation.soft_validation_service import SoftValidationService
 from app.services.types import PaginatedResult, PaginationParams
 from app.services.base import paginate
 
@@ -542,6 +543,9 @@ class DepreciationService:
         asset.next_depreciation_date = next_schedule.schedule_date if next_schedule else None
 
         self.db.flush()
+        validator = SoftValidationService(self.db)
+        validator.validate_and_store(schedule)
+        validator.validate_and_store(asset)
 
         return DepreciationPostResult(
             journal_entry_id=journal_entry.id,
@@ -636,6 +640,13 @@ class DepreciationService:
                 asset.next_depreciation_date = next_schedule.schedule_date if next_schedule else None
 
         self.db.flush()
+        validator = SoftValidationService(self.db)
+        for schedule in schedules:
+            validator.validate_and_store(schedule)
+        for asset_id in {s.asset_id for s in schedules}:
+            asset = self.db.query(Asset).filter(Asset.id == asset_id).first()
+            if asset:
+                validator.validate_and_store(asset)
 
         return DepreciationPostResult(
             journal_entry_id=journal_entry.id,
@@ -866,6 +877,9 @@ class DepreciationService:
         asset.next_depreciation_date = schedule.schedule_date
 
         self.db.flush()
+        validator = SoftValidationService(self.db)
+        validator.validate_and_store(schedule)
+        validator.validate_and_store(asset)
 
         return DepreciationPostResult(
             journal_entry_id=je.id,

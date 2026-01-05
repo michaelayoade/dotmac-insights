@@ -12,14 +12,15 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.models.support_sla import RoutingRule, RoutingRoundRobinState, RoutingStrategy
-from app.models.agent import Agent, Team, TeamMember
+from app.models.party import Party, PartyRole
+from app.models.agent import Team, TeamMember
 from app.models.ticket import Ticket, TicketStatus
 
 logger = structlog.get_logger()
 
 
 class WorkloadEntry(TypedDict):
-    agent: Agent
+    agent: Party
     name: str
     capacity: int
     load: int
@@ -95,7 +96,7 @@ class RoutingEngine:
             }
 
         # Perform assignment
-        ticket.assigned_to = selected.display_name or selected.email
+        ticket.assigned_to = selected.display_name or selected.primary_email
         if rule.team_id:
             team = self.db.query(Team).filter(Team.id == rule.team_id).first()
             if team:
@@ -107,7 +108,7 @@ class RoutingEngine:
             "ticket_auto_assigned",
             ticket_id=ticket.id,
             agent_id=selected.id,
-            agent_name=selected.display_name,
+            agent_name=selected.name,
             rule_id=rule.id,
             strategy=rule.strategy,
         )
@@ -115,7 +116,7 @@ class RoutingEngine:
         return {
             "assigned": True,
             "agent_id": selected.id,
-            "agent_name": selected.display_name or selected.email,
+            "agent_name": selected.display_name or selected.primary_email,
             "team_id": rule.team_id,
             "rule_id": rule.id,
             "rule_name": rule.name,
@@ -199,7 +200,7 @@ class RoutingEngine:
             return str(actual or "").endswith(str(expected))
         return False
 
-    def get_available_agents(self, rule: RoutingRule) -> List[Agent]:
+    def get_available_agents(self, rule: RoutingRule) -> List[Party]:
         """Get list of available agents for a routing rule.
 
         Tries the rule's team first, then fallback team if configured.
@@ -208,7 +209,7 @@ class RoutingEngine:
             rule: Routing rule
 
         Returns:
-            List of available agents
+            List of available agents (Party objects with support_agent role)
         """
         team_id = rule.team_id
 
@@ -225,7 +226,7 @@ class RoutingEngine:
 
         return []
 
-    def _get_team_agents(self, team_id: int) -> List[Agent]:
+    def _get_team_agents(self, team_id: int) -> List[Party]:
         """Get active agents for a team."""
         members = self.db.query(TeamMember).filter(
             TeamMember.team_id == team_id,
@@ -235,25 +236,31 @@ class RoutingEngine:
         if not members:
             return []
 
-        agent_ids = [m.agent_id for m in members]
-        agents = self.db.query(Agent).filter(
-            Agent.id.in_(agent_ids),
-            Agent.is_active == True
-        ).all()
+        agent_ids = [m.party_id for m in members]
+        agents = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(
+                Party.id.in_(agent_ids),
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+            )
+            .all()
+        )
 
         return agents
 
     def select_agent(
         self,
         ticket: Ticket,
-        agents: List[Agent],
+        agents: List[Party],
         rule: RoutingRule,
-    ) -> Optional[Agent]:
+    ) -> Optional[Party]:
         """Select the best agent based on routing strategy.
 
         Args:
             ticket: Ticket being assigned
-            agents: Available agents
+            agents: Available agents (Party objects)
             rule: Routing rule with strategy
 
         Returns:
@@ -273,7 +280,7 @@ class RoutingEngine:
             # Default to first available
             return agents[0] if agents else None
 
-    def _round_robin(self, team_id: int, agents: List[Agent]) -> Optional[Agent]:
+    def _round_robin(self, team_id: int, agents: List[Party]) -> Optional[Party]:
         """Round-robin agent selection."""
         if not agents:
             return None
@@ -289,36 +296,36 @@ class RoutingEngine:
             selected = agents[0]
             state = RoutingRoundRobinState(
                 team_id=team_id,
-                last_agent_id=selected.id
+                last_party_id=selected.id
             )
             self.db.add(state)
             self.db.commit()
             return selected
 
         # Find next agent in rotation
-        if state.last_agent_id is None:
+        if state.last_party_id is None:
             next_idx = 0
         else:
             try:
-                last_idx = agent_ids.index(state.last_agent_id)
+                last_idx = agent_ids.index(state.last_party_id)
                 next_idx = (last_idx + 1) % len(agents)
             except ValueError:
                 next_idx = 0
 
         selected = agents[next_idx]
-        state.last_agent_id = selected.id
+        state.last_party_id = selected.id
         self.db.commit()
 
         return selected
 
-    def _least_busy(self, agents: List[Agent]) -> Optional[Agent]:
+    def _least_busy(self, agents: List[Party]) -> Optional[Party]:
         """Select agent with fewest open tickets."""
         if not agents:
             return None
 
         ticket_counts: Dict[int, int] = {}
         for agent in agents:
-            name: str = agent.display_name or agent.email or f"agent-{agent.id}"
+            name: str = agent.display_name or agent.primary_email or f"agent-{agent.id}"
             name = str(name)
             count = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -338,7 +345,7 @@ class RoutingEngine:
 
         return agents[0]
 
-    def _skill_based(self, ticket: Ticket, agents: List[Agent]) -> Optional[Agent]:
+    def _skill_based(self, ticket: Ticket, agents: List[Party]) -> Optional[Party]:
         """Select agent based on skill matching."""
         if not agents:
             return None
@@ -352,8 +359,9 @@ class RoutingEngine:
 
         for agent in agents:
             score = 0.0
-            skills = agent.skills or {}
-            domains = agent.domains or {}
+            # Get agent metadata for skills/domains (stored in Party metadata)
+            skills = agent.agent_skills
+            domains = agent.agent_domains
 
             # Match ticket type
             if ticket_type:
@@ -372,8 +380,8 @@ class RoutingEngine:
                 if region in [k.lower() for k in domains.keys()]:
                     score += 1
 
-            # Consider routing weight
-            score += float(agent.routing_weight) * 0.1
+            # Consider routing weight from metadata
+            score += float(agent.agent_routing_weight) * 0.1
 
             if score > best_score:
                 best_score = score
@@ -381,7 +389,7 @@ class RoutingEngine:
 
         return best_match or agents[0]
 
-    def _load_balanced(self, agents: List[Agent]) -> Optional[Agent]:
+    def _load_balanced(self, agents: List[Party]) -> Optional[Party]:
         """Select agent based on capacity utilization."""
         if not agents:
             return None
@@ -390,8 +398,8 @@ class RoutingEngine:
         lowest_utilization = float('inf')
 
         for agent in agents:
-            capacity = agent.capacity or 10
-            name = agent.display_name or agent.email or f"agent-{agent.id}"
+            capacity = agent.agent_capacity
+            name = agent.display_name or agent.primary_email or f"agent-{agent.id}"
 
             current_load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -423,15 +431,19 @@ class RoutingEngine:
         Returns:
             Summary of agent workloads
         """
-        query = self.db.query(Agent).filter(Agent.is_active == True)
+        query = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
+        )
 
         if team_id:
-            member_ids = self.db.query(TeamMember.agent_id).filter(
+            member_ids = self.db.query(TeamMember.party_id).filter(
                 TeamMember.team_id == team_id,
                 TeamMember.is_active == True
             ).all()
             agent_ids = [m[0] for m in member_ids]
-            query = query.filter(Agent.id.in_(agent_ids))
+            query = query.filter(Party.id.in_(agent_ids))
 
         agents = query.all()
 
@@ -440,8 +452,8 @@ class RoutingEngine:
         agent_data: List[Dict[str, Any]] = []
 
         for agent in agents:
-            capacity = agent.capacity or 10
-            name: str = agent.display_name or agent.email or f"agent-{agent.id}"
+            capacity = agent.agent_capacity
+            name: str = agent.display_name or agent.primary_email or f"agent-{agent.id}"
 
             load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -458,7 +470,7 @@ class RoutingEngine:
             agent_data.append({
                 "agent_id": agent.id,
                 "agent_name": agent.display_name,
-                "email": agent.email,
+                "email": agent.primary_email,
                 "capacity": capacity,
                 "current_load": load,
                 "utilization_pct": round(load / capacity * 100, 1) if capacity > 0 else 0,
@@ -490,15 +502,19 @@ class RoutingEngine:
             Summary of rebalancing performed
         """
         # Get agents
-        query = self.db.query(Agent).filter(Agent.is_active == True)
+        query = (
+            self.db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(PartyRole.role == "support_agent", PartyRole.status == "active")
+        )
 
         if team_id:
-            member_ids = self.db.query(TeamMember.agent_id).filter(
+            member_ids = self.db.query(TeamMember.party_id).filter(
                 TeamMember.team_id == team_id,
                 TeamMember.is_active == True
             ).all()
             agent_ids = [m[0] for m in member_ids]
-            query = query.filter(Agent.id.in_(agent_ids))
+            query = query.filter(Party.id.in_(agent_ids))
 
         agents = query.all()
 
@@ -511,8 +527,8 @@ class RoutingEngine:
         # Calculate current workloads
         workloads: Dict[int, WorkloadEntry] = {}
         for agent in agents:
-            name: str = agent.display_name or agent.email or f"agent-{agent.id}"
-            capacity = agent.capacity or 10
+            name: str = agent.display_name or agent.primary_email or f"agent-{agent.id}"
+            capacity = agent.agent_capacity
 
             load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,

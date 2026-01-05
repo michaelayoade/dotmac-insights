@@ -6,7 +6,7 @@ Business logic is delegated to services in app/services/assets/.
 """
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Sequence
 from fastapi import APIRouter, Request, Response, Depends, Query
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
 from app.auth import Principal
 from app.models.asset import AssetStatus
+from app.models.validation import FinanceValidationIssue
 from app.services.assets import (
     AssetService,
     AssetCategoryService,
@@ -42,6 +43,45 @@ TEMPLATE_PATH = "modules/assets/templates"
 
 
 # ============= SERVICE DEPENDENCY PROVIDERS =============
+
+def _get_validation_issue_counts(
+    db: Session,
+    model_name: str,
+    record_ids: Sequence[int],
+    scope: str,
+) -> dict[int, int]:
+    if not record_ids:
+        return {}
+    rows = (
+        db.query(FinanceValidationIssue.record_id, FinanceValidationIssue.issues)
+        .filter(
+            FinanceValidationIssue.model_name == model_name,
+            FinanceValidationIssue.record_id.in_(record_ids),
+            FinanceValidationIssue.scope == scope,
+        )
+        .all()
+    )
+    return {record_id: len(issues or []) for record_id, issues in rows if issues}
+
+
+def _get_validation_issues(
+    db: Session,
+    model_name: str,
+    record_id: int,
+    scope: str,
+) -> list[dict]:
+    row = (
+        db.query(FinanceValidationIssue.issues)
+        .filter(
+            FinanceValidationIssue.model_name == model_name,
+            FinanceValidationIssue.record_id == record_id,
+            FinanceValidationIssue.scope == scope,
+        )
+        .first()
+    )
+    if not row:
+        return []
+    return row[0] or []
 
 def get_asset_service(
     db: Session = Depends(get_db),
@@ -93,6 +133,7 @@ async def assets_list(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
+    db: Session = Depends(get_db),
     service: AssetService = Depends(get_asset_service),
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -127,6 +168,14 @@ async def assets_list(
     # Get assets via service
     result = service.list_assets(filters, pagination)
 
+    asset_ids = [asset.id for asset in result.items]
+    asset_issue_counts = _get_validation_issue_counts(
+        db,
+        model_name="Asset",
+        record_ids=asset_ids,
+        scope="assets",
+    )
+
     # Get filter options via service
     filter_options = service.get_filter_options()
 
@@ -134,6 +183,7 @@ async def assets_list(
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Assets"
     context["assets"] = result.items
+    context["asset_issue_counts"] = asset_issue_counts
     context["q"] = q
     context["status"] = status
     context["category"] = category
@@ -164,6 +214,7 @@ async def assets_table(
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
+    db: Session = Depends(get_db),
     service: AssetService = Depends(get_asset_service),
     q: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -176,7 +227,7 @@ async def assets_table(
 ):
     """Assets table partial for HTMX."""
     return await assets_list(
-        request, response, user, csrf_token, service,
+        request, response, user, csrf_token, db, service,
         q, status, category, location, page, per_page, sort, dir
     )
 
@@ -295,6 +346,7 @@ async def asset_detail(
     user: SessionUser,
     csrf_token: CSRFToken,
     asset_id: int,
+    db: Session = Depends(get_db),
     service: AssetService = Depends(get_asset_service),
     depreciation_service: DepreciationService = Depends(get_depreciation_service),
 ):
@@ -309,6 +361,12 @@ async def asset_detail(
 
     # Get pending depreciation for this asset
     pending_depreciation = depreciation_service.get_pending_depreciation_for_asset(asset_id)
+    validation_issues = _get_validation_issues(
+        db,
+        model_name="Asset",
+        record_id=asset_id,
+        scope="assets",
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -322,6 +380,7 @@ async def asset_detail(
     context["pending_depreciation"] = pending_depreciation
     context["pending_depreciation_count"] = len(pending_depreciation)
     context["pending_depreciation_amount"] = sum(p.depreciation_amount for p in pending_depreciation)
+    context["validation_issues"] = validation_issues
 
     template = templates.get_template(f"{TEMPLATE_PATH}/pages/detail.html")
     return HTMLResponse(template.render(context))
@@ -334,6 +393,7 @@ async def category_detail(
     user: SessionUser,
     csrf_token: CSRFToken,
     category_id: int,
+    db: Session = Depends(get_db),
     service: AssetCategoryService = Depends(get_category_service),
 ):
     """Asset category detail page."""
@@ -349,6 +409,12 @@ async def category_detail(
     assets, asset_count = service.get_assets_in_category(
         category.asset_category_name, limit=50, offset=0
     )
+    validation_issues = _get_validation_issues(
+        db,
+        model_name="AssetCategory",
+        record_id=category_id,
+        scope="assets",
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -357,6 +423,7 @@ async def category_detail(
     context["finance_books"] = category.finance_books
     context["assets"] = assets
     context["asset_count"] = asset_count
+    context["validation_issues"] = validation_issues
 
     template = templates.get_template(f"{TEMPLATE_PATH}/pages/category_detail.html")
     return HTMLResponse(template.render(context))

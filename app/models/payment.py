@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import Optional, List, TYPE_CHECKING
 import enum
 from app.database import Base, SoftDeleteMixin
+from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.party import CustomerAccount
@@ -39,7 +40,7 @@ class PaymentSource(enum.Enum):
     INTERNAL = "internal"
 
 
-class Payment(SoftDeleteMixin, Base):
+class Payment(SoftValidationMixin, SoftDeleteMixin, Base):
     """Payment records from all sources (AR - customer payments)."""
 
     __tablename__ = "payments"

@@ -3,7 +3,7 @@
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
     <div>
-        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Accounts Payable Aging</h1>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Accounts Payable Aging</h1>
         <p class="mt-1.5 text-gray-500 font-body">Outstanding supplier invoices by age</p>
     </div>
 </div>
@@ -12,59 +12,63 @@
 {% block content %}
 <!-- Summary Cards -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-    <div class="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-4">
+    <a href="/purchasing?status=unpaid" class="bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl p-4 hover:from-primary-100 hover:to-primary-200 transition-all cursor-pointer group total-outstanding" data-testid="total-outstanding">
         <p class="text-xs font-medium text-primary-700 uppercase tracking-wider">Total Outstanding</p>
         <p class="mt-1 text-2xl font-bold text-primary-800 font-mono">{{ '{:,.2f}'.format(total_outstanding) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-primary-600 mt-1 group-hover:underline">View all →</p>
+    </a>
+    <a href="/purchasing?status=overdue" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-red-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Total Overdue</p>
         <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(total_overdue) }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-red-600">View overdue →</p>
+    </a>
+    <a href="/purchasing?status=unpaid" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-primary-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Bills</p>
         <p class="mt-1 text-2xl font-bold text-gray-900">{{ bills|length }}</p>
-    </div>
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-primary-600">View list →</p>
+    </a>
+    <a href="/purchasing?aging=over_90" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 hover:ring-amber-200 transition-all cursor-pointer group">
         <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Over 90 Days</p>
         <p class="mt-1 text-2xl font-bold text-amber-600 font-mono">{{ '{:,.2f}'.format(buckets.over_90.amount) }}</p>
-    </div>
+        <p class="text-xs text-gray-400 mt-1 group-hover:text-amber-600">{{ buckets.over_90.count }} bills →</p>
+    </a>
 </div>
 
 <!-- Aging Buckets Visualization -->
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mb-6">
     <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Aging Breakdown</h2>
     <div class="grid grid-cols-5 gap-4">
-        <div class="text-center p-4 rounded-xl bg-emerald-50">
+        <a href="/purchasing?aging=current" class="aging-bucket text-center p-4 rounded-xl bg-emerald-50 hover:bg-emerald-100 transition-colors cursor-pointer group" data-bucket="current">
             <p class="text-xs font-medium text-emerald-700 uppercase tracking-wider">Current</p>
             <p class="mt-2 text-xl font-bold text-emerald-800 font-mono">{{ '{:,.0f}'.format(buckets.current.amount) }}</p>
-            <p class="text-xs text-emerald-600">{{ buckets.current.count }} bills</p>
-        </div>
-        <div class="text-center p-4 rounded-xl bg-yellow-50">
+            <p class="text-xs text-emerald-600 group-hover:underline">{{ buckets.current.count }} bills →</p>
+        </a>
+        <a href="/purchasing?aging=1_30" class="aging-bucket text-center p-4 rounded-xl bg-yellow-50 hover:bg-yellow-100 transition-colors cursor-pointer group" data-bucket="1_30">
             <p class="text-xs font-medium text-yellow-700 uppercase tracking-wider">1-30 Days</p>
             <p class="mt-2 text-xl font-bold text-yellow-800 font-mono">{{ '{:,.0f}'.format(buckets['1_30'].amount) }}</p>
-            <p class="text-xs text-yellow-600">{{ buckets['1_30'].count }} bills</p>
-        </div>
-        <div class="text-center p-4 rounded-xl bg-orange-50">
+            <p class="text-xs text-yellow-600 group-hover:underline">{{ buckets['1_30'].count }} bills →</p>
+        </a>
+        <a href="/purchasing?aging=31_60" class="aging-bucket text-center p-4 rounded-xl bg-orange-50 hover:bg-orange-100 transition-colors cursor-pointer group" data-bucket="31_60">
             <p class="text-xs font-medium text-orange-700 uppercase tracking-wider">31-60 Days</p>
             <p class="mt-2 text-xl font-bold text-orange-800 font-mono">{{ '{:,.0f}'.format(buckets['31_60'].amount) }}</p>
-            <p class="text-xs text-orange-600">{{ buckets['31_60'].count }} bills</p>
-        </div>
-        <div class="text-center p-4 rounded-xl bg-red-50">
+            <p class="text-xs text-orange-600 group-hover:underline">{{ buckets['31_60'].count }} bills →</p>
+        </a>
+        <a href="/purchasing?aging=61_90" class="aging-bucket text-center p-4 rounded-xl bg-red-50 hover:bg-red-100 transition-colors cursor-pointer group" data-bucket="61_90">
             <p class="text-xs font-medium text-red-700 uppercase tracking-wider">61-90 Days</p>
             <p class="mt-2 text-xl font-bold text-red-800 font-mono">{{ '{:,.0f}'.format(buckets['61_90'].amount) }}</p>
-            <p class="text-xs text-red-600">{{ buckets['61_90'].count }} bills</p>
-        </div>
-        <div class="text-center p-4 rounded-xl bg-gray-100">
+            <p class="text-xs text-red-600 group-hover:underline">{{ buckets['61_90'].count }} bills →</p>
+        </a>
+        <a href="/purchasing?aging=over_90" class="aging-bucket text-center p-4 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors cursor-pointer group" data-bucket="over_90">
             <p class="text-xs font-medium text-gray-700 uppercase tracking-wider">Over 90</p>
             <p class="mt-2 text-xl font-bold text-gray-800 font-mono">{{ '{:,.0f}'.format(buckets.over_90.amount) }}</p>
-            <p class="text-xs text-gray-600">{{ buckets.over_90.count }} bills</p>
-        </div>
+            <p class="text-xs text-gray-600 group-hover:underline">{{ buckets.over_90.count }} bills →</p>
+        </a>
     </div>
 </div>
 
 <!-- Outstanding Bills Table -->
 {% if bills %}
-<div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="aging-table">
     <div class="px-6 py-4 border-b border-gray-100">
         <h2 class="text-lg font-display font-semibold text-gray-900">Outstanding Bills</h2>
     </div>
@@ -81,7 +85,7 @@
             </thead>
             <tbody class="divide-y divide-gray-100">
                 {% for bill in bills %}
-                {% set days_overdue = ((now_date or today) - bill.due_date.date()).days if bill.due_date else 0 %}
+                {% set days_overdue = bill.aging_days if bill.aging_days is defined else 0 %}
                 <tr class="hover:bg-surface-50">
                     <td class="py-3.5 pl-6 pr-3">
                         <a href="/accounting/purchase-invoices/{{ bill.id }}" class="font-medium text-gray-900 hover:text-primary-600">
@@ -111,7 +115,7 @@
     </div>
 </div>
 {% else %}
-<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center">
+<div class="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center empty-state" data-testid="empty-state">
     <div class="mx-auto w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
         <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>

@@ -26,6 +26,7 @@ from app.models.payment_subscription import (
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
 from app.models.party import CustomerAccount
 from app.services.errors import NotFoundError, ValidationError
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .subscription_types import (
     DailyBillingConfig,
@@ -184,7 +185,6 @@ class BillingService:
                 sub, billing_date, total_amount, config.billing_type
             )
             invoice_id = invoice.id
-            self.db.flush()
 
         # Auto-charge if configured
         charge_reference = None
@@ -370,6 +370,7 @@ class BillingService:
 
         self.db.add(invoice)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(invoice)
         return invoice
 
     # -------------------------------------------------------------------------
@@ -696,6 +697,8 @@ class BillingService:
         )
 
         self.db.add(invoice)
+        self.db.flush()
+        SoftValidationService(self.db).validate_and_store(invoice)
         return invoice
 
     def _auto_charge_subscription(

@@ -2,7 +2,7 @@
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-    <div>
+    <div class="min-w-0">
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Operations</h1>
         <p class="mt-1.5 text-gray-500 font-body">Projects, Field Service, Inventory, Assets & Fleet</p>
     </div>
@@ -12,15 +12,15 @@
 {% block content %}
 <div class="space-y-8">
     <!-- Stats Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4" data-testid="stats-grid">
         {% for stat in stats %}
-        <a href="{{ stat.href }}" class="block bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 hover:shadow-warm transition-shadow group">
+        <a href="{{ stat.href }}" class="block bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 sm:p-5 hover:shadow-warm transition-shadow group">
             <div class="flex items-center gap-4">
-                <div class="flex-shrink-0 w-12 h-12 rounded-xl {{ stat.icon_bg }} flex items-center justify-center group-hover:scale-105 transition-transform">
+                <div class="flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-xl {{ stat.icon_bg }} flex items-center justify-center group-hover:scale-105 transition-transform">
                     {% include "components/icons/" ~ stat.icon ~ ".html" ignore missing %}
                 </div>
                 <div class="min-w-0">
-                    <p class="text-2xl font-display font-bold text-gray-900">{{ stat.value }}</p>
+                    <p class="text-lg sm:text-2xl font-display font-bold text-gray-900 break-words">{{ stat.value }}</p>
                     <p class="text-sm text-gray-500 truncate">{{ stat.label }}</p>
                 </div>
             </div>

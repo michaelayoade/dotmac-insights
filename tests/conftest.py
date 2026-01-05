@@ -33,6 +33,7 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "inbox: Inbox/conversations module tests")
     config.addinivalue_line("markers", "inventory: Inventory module tests")
     config.addinivalue_line("markers", "expenses: Expenses module tests")
+    config.addinivalue_line("markers", "marketing: Marketing module tests")
 
 # Force SQLite for tests (use per-session temp DB unless overridden)
 if "TEST_DATABASE_URL" not in os.environ:

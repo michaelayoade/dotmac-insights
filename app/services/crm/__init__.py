@@ -25,6 +25,7 @@ from .segments import SegmentService
 from .scoring import LeadScoringService
 from .communication import CRMCommunicationService
 from .customer_health import CustomerHealthService
+from .health_web import CustomerHealthWebService
 
 __all__ = [
     "OpportunityService",
@@ -39,4 +40,5 @@ __all__ = [
     "LeadScoringService",
     "CRMCommunicationService",
     "CustomerHealthService",
+    "CustomerHealthWebService",
 ]

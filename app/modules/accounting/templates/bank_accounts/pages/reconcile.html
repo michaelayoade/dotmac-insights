@@ -28,15 +28,15 @@
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-amber-600 uppercase tracking-wider">Unreconciled Transactions</p>
             <p class="mt-1 text-2xl font-bold text-amber-600">{{ unreconciled_txns|length }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-emerald-600 uppercase tracking-wider">Unreconciled Deposits</p>
             <p class="mt-1 text-2xl font-bold text-emerald-600 font-mono">{{ '{:,.2f}'.format(unreconciled_deposits) }}</p>
         </div>
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 p-4">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
             <p class="text-xs font-medium text-red-600 uppercase tracking-wider">Unreconciled Withdrawals</p>
             <p class="mt-1 text-2xl font-bold text-red-600 font-mono">{{ '{:,.2f}'.format(unreconciled_withdrawals) }}</p>
         </div>
@@ -47,7 +47,7 @@
     <form action="/accounting/bank-accounts/{{ account.id }}/reconcile" method="POST">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
-        <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
             <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 class="text-lg font-display font-semibold text-gray-900">Unreconciled Transactions</h2>
                 <div class="flex items-center gap-2">
@@ -143,7 +143,7 @@
 
     <!-- Recent Reconciliations -->
     {% if reconciliations %}
-    <div class="bg-white rounded-xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100">
             <h2 class="text-lg font-display font-semibold text-gray-900">Reconciliation History</h2>
         </div>

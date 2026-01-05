@@ -19,6 +19,7 @@ __all__ = [
     "DesignationFilters",
     "DesignationCreateData",
     "DesignationUpdateData",
+    "DesignationHeadcount",
     # HD Team types
     "HDTeamFilters",
     "HDTeamCreateData",
@@ -89,6 +90,18 @@ class DepartmentHeadcount:
 # ==============================================================================
 # Designation Types
 # ==============================================================================
+
+
+@dataclass
+class DesignationHeadcount:
+    """Headcount information for a designation."""
+
+    designation_id: int
+    designation_name: str
+    total_employees: int
+    active_employees: int
+    on_leave: int
+    terminated: int
 
 
 @dataclass

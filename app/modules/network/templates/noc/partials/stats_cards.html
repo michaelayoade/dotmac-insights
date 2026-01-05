@@ -1,0 +1,91 @@
+{# NOC Stats Cards #}
+
+{# Online Routers #}
+<div class="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-green-50 to-green-100 rounded-xl flex items-center justify-center ring-1 ring-green-200/50">
+            <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-green-600 font-display tabular-nums">{{ stats.online_routers }}</p>
+            <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Online</p>
+        </div>
+    </div>
+</div>
+
+{# Offline Routers #}
+<div class="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-red-50 to-red-100 rounded-xl flex items-center justify-center ring-1 ring-red-200/50">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-red-600 font-display tabular-nums">{{ stats.offline_routers }}</p>
+            <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Offline</p>
+        </div>
+    </div>
+</div>
+
+{# Critical Alerts #}
+<div class="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm {% if stats.critical_alerts > 0 %}animate-pulse{% endif %}">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-red-50 to-orange-100 rounded-xl flex items-center justify-center ring-1 ring-red-200/50">
+            <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-red-600 font-display tabular-nums">{{ stats.critical_alerts }}</p>
+            <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Critical</p>
+        </div>
+    </div>
+</div>
+
+{# Warning Alerts #}
+<div class="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-amber-50 to-yellow-100 rounded-xl flex items-center justify-center ring-1 ring-amber-200/50">
+            <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-amber-600 font-display tabular-nums">{{ stats.warning_alerts }}</p>
+            <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Warnings</p>
+        </div>
+    </div>
+</div>
+
+{# Active Incidents #}
+<div class="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-purple-50 to-violet-100 rounded-xl flex items-center justify-center ring-1 ring-purple-200/50">
+            <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-purple-600 font-display tabular-nums">{{ stats.active_incidents }}</p>
+            <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Incidents</p>
+        </div>
+    </div>
+</div>
+
+{# Interfaces Up #}
+<div class="relative bg-white rounded-2xl border border-gray-100 p-5 shadow-warm">
+    <div class="flex items-center gap-3">
+        <div class="flex-shrink-0 w-11 h-11 bg-gradient-to-br from-cyan-50 to-blue-100 rounded-xl flex items-center justify-center ring-1 ring-cyan-200/50">
+            <svg class="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+        </div>
+        <div>
+            <p class="text-2xl font-bold text-cyan-600 font-display tabular-nums">{{ stats.up_interfaces }}/{{ stats.total_interfaces }}</p>
+            <p class="text-xs text-gray-500 font-body font-medium uppercase tracking-wide">Interfaces</p>
+        </div>
+    </div>
+</div>

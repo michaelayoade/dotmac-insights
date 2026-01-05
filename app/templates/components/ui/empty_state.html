@@ -2,16 +2,9 @@
 Empty State Component
 
 Usage:
-{% include "components/ui/empty_state.html" with {
-    title: "No parties",
-    message: "Get started by creating a new party.",
-    icon: "users",
-    action: {
-        label: "Add party",
-        href: "/parties",
-        testid: "add-party-btn"
-    }
-} %}
+{% with title="No parties", message="Get started by creating a new party.", icon="users", action={ label: "Add party", href: "/parties", testid: "add-party-btn" } %}
+{% include "components/ui/empty_state.html" %}
+{% endwith %}
 #}
 
 <div class="text-center py-12" data-testid="empty-state">

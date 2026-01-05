@@ -308,13 +308,13 @@ class RoutingRoundRobinState(Base):
         ForeignKey("teams.id", ondelete="CASCADE"), unique=True, nullable=False, index=True
     )
 
-    # Last assigned agent ID
-    last_agent_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey("agents.id", ondelete="SET NULL"), nullable=True
+    # Last assigned party ID (support agent)
+    last_party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"), nullable=True
     )
 
     # When this was last updated
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self) -> str:
-        return f"<RoutingRoundRobinState team={self.team_id} last_agent={self.last_agent_id}>"
+        return f"<RoutingRoundRobinState team={self.team_id} last_party={self.last_party_id}>"

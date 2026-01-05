@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.auth import Require
 from app.models.omni import InboxRoutingRule
-from app.models.agent import Agent, Team
+from app.models.party import Party, PartyRole
+from app.models.agent import Team
 
 router = APIRouter()
 
@@ -134,7 +135,12 @@ async def create_routing_rule(
     """Create a new routing rule."""
     # Validate action targets
     if payload.action_type == "assign_agent" and payload.action_value:
-        agent = db.query(Agent).filter(Agent.id == int(payload.action_value)).first()
+        agent = (
+            db.query(Party)
+            .join(PartyRole, Party.id == PartyRole.party_id)
+            .filter(Party.id == int(payload.action_value), PartyRole.role == "support_agent")
+            .first()
+        )
         if not agent:
             raise HTTPException(status_code=400, detail="Agent not found")
 

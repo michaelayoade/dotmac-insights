@@ -29,6 +29,7 @@ from app.models.accounting import (
 from app.models.payment import Payment
 from app.models.accounting_ext import AuditAction
 from app.services.audit_logger import AuditLogger, serialize_for_audit
+from app.services.activity_logger import ActivityLogger
 from app.services.transaction_manager import transactional_session
 
 
@@ -138,6 +139,20 @@ class BankReconciliationService:
             )
             self.db.add(reconciliation)
             self.db.flush()
+
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.bank_reconciliation.start",
+                user_id=user_id,
+                entity_type="bank_reconciliation",
+                entity_id=str(reconciliation.id),
+                summary=f"Started bank reconciliation {reconciliation.id}",
+                metadata={
+                    "bank_account": bank_account.account_name,
+                    "from_date": from_date.isoformat(),
+                    "to_date": to_date.isoformat(),
+                },
+            )
 
             self.audit_logger.log_create(
                 doctype="bank_reconciliation",
@@ -358,6 +373,16 @@ class BankReconciliationService:
                 remarks=f"Matched to {len(gl_entries)} GL entries",
             )
 
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.bank_reconciliation.match",
+                user_id=user_id,
+                entity_type="bank_reconciliation",
+                entity_id=str(reconciliation_id or ""),
+                summary=f"Matched bank transaction {bank_txn.id}",
+                metadata={"gl_entry_ids": gl_entry_ids},
+            )
+
             return {
                 "bank_transaction_id": bank_txn.id,
                 "matched_gl_entries": gl_entry_ids,
@@ -422,6 +447,16 @@ class BankReconciliationService:
                         continue
             else:
                 unmatched_bank.append(bank_id)
+
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="finance.bank_reconciliation.auto_match",
+            user_id=user_id,
+            entity_type="bank_reconciliation",
+            entity_id=str(reconciliation_id),
+            summary=f"Auto-matched reconciliation {reconciliation_id}",
+            metadata={"matched_count": len(matched), "unmatched_count": len(unmatched_bank)},
+        )
 
         return {
             "matched_count": len(matched),
@@ -496,6 +531,16 @@ class BankReconciliationService:
                     "gl_closing_balance": float(gl_closing),
                     "difference": float(difference),
                 },
+            )
+
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.bank_reconciliation.complete",
+                user_id=user_id,
+                entity_type="bank_reconciliation",
+                entity_id=str(reconciliation.id),
+                summary=f"Completed reconciliation {reconciliation.id}",
+                metadata={"difference": float(difference), "bank_account": reconciliation.bank_account},
             )
 
             return {
@@ -587,6 +632,16 @@ class BankReconciliationService:
                 document_name=bank_account.account_name,
                 new_values={"imported_count": len(imported)},
                 remarks=f"CSV import: {len(imported)} transactions",
+            )
+
+            activity_logger = ActivityLogger(self.db)
+            activity_logger.log(
+                action="finance.bank_reconciliation.import",
+                user_id=user_id,
+                entity_type="bank_transaction",
+                entity_id=bank_account.account_name,
+                summary=f"Imported {len(imported)} bank transactions",
+                metadata={"imported_count": len(imported)},
             )
 
         return {

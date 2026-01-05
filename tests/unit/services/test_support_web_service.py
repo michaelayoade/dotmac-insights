@@ -71,6 +71,7 @@ class MockUnifiedTicket:
     assigned_to_id: Optional[int] = None
     assigned_team: Optional[str] = None
     resolution: Optional[str] = None
+    resolution_type: Optional[str] = None
     resolution_date: Optional[datetime] = None
     due_date: Optional[datetime] = None
     is_deleted: bool = False
@@ -396,8 +397,8 @@ class TestDashboardStats:
             mock_query.filter.return_value = mock_query
             mock_query.group_by.return_value = mock_query
 
-            # Set up scalar returns for different queries
-            mock_query.scalar.side_effect = [10, 2, 5, 3, 7]  # Various counts
+            # Set up scalar returns for different queries (method calls ~10 scalar queries)
+            mock_query.scalar.return_value = 5  # Return 5 for all scalar queries
             mock_query.all.return_value = []
             mock_db_patched.query.return_value = mock_query
 
@@ -459,18 +460,23 @@ class TestBulkOperations:
         with patch.object(service, 'db') as mock_db_patched:
             mock_query = MagicMock()
             mock_query.filter.return_value = mock_query
-            mock_query.update.return_value = 3  # 3 updated
+
+            # Create 3 mock tickets that will be returned by .all()
+            mock_tickets = [
+                MagicMock(id=1, status="open", resolution=None, resolution_type=None),
+                MagicMock(id=2, status="open", resolution=None, resolution_type=None),
+                MagicMock(id=3, status="open", resolution=None, resolution_type=None),
+            ]
+            mock_query.all.return_value = mock_tickets
 
             mock_db_patched.query.return_value = mock_query
 
             result = service.bulk_update_status([1, 2, 3], TicketStatus.RESOLVED)
 
             assert result == 3
-            # Verify update was called with audit fields
-            mock_query.update.assert_called_once()
-            update_dict = mock_query.update.call_args[0][0]
-            assert "updated_by_id" in update_dict
-            assert update_dict["updated_by_id"] == 42
+            # Verify audit fields were set on each ticket
+            for ticket in mock_tickets:
+                assert ticket.updated_by_id == 42
 
     def test_bulk_delete_soft_deletes(self, mock_db):
         """Test that bulk delete performs soft delete."""
@@ -555,6 +561,7 @@ class TestAgentStats:
 
         with patch.object(service, 'db') as mock_db_patched:
             mock_query = MagicMock()
+            mock_query.join.return_value = mock_query
             mock_query.outerjoin.return_value = mock_query
             mock_query.filter.return_value = mock_query
             mock_query.group_by.return_value = mock_query
@@ -562,12 +569,11 @@ class TestAgentStats:
             mock_query.limit.return_value = mock_query
             mock_query.subquery.return_value = MagicMock()
 
-            # Mock agent results
+            # Mock agent results (now uses Party.name and Party.primary_email)
             mock_result = MagicMock()
             mock_result.id = 1
-            mock_result.display_name = "Agent 1"
-            mock_result.email = "agent1@example.com"
-            mock_result.employee_id = 10
+            mock_result.name = "Agent 1"
+            mock_result.primary_email = "agent1@example.com"
             mock_result.open_tickets = 5
             mock_query.all.return_value = [mock_result]
 

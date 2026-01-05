@@ -1,5 +1,5 @@
 {% if scorecards %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="scorecards-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
             <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('employee')" x-cloak>Employee</th>
@@ -46,22 +46,28 @@
 </div>
 
 {% if total_pages > 1 %}
-<div class="flex items-center justify-between mt-6">
-    <p class="text-sm text-gray-500">Showing {{ ((page - 1) * per_page) + 1 }} to {{ [page * per_page, total]|min }} of {{ total }} scorecards</p>
-    <div class="flex gap-2">
-        {% if page > 1 %}
-        <button hx-get="/performance/scorecards?page={{ page - 1 }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Previous</button>
-        {% endif %}
-        {% if page < total_pages %}
-        <button hx-get="/performance/scorecards?page={{ page + 1 }}&status={{ status_filter }}" hx-target="#table-container" hx-push-url="true"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50">Next</button>
-        {% endif %}
-    </div>
-</div>
+{% set pagination = {
+    "page": page,
+    "per_page": per_page,
+    "total": total,
+    "total_pages": total_pages,
+    "has_prev": page > 1,
+    "has_next": page < total_pages,
+    "prev_page": (page - 1) if page > 1 else None,
+    "next_page": (page + 1) if page < total_pages else None,
+    "start_item": ((page - 1) * per_page) + 1,
+    "end_item": [page * per_page, total]|min
+} %}
+{% set base_url = "/performance/scorecards" %}
+{% if status_filter %}
+{% set base_url = base_url ~ "?status=" ~ status_filter %}
+{% endif %}
+{% with pagination=pagination, base_url=base_url, htmx_target="#table-container" %}
+{% include "components/ui/pagination.html" %}
+{% endwith %}
 {% endif %}
 {% else %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="scorecards-empty-state">
     <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No scorecards found</h3>
     <p class="text-sm text-gray-500">{% if status_filter %}Try adjusting your filters.{% else %}Employee scorecards will appear here when generated.{% endif %}</p>
 </div>

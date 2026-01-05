@@ -11,7 +11,7 @@
             <a href="/support/channels/new" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
                 New Channel
             </a>
-            <a href="/settings/support" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 font-medium ring-1 ring-gray-200">
+            <a href="/settings/support" class="inline-flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-surface-50 font-medium ring-1 ring-gray-200">
                 Settings
             </a>
         </div>
@@ -45,7 +45,7 @@
                         <td class="px-6 py-4 text-right space-x-3">
                             <a href="/support/channels/{{ channel.id }}/edit" class="text-xs font-medium text-gray-600 hover:text-gray-900">Edit</a>
                             <form hx-post="/support/channels/{{ channel.id }}/toggle" hx-swap="none">
-                                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <button
                                     type="submit"
                                     class="text-xs font-medium px-3 py-1.5 rounded-lg {{ 'bg-gray-100 text-gray-700 hover:bg-gray-200' if channel.is_active else 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' }}"

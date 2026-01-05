@@ -23,6 +23,7 @@ MODULE_CONFIG = ModuleConfig(
     group="Operations",
     order=65,
     scopes=["assets:read"],
+    enabled=False,
     prefixes=["/assets"],
 )
 

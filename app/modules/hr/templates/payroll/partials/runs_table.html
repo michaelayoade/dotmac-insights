@@ -1,6 +1,6 @@
 {# Payroll runs table partial #}
 {% if runs %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" data-testid="runs-table">
     <table class="min-w-full divide-y divide-gray-100">
         <thead><tr class="bg-surface-50">
             <th class="py-3.5 pl-6 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500" x-show="isVisible('entry')" x-cloak>Payroll Entry</th>
@@ -41,7 +41,7 @@
     </table>
 </div>
 {% else %}
-<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center">
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 py-16 px-6 text-center" data-testid="runs-empty-state">
     <h3 class="text-lg font-display font-semibold text-gray-900 mb-2">No payroll runs found</h3>
     <p class="text-sm text-gray-500">Payroll runs are synced from ERPNext.</p>
 </div>

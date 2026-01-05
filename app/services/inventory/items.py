@@ -16,6 +16,7 @@ from app.models.inventory import StockLedgerEntry
 from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     ItemFilters,
@@ -101,7 +102,12 @@ class ItemService:
         # Pagination
         query = query.offset(pagination.offset).limit(pagination.limit)
 
-        return PaginatedResult(items=query.all(), total=total)
+        return PaginatedResult(
+            items=query.all(),
+            total=total,
+            offset=pagination.offset,
+            limit=pagination.limit,
+        )
 
     def get_item(self, item_id: int) -> Item:
         """Get an item by ID.
@@ -225,6 +231,7 @@ class ItemService:
         )
         self.db.add(item)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(item)
 
         return item
 
@@ -281,6 +288,7 @@ class ItemService:
 
         item.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(item)
         return item
 
     def delete_item(self, item_id: int) -> None:
@@ -327,6 +335,7 @@ class ItemService:
         item.status = "inactive"
         item.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(item)
         return item
 
     def activate_item(self, item_id: int) -> Item:
@@ -345,4 +354,5 @@ class ItemService:
         item.status = "active"
         item.updated_at = datetime.utcnow()
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(item)
         return item

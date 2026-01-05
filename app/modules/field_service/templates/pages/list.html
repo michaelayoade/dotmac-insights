@@ -85,7 +85,7 @@
                 hx-get="/field-service/table"
                 hx-target="#orders-table-container"
                 hx-trigger="input changed delay:300ms, search"
-                hx-include="[name='status'], [name='priority'], [name='type']"
+                hx-include="[name='status'], [name='priority'], [name='type'], [name='sort'], [name='dir']"
                 hx-push-url="true"
                 hx-indicator="#search-spinner"
                 data-testid="orders-search"
@@ -100,6 +100,9 @@
 
         <!-- Filters -->
         <div class="flex gap-3 flex-wrap">
+            <div id="orders-filter-state">
+                {% include "modules/field_service/templates/partials/filter_state_inputs.html" %}
+            </div>
             <!-- Status filter -->
             <div class="relative" x-data="{ open: false }">
                 <button
@@ -127,7 +130,7 @@
                         class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_status else 'text-gray-700 hover:bg-surface-50' }}"
                         hx-get="/field-service/table"
                         hx-target="#orders-table-container"
-                        hx-include="[name='q'], [name='priority'], [name='type']"
+                        hx-include="[name='q'], [name='priority'], [name='type'], [name='sort'], [name='dir']"
                         hx-push-url="true"
                         @click="open = false"
                     >All Statuses</a>
@@ -137,7 +140,7 @@
                         class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if current_status == opt.value else 'text-gray-700 hover:bg-surface-50' }}"
                         hx-get="/field-service/table?status={{ opt.value }}"
                         hx-target="#orders-table-container"
-                        hx-include="[name='q'], [name='priority'], [name='type']"
+                        hx-include="[name='q'], [name='priority'], [name='type'], [name='sort'], [name='dir']"
                         hx-push-url="true"
                         @click="open = false"
                     >{{ opt.label }}</a>
@@ -172,7 +175,7 @@
                         class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_priority else 'text-gray-700 hover:bg-surface-50' }}"
                         hx-get="/field-service/table"
                         hx-target="#orders-table-container"
-                        hx-include="[name='q'], [name='status'], [name='type']"
+                        hx-include="[name='q'], [name='status'], [name='type'], [name='sort'], [name='dir']"
                         hx-push-url="true"
                         @click="open = false"
                     >All Priorities</a>
@@ -182,7 +185,7 @@
                         class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if current_priority == opt.value else 'text-gray-700 hover:bg-surface-50' }}"
                         hx-get="/field-service/table?priority={{ opt.value }}"
                         hx-target="#orders-table-container"
-                        hx-include="[name='q'], [name='status'], [name='type']"
+                        hx-include="[name='q'], [name='status'], [name='type'], [name='sort'], [name='dir']"
                         hx-push-url="true"
                         @click="open = false"
                     >{{ opt.label }}</a>
@@ -217,7 +220,7 @@
                         class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if not current_type else 'text-gray-700 hover:bg-surface-50' }}"
                         hx-get="/field-service/table"
                         hx-target="#orders-table-container"
-                        hx-include="[name='q'], [name='status'], [name='priority']"
+                        hx-include="[name='q'], [name='status'], [name='priority'], [name='sort'], [name='dir']"
                         hx-push-url="true"
                         @click="open = false"
                     >All Types</a>
@@ -227,7 +230,7 @@
                         class="block px-3 py-2 text-sm rounded-lg {{ 'text-primary-700 bg-primary-50 font-medium' if current_type == opt.value else 'text-gray-700 hover:bg-surface-50' }}"
                         hx-get="/field-service/table?type={{ opt.value }}"
                         hx-target="#orders-table-container"
-                        hx-include="[name='q'], [name='status'], [name='priority']"
+                        hx-include="[name='q'], [name='status'], [name='priority'], [name='sort'], [name='dir']"
                         hx-push-url="true"
                         @click="open = false"
                     >{{ opt.label }}</a>
@@ -238,90 +241,9 @@
     </div>
 
     <!-- Active filters display -->
-    {% if current_status or current_priority or current_type or search_query %}
-    <div class="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-2">
-        <span class="text-xs text-gray-500 font-body">Active filters:</span>
-        {% if search_query %}
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
-            <span>"{{ search_query }}"</span>
-            <button
-                type="button"
-                class="text-gray-400 hover:text-gray-600"
-                hx-get="/field-service/table"
-                hx-target="#orders-table-container"
-                hx-include="[name='status'], [name='priority'], [name='type']"
-                hx-push-url="true"
-                onclick="document.querySelector('[name=q]').value = ''"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </span>
-        {% endif %}
-        {% if current_status %}
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
-            <span>Status: {{ current_status | replace('_', ' ') | title }}</span>
-            <button
-                type="button"
-                class="text-gray-400 hover:text-gray-600"
-                hx-get="/field-service/table"
-                hx-target="#orders-table-container"
-                hx-include="[name='q'], [name='priority'], [name='type']"
-                hx-push-url="true"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </span>
-        {% endif %}
-        {% if current_priority %}
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
-            <span>Priority: {{ current_priority | title }}</span>
-            <button
-                type="button"
-                class="text-gray-400 hover:text-gray-600"
-                hx-get="/field-service/table"
-                hx-target="#orders-table-container"
-                hx-include="[name='q'], [name='status'], [name='type']"
-                hx-push-url="true"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </span>
-        {% endif %}
-        {% if current_type %}
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 text-sm text-gray-700">
-            <span>Type: {{ current_type | title }}</span>
-            <button
-                type="button"
-                class="text-gray-400 hover:text-gray-600"
-                hx-get="/field-service/table"
-                hx-target="#orders-table-container"
-                hx-include="[name='q'], [name='status'], [name='priority']"
-                hx-push-url="true"
-            >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </span>
-        {% endif %}
-        <button
-            type="button"
-            class="text-xs text-primary-600 hover:text-primary-500 font-medium transition-colors"
-            hx-get="/field-service/table"
-            hx-target="#orders-table-container"
-            hx-push-url="/field-service"
-            onclick="document.querySelector('[name=q]').value = ''"
-        >
-            Clear all
-        </button>
+    <div id="orders-active-filters">
+        {% include "modules/field_service/templates/partials/active_filters.html" %}
     </div>
-    {% endif %}
 </div>
 
 <!-- Service Orders Table -->
@@ -336,7 +258,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900">Service Orders Map</h2>
-                    <p class="text-sm text-gray-500">{{ orders | length }} orders with locations</p>
+                    <p class="text-sm text-gray-500"><span id="field-service-map-count">{{ orders_with_coords | length }}</span> orders with locations</p>
                 </div>
                 <div class="flex items-center gap-4 text-xs text-gray-500">
                     <span class="flex items-center gap-1">
@@ -354,6 +276,7 @@
                 </div>
             </div>
         </div>
+        <div id="field-service-map-data" class="hidden" data-orders='{{ orders_with_coords | tojson | safe }}'></div>
         <div id="field-service-map" class="h-[600px]"></div>
     </div>
 </div>
@@ -363,10 +286,21 @@
 <!-- Leaflet JS for Map View -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
-// Field Service Map Data from Server
-const fieldServiceOrders = {{ orders | tojson | safe }};
-
 let fieldServiceMap = null;
+let fieldServiceMarkers = null;
+
+function getFieldServiceOrders() {
+    const dataNode = document.getElementById('field-service-map-data');
+    if (!dataNode) {
+        return [];
+    }
+    try {
+        const raw = dataNode.getAttribute('data-orders') || '[]';
+        return JSON.parse(raw);
+    } catch (error) {
+        return [];
+    }
+}
 
 function initFieldServiceMap() {
     const mapContainer = document.getElementById('field-service-map');
@@ -393,9 +327,18 @@ function initFieldServiceMap() {
         'low': '#6b7280'
     };
 
-    // Add markers for each order
+    fieldServiceMarkers = L.layerGroup().addTo(fieldServiceMap);
+    updateFieldServiceMapMarkers();
+}
+
+function updateFieldServiceMapMarkers() {
+    if (!fieldServiceMap || !fieldServiceMarkers) return;
+
+    fieldServiceMarkers.clearLayers();
+
     const bounds = [];
-    fieldServiceOrders.forEach(order => {
+    const orders = getFieldServiceOrders();
+    orders.forEach(order => {
         // Try to get coordinates from the order
         const lat = order.latitude || order.service_latitude;
         const lng = order.longitude || order.service_longitude;
@@ -410,7 +353,7 @@ function initFieldServiceMap() {
                 weight: 2,
                 opacity: 1,
                 fillOpacity: 0.8
-            }).addTo(fieldServiceMap);
+            }).addTo(fieldServiceMarkers);
 
             // Popup content
             const statusBadge = order.status ? `<span class="inline-block px-2 py-0.5 text-xs rounded-full bg-gray-100">${order.status.replace('_', ' ')}</span>` : '';
@@ -441,6 +384,12 @@ function initFieldServiceMap() {
         fieldServiceMap.invalidateSize();
     }, 100);
 }
+
+document.body.addEventListener('htmx:afterSwap', (event) => {
+    if (event.target && event.target.id === 'orders-table-container') {
+        updateFieldServiceMapMarkers();
+    }
+});
 </script>
 {% endblock %}
 {% endblock %}

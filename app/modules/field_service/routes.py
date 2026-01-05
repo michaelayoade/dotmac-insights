@@ -12,7 +12,6 @@ from datetime import datetime, date
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import func, or_, true
 
 from app.web.dependencies import SessionUser, CSRFToken, CSRFProtect, DB, require_scope
 from app.web.context import (
@@ -23,12 +22,25 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.field_service import (
-    ServiceOrder, ServiceOrderType, ServiceOrderStatus, ServiceOrderPriority,
-    FieldTeam, FieldTeamMember, ServiceZone, TechnicianSkill
+    ServiceOrderType, ServiceOrderStatus, ServiceOrderPriority,
 )
-from app.models.party import CustomerAccount, Party
-from app.models.employee import Employee, EmploymentStatus
 from app.core.security import is_htmx_request, htmx_toast, set_flash
+from app.services.field_service import (
+    ServiceOrderService,
+    TeamService,
+    FieldServiceLookupService,
+    ServiceOrderFilters,
+    ServiceOrderCreateData,
+    ServiceOrderUpdateData,
+    TeamFilters,
+    TeamCreateData,
+    TeamUpdateData,
+    TeamMemberData,
+    TechnicianFilters,
+    TechnicianSkillData,
+)
+from app.services.types import PaginationParams
+from app.services.errors import NotFoundError, ValidationError
 
 # Permission dependencies
 RequireFieldServiceRead = Depends(require_scope("field_service:read"))
@@ -66,6 +78,13 @@ def _form_enum(enum_cls: type, form: Any, key: str, default: Any) -> Any:
         return default
 
 
+def _get_order_form_options(lookup: FieldServiceLookupService):
+    customers = lookup.list_customers(limit=100)
+    technicians = lookup.list_employees(limit=100, active_only=False)
+    teams = lookup.list_teams(active_only=True)
+    return customers, technicians, teams
+
+
 def get_status_options():
     """Get status options for select dropdown."""
     return [
@@ -90,19 +109,6 @@ def get_type_options():
     ]
 
 
-def generate_order_number(db) -> str:
-    """Generate a unique order number."""
-    today = date.today()
-    prefix = f"SO-{today.strftime('%Y%m%d')}"
-
-    # Count existing orders today
-    count = db.query(ServiceOrder).filter(
-        ServiceOrder.order_number.like(f"{prefix}%")
-    ).count()
-
-    return f"{prefix}-{count + 1:04d}"
-
-
 # =============================================================================
 # DASHBOARD
 # =============================================================================
@@ -117,87 +123,54 @@ async def field_service_dashboard(
 ):
     """Field Service Dashboard with overview stats."""
     today = date.today()
+    order_service = ServiceOrderService(db)
+    team_service = TeamService(db)
 
-    # Order Stats
-    total_orders = db.query(func.count(ServiceOrder.id)).scalar() or 0
+    # Get order stats from service
+    stats = order_service.get_stats()
 
-    today_scheduled = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.scheduled_date == today
-    ).scalar() or 0
-
-    in_progress = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.status.in_([
-            ServiceOrderStatus.EN_ROUTE,
-            ServiceOrderStatus.ON_SITE,
-            ServiceOrderStatus.IN_PROGRESS
-        ])
-    ).scalar() or 0
-
-    pending_dispatch = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.status.in_([ServiceOrderStatus.DRAFT, ServiceOrderStatus.SCHEDULED])
-    ).scalar() or 0
-
-    completed_today = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.status == ServiceOrderStatus.COMPLETED,
-        func.date(ServiceOrder.actual_end_time) == today
-    ).scalar() or 0
-
-    # Orders by status
-    status_counts = db.query(
-        ServiceOrder.status,
-        func.count(ServiceOrder.id).label("count")
-    ).group_by(ServiceOrder.status).all()
-
+    # Orders by status distribution
     status_distribution = [
-        {"status": s[0].value, "count": s[1]}
-        for s in status_counts
+        {"status": status, "count": count}
+        for status, count in stats.by_status.items()
     ]
 
-    # Orders by priority
-    priority_counts = db.query(
-        ServiceOrder.priority,
-        func.count(ServiceOrder.id).label("count")
-    ).group_by(ServiceOrder.priority).all()
-
+    # Orders by priority distribution
     priority_distribution = [
-        {"priority": p[0].value, "count": p[1]}
-        for p in priority_counts
+        {"priority": priority, "count": count}
+        for priority, count in stats.by_priority.items()
     ]
 
     # Today's schedule
-    todays_orders = db.query(ServiceOrder).filter(
-        ServiceOrder.scheduled_date == today
-    ).order_by(ServiceOrder.scheduled_start_time).limit(10).all()
+    today_filters = ServiceOrderFilters(
+        scheduled_date_from=today,
+        scheduled_date_to=today,
+    )
+    today_result = order_service.list_orders(today_filters, PaginationParams(limit=10))
+    todays_orders = today_result.items
 
-    # Active teams
-    teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
+    # Active teams with stats
+    team_filters = TeamFilters(is_active=True)
+    teams_result = team_service.list_teams(team_filters)
     team_stats = []
-    for team in teams:
-        member_count = db.query(func.count(FieldTeamMember.id)).filter(
-            FieldTeamMember.team_id == team.id,
-            FieldTeamMember.is_active == True
-        ).scalar() or 0
-        active_orders = db.query(func.count(ServiceOrder.id)).filter(
-            ServiceOrder.assigned_team_id == team.id,
-            ServiceOrder.status.in_([
-                ServiceOrderStatus.SCHEDULED,
-                ServiceOrderStatus.DISPATCHED,
-                ServiceOrderStatus.EN_ROUTE,
-                ServiceOrderStatus.ON_SITE,
-                ServiceOrderStatus.IN_PROGRESS
-            ])
-        ).scalar() or 0
+    for team in teams_result.items:
+        team_counts = team_service.get_team_stats(team.id)
         team_stats.append({
             "id": team.id,
             "name": team.name,
-            "members": member_count,
-            "active_orders": active_orders
+            "members": team_service.count_team_members(team.id),
+            "active_orders": team_counts["active_orders"],
         })
 
     # Recent completions
-    recent_completions = db.query(ServiceOrder).filter(
-        ServiceOrder.status == ServiceOrderStatus.COMPLETED
-    ).order_by(ServiceOrder.actual_end_time.desc()).limit(5).all()
+    completed_filters = ServiceOrderFilters(status="completed")
+    completed_result = order_service.list_orders(completed_filters, PaginationParams(limit=5))
+    recent_completions = completed_result.items
+
+    # Calculate today counts
+    today_scheduled = len(todays_orders)
+    in_progress = stats.by_status.get("en_route", 0) + stats.by_status.get("on_site", 0) + stats.by_status.get("in_progress", 0)
+    pending_dispatch = stats.by_status.get("draft", 0) + stats.by_status.get("scheduled", 0)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -208,11 +181,11 @@ async def field_service_dashboard(
     ])
 
     context["stats"] = {
-        "total_orders": total_orders,
+        "total_orders": stats.total,
         "today_scheduled": today_scheduled,
         "in_progress": in_progress,
         "pending_dispatch": pending_dispatch,
-        "completed_today": completed_today,
+        "completed_today": stats.completed_today,
     }
     context["status_distribution"] = status_distribution
     context["priority_distribution"] = priority_distribution
@@ -242,42 +215,33 @@ async def service_orders_list(
     dir: str = Query("desc", description="Sort direction"),
 ):
     """Service orders list page."""
-    query = db.query(ServiceOrder)
+    service = ServiceOrderService(db)
 
-    # Search
-    if q:
-        search_filter = or_(
-            ServiceOrder.order_number.ilike(f"%{q}%"),
-            ServiceOrder.title.ilike(f"%{q}%"),
-            ServiceOrder.service_address.ilike(f"%{q}%"),
-            ServiceOrder.city.ilike(f"%{q}%"),
-        )
-        query = query.filter(search_filter)
-
-    # Filters
-    if status:
-        query = query.filter(ServiceOrder.status == status)
-    if priority:
-        query = query.filter(ServiceOrder.priority == priority)
-    if type:
-        query = query.filter(ServiceOrder.order_type == type)
-
-    # Count total
-    total = query.count()
-
-    # Sort
-    sort_column = getattr(ServiceOrder, sort, ServiceOrder.scheduled_date)
-    if dir == "desc":
-        sort_column = sort_column.desc()
-    query = query.order_by(sort_column)
+    # Build filters
+    filters = ServiceOrderFilters(
+        search=q,
+        status=status,
+        priority=priority,
+        order_type=type,
+        sort_by=sort,
+        sort_dir=dir,
+    )
 
     # Paginate
     offset = (page - 1) * per_page
-    orders = query.offset(offset).limit(per_page).all()
+    pagination = PaginationParams(limit=per_page, offset=offset)
+    result = service.list_orders(filters, pagination)
+    orders_with_coords = [
+        order
+        for order in result.items
+        if getattr(order, "latitude", None)
+        and getattr(order, "longitude", None)
+    ]
 
     # Build context
     context = get_base_context(request, response, user, csrf_token)
-    context["orders"] = orders
+    context["orders"] = result.items
+    context["orders_with_coords"] = orders_with_coords
     context["search_query"] = q or ""
     context["current_status"] = status
     context["current_priority"] = priority
@@ -287,7 +251,7 @@ async def service_orders_list(
     context["type_options"] = get_type_options()
     context["sort_key"] = sort
     context["sort_dir"] = dir
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     # HTMX partial or full page
     if is_htmx_request(request):
@@ -338,15 +302,8 @@ async def service_order_new(
     db: DB,
 ):
     """New service order form page."""
-    customers = (
-        db.query(CustomerAccount)
-        .join(Party, CustomerAccount.party_id == Party.id)
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
-    technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
-    teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
+    lookup = FieldServiceLookupService(db)
+    customers, technicians, teams = _get_order_form_options(lookup)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -395,15 +352,8 @@ async def service_order_create(
         errors["customer_account_id"] = "Customer is required"
 
     if errors:
-        customers = (
-            db.query(CustomerAccount)
-            .join(Party, CustomerAccount.party_id == Party.id)
-            .order_by(Party.name)
-            .limit(100)
-            .all()
-        )
-        technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
-        teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
+        lookup = FieldServiceLookupService(db)
+        customers, technicians, teams = _get_order_form_options(lookup)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -435,41 +385,59 @@ async def service_order_create(
         except ValueError:
             pass
 
-    # Create service order
-    order = ServiceOrder(
-        order_number=generate_order_number(db),
-        title=title,
-        description=_form_str(form, "description") or None,
-        order_type=_form_enum(ServiceOrderType, form, "order_type", ServiceOrderType.REPAIR),
-        status=_form_enum(ServiceOrderStatus, form, "status", ServiceOrderStatus.DRAFT),
-        priority=_form_enum(ServiceOrderPriority, form, "priority", ServiceOrderPriority.MEDIUM),
+    # Build create data
+    order_type = _form_enum(ServiceOrderType, form, "order_type", ServiceOrderType.REPAIR)
+    priority = _form_enum(ServiceOrderPriority, form, "priority", ServiceOrderPriority.MEDIUM)
+
+    data = ServiceOrderCreateData(
         customer_account_id=customer_account_id,
+        order_type=order_type.value,
+        title=title,
         service_address=service_address,
+        scheduled_date=scheduled_date,
+        description=_form_str(form, "description") or None,
+        priority=priority.value,
         city=_form_str(form, "city") or None,
         state=_form_str(form, "state") or None,
         postal_code=_form_str(form, "postal_code") or None,
-        scheduled_date=scheduled_date,
         customer_contact_name=_form_str(form, "customer_contact_name") or None,
         customer_contact_phone=_form_str(form, "customer_contact_phone") or None,
-        created_by=user.email if user else None,
+        assigned_technician_id=_form_int(form, "assigned_technician_id"),
+        assigned_team_id=_form_int(form, "assigned_team_id"),
     )
 
-    # Assign technician if provided
-    technician_id = _form_int(form, "assigned_technician_id")
-    if technician_id is not None:
-        order.assigned_technician_id = technician_id
+    service = ServiceOrderService(db)
+    try:
+        order = service.create_order(data)
+        db.commit()
+        db.refresh(order)
+        set_flash(response, f"Service order '{order.order_number}' created successfully.", "success")
+        return RedirectResponse(url=f"/field-service/{order.id}", status_code=303)
+    except ValidationError as e:
+        errors["general"] = str(e)
+        lookup = FieldServiceLookupService(db)
+        customers, technicians, teams = _get_order_form_options(lookup)
 
-    # Assign team if provided
-    team_id = _form_int(form, "assigned_team_id")
-    if team_id is not None:
-        order.assigned_team_id = team_id
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Service Order"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Field Service", "href": "/field-service"},
+            {"label": "New Order"},
+        ])
+        context["order"] = None
+        context["customers"] = customers
+        context["technicians"] = technicians
+        context["teams"] = teams
+        context["status_options"] = get_status_options()
+        context["priority_options"] = get_priority_options()
+        context["type_options"] = get_type_options()
+        context["errors"] = errors
+        context["form_data"] = dict(form)
 
-    db.add(order)
-    db.commit()
-    db.refresh(order)
-
-    set_flash(response, f"Service order '{order.order_number}' created successfully.", "success")
-    return RedirectResponse(url=f"/field-service/{order.id}", status_code=303)
+        template = templates.get_template("modules/field_service/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.get("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceRead])
@@ -482,44 +450,25 @@ async def service_order_detail(
     order_id: int,
 ):
     """Service order detail page."""
-    order = db.query(ServiceOrder).filter(
-        ServiceOrder.id == order_id,
-    ).first()
+    service = ServiceOrderService(db)
 
-    if not order:
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Service order not found")
 
-    # Load customer details
-    customer = None
-    if order.customer_account_id:
-        customer = (
-            db.query(CustomerAccount)
-            .join(Party, CustomerAccount.party_id == Party.id)
-            .filter(CustomerAccount.id == order.customer_account_id)
-            .first()
-        )
+    lookup = FieldServiceLookupService(db)
 
-    # Load technician (employee) details
-    technician = None
-    if order.assigned_technician_id:
-        technician = db.query(Employee).filter(Employee.id == order.assigned_technician_id).first()
+    customer = order.customer
+    technician = order.technician
+    team = order.team
 
-    # Load team details
-    team = None
-    if order.assigned_team_id:
-        team = db.query(FieldTeam).filter(FieldTeam.id == order.assigned_team_id).first()
-
-    # Load related project
-    from app.models.project import Project
-    related_project = None
-    if order.project_id:
-        related_project = db.query(Project).filter(Project.id == order.project_id).first()
-
-    # Load related ticket
-    from app.models.unified_ticket import UnifiedTicket
-    related_ticket = None
-    if order.ticket_id:
-        related_ticket = db.query(UnifiedTicket).filter(UnifiedTicket.id == order.ticket_id).first()
+    related_project = (
+        lookup.get_project(order.project_id) if order.project_id else None
+    )
+    related_ticket = (
+        lookup.get_unified_ticket(order.ticket_id) if order.ticket_id else None
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -550,22 +499,15 @@ async def service_order_edit(
     order_id: int,
 ):
     """Service order edit form page."""
-    order = db.query(ServiceOrder).filter(
-        ServiceOrder.id == order_id,
-    ).first()
+    service = ServiceOrderService(db)
 
-    if not order:
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Service order not found")
 
-    customers = (
-        db.query(CustomerAccount)
-        .join(Party, CustomerAccount.party_id == Party.id)
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
-    technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
-    teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
+    lookup = FieldServiceLookupService(db)
+    customers, technicians, teams = _get_order_form_options(lookup)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -600,11 +542,11 @@ async def service_order_update(
     order_id: int,
 ):
     """Update a service order."""
-    order = db.query(ServiceOrder).filter(
-        ServiceOrder.id == order_id,
-    ).first()
+    service = ServiceOrderService(db)
 
-    if not order:
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Service order not found")
 
     form = await request.form()
@@ -620,15 +562,8 @@ async def service_order_update(
         errors["service_address"] = "Service address is required"
 
     if errors:
-        customers = (
-            db.query(CustomerAccount)
-            .join(Party, CustomerAccount.party_id == Party.id)
-            .order_by(Party.name)
-            .limit(100)
-            .all()
-        )
-        technicians = db.query(Employee).filter(Employee.is_deleted == False).limit(100).all()
-        teams = db.query(FieldTeam).filter(FieldTeam.is_active == True).all()
+        lookup = FieldServiceLookupService(db)
+        customers, technicians, teams = _get_order_form_options(lookup)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -652,38 +587,64 @@ async def service_order_update(
         return HTMLResponse(template.render(context), status_code=422)
 
     # Parse scheduled date
+    scheduled_date = None
     scheduled_date_str = _form_str(form, "scheduled_date")
     if scheduled_date_str:
         try:
-            order.scheduled_date = datetime.strptime(scheduled_date_str, "%Y-%m-%d").date()
+            scheduled_date = datetime.strptime(scheduled_date_str, "%Y-%m-%d").date()
         except ValueError:
             pass
 
-    # Update order
-    order.title = title
-    order.description = _form_str(form, "description") or None
-    order.order_type = _form_enum(ServiceOrderType, form, "order_type", order.order_type)
-    order.status = _form_enum(ServiceOrderStatus, form, "status", order.status)
-    order.priority = _form_enum(ServiceOrderPriority, form, "priority", order.priority)
-    order.service_address = service_address
-    order.city = _form_str(form, "city") or None
-    order.state = _form_str(form, "state") or None
-    order.postal_code = _form_str(form, "postal_code") or None
-    order.customer_contact_name = _form_str(form, "customer_contact_name") or None
-    order.customer_contact_phone = _form_str(form, "customer_contact_phone") or None
+    # Build update data
+    order_type = _form_enum(ServiceOrderType, form, "order_type", order.order_type)
+    priority = _form_enum(ServiceOrderPriority, form, "priority", order.priority)
 
-    # Assign technician
-    technician_id = _form_int(form, "assigned_technician_id")
-    order.assigned_technician_id = technician_id
+    data = ServiceOrderUpdateData(
+        title=title,
+        description=_form_str(form, "description") or None,
+        order_type=order_type.value,
+        priority=priority.value,
+        service_address=service_address,
+        city=_form_str(form, "city") or None,
+        state=_form_str(form, "state") or None,
+        postal_code=_form_str(form, "postal_code") or None,
+        scheduled_date=scheduled_date,
+        customer_contact_name=_form_str(form, "customer_contact_name") or None,
+        customer_contact_phone=_form_str(form, "customer_contact_phone") or None,
+        assigned_technician_id=_form_int(form, "assigned_technician_id"),
+        assigned_team_id=_form_int(form, "assigned_team_id"),
+    )
 
-    # Assign team
-    team_id = _form_int(form, "assigned_team_id")
-    order.assigned_team_id = team_id
+    try:
+        order = service.update_order(order_id, data)
+        db.commit()
+        set_flash(response, f"Service order '{order.order_number}' updated successfully.", "success")
+        return RedirectResponse(url=f"/field-service/{order.id}", status_code=303)
+    except ValidationError as e:
+        errors["general"] = str(e)
+        lookup = FieldServiceLookupService(db)
+        customers, technicians, teams = _get_order_form_options(lookup)
 
-    db.commit()
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {order.order_number}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Field Service", "href": "/field-service"},
+            {"label": order.order_number, "href": f"/field-service/{order.id}"},
+            {"label": "Edit"},
+        ])
+        context["order"] = order
+        context["customers"] = customers
+        context["technicians"] = technicians
+        context["teams"] = teams
+        context["status_options"] = get_status_options()
+        context["priority_options"] = get_priority_options()
+        context["type_options"] = get_type_options()
+        context["errors"] = errors
 
-    set_flash(response, f"Service order '{order.order_number}' updated successfully.", "success")
-    return RedirectResponse(url=f"/field-service/{order.id}", status_code=303)
+        template = templates.get_template("modules/field_service/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
 
 
 @router.delete("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
@@ -696,16 +657,15 @@ async def service_order_delete(
     order_id: int,
 ):
     """Delete a service order."""
-    order = db.query(ServiceOrder).filter(
-        ServiceOrder.id == order_id,
-    ).first()
+    service = ServiceOrderService(db)
 
-    if not order:
+    try:
+        order = service.get_order(order_id)
+        order_number = order.order_number
+        service.cancel(order_id, "Deleted via web UI")
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Service order not found")
-
-    order_number = order.order_number
-    db.delete(order)
-    db.commit()
 
     if is_htmx_request(request):
         htmx_toast(response, f"Service order '{order_number}' deleted.", "success")
@@ -725,11 +685,11 @@ async def service_order_row(
     order_id: int,
 ):
     """Single service order row partial for HTMX updates."""
-    order = db.query(ServiceOrder).filter(
-        ServiceOrder.id == order_id,
-    ).first()
+    service = ServiceOrderService(db)
 
-    if not order:
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
         return HTMLResponse("", status_code=404)
 
     context = get_base_context(request, response, user, csrf_token)
@@ -755,31 +715,24 @@ async def teams_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Field teams list page."""
-    query = db.query(FieldTeam)
+    service = TeamService(db)
+    filters = TeamFilters(search=q)
+    pagination = PaginationParams(page=page, limit=per_page)
 
-    if q:
-        query = query.filter(FieldTeam.name.ilike(f"%{q}%"))
-
-    total = query.count()
-    offset = (page - 1) * per_page
-    teams = query.order_by(FieldTeam.name).offset(offset).limit(per_page).all()
+    result = service.list_teams(filters, pagination)
 
     # Get member counts for each team
     teams_with_counts = []
-    for team in teams:
-        member_count = db.query(func.count(FieldTeamMember.id)).filter(
-            FieldTeamMember.team_id == team.id,
-            FieldTeamMember.is_active == True
-        ).scalar() or 0
+    for team in result.items:
         teams_with_counts.append({
             "team": team,
-            "member_count": member_count
+            "member_count": service.count_team_members(team.id),
         })
 
     context = get_base_context(request, response, user, csrf_token)
     context["teams"] = teams_with_counts
     context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/field_service/templates/partials/teams_table.html")
@@ -806,11 +759,9 @@ async def team_new(
     db: DB,
 ):
     """New team form page."""
-    supervisors = db.query(Employee).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE
-    ).limit(100).all()
-    zones = db.query(ServiceZone).filter(ServiceZone.is_active == True).all()
+    lookup = FieldServiceLookupService(db)
+    supervisors = lookup.list_employees(limit=100, active_only=True)
+    zones = lookup.list_zones(active_only=True)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -848,11 +799,9 @@ async def team_create(
         errors["name"] = "Team name is required"
 
     if errors:
-        supervisors = db.query(Employee).filter(
-            Employee.is_deleted == False,
-            Employee.status == EmploymentStatus.ACTIVE
-        ).limit(100).all()
-        zones = db.query(ServiceZone).filter(ServiceZone.is_active == True).all()
+        lookup = FieldServiceLookupService(db)
+        supervisors = lookup.list_employees(limit=100, active_only=True)
+        zones = lookup.list_zones(active_only=True)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -872,22 +821,19 @@ async def team_create(
         template = templates.get_template("modules/field_service/templates/pages/team_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    team = FieldTeam(
+    service = TeamService(db)
+    data = TeamCreateData(
         name=name,
         description=_form_str(form, "description") or None,
         contact_phone=_form_str(form, "contact_phone") or None,
         contact_email=_form_str(form, "contact_email") or None,
         max_daily_orders=_form_int(form, "max_daily_orders", 10) or 10,
-        is_active=form.get("is_active") == "on",
+        supervisor_id=_form_int(form, "supervisor_id"),
     )
 
-    supervisor_id = _form_int(form, "supervisor_id")
-    if supervisor_id is not None:
-        team.supervisor_id = supervisor_id
-
-    db.add(team)
+    team = service.create_team(data)
+    team.is_active = form.get("is_active") == "on"
     db.commit()
-    db.refresh(team)
 
     set_flash(response, f"Team '{team.name}' created successfully.", "success")
     return RedirectResponse(url=f"/field-service/teams/{team.id}", status_code=303)
@@ -903,34 +849,17 @@ async def team_detail(
     team_id: int,
 ):
     """Team detail page."""
-    team = db.query(FieldTeam).filter(FieldTeam.id == team_id).first()
-    if not team:
+    service = TeamService(db)
+    try:
+        team = service.get_team(team_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    # Get members with employee info
-    members = db.query(FieldTeamMember).filter(
-        FieldTeamMember.team_id == team_id
-    ).all()
+    members = service.list_team_members(team_id)
+    available_employees = service.list_available_employees(team_id)
 
-    # Get available employees to add
-    member_employee_ids = [m.employee_id for m in members]
-    available_employees = db.query(Employee).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE,
-        ~Employee.id.in_(member_employee_ids) if member_employee_ids else true()
-    ).limit(50).all()
-
-    # Get team's active orders
-    active_orders = db.query(ServiceOrder).filter(
-        ServiceOrder.assigned_team_id == team_id,
-        ServiceOrder.status.in_([
-            ServiceOrderStatus.SCHEDULED,
-            ServiceOrderStatus.DISPATCHED,
-            ServiceOrderStatus.EN_ROUTE,
-            ServiceOrderStatus.ON_SITE,
-            ServiceOrderStatus.IN_PROGRESS
-        ])
-    ).order_by(ServiceOrder.scheduled_date).limit(10).all()
+    order_service = ServiceOrderService(db)
+    active_orders = order_service.list_active_orders_for_team(team_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -960,15 +889,15 @@ async def team_edit(
     team_id: int,
 ):
     """Team edit form page."""
-    team = db.query(FieldTeam).filter(FieldTeam.id == team_id).first()
-    if not team:
+    service = TeamService(db)
+    try:
+        team = service.get_team(team_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    supervisors = db.query(Employee).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE
-    ).limit(100).all()
-    zones = db.query(ServiceZone).filter(ServiceZone.is_active == True).all()
+    lookup = FieldServiceLookupService(db)
+    supervisors = lookup.list_employees(limit=100, active_only=True)
+    zones = lookup.list_zones(active_only=True)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -1000,8 +929,10 @@ async def team_update(
     team_id: int,
 ):
     """Update a field team."""
-    team = db.query(FieldTeam).filter(FieldTeam.id == team_id).first()
-    if not team:
+    service = TeamService(db)
+    try:
+        team = service.get_team(team_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Team not found")
 
     form = await request.form()
@@ -1012,11 +943,9 @@ async def team_update(
         errors["name"] = "Team name is required"
 
     if errors:
-        supervisors = db.query(Employee).filter(
-            Employee.is_deleted == False,
-            Employee.status == EmploymentStatus.ACTIVE
-        ).limit(100).all()
-        zones = db.query(ServiceZone).filter(ServiceZone.is_active == True).all()
+        lookup = FieldServiceLookupService(db)
+        supervisors = lookup.list_employees(limit=100, active_only=True)
+        zones = lookup.list_zones(active_only=True)
 
         context = get_base_context(request, response, user, csrf_token)
         context["navigation"] = get_navigation_context(user)
@@ -1036,16 +965,17 @@ async def team_update(
         template = templates.get_template("modules/field_service/templates/pages/team_form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
-    team.name = name
-    team.description = _form_str(form, "description") or None
-    team.contact_phone = _form_str(form, "contact_phone") or None
-    team.contact_email = _form_str(form, "contact_email") or None
-    team.max_daily_orders = _form_int(form, "max_daily_orders", 10) or 10
-    team.is_active = form.get("is_active") == "on"
+    data = TeamUpdateData(
+        name=name,
+        description=_form_str(form, "description") or None,
+        contact_phone=_form_str(form, "contact_phone") or None,
+        contact_email=_form_str(form, "contact_email") or None,
+        max_daily_orders=_form_int(form, "max_daily_orders", 10) or 10,
+        is_active=form.get("is_active") == "on",
+        supervisor_id=_form_int(form, "supervisor_id"),
+    )
 
-    supervisor_id = _form_int(form, "supervisor_id")
-    team.supervisor_id = supervisor_id
-
+    team = service.update_team(team_id, data)
     db.commit()
 
     set_flash(response, f"Team '{team.name}' updated successfully.", "success")
@@ -1061,21 +991,21 @@ async def team_delete(
     db: DB,
     team_id: int,
 ):
-    """Delete a field team."""
-    team = db.query(FieldTeam).filter(FieldTeam.id == team_id).first()
-    if not team:
+    """Deactivate a field team."""
+    service = TeamService(db)
+    try:
+        team = service.deactivate_team(team_id)
+        name = team.name
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    name = team.name
-    db.delete(team)
-    db.commit()
-
     if is_htmx_request(request):
-        htmx_toast(response, f"Team '{name}' deleted.", "success")
+        htmx_toast(response, f"Team '{name}' deactivated.", "success")
         response.headers["HX-Redirect"] = "/field-service/teams"
         return HTMLResponse("", headers=dict(response.headers))
 
-    set_flash(response, f"Team '{name}' deleted.", "success")
+    set_flash(response, f"Team '{name}' deactivated.", "success")
     return RedirectResponse(url="/field-service/teams", status_code=303)
 
 
@@ -1090,36 +1020,24 @@ async def team_add_member(
     team_id: int,
 ):
     """Add a member to a team."""
-    team = db.query(FieldTeam).filter(FieldTeam.id == team_id).first()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-
     form = await request.form()
     employee_id = _form_int(form, "employee_id")
-    role = form.get("role", "technician")
+    role = _form_str(form, "role", "technician")
 
     if employee_id is None:
         set_flash(response, "Please select an employee.", "error")
         return RedirectResponse(url=f"/field-service/teams/{team_id}", status_code=303)
 
-    # Check if already a member
-    existing = db.query(FieldTeamMember).filter(
-        FieldTeamMember.team_id == team_id,
-        FieldTeamMember.employee_id == employee_id
-    ).first()
-
-    if existing:
+    service = TeamService(db)
+    try:
+        data = TeamMemberData(employee_id=employee_id, role=role)
+        service.add_member(team_id, data)
+        db.commit()
+    except NotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValidationError:
         set_flash(response, "Employee is already a team member.", "error")
         return RedirectResponse(url=f"/field-service/teams/{team_id}", status_code=303)
-
-    member = FieldTeamMember(
-        team_id=team_id,
-        employee_id=employee_id,
-        role=role,
-        is_active=True
-    )
-    db.add(member)
-    db.commit()
 
     set_flash(response, "Team member added.", "success")
     return RedirectResponse(url=f"/field-service/teams/{team_id}", status_code=303)
@@ -1136,15 +1054,14 @@ async def team_remove_member(
     member_id: int,
 ):
     """Remove a member from a team."""
-    member = db.query(FieldTeamMember).filter(
-        FieldTeamMember.id == member_id,
-        FieldTeamMember.team_id == team_id
-    ).first()
-
+    service = TeamService(db)
+    member = service.get_team_member(team_id, member_id)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    db.delete(member)
+    if not member.employee:
+        raise HTTPException(status_code=400, detail="Member has no linked employee")
+    service.remove_member(team_id, member.employee.id)
     db.commit()
 
     if is_htmx_request(request):
@@ -1171,56 +1088,31 @@ async def technicians_list(
     per_page: int = Query(25, ge=10, le=100),
 ):
     """Technicians list page - employees with field team memberships."""
-    # Get employees who are field team members
-    query = db.query(Employee).join(
-        FieldTeamMember, FieldTeamMember.employee_id == Employee.id
-    ).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE
-    ).distinct()
+    service = TeamService(db)
+    filters = TechnicianFilters(search=q)
+    pagination = PaginationParams(page=page, limit=per_page)
 
-    if q:
-        query = query.filter(Employee.name.ilike(f"%{q}%"))
-
-    total = query.count()
-    offset = (page - 1) * per_page
-    technicians = query.order_by(Employee.name).offset(offset).limit(per_page).all()
+    result = service.list_technicians(filters, pagination)
 
     # Get team memberships and skills for each technician
     technicians_with_info = []
-    for tech in technicians:
-        memberships = db.query(FieldTeamMember).filter(
-            FieldTeamMember.employee_id == tech.id,
-            FieldTeamMember.is_active == True
-        ).all()
-
-        skills = db.query(TechnicianSkill).filter(
-            TechnicianSkill.employee_id == tech.id,
-            TechnicianSkill.is_active == True
-        ).all()
-
-        active_orders = db.query(func.count(ServiceOrder.id)).filter(
-            ServiceOrder.assigned_technician_id == tech.id,
-            ServiceOrder.status.in_([
-                ServiceOrderStatus.SCHEDULED,
-                ServiceOrderStatus.DISPATCHED,
-                ServiceOrderStatus.EN_ROUTE,
-                ServiceOrderStatus.ON_SITE,
-                ServiceOrderStatus.IN_PROGRESS
-            ])
-        ).scalar() or 0
+    order_service = ServiceOrderService(db)
+    for tech in result.items:
+        memberships = service.get_technician_teams(tech.id)
+        skills = service.get_technician_skills(tech.id)
+        active_orders = order_service.count_active_orders_for_technician(tech.id)
 
         technicians_with_info.append({
             "employee": tech,
             "memberships": memberships,
             "skills": skills,
-            "active_orders": active_orders
+            "active_orders": active_orders,
         })
 
     context = get_base_context(request, response, user, csrf_token)
     context["technicians"] = technicians_with_info
     context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
+    context["pagination"] = build_pagination_context(page, per_page, result.total)
 
     if is_htmx_request(request):
         template = templates.get_template("modules/field_service/templates/partials/technicians_table.html")
@@ -1248,45 +1140,21 @@ async def technician_detail(
     employee_id: int,
 ):
     """Technician detail page."""
-    employee = db.query(Employee).filter(
-        Employee.id == employee_id,
-        Employee.is_deleted == False
-    ).first()
-
-    if not employee:
+    service = TeamService(db)
+    try:
+        employee = service.get_technician(employee_id)
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Technician not found")
 
-    # Get team memberships
-    memberships = db.query(FieldTeamMember).filter(
-        FieldTeamMember.employee_id == employee_id
-    ).all()
+    # Get team memberships and skills from service
+    memberships = service.get_technician_teams(employee_id)
+    skills = service.get_technician_skills(employee_id)
 
-    # Get skills
-    skills = db.query(TechnicianSkill).filter(
-        TechnicianSkill.employee_id == employee_id
-    ).all()
+    order_service = ServiceOrderService(db)
+    recent_orders = order_service.list_recent_orders_for_technician(employee_id)
 
-    # Get recent orders
-    recent_orders = db.query(ServiceOrder).filter(
-        ServiceOrder.assigned_technician_id == employee_id
-    ).order_by(ServiceOrder.scheduled_date.desc()).limit(10).all()
-
-    # Stats
-    completed_orders = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.assigned_technician_id == employee_id,
-        ServiceOrder.status == ServiceOrderStatus.COMPLETED
-    ).scalar() or 0
-
-    active_orders = db.query(func.count(ServiceOrder.id)).filter(
-        ServiceOrder.assigned_technician_id == employee_id,
-        ServiceOrder.status.in_([
-            ServiceOrderStatus.SCHEDULED,
-            ServiceOrderStatus.DISPATCHED,
-            ServiceOrderStatus.EN_ROUTE,
-            ServiceOrderStatus.ON_SITE,
-            ServiceOrderStatus.IN_PROGRESS
-        ])
-    ).scalar() or 0
+    completed_orders = order_service.count_completed_orders_for_technician(employee_id)
+    active_orders = order_service.count_active_orders_for_technician(employee_id)
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -1319,10 +1187,6 @@ async def technician_add_skill(
     employee_id: int,
 ):
     """Add a skill to a technician."""
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
-    if not employee:
-        raise HTTPException(status_code=404, detail="Technician not found")
-
     form = await request.form()
     skill_type = _form_str(form, "skill_type")
     proficiency_level = _form_str(form, "proficiency_level", "intermediate")
@@ -1331,15 +1195,17 @@ async def technician_add_skill(
         set_flash(response, "Skill type is required.", "error")
         return RedirectResponse(url=f"/field-service/technicians/{employee_id}", status_code=303)
 
-    skill = TechnicianSkill(
-        employee_id=employee_id,
-        skill_type=skill_type,
-        proficiency_level=proficiency_level,
-        certification=_form_str(form, "certification") or None,
-        is_active=True
-    )
-    db.add(skill)
-    db.commit()
+    service = TeamService(db)
+    try:
+        data = TechnicianSkillData(
+            skill_type=skill_type,
+            proficiency_level=proficiency_level,
+            certification=_form_str(form, "certification") or None,
+        )
+        service.add_skill(employee_id, data)
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Technician not found")
 
     set_flash(response, "Skill added.", "success")
     return RedirectResponse(url=f"/field-service/technicians/{employee_id}", status_code=303)
@@ -1356,16 +1222,12 @@ async def technician_remove_skill(
     skill_id: int,
 ):
     """Remove a skill from a technician."""
-    skill = db.query(TechnicianSkill).filter(
-        TechnicianSkill.id == skill_id,
-        TechnicianSkill.employee_id == employee_id
-    ).first()
-
-    if not skill:
+    service = TeamService(db)
+    try:
+        service.remove_skill(employee_id, skill_id)
+        db.commit()
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Skill not found")
-
-    db.delete(skill)
-    db.commit()
 
     if is_htmx_request(request):
         htmx_toast(response, "Skill removed.", "success")

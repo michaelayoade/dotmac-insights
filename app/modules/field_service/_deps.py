@@ -135,18 +135,14 @@ def get_type_options():
 
 
 # =============================================================================
-# DYNAMIC OPTIONS FROM DATABASE
+# DYNAMIC OPTIONS FROM DATABASE (using services)
 # =============================================================================
 
 def get_customer_options(db):
     """Get customer accounts for service order dropdown."""
-    customers = (
-        db.query(CustomerAccount)
-        .join(Party, CustomerAccount.party_id == Party.id)
-        .order_by(Party.name)
-        .limit(100)
-        .all()
-    )
+    from app.services.subscribers import SubscriberService
+    service = SubscriberService(db)
+    customers = service.list_customer_accounts(limit=100)
     return [
         {"value": str(c.id), "label": c.party.name if c.party else f"Account {c.id}"}
         for c in customers
@@ -155,10 +151,9 @@ def get_customer_options(db):
 
 def get_technician_options(db):
     """Get active technicians for assignment dropdown."""
-    employees = db.query(Employee).filter(
-        Employee.is_deleted == False,
-        Employee.status == EmploymentStatus.ACTIVE
-    ).order_by(Employee.first_name).all()
+    from app.services.field_service import TeamService
+    service = TeamService(db)
+    employees = service.list_technicians(active_only=True)
     return [
         {"value": str(e.id), "label": f"{e.first_name} {e.last_name}".strip() or e.email}
         for e in employees
@@ -167,9 +162,9 @@ def get_technician_options(db):
 
 def get_team_options(db):
     """Get active field teams for assignment dropdown."""
-    teams = db.query(FieldTeam).filter(
-        FieldTeam.is_active == True
-    ).order_by(FieldTeam.name).all()
+    from app.services.field_service import TeamService
+    service = TeamService(db)
+    teams = service.list_teams(active_only=True)
     return [
         {"value": str(t.id), "label": t.name}
         for t in teams
@@ -178,9 +173,9 @@ def get_team_options(db):
 
 def get_zone_options(db):
     """Get service zones for filtering/assignment."""
-    zones = db.query(ServiceZone).filter(
-        ServiceZone.is_active == True
-    ).order_by(ServiceZone.name).all()
+    from app.services.field_service import ScheduleService
+    service = ScheduleService(db)
+    zones = service.list_zones(active_only=True)
     return [
         {"value": str(z.id), "label": z.name}
         for z in zones
@@ -189,7 +184,9 @@ def get_zone_options(db):
 
 def get_skill_options(db):
     """Get technician skills for filtering."""
-    skills = db.query(TechnicianSkill).order_by(TechnicianSkill.name).all()
+    from app.services.field_service import TeamService
+    service = TeamService(db)
+    skills = service.list_skills()
     return [
         {"value": str(s.id), "label": s.name}
         for s in skills
@@ -434,7 +431,7 @@ class FieldServiceWebService:
         technicians = self.db.query(Employee).join(
             FieldTeamMember,
             and_(
-                FieldTeamMember.employee_id == Employee.id,
+                FieldTeamMember.party_id == Employee.party_id,
                 FieldTeamMember.is_active == True
             )
         ).distinct().all()

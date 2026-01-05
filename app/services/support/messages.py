@@ -23,6 +23,8 @@ from app.models.omni import (
     OmniMessage,
 )
 from app.services.types import PaginatedResult, PaginationParams
+from app.services.activity_logger import ActivityLogger
+from app.services.validation.soft_validation_service import SoftValidationService
 
 from .types import (
     AttachmentData,
@@ -225,6 +227,7 @@ class MessageService:
         )
         self.db.add(msg)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
 
         # Add attachments
         for att_data in data.attachments:
@@ -233,7 +236,16 @@ class MessageService:
         # Update conversation stats
         self._update_conversation_stats(conv, is_inbound=True)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="support.message.inbound",
+            entity_type="message",
+            entity_id=str(msg.id),
+            summary=f"Inbound message on conversation {conv.id}",
+            metadata={"conversation_id": conv.id, "channel_id": msg.channel_id},
+        )
         return msg
 
     def create_outbound(self, data: OutboundMessageData) -> OmniMessage:
@@ -256,7 +268,7 @@ class MessageService:
             body=data.body,
             subject=data.subject,
             message_type=data.message_type or "outgoing",
-            agent_id=data.agent_id,
+            party_id=data.agent_id,
             channel_id=data.channel_id or conv.channel_id,
             meta=data.meta if data.meta else None,
             created_at=datetime.now(timezone.utc),
@@ -264,6 +276,7 @@ class MessageService:
         )
         self.db.add(msg)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
 
         # Add attachments
         for att_data in data.attachments:
@@ -272,7 +285,18 @@ class MessageService:
         # Update conversation stats
         self._update_conversation_stats(conv, is_inbound=False)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="support.message.outbound",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="message",
+            entity_id=str(msg.id),
+            summary=f"Outbound message on conversation {conv.id}",
+            metadata={"conversation_id": conv.id, "channel_id": msg.channel_id},
+        )
         return msg
 
     def create_internal_note(self, data: InternalNoteData) -> OmniMessage:
@@ -296,7 +320,7 @@ class MessageService:
             direction="outbound",
             body=data.body,
             message_type="private_note",
-            agent_id=data.agent_id,
+            party_id=data.agent_id,
             channel_id=conv.channel_id,
             meta=meta,
             created_at=datetime.now(timezone.utc),
@@ -304,11 +328,23 @@ class MessageService:
         )
         self.db.add(msg)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
 
         # Update conversation stats (private notes don't trigger first response)
         self._update_conversation_stats(conv, is_inbound=False, is_private=True)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
 
+        activity_logger = ActivityLogger(self.db)
+        activity_logger.log(
+            action="support.message.note",
+            user_id=self.principal.id if self.principal else None,
+            user_email=getattr(self.principal, "email", None),
+            entity_type="message",
+            entity_id=str(msg.id),
+            summary=f"Internal note on conversation {conv.id}",
+            metadata={"conversation_id": conv.id},
+        )
         return msg
 
     # -------------------------------------------------------------------------
@@ -341,6 +377,7 @@ class MessageService:
         msg.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
         return msg
 
     def mark_sent(
@@ -369,6 +406,7 @@ class MessageService:
         msg.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
         return msg
 
     def mark_read(self, message_id: int) -> OmniMessage:
@@ -388,6 +426,7 @@ class MessageService:
         msg.read_at = datetime.now(timezone.utc)
         msg.updated_at = datetime.now(timezone.utc)
 
+        conv = None
         # Decrement conversation unread count
         if msg.direction == "inbound":
             conv = msg.conversation
@@ -395,6 +434,9 @@ class MessageService:
                 conv.unread_count -= 1
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
+        if conv:
+            SoftValidationService(self.db).validate_and_store(conv)
         return msg
 
     def mark_failed(
@@ -426,6 +468,7 @@ class MessageService:
         msg.updated_at = datetime.now(timezone.utc)
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(msg)
         return msg
 
     # -------------------------------------------------------------------------
@@ -462,6 +505,7 @@ class MessageService:
         conv.updated_at = now
 
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(conv)
         return updated
 
     # -------------------------------------------------------------------------
@@ -489,6 +533,7 @@ class MessageService:
         )
         self.db.add(attachment)
         self.db.flush()
+        SoftValidationService(self.db).validate_and_store(attachment)
         return attachment
 
     def add_attachment(

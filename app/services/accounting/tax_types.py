@@ -13,6 +13,8 @@ from typing import List, Optional
 __all__ = [
     # Tax Filing types
     "TaxCodeFilters",
+    "TaxCodeCreateData",
+    "TaxCodeUpdateData",
     "TaxFilingFilters",
     "TaxFilingCreateData",
     "TaxFilingUpdateData",
@@ -36,6 +38,48 @@ class TaxCodeFilters:
 
     query: Optional[str] = None
     tax_type: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+@dataclass
+class TaxCodeCreateData:
+    """Data for creating a tax code."""
+
+    code: str
+    name: str
+    rate: Decimal
+    tax_type: str
+    is_tax_inclusive: bool = False
+    rounding_method: str = "round"
+    rounding_precision: int = 2
+    description: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    country: Optional[str] = None
+    account_head: Optional[str] = None
+    cost_center: Optional[str] = None
+    valid_from: Optional[date] = None
+    valid_to: Optional[date] = None
+    company: Optional[str] = None
+
+
+@dataclass
+class TaxCodeUpdateData:
+    """Data for updating a tax code (all fields optional)."""
+
+    name: Optional[str] = None
+    rate: Optional[Decimal] = None
+    tax_type: Optional[str] = None
+    is_tax_inclusive: Optional[bool] = None
+    rounding_method: Optional[str] = None
+    rounding_precision: Optional[int] = None
+    description: Optional[str] = None
+    jurisdiction: Optional[str] = None
+    country: Optional[str] = None
+    account_head: Optional[str] = None
+    cost_center: Optional[str] = None
+    valid_from: Optional[date] = None
+    valid_to: Optional[date] = None
+    company: Optional[str] = None
     is_active: Optional[bool] = None
 
 

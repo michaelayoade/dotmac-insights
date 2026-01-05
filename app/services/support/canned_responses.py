@@ -18,14 +18,21 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.models.support_canned import CannedResponse, CannedResponseScope
-from app.models.agent import Agent, TeamMember
+from app.models.party import Party, PartyRole
+from app.models.agent import TeamMember
 from app.models.omni import OmniConversation
 from app.models.ticket import Ticket
+
+from sqlalchemy import func
 
 from .types import (
     CannedResponseCreate,
     CannedResponseUpdate,
+    CannedResponseFilters,
+    CannedResponseStats,
+    CannedListResult,
 )
+from app.services.base import PaginationParams
 from .errors import (
     CannedResponseNotFoundError,
     DuplicateShortcodeError,
@@ -108,7 +115,7 @@ class CannedResponseService:
             query = query.filter(CannedResponse.team_id == team_id)
 
         if agent_id:
-            query = query.filter(CannedResponse.agent_id == agent_id)
+            query = query.filter(CannedResponse.party_id == agent_id)
 
         if category:
             query = query.filter(CannedResponse.category == category)
@@ -124,6 +131,99 @@ class CannedResponseService:
             )
 
         return query.order_by(CannedResponse.name.asc()).all()
+
+    def list_with_stats(
+        self,
+        filters: Optional[CannedResponseFilters] = None,
+        pagination: Optional[PaginationParams] = None,
+    ) -> CannedListResult:
+        """List canned responses with filtering, pagination, and aggregate stats.
+
+        This is the primary method for the canned responses list page - it returns
+        everything needed in a single call to avoid N+1 queries.
+
+        Args:
+            filters: Optional filters for search, scope, category.
+            pagination: Pagination parameters (offset, limit).
+
+        Returns:
+            CannedListResult with items, total, and stats.
+        """
+        filters = filters or CannedResponseFilters()
+        pagination = pagination or PaginationParams(offset=0, limit=25)
+
+        # Build base query
+        query = self.db.query(CannedResponse)
+
+        # Apply active filter
+        if filters.active_only:
+            query = query.filter(CannedResponse.is_active == True)
+
+        # Apply search filter
+        if filters.search:
+            search_term = f"%{filters.search}%"
+            query = query.filter(
+                or_(
+                    CannedResponse.name.ilike(search_term),
+                    CannedResponse.content.ilike(search_term),
+                    CannedResponse.shortcode.ilike(search_term),
+                )
+            )
+
+        # Apply scope filter
+        if filters.scope:
+            query = query.filter(CannedResponse.scope == filters.scope)
+
+        # Apply team filter
+        if filters.team_id:
+            query = query.filter(CannedResponse.team_id == filters.team_id)
+
+        # Apply category filter
+        if filters.category:
+            query = query.filter(CannedResponse.category == filters.category)
+
+        # Get total count
+        total = query.count()
+
+        # Apply sorting and pagination
+        items = (
+            query.order_by(CannedResponse.name.asc())
+            .offset(pagination.offset)
+            .limit(pagination.limit)
+            .all()
+        )
+
+        # Get stats (single optimized query using conditional aggregation)
+        stats_query = self.db.query(
+            func.count(CannedResponse.id).filter(
+                CannedResponse.is_active == True
+            ).label("total"),
+            func.count(CannedResponse.id).filter(
+                CannedResponse.is_active == True,
+                CannedResponse.scope == CannedResponseScope.PERSONAL.value,
+            ).label("personal"),
+            func.count(CannedResponse.id).filter(
+                CannedResponse.is_active == True,
+                CannedResponse.scope == CannedResponseScope.TEAM.value,
+            ).label("team"),
+            func.count(CannedResponse.id).filter(
+                CannedResponse.is_active == True,
+                CannedResponse.scope == CannedResponseScope.GLOBAL.value,
+            ).label("global_count"),
+        ).first()
+
+        stats = CannedResponseStats(
+            total=stats_query.total or 0,
+            personal_count=stats_query.personal or 0,
+            team_count=stats_query.team or 0,
+            global_count=stats_query.global_count or 0,
+        )
+
+        return CannedListResult(
+            items=items,
+            total=total,
+            stats=stats,
+        )
 
     def get(self, response_id: int) -> CannedResponse:
         """Get a canned response by ID.
@@ -170,7 +270,7 @@ class CannedResponseService:
             team_ids = (
                 self.db.query(TeamMember.team_id)
                 .filter(
-                    TeamMember.agent_id == agent_id,
+                    TeamMember.party_id == agent_id,
                     TeamMember.is_active == True,
                 )
                 .all()
@@ -182,7 +282,7 @@ class CannedResponseService:
                 or_(
                     CannedResponse.scope == CannedResponseScope.GLOBAL.value,
                     (CannedResponse.scope == CannedResponseScope.PERSONAL.value)
-                    & (CannedResponse.agent_id == agent_id),
+                    & (CannedResponse.party_id == agent_id),
                     (CannedResponse.scope == CannedResponseScope.TEAM.value)
                     & (CannedResponse.team_id.in_(team_ids)),
                 )
@@ -208,7 +308,7 @@ class CannedResponseService:
         team_ids = (
             self.db.query(TeamMember.team_id)
             .filter(
-                TeamMember.agent_id == agent_id,
+                TeamMember.party_id == agent_id,
                 TeamMember.is_active == True,
             )
             .all()
@@ -220,7 +320,7 @@ class CannedResponseService:
             or_(
                 CannedResponse.scope == CannedResponseScope.GLOBAL.value,
                 (CannedResponse.scope == CannedResponseScope.PERSONAL.value)
-                & (CannedResponse.agent_id == agent_id),
+                & (CannedResponse.party_id == agent_id),
                 (CannedResponse.scope == CannedResponseScope.TEAM.value)
                 & (CannedResponse.team_id.in_(team_ids)),
             ),
@@ -260,7 +360,7 @@ class CannedResponseService:
             shortcode=data.shortcode,
             scope=data.scope,
             team_id=data.team_id,
-            agent_id=data.agent_id,
+            party_id=data.agent_id,
             category=data.category,
             usage_count=0,
             is_active=True,
@@ -364,7 +464,7 @@ class CannedResponseService:
         variables: Optional[Dict[str, str]] = None,
         ticket: Optional[Ticket] = None,
         conversation: Optional[OmniConversation] = None,
-        agent: Optional[Agent] = None,
+        agent: Optional[Party] = None,
     ) -> str:
         """Render a canned response with variable substitution.
 
@@ -373,7 +473,7 @@ class CannedResponseService:
             variables: Optional custom variables dict.
             ticket: Optional Ticket for extracting context.
             conversation: Optional OmniConversation for context.
-            agent: Optional Agent for context.
+            agent: Optional Party (with support_agent role) for context.
 
         Returns:
             Rendered content string.
@@ -393,7 +493,7 @@ class CannedResponseService:
         variables: Optional[Dict[str, str]] = None,
         ticket: Optional[Ticket] = None,
         conversation: Optional[OmniConversation] = None,
-        agent: Optional[Agent] = None,
+        agent: Optional[Party] = None,
     ) -> str:
         """Render arbitrary content with variable substitution.
 
@@ -402,7 +502,7 @@ class CannedResponseService:
             variables: Optional custom variables dict.
             ticket: Optional Ticket for extracting context.
             conversation: Optional OmniConversation for context.
-            agent: Optional Agent for context.
+            agent: Optional Party (with support_agent role) for context.
 
         Returns:
             Rendered content string.
@@ -421,7 +521,7 @@ class CannedResponseService:
         variables: Optional[Dict[str, str]] = None,
         ticket: Optional[Ticket] = None,
         conversation: Optional[OmniConversation] = None,
-        agent: Optional[Agent] = None,
+        agent: Optional[Party] = None,
     ) -> str:
         """Internal render implementation."""
         # Build context from provided objects
@@ -464,8 +564,8 @@ class CannedResponseService:
 
         # Add agent context
         if agent:
-            context["agent.name"] = getattr(agent, "display_name", "") or ""
-            context["agent.email"] = getattr(agent, "email", "") or ""
+            context["agent.name"] = getattr(agent, "name", "") or ""
+            context["agent.email"] = getattr(agent, "primary_email", "") or ""
 
         # Override with explicit variables
         if variables:

@@ -148,7 +148,16 @@ class ServiceOrderService:
             )
 
         # Status filter
-        if filters.status:
+        if filters.statuses:
+            valid_statuses = []
+            for status_value in filters.statuses:
+                try:
+                    valid_statuses.append(ServiceOrderStatus(status_value))
+                except ValueError:
+                    continue
+            if valid_statuses:
+                query = query.filter(ServiceOrder.status.in_(valid_statuses))
+        elif filters.status:
             try:
                 status_enum = ServiceOrderStatus(filters.status)
                 query = query.filter(ServiceOrder.status == status_enum)
@@ -199,11 +208,16 @@ class ServiceOrderService:
         if filters.is_billable is not None:
             query = query.filter(ServiceOrder.is_billable == filters.is_billable)
 
-        # Default ordering
-        query = query.order_by(
-            ServiceOrder.scheduled_date.desc(),
-            ServiceOrder.scheduled_start_time.asc(),
-        )
+        # Sorting
+        sort_column = getattr(ServiceOrder, filters.sort_by, ServiceOrder.scheduled_date)
+        ascending = str(filters.sort_dir).lower() == "asc"
+        if filters.sort_by == "scheduled_date":
+            query = query.order_by(
+                sort_column.asc() if ascending else sort_column.desc(),
+                ServiceOrder.scheduled_start_time.asc(),
+            )
+        else:
+            query = query.order_by(sort_column.asc() if ascending else sort_column.desc())
 
         return paginate(query, pagination)
 
@@ -765,6 +779,10 @@ class ServiceOrderService:
             base_query = base_query.filter(
                 ServiceOrder.assigned_technician_id == filters.technician_id
             )
+        if filters.team_id:
+            base_query = base_query.filter(
+                ServiceOrder.assigned_team_id == filters.team_id
+            )
 
         # Count by status
         by_status = {}
@@ -959,6 +977,95 @@ class ServiceOrderService:
             billable_hours_this_week=billable_hours,
             utilization_percent=utilization,
             avg_customer_rating=avg_rating,
+        )
+
+    def count_active_orders_for_technician(self, technician_id: int) -> int:
+        """Count active orders assigned to a technician."""
+        return (
+            self.db.query(ServiceOrder)
+            .filter(
+                ServiceOrder.assigned_technician_id == technician_id,
+                ServiceOrder.status.in_([
+                    ServiceOrderStatus.SCHEDULED,
+                    ServiceOrderStatus.DISPATCHED,
+                    ServiceOrderStatus.EN_ROUTE,
+                    ServiceOrderStatus.ON_SITE,
+                    ServiceOrderStatus.IN_PROGRESS,
+                ]),
+            )
+            .count()
+        )
+
+    def count_completed_orders_for_technician(self, technician_id: int) -> int:
+        """Count completed orders assigned to a technician."""
+        return (
+            self.db.query(ServiceOrder)
+            .filter(
+                ServiceOrder.assigned_technician_id == technician_id,
+                ServiceOrder.status == ServiceOrderStatus.COMPLETED,
+            )
+            .count()
+        )
+
+    def list_active_orders_for_team(
+        self,
+        team_id: int,
+        limit: int = 10,
+    ) -> List[ServiceOrder]:
+        """List active orders assigned to a team."""
+        return (
+            self.db.query(ServiceOrder)
+            .filter(
+                ServiceOrder.assigned_team_id == team_id,
+                ServiceOrder.status.in_([
+                    ServiceOrderStatus.SCHEDULED,
+                    ServiceOrderStatus.DISPATCHED,
+                    ServiceOrderStatus.EN_ROUTE,
+                    ServiceOrderStatus.ON_SITE,
+                    ServiceOrderStatus.IN_PROGRESS,
+                ]),
+            )
+            .order_by(ServiceOrder.scheduled_date)
+            .limit(limit)
+            .all()
+        )
+
+    def list_recent_orders_for_technician(
+        self,
+        technician_id: int,
+        limit: int = 10,
+    ) -> List[ServiceOrder]:
+        """List recent orders for a technician."""
+        return (
+            self.db.query(ServiceOrder)
+            .filter(ServiceOrder.assigned_technician_id == technician_id)
+            .order_by(ServiceOrder.scheduled_date.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def list_active_orders_for_technician(
+        self,
+        technician_id: int,
+        limit: int = 10,
+    ) -> List[ServiceOrder]:
+        """List active orders for a technician."""
+        return (
+            self.db.query(ServiceOrder)
+            .filter(
+                ServiceOrder.assigned_technician_id == technician_id,
+                ServiceOrder.status.in_([
+                    ServiceOrderStatus.SCHEDULED,
+                    ServiceOrderStatus.DISPATCHED,
+                    ServiceOrderStatus.EN_ROUTE,
+                    ServiceOrderStatus.ON_SITE,
+                    ServiceOrderStatus.IN_PROGRESS,
+                    ServiceOrderStatus.PENDING_PARTS,
+                ]),
+            )
+            .order_by(ServiceOrder.scheduled_date)
+            .limit(limit)
+            .all()
         )
 
     def calculate_costs(self, order_id: int) -> ServiceCostBreakdown:

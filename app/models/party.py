@@ -19,7 +19,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 
 from app.database import Base
 from app.utils.datetime_utils import utc_now
@@ -145,21 +145,21 @@ class Party(Base):
     tax_id: Mapped[Optional[str]] = mapped_column(Text)
 
     # Social media profiles
-    linkedin_url: Mapped[Optional[str]] = mapped_column(Text)
-    twitter_handle: Mapped[Optional[str]] = mapped_column(Text)
-    facebook_url: Mapped[Optional[str]] = mapped_column(Text)
-    instagram_handle: Mapped[Optional[str]] = mapped_column(Text)
-    website_url: Mapped[Optional[str]] = mapped_column(Text)
+    linkedin_url: Mapped[Optional[str]] = deferred(mapped_column(Text))
+    twitter_handle: Mapped[Optional[str]] = deferred(mapped_column(Text))
+    facebook_url: Mapped[Optional[str]] = deferred(mapped_column(Text))
+    instagram_handle: Mapped[Optional[str]] = deferred(mapped_column(Text))
+    website_url: Mapped[Optional[str]] = deferred(mapped_column(Text))
 
     # Communication preferences
-    preferred_channel: Mapped[Optional[str]] = mapped_column(Text)  # email, sms, whatsapp, phone
-    do_not_contact: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    contact_frequency_limit: Mapped[Optional[int]] = mapped_column()  # max contacts per week
+    preferred_channel: Mapped[Optional[str]] = deferred(mapped_column(Text))  # email, sms, whatsapp, phone
+    do_not_contact: Mapped[bool] = deferred(mapped_column(Boolean, nullable=False, server_default=text("false")))
+    contact_frequency_limit: Mapped[Optional[int]] = deferred(mapped_column())  # max contacts per week
 
     # Engagement tracking
-    engagement_score: Mapped[Optional[int]] = mapped_column()  # 0-100 computed score
-    last_engagement_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    last_contacted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    engagement_score: Mapped[Optional[int]] = deferred(mapped_column())  # 0-100 computed score
+    last_engagement_at: Mapped[Optional[datetime]] = deferred(mapped_column(DateTime(timezone=True)))
+    last_contacted_at: Mapped[Optional[datetime]] = deferred(mapped_column(DateTime(timezone=True)))
     tags: Mapped[List[dict]] = mapped_column(
         JSONB,
         default=list,
@@ -216,6 +216,82 @@ class Party(Base):
         Index("ix_parties_type_status", "type", "status"),
         Index("ix_parties_name", "name"),
     )
+
+    # =========================================================================
+    # Support Agent Helper Methods (after Agent → Party unification)
+    # =========================================================================
+
+    @property
+    def is_support_agent(self) -> bool:
+        """Check if this party has an active support_agent role."""
+        return any(
+            r.role == "support_agent" and r.status == "active" and r.until is None
+            for r in self.roles
+        )
+
+    @property
+    def support_agent_role(self) -> Optional["PartyRole"]:
+        """Get the active support_agent role if present."""
+        return next(
+            (r for r in self.roles
+             if r.role == "support_agent" and r.status == "active" and r.until is None),
+            None,
+        )
+
+    @property
+    def agent_metadata(self) -> dict:
+        """Get agent metadata from the support_agent role."""
+        role = self.support_agent_role
+        return role.metadata_ if role else {}
+
+    @property
+    def agent_capacity(self) -> int:
+        """Get max concurrent tickets capacity (default 10)."""
+        return self.agent_metadata.get("capacity", 10)
+
+    @property
+    def agent_routing_weight(self) -> int:
+        """Get routing weight for ticket assignment (default 1)."""
+        return self.agent_metadata.get("routing_weight", 1)
+
+    @property
+    def agent_domains(self) -> dict:
+        """Get domains this agent handles (e.g., {'support': True, 'sales': False})."""
+        return self.agent_metadata.get("domains", {})
+
+    @property
+    def agent_skills(self) -> dict:
+        """Get agent skills with levels (e.g., {'network': 3, 'billing': 2})."""
+        return self.agent_metadata.get("skills", {})
+
+    @property
+    def agent_channel_caps(self) -> list:
+        """Get channels this agent can handle (e.g., ['email', 'whatsapp'])."""
+        caps = self.agent_metadata.get("channel_caps", [])
+        # Handle both list and dict format for backwards compatibility
+        if isinstance(caps, dict):
+            return [k for k, v in caps.items() if v]
+        return caps
+
+    @property
+    def is_available(self) -> bool:
+        """Check if agent is currently available (online status)."""
+        return self.agent_metadata.get("is_available", False)
+
+    @property
+    def is_active(self) -> bool:
+        """Check if party has an active support_agent role."""
+        role = self.support_agent_role
+        return role is not None and role.status == "active"
+
+    @property
+    def display_name(self) -> str:
+        """Get display name for the party."""
+        if self.name:
+            return self.name
+        if self.first_name or self.last_name:
+            return f"{self.first_name or ''} {self.last_name or ''}".strip()
+        return self.primary_email or f"Party {self.id}"
 
 
 class PartyRole(Base):

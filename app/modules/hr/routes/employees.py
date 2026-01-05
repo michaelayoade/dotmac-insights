@@ -7,8 +7,6 @@ Permission Requirements:
 
 Uses EmployeeService and OrganizationService for all business logic.
 """
-from __future__ import annotations
-
 from typing import Optional, Any
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
@@ -30,6 +28,9 @@ from app.services.hr.employee_types import (
     EmployeeUpdateData,
 )
 from app.services.hr.organization import OrganizationService
+from app.services.projects.tasks import TaskService
+from app.services.field_service.service_orders import ServiceOrderService
+from app.modules.support._services import SupportWebService
 from app.services.types import PaginationParams
 from app.services.hr.errors import (
     EmployeeNotFoundError,
@@ -338,34 +339,18 @@ async def employee_detail(
     except EmployeeNotFoundError:
         raise HTTPException(status_code=404, detail="Employee not found")
 
-    # Load assigned tasks (still direct DB as Task is not an HR service concern)
-    from app.models.task import Task, TaskStatus
-    assigned_tasks = db.query(Task).filter(
-        Task.assigned_to_id == employee_id,
-        Task.status.notin_([TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
-    ).order_by(Task.exp_end_date).limit(10).all()
+    task_service = TaskService(db, user)
+    assigned_tasks = task_service.list_active_tasks_for_employee(employee_id, limit=10)
 
-    # Load assigned service orders
-    from app.models.field_service import ServiceOrder, ServiceOrderStatus
-    assigned_orders = db.query(ServiceOrder).filter(
-        ServiceOrder.assigned_technician_id == employee_id,
-        ServiceOrder.status.in_([
-            ServiceOrderStatus.SCHEDULED,
-            ServiceOrderStatus.DISPATCHED,
-            ServiceOrderStatus.EN_ROUTE,
-            ServiceOrderStatus.ON_SITE,
-            ServiceOrderStatus.IN_PROGRESS,
-            ServiceOrderStatus.PENDING_PARTS,
-        ]),
-    ).order_by(ServiceOrder.scheduled_date).limit(10).all()
+    service_order_service = ServiceOrderService(db, user)
+    assigned_orders = service_order_service.list_active_orders_for_technician(
+        employee_id, limit=10
+    )
 
-    # Load assigned tickets
-    from app.models.unified_ticket import UnifiedTicket
-    assigned_tickets = db.query(UnifiedTicket).filter(
-        UnifiedTicket.assigned_to_id == employee_id,
-        UnifiedTicket.is_deleted == False,
-        UnifiedTicket.status.in_(["open", "in_progress"]),
-    ).order_by(UnifiedTicket.created_at.desc()).limit(10).all()
+    support_service = SupportWebService(db, user_id=user.id, principal=user)
+    assigned_tickets = support_service.list_open_tickets_for_employee(
+        employee_id, limit=10
+    )
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
