@@ -47,7 +47,14 @@
                     <button type="button" class="btn btn-success">Mark Won</button>
                     <button type="button" class="btn btn-danger">Mark Lost</button>
                     {% endif %}
-                    <button type="button" class="btn btn-secondary">Edit</button>
+                    <a href="/crm/opportunities/{{ opportunity.id }}/edit" class="btn btn-secondary">Edit</a>
+                    <button
+                        type="button"
+                        class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50"
+                        onclick="document.getElementById('confirm-delete-modal').classList.remove('hidden')"
+                    >
+                        Delete
+                    </button>
                 </div>
             </div>
         </div>
@@ -101,7 +108,7 @@
                     <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Amount</dt>
-                            <dd class="mt-1 text-2xl font-semibold text-gray-900">${{ '{:,.0f}'.format(opportunity.amount or 0) }}</dd>
+                            <dd class="mt-1 text-2xl font-semibold text-gray-900">₦{{ '{:,.0f}'.format(opportunity.deal_value or 0) }}</dd>
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Probability</dt>
@@ -118,7 +125,7 @@
                         </div>
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Weighted Value</dt>
-                            <dd class="mt-1 text-sm text-gray-900">${{ '{:,.0f}'.format((opportunity.amount or 0) * (opportunity.probability or 0) / 100) }}</dd>
+                            <dd class="mt-1 text-sm text-gray-900">₦{{ '{:,.0f}'.format(opportunity.weighted_value or 0) }}</dd>
                         </div>
                         {% if party %}
                         <div class="sm:col-span-2">
@@ -128,10 +135,10 @@
                             </dd>
                         </div>
                         {% endif %}
-                        {% if opportunity.notes %}
+                        {% if opportunity.description %}
                         <div class="sm:col-span-2">
                             <dt class="text-sm font-medium text-gray-500">Notes</dt>
-                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.notes }}</dd>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.description }}</dd>
                         </div>
                         {% endif %}
                     </dl>
@@ -219,15 +226,41 @@
                             <dt class="text-sm font-medium text-gray-500">Last Updated</dt>
                             <dd class="mt-1 text-sm text-gray-900">{{ opportunity.updated_at.strftime('%b %d, %Y') if opportunity.updated_at else '-' }}</dd>
                         </div>
-                        {% if opportunity.closed_at %}
+                        {% if opportunity.actual_close_date %}
                         <div>
                             <dt class="text-sm font-medium text-gray-500">Closed</dt>
-                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.closed_at.strftime('%b %d, %Y') }}</dd>
+                            <dd class="mt-1 text-sm text-gray-900">{{ opportunity.actual_close_date.strftime('%b %d, %Y') }}</dd>
                         </div>
                         {% endif %}
                     </dl>
                 </div>
             </div>
+        </div>
+    </div>
+    <div
+        id="confirm-delete-modal"
+        class="confirm-dialog hidden fixed inset-0 z-40 flex items-center justify-center bg-gray-900/40 p-4"
+        data-confirm
+    >
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-warm-xl">
+            <h3 class="text-lg font-semibold text-gray-900">Delete opportunity</h3>
+            <p class="mt-2 text-sm text-gray-600">This will permanently remove the opportunity.</p>
+            <form method="POST" action="/crm/opportunities/{{ opportunity.id }}/delete" class="mt-6 flex justify-end gap-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button
+                    type="button"
+                    class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                    onclick="document.getElementById('confirm-delete-modal').classList.add('hidden')"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700"
+                >
+                    Delete
+                </button>
+            </form>
         </div>
     </div>
     {% endif %}

@@ -37,6 +37,12 @@ class SoftDeleteMixin:
         nullable=True,
     )
 
+    def soft_delete(self, deleted_by: Optional[int] = None) -> None:
+        """Mark the record as soft-deleted."""
+        self.is_deleted = True
+        self.deleted_at = datetime.utcnow()
+        self.deleted_by_id = deleted_by
+
 
 def _soft_delete_criteria(cls: type[SoftDeleteMixin]) -> Any:
     return cls.is_deleted == False  # noqa: E712
@@ -86,8 +92,12 @@ def _apply_soft_delete_filter(execute_state) -> None:
 def get_db():
     """Dependency for FastAPI routes."""
     db = SessionLocal()
+    db.rollback()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

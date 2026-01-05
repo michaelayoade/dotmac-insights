@@ -10,12 +10,12 @@ from datetime import date, datetime, time, timezone
 from fastapi import APIRouter, Request, Response, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope, CSRFProtect
+from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope, csrf_protect
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
 from app.services.errors import ValidationError
 from app.core.security import set_flash
-from app.models.marketing import SocialAccount, SocialPostStatus, SocialPlatform
+from app.models.marketing import SocialPostStatus, SocialPlatform
 from app.services.secrets_service import get_secrets
 
 from app.services.marketing import (
@@ -100,18 +100,8 @@ def _parse_time(value: str) -> time | None:
         return None
 
 
-def _parse_recipients(raw_value: str) -> list[str]:
-    if not raw_value:
-        return []
-    items = []
-    for chunk in raw_value.replace(",", "\n").splitlines():
-        value = chunk.strip()
-        if value:
-            items.append(value)
-    return items
-
-
-def _parse_media_urls(raw_value: str) -> list[str]:
+def _parse_list(raw_value: str) -> list[str]:
+    """Parse a comma or newline separated string into a list of trimmed values."""
     if not raw_value:
         return []
     items = []
@@ -279,18 +269,15 @@ async def marketing_social_compose(
     context["navigation"] = get_navigation_context(user)
     context["page_title"] = "Compose Social Post"
 
-    accounts = (
-        db.query(SocialAccount)
-        .order_by(SocialAccount.platform.asc(), SocialAccount.display_name.asc().nullslast())
-        .all()
-    )
+    social_service = get_social_service(db)
+    accounts = social_service.list_accounts_for_compose()
     context["accounts"] = accounts
 
     template = templates.get_template("modules/marketing/templates/pages/social_compose.html")
     return HTMLResponse(template.render(context))
 
 
-@protected_router.post("/social/compose", dependencies=[RequireMarketingWrite, CSRFProtect])
+@protected_router.post("/social/compose", dependencies=[RequireMarketingWrite, Depends(csrf_protect)])
 async def submit_social_compose(
     request: Request,
     response: Response,
@@ -299,8 +286,8 @@ async def submit_social_compose(
     form = await request.form()
     account_id_raw = _form_str(form, "account_id")
     content = _form_str(form, "content")
-    media_urls = _parse_media_urls(_form_str(form, "media_urls"))
-    recipients = _parse_recipients(_form_str(form, "recipients"))
+    media_urls = _parse_list(_form_str(form, "media_urls"))
+    recipients = _parse_list(_form_str(form, "recipients"))
     date_str = _form_str(form, "schedule_date")
     time_str = _form_str(form, "schedule_time")
     action = _form_str(form, "action") or "draft"
@@ -309,8 +296,9 @@ async def submit_social_compose(
         set_flash(response, "Select a social account.", "error")
         return RedirectResponse(url="/marketing/social/compose", status_code=303)
 
-    if not content and not media_urls:
-        set_flash(response, "Add text or media before scheduling.", "error")
+    content = content.strip()
+    if not content:
+        set_flash(response, "Add text before scheduling.", "error")
         return RedirectResponse(url="/marketing/social/compose", status_code=303)
 
     schedule_date = _parse_date(date_str)
@@ -333,7 +321,7 @@ async def submit_social_compose(
         social_service.create_post(
             {
                 "account_id": int(account_id_raw),
-                "content": content or " ",
+                "content": content,
                 "media_urls": media_urls,
                 "scheduled_at": scheduled_at,
                 "status": status,
@@ -387,7 +375,7 @@ async def marketing_social_accounts(
     return HTMLResponse(template.render(context))
 
 
-@protected_router.post("/social/accounts", dependencies=[RequireMarketingWrite, CSRFProtect])
+@protected_router.post("/social/accounts", dependencies=[RequireMarketingWrite, Depends(csrf_protect)])
 async def create_social_account(
     request: Request,
     response: Response,
@@ -546,7 +534,7 @@ async def marketing_integrations(
     return HTMLResponse(template.render(context))
 
 
-@protected_router.post("/integrations/callback-settings", dependencies=[RequireMarketingWrite, CSRFProtect])
+@protected_router.post("/integrations/callback-settings", dependencies=[RequireMarketingWrite, Depends(csrf_protect)])
 async def update_callback_settings(
     request: Request,
     response: Response,
@@ -569,7 +557,7 @@ async def update_callback_settings(
     return RedirectResponse(url="/marketing/integrations", status_code=303)
 
 
-@protected_router.post("/integrations/custom", dependencies=[RequireMarketingWrite, CSRFProtect])
+@protected_router.post("/integrations/custom", dependencies=[RequireMarketingWrite, Depends(csrf_protect)])
 async def create_custom_integration(
     request: Request,
     response: Response,
@@ -601,7 +589,7 @@ async def create_custom_integration(
     return RedirectResponse(url="/marketing/integrations", status_code=303)
 
 
-@protected_router.post("/integrations/whatsapp-settings", dependencies=[RequireMarketingWrite, CSRFProtect])
+@protected_router.post("/integrations/whatsapp-settings", dependencies=[RequireMarketingWrite, Depends(csrf_protect)])
 async def update_whatsapp_settings(
     request: Request,
     response: Response,

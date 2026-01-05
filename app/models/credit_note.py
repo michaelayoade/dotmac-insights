@@ -35,6 +35,7 @@ class CreditNote(SoftValidationMixin, SoftDeleteMixin, Base):
 
     # Customer account link (party-based identity)
     customer_account_id: Mapped[Optional[int]] = mapped_column(
+        "customer_id",
         BigInteger,
         ForeignKey("customer_accounts.id", ondelete="SET NULL"),
         nullable=True,
@@ -81,6 +82,8 @@ class CreditNote(SoftValidationMixin, SoftDeleteMixin, Base):
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     # Sync metadata
+    origin_system: Mapped[str] = mapped_column(String(50), default="local")
+    write_back_status: Mapped[str] = mapped_column(String(50), default="pending")
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)

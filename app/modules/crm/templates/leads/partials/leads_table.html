@@ -13,7 +13,7 @@
         <tbody class="bg-white divide-y divide-gray-200">
             {% if leads %}
                 {% for lead in leads %}
-                <tr class="hover:bg-surface-50 cursor-pointer" onclick="window.location='/crm/leads/{{ lead.id }}'">
+                <tr class="hover:bg-surface-50 cursor-pointer" onclick="window.location='/crm/leads/{{ lead.party_id }}'">
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-10 w-10">
@@ -30,26 +30,26 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        <div class="text-sm text-gray-900">{{ lead.email or '-' }}</div>
-                        <div class="text-sm text-gray-500">{{ lead.phone or '' }}</div>
+                        <div class="text-sm text-gray-900">{{ lead.primary_email or '-' }}</div>
+                        <div class="text-sm text-gray-500">{{ lead.primary_phone or '' }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
-                        {% if lead.engagement_score is not none %}
+                        {% if lead.lead_score is not none %}
                         <div class="flex items-center">
                             <span class="text-sm font-medium
-                                {% if lead.engagement_score >= 80 %}text-green-600
-                                {% elif lead.engagement_score >= 60 %}text-blue-600
-                                {% elif lead.engagement_score >= 40 %}text-yellow-600
+                                {% if lead.lead_score >= 80 %}text-green-600
+                                {% elif lead.lead_score >= 60 %}text-blue-600
+                                {% elif lead.lead_score >= 40 %}text-yellow-600
                                 {% else %}text-gray-600{% endif %}">
-                                {{ lead.engagement_score }}
+                                {{ lead.lead_score }}
                             </span>
                             <div class="ml-2 w-16 bg-gray-200 rounded-full h-2">
                                 <div class="h-2 rounded-full
-                                    {% if lead.engagement_score >= 80 %}bg-green-500
-                                    {% elif lead.engagement_score >= 60 %}bg-blue-500
-                                    {% elif lead.engagement_score >= 40 %}bg-yellow-500
+                                    {% if lead.lead_score >= 80 %}bg-green-500
+                                    {% elif lead.lead_score >= 60 %}bg-blue-500
+                                    {% elif lead.lead_score >= 40 %}bg-yellow-500
                                     {% else %}bg-gray-400{% endif %}"
-                                    style="width: {{ lead.engagement_score }}%"></div>
+                                    style="width: {{ lead.lead_score }}%"></div>
                             </div>
                         </div>
                         {% else %}
@@ -69,7 +69,7 @@
                         {{ lead.created_at.strftime('%b %d, %Y') if lead.created_at else '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <a href="/crm/leads/{{ lead.id }}" class="text-blue-600 hover:text-blue-900">View</a>
+                        <a href="/crm/leads/{{ lead.party_id }}" class="text-blue-600 hover:text-blue-900">View</a>
                     </td>
                 </tr>
                 {% endfor %}

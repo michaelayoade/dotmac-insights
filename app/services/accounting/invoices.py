@@ -39,7 +39,6 @@ __all__ = ["InvoiceService"]
 ALLOWED_FILTERS = {"customer_account_id", "status"}
 ALLOWED_SORTS = {
     "invoice_date",
-    "posting_date",
     "due_date",
     "status",
     "invoice_number",
@@ -195,13 +194,21 @@ class InvoiceService:
             invoice_number = generate_voucher_number(self.db, "invoice")
 
         # Create invoice
+        invoice_date = data.invoice_date
+        if data.posting_date:
+            invoice_date = data.posting_date
+
         invoice = Invoice(
             invoice_number=invoice_number,
             customer_account_id=data.customer_account_id,
             description=data.description,
-            invoice_date=data.invoice_date,
+            invoice_date=invoice_date,
             due_date=data.due_date,
-            posting_date=data.posting_date or data.invoice_date,
+            amount=Decimal("0"),
+            tax_amount=Decimal("0"),
+            total_amount=Decimal("0"),
+            amount_paid=Decimal("0"),
+            balance=Decimal("0"),
             currency=data.currency,
             conversion_rate=data.conversion_rate,
             payment_terms_id=data.payment_terms_id,
@@ -212,7 +219,6 @@ class InvoiceService:
             docstatus=0,
             workflow_status="draft",
             created_by_id=self.principal.id if self.principal else None,
-            origin_system="local",
         )
 
         self.db.add(invoice)
@@ -310,8 +316,6 @@ class InvoiceService:
         if data.due_date is not None:
             invoice.due_date = data.due_date
 
-        if data.posting_date is not None:
-            invoice.posting_date = data.posting_date
 
         if data.currency is not None:
             invoice.currency = data.currency

@@ -1,0 +1,204 @@
+{% extends "layouts/module.html" %}
+
+{% set is_edit = activity is defined and activity.id %}
+
+{% block module_content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <a
+            href="/crm/activities"
+            class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">
+                {{ "Edit Activity" if is_edit else "New Activity" }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ "Update activity details" if is_edit else "Log a call, meeting, task, or note" }}
+            </p>
+        </div>
+    </div>
+
+    <form
+        action="{{ '/crm/activities/' ~ activity.id if is_edit else '/crm/activities' }}"
+        method="POST"
+        class="space-y-6"
+        data-testid="activity-form"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {% if errors and errors.form %}
+        <div class="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm" data-testid="form-error">
+            {{ errors.form }}
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Activity Details</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                    <label for="activity_type" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Activity Type <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="activity_type"
+                        name="activity_type"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors and errors.activity_type else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm"
+                    >
+                        <option value="">Select type</option>
+                        {% for opt in type_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if form_data.activity_type == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if errors and errors.activity_type %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="activity_type">{{ errors.activity_type }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Status
+                    </label>
+                    <select
+                        id="status"
+                        name="status"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        {% for opt in status_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if form_data.status == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="subject" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Subject <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="subject"
+                        name="subject"
+                        value="{{ form_data.subject or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors and errors.subject else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm"
+                        placeholder="e.g., Intro call with ACME"
+                    >
+                    {% if errors and errors.subject %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="subject">{{ errors.subject }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="party_id" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Account
+                    </label>
+                    <select
+                        id="party_id"
+                        name="party_id"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select account</option>
+                        {% for account in account_options %}
+                        <option value="{{ account.id }}" {{ 'selected' if form_data.party_id == account.id else '' }}>
+                            {{ account.name or account.legal_name or ('Account #' ~ account.id) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="opportunity_id" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Opportunity
+                    </label>
+                    <select
+                        id="opportunity_id"
+                        name="opportunity_id"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select opportunity</option>
+                        {% for opp in opportunity_options %}
+                        <option value="{{ opp.id }}" {{ 'selected' if form_data.opportunity_id == opp.id else '' }}>
+                            {{ opp.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="scheduled_at" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Scheduled At
+                    </label>
+                    <input
+                        type="datetime-local"
+                        id="scheduled_at"
+                        name="scheduled_at"
+                        value="{{ form_data.scheduled_at or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                    {% if errors and errors.scheduled_at %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="scheduled_at">{{ errors.scheduled_at }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="duration_minutes" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Duration (minutes)
+                    </label>
+                    <input
+                        type="number"
+                        id="duration_minutes"
+                        name="duration_minutes"
+                        value="{{ form_data.duration_minutes or '' }}"
+                        min="0"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                    {% if errors and errors.duration_minutes %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="duration_minutes">{{ errors.duration_minutes }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="priority" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Priority
+                    </label>
+                    <select
+                        id="priority"
+                        name="priority"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        {% for opt in priority_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if form_data.priority == opt.value else '' }}>
+                            {{ opt.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Notes
+                    </label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        rows="4"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >{{ form_data.description or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <a href="/crm/activities" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">{{ "Save Changes" if is_edit else "Create Activity" }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

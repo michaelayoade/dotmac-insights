@@ -18,6 +18,7 @@ from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.credit_note import CreditNote, CreditNoteStatus
+from app.models.party import CustomerAccount
 from app.models.document_lines import InvoiceLine
 from app.models.party import CustomerAccount, Party
 from app.core.security import validate_csrf, set_flash
@@ -161,7 +162,7 @@ async def credit_notes_list(
 ):
     """Credit notes list page."""
     query = select(CreditNote).options(
-        selectinload(CreditNote.contact),
+        selectinload(CreditNote.customer_account).selectinload(CustomerAccount.party),
         selectinload(CreditNote.invoice)
     )
 
@@ -210,7 +211,13 @@ async def credit_notes_list(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/{invoice_id}", response_class=HTMLResponse, dependencies=[RequireInvoicesRead])
+@router.get("/new", response_class=HTMLResponse, dependencies=[RequireInvoicesWrite])
+async def invoice_new_redirect() -> RedirectResponse:
+    """Redirect to the accounting invoice creation flow."""
+    return RedirectResponse(url="/accounting/invoices/new", status_code=302)
+
+
+@router.get("/{invoice_id:int}", response_class=HTMLResponse, dependencies=[RequireInvoicesRead])
 async def invoice_detail(
     invoice_id: int,
     request: Request,
@@ -264,7 +271,7 @@ async def credit_note_detail(
         .options(
             selectinload(CreditNote.lines),
             selectinload(CreditNote.invoice),
-            selectinload(CreditNote.contact),
+            selectinload(CreditNote.customer_account).selectinload(CustomerAccount.party),
         )
         .where(CreditNote.id == credit_note_id)
     )

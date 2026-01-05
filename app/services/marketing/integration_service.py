@@ -1,7 +1,7 @@
 """Integration service stubs for the Marketing module."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 import re
 from typing import List, Dict, Any, Optional
@@ -180,7 +180,7 @@ class IntegrationService:
     def set_oauth_state(self, integration: MarketingIntegration, state: str, expires_in: int = 600) -> None:
         settings = integration.settings or {}
         settings["oauth_state"] = state
-        settings["oauth_state_expires_at"] = (datetime.utcnow() + timedelta(seconds=expires_in)).isoformat()
+        settings["oauth_state_expires_at"] = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
         integration.settings = settings
         self.db.flush()
 
@@ -195,7 +195,7 @@ class IntegrationService:
                 expires_at_dt = datetime.fromisoformat(expires_at)
             except ValueError:
                 return False
-            if datetime.utcnow() > expires_at_dt:
+            if datetime.now(timezone.utc) > expires_at_dt:
                 return False
         return True
 
@@ -216,7 +216,7 @@ class IntegrationService:
         channel = self._get_existing_channel(integration)
         if channel:
             channel.is_active = False
-            channel.updated_at = datetime.utcnow()
+            channel.updated_at = datetime.now(timezone.utc)
         self.db.delete(integration)
 
     def ensure_omni_channel(self, integration: MarketingIntegration) -> OmniChannel:
@@ -232,7 +232,7 @@ class IntegrationService:
                 channel.name = channel_name
             channel.config = _marketing_channel_config(integration)
             channel.is_active = True
-            channel.updated_at = datetime.utcnow()
+            channel.updated_at = datetime.now(timezone.utc)
         else:
             channel = self._create_channel(channel_name, channel_type, integration)
 

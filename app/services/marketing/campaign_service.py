@@ -7,6 +7,7 @@ from typing import List, Dict, Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.marketing import MarketingCampaign, MarketingCampaignStatus, MarketingCampaignType
 from app.services.errors import NotFoundError
 from app.services.validation.soft_validation_service import SoftValidationService
@@ -69,7 +70,7 @@ class CampaignService:
             {"label": "Total Campaigns", "value": total_campaigns, "icon": "target", "color": "text-primary-600"},
             {"label": "Active", "value": active_campaigns, "icon": "trending-up", "color": "text-emerald-600"},
             {"label": "Paused", "value": scheduled, "icon": "clock", "color": "text-amber-600"},
-            {"label": "Budget", "value": _format_currency("NGN", Decimal(total_budget)), "icon": "dollar-sign", "color": "text-indigo-600"},
+            {"label": "Budget", "value": _format_currency(settings.default_currency, Decimal(total_budget)), "icon": "dollar-sign", "color": "text-indigo-600"},
         ]
 
     def get_campaign(self, campaign_id: int) -> MarketingCampaign:

@@ -35,6 +35,10 @@ from app.services.accounting.receivables import ReceivablesService
 from app.services.accounting.settings import AccountingSettingsService
 from app.services.accounting.approvals import ApprovalsService
 from app.services.workflow_task_service import WorkflowTaskService
+from app.services.subscriptions import SubscriptionService
+from app.services.marketing.analytics_service import MarketingAnalyticsService
+from app.currency import get_currency_symbol
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +71,8 @@ async def dashboard(
     from datetime import datetime
     from app.models.invoice import Invoice, InvoiceStatus
     from app.models.unified_ticket import UnifiedTicket
+    from app.models.lead import Lead
+    from app.models.payment import Payment
 
     context = get_base_context(request, response, user, csrf_token)
     context["navigation"] = get_navigation_context(user)
@@ -84,6 +90,7 @@ async def dashboard(
 
     # Fetch recent activities (mix of invoices, tickets)
     activities = []
+    currency_symbol = get_currency_symbol(settings.base_currency)
 
     # Recent invoices
     try:
@@ -102,7 +109,7 @@ async def dashboard(
                 "color_to": "to-emerald-200",
                 "text_color": "text-emerald-600",
                 "action": "was invoiced",
-                "description": f"Invoice {inv.invoice_number} for ${inv.total_amount:,.2f}" if inv.total_amount else f"Invoice {inv.invoice_number}",
+                "description": f"Invoice {inv.invoice_number} for {currency_symbol}{inv.total_amount:,.2f}" if inv.total_amount else f"Invoice {inv.invoice_number}",
                 "timestamp": inv.created_at,
                 "badge": inv.status.value.replace("_", " ").title() if inv.status else None,
                 "badge_color": "bg-emerald-100 text-emerald-600" if inv.status == InvoiceStatus.PAID else "bg-amber-100 text-amber-600",
@@ -131,6 +138,52 @@ async def dashboard(
     except Exception:
         logger.exception("dashboard_recent_tickets_failed")
 
+    # Recent leads
+    try:
+        recent_leads = db.query(Lead).order_by(
+            Lead.created_at.desc()
+        ).limit(3).all()
+        for lead in recent_leads:
+            lead_name = lead.name or lead.email or "New Lead"
+            activities.append({
+                "user_name": lead_name,
+                "user_initials": lead_name[:2].upper(),
+                "color_from": "from-blue-100",
+                "color_to": "to-blue-200",
+                "text_color": "text-blue-600",
+                "action": "became a lead",
+                "description": f"{lead.email or ''} - {lead.phone or ''}".strip(" -"),
+                "timestamp": lead.created_at,
+                "badge": lead.status.value.replace("_", " ").title() if lead.status else "New",
+                "badge_color": "bg-blue-100 text-blue-600",
+            })
+    except Exception:
+        logger.exception("dashboard_recent_leads_failed")
+
+    # Recent payments
+    try:
+        recent_payments = db.query(Payment).order_by(
+            Payment.created_at.desc()
+        ).limit(3).all()
+        for payment in recent_payments:
+            payer_name = None
+            if payment.customer_account and payment.customer_account.party:
+                payer_name = payment.customer_account.party.name
+            activities.append({
+                "user_name": payer_name or "Customer",
+                "user_initials": (payer_name or "P")[:2].upper(),
+                "color_from": "from-green-100",
+                "color_to": "to-green-200",
+                "text_color": "text-green-600",
+                "action": "made a payment",
+                "description": f"{currency_symbol}{payment.amount:,.2f}" if payment.amount else "Payment received",
+                "timestamp": payment.created_at,
+                "badge": payment.status.value.title() if payment.status else None,
+                "badge_color": "bg-green-100 text-green-600",
+            })
+    except Exception:
+        logger.exception("dashboard_recent_payments_failed")
+
     # Sort by timestamp and take top 6
     activities.sort(key=lambda x: x["timestamp"] or datetime.min, reverse=True)
     context["activities"] = activities[:6]
@@ -146,6 +199,8 @@ def _build_dashboard_stats(db):
     - party_service.count_parties() for party count
     - TicketService.get_dashboard_stats() for open ticket count
     - ReceivablesService.get_invoice_stats() for revenue and pending invoices
+    - MarketingAnalyticsService.get_dashboard_stats() for campaigns
+    - SubscriptionService.get_stats() for active subscriptions
     """
     # 1. Total Parties (via party service)
     party_count = party_service.count_parties(db)
@@ -160,6 +215,27 @@ def _build_dashboard_stats(db):
     receivables_service = ReceivablesService(db, settings_service)
     invoice_stats = receivables_service.get_invoice_stats()
 
+    # 5. Active Campaigns (via marketing analytics service)
+    try:
+        marketing_service = MarketingAnalyticsService(db)
+        marketing_stats = marketing_service.get_dashboard_stats()
+        active_campaigns = marketing_stats[0]["value"] if marketing_stats else 0
+    except Exception:
+        logger.exception("dashboard_marketing_stats_failed")
+        active_campaigns = 0
+
+    # 6. Active Subscriptions (via subscription service)
+    try:
+        sub_service = SubscriptionService(db)
+        sub_stats = sub_service.get_stats()
+        active_subs = sub_stats.active
+    except Exception:
+        logger.exception("dashboard_subscription_stats_failed")
+        active_subs = 0
+
+    # Get currency symbol for formatting
+    currency_symbol = get_currency_symbol(settings.base_currency)
+
     stats = [
         {
             "key": "parties",
@@ -170,6 +246,7 @@ def _build_dashboard_stats(db):
             "icon_bg": "bg-primary-50",
             "icon_color": "text-primary-600",
             "accent_gradient": "from-primary-400 to-primary-600",
+            "href": "/parties",
         },
         {
             "key": "tickets",
@@ -180,16 +257,18 @@ def _build_dashboard_stats(db):
             "icon_bg": "bg-amber-50",
             "icon_color": "text-amber-600",
             "accent_gradient": "from-amber-400 to-amber-600",
+            "href": "/support/tickets?status=open",
         },
         {
             "key": "revenue",
             "label": "Revenue (MTD)",
-            "value": f"${float(invoice_stats.total_revenue):,.0f}",
+            "value": f"{currency_symbol}{float(invoice_stats.total_revenue):,.0f}",
             "subtext": "This month",
             "icon": "currency",
             "icon_bg": "bg-emerald-50",
             "icon_color": "text-emerald-600",
             "accent_gradient": "from-emerald-400 to-emerald-600",
+            "href": "/accounting/invoices?status=paid",
         },
         {
             "key": "invoices",
@@ -200,6 +279,29 @@ def _build_dashboard_stats(db):
             "icon_bg": "bg-red-50",
             "icon_color": "text-red-600",
             "accent_gradient": "from-red-400 to-red-600",
+            "href": "/accounting/invoices?status=pending",
+        },
+        {
+            "key": "campaigns",
+            "label": "Active Campaigns",
+            "value": f"{active_campaigns:,}",
+            "subtext": "Marketing campaigns",
+            "icon": "megaphone",
+            "icon_bg": "bg-purple-50",
+            "icon_color": "text-purple-600",
+            "accent_gradient": "from-purple-400 to-purple-600",
+            "href": "/marketing/campaigns",
+        },
+        {
+            "key": "subscriptions",
+            "label": "Active Subscriptions",
+            "value": f"{active_subs:,}",
+            "subtext": "Service plans",
+            "icon": "repeat",
+            "icon_bg": "bg-blue-50",
+            "icon_color": "text-blue-600",
+            "accent_gradient": "from-blue-400 to-blue-600",
+            "href": "/subscriptions?status=active",
         },
     ]
 
@@ -292,8 +394,9 @@ async def dashboard_stats(
             '''
         subtext_html = f'<p class="mt-1 text-xs text-gray-400 font-body">{stat.get("subtext", "")}</p>' if stat.get("subtext") else ""
 
+        href = stat.get("href", "#")
         html_parts.append(f'''
-        <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{stat.get('key', '')}">
+        <a href="{href}" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-{stat.get('key', '')}">
             <div class="flex items-start justify-between">
                 <div class="flex-1">
                     <dt class="text-sm font-medium text-gray-500 font-body">{stat.get("label", "")}</dt>
@@ -308,7 +411,7 @@ async def dashboard_stats(
                 </div>
             </div>
             <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r {stat.get("accent_gradient", "from-primary-400 to-primary-600")} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </div>
+        </a>
         ''')
 
     return HTMLResponse("".join(html_parts))
@@ -321,6 +424,8 @@ def _get_stat_icon_html(icon_name: str) -> str:
         "ticket": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
         "currency": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
         "invoice": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>',
+        "megaphone": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>',
+        "repeat": '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>',
     }
     return icons.get(icon_name, '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>')
 

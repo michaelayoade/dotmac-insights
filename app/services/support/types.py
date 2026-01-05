@@ -111,6 +111,17 @@ __all__ = [
     # Email template types
     "EmailTemplateCreate",
     "EmailTemplateUpdate",
+    # Tag analytics types
+    "TagStats",
+    "TagTrend",
+    # Enhanced SLA analytics types
+    "AgentSLAStats",
+    "TeamSLAStats",
+    "NearMissTicket",
+    "SLATrendPoint",
+    "CategorySLAStats",
+    "PrioritySLAStats",
+    "SLAAnalyticsSummary",
 ]
 
 
@@ -1611,3 +1622,142 @@ class E2EReport:
     patterns: PatternInsights
     automation: AutomationEffectiveness
     kb_deflection: KBDeflection
+
+
+# ==============================================================================
+# Tag Analytics Types
+# ==============================================================================
+
+
+@dataclass
+class TagStats:
+    """Tag usage statistics for dashboard."""
+
+    tag_id: int
+    tag_name: str
+    color: str
+    ticket_count: int
+    pct_of_total: float
+    growth_pct: float  # Growth vs prior period (positive = trending up)
+    prior_period_count: int
+
+
+@dataclass
+class TagTrend:
+    """Tag usage trend over time for sparklines."""
+
+    tag_id: int
+    tag_name: str
+    color: str
+    daily_counts: List[Dict[str, Any]]  # [{"date": "2026-01-01", "count": 5}, ...]
+
+
+# ==============================================================================
+# Enhanced SLA Analytics Types
+# ==============================================================================
+
+
+@dataclass
+class AgentSLAStats:
+    """SLA attainment statistics per agent."""
+
+    agent_id: int
+    agent_name: str
+    team_name: Optional[str]
+    total_tickets: int
+    response_met: int
+    response_breached: int
+    response_attainment_pct: float
+    resolution_met: int
+    resolution_breached: int
+    resolution_attainment_pct: float
+    overall_attainment_pct: float
+    avg_response_hours: Optional[float]
+    avg_resolution_hours: Optional[float]
+
+
+@dataclass
+class TeamSLAStats:
+    """SLA attainment statistics per team."""
+
+    team_id: int
+    team_name: str
+    total_tickets: int
+    response_met: int
+    response_breached: int
+    response_attainment_pct: float
+    resolution_met: int
+    resolution_breached: int
+    resolution_attainment_pct: float
+    overall_attainment_pct: float
+    agent_count: int
+
+
+@dataclass
+class NearMissTicket:
+    """Ticket that came close to breaching SLA."""
+
+    ticket_id: int
+    ticket_number: str
+    subject: str
+    sla_type: str  # 'response' or 'resolution'
+    target_time: datetime
+    actual_time: datetime
+    margin_minutes: int  # Minutes remaining before breach
+    margin_pct: float  # e.g., 0.95 means 5% margin
+    assigned_to: Optional[str]
+    priority: str
+
+
+@dataclass
+class SLATrendPoint:
+    """SLA attainment for a single time period."""
+
+    period: str  # Date or period label
+    response_attainment_pct: float
+    resolution_attainment_pct: float
+    overall_attainment_pct: float
+    total_tracked: int
+    breaches: int
+
+
+@dataclass
+class CategorySLAStats:
+    """SLA performance by ticket category."""
+
+    category: str
+    total_tickets: int
+    response_attainment_pct: float
+    resolution_attainment_pct: float
+    overall_attainment_pct: float
+    avg_resolution_hours: float
+    breaches: int
+
+
+@dataclass
+class PrioritySLAStats:
+    """SLA performance by priority level."""
+
+    priority: str
+    total_tickets: int
+    response_attainment_pct: float
+    resolution_attainment_pct: float
+    overall_attainment_pct: float
+    avg_response_hours: float
+    avg_resolution_hours: float
+    breaches: int
+
+
+@dataclass
+class SLAAnalyticsSummary:
+    """Summary statistics for SLA analytics dashboard."""
+
+    overall_attainment_pct: float
+    response_attainment_pct: float
+    resolution_attainment_pct: float
+    total_tracked: int
+    total_breaches: int
+    response_breaches: int
+    resolution_breaches: int
+    near_miss_count: int
+    period_days: int

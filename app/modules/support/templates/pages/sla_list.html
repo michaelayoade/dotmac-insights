@@ -5,64 +5,405 @@
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-display font-bold text-gray-900">SLA Policies</h1>
-            <p class="mt-1 text-sm text-gray-500">Service Level Agreement policies for ticket response and resolution</p>
+            <h1 class="text-2xl font-display font-bold text-gray-900">SLA Analytics</h1>
+            <p class="mt-1 text-sm text-gray-500">Service Level Agreement performance metrics and insights</p>
         </div>
-        <div class="flex gap-3">
-            <a href="/support/sla/calendars" class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <div class="flex items-center gap-3">
+            <!-- Period Filter -->
+            <select id="days-filter"
+                    onchange="window.location.href='/support/sla?days=' + this.value"
+                    class="px-4 py-2.5 border border-gray-200 rounded-xl bg-white text-sm font-medium text-gray-700 focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                <option value="7" {{ 'selected' if selected_days == 7 else '' }}>Last 7 days</option>
+                <option value="30" {{ 'selected' if selected_days == 30 else '' }}>Last 30 days</option>
+                <option value="90" {{ 'selected' if selected_days == 90 else '' }}>Last 90 days</option>
+                <option value="180" {{ 'selected' if selected_days == 180 else '' }}>Last 6 months</option>
+                <option value="365" {{ 'selected' if selected_days == 365 else '' }}>Last year</option>
+            </select>
+            <a href="/support/sla/calendars" class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600 text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 Calendars
             </a>
-        </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Total Policies</p>
-                    <p class="text-3xl font-bold text-gray-900 mt-1">{{ stats.total }}</p>
-                </div>
-                <div class="w-12 h-12 bg-gray-50 rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                </div>
-            </div>
-        </div>
-        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
-            <div class="flex items-center justify-between">
-                <div>
-                    <p class="text-sm font-medium text-gray-500">Active</p>
-                    <p class="text-3xl font-bold text-emerald-600 mt-1">{{ stats.active }}</p>
-                </div>
-                <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Filters -->
-    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4">
-        <form hx-get="/support/sla" hx-target="#table-container" hx-push-url="true" class="flex flex-col sm:flex-row gap-4">
-            <div class="flex-1">
-                <input type="text" name="q" value="{{ search_query }}" placeholder="Search policies..."
-                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
-            </div>
-            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
-                Search
-            </button>
-            {% if search_query %}
-            <a href="/support/sla" class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-600">
-                Clear
+            <a href="/settings/support?tab=sla" class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Configure Policies ({{ active_policy_count }})
             </a>
-            {% endif %}
-        </form>
+        </div>
     </div>
 
-    <!-- Table -->
-    <div id="table-container">
-        {% include "modules/support/templates/partials/sla_table.html" %}
+    <!-- Summary Stats -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Overall Attainment -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Overall SLA</p>
+                    <p class="text-3xl font-bold {% if summary.overall_attainment_pct >= 90 %}text-emerald-600{% elif summary.overall_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ "%.1f"|format(summary.overall_attainment_pct) }}%</p>
+                </div>
+                <div class="w-12 h-12 {% if summary.overall_attainment_pct >= 90 %}bg-emerald-50{% elif summary.overall_attainment_pct >= 70 %}bg-amber-50{% else %}bg-red-50{% endif %} rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 {% if summary.overall_attainment_pct >= 90 %}text-emerald-600{% elif summary.overall_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">{{ summary.total_tracked }} tickets tracked</p>
+        </div>
+
+        <!-- Response SLA -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Response SLA</p>
+                    <p class="text-3xl font-bold {% if summary.response_attainment_pct >= 90 %}text-emerald-600{% elif summary.response_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ "%.1f"|format(summary.response_attainment_pct) }}%</p>
+                </div>
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">{{ summary.response_breaches }} breaches</p>
+        </div>
+
+        <!-- Resolution SLA -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Resolution SLA</p>
+                    <p class="text-3xl font-bold {% if summary.resolution_attainment_pct >= 90 %}text-emerald-600{% elif summary.resolution_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ "%.1f"|format(summary.resolution_attainment_pct) }}%</p>
+                </div>
+                <div class="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">{{ summary.resolution_breaches }} breaches</p>
+        </div>
+
+        <!-- Total Breaches -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm font-medium text-gray-500">Total Breaches</p>
+                    <p class="text-3xl font-bold {% if summary.total_breaches == 0 %}text-emerald-600{% elif summary.total_breaches < 10 %}text-amber-600{% else %}text-red-600{% endif %} mt-1">{{ summary.total_breaches }}</p>
+                </div>
+                <div class="w-12 h-12 {% if summary.total_breaches == 0 %}bg-emerald-50{% elif summary.total_breaches < 10 %}bg-amber-50{% else %}bg-red-50{% endif %} rounded-xl flex items-center justify-center">
+                    <svg class="w-6 h-6 {% if summary.total_breaches == 0 %}text-emerald-600{% elif summary.total_breaches < 10 %}text-amber-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">Last {{ selected_days }} days</p>
+        </div>
     </div>
+
+    <!-- Trend Chart -->
+    {% if trends %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">SLA Attainment Trend</h2>
+        <div class="h-64">
+            <canvas id="sla-trend-chart"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Agent & Team Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Agent Performance Table -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Agent Performance</h2>
+            {% if agent_stats %}
+            <div class="overflow-x-auto">
+                <table class="min-w-full" data-testid="sla-agent-table">
+                    <thead>
+                        <tr class="border-b border-gray-100">
+                            <th class="text-left py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
+                            <th class="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Tickets</th>
+                            <th class="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Response</th>
+                            <th class="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Resolution</th>
+                            <th class="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Overall</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for agent in agent_stats[:10] %}
+                        <tr class="hover:bg-surface-50">
+                            <td class="py-3 px-2">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-medium text-sm">
+                                        {{ agent.agent_name[:1].upper() if agent.agent_name else '?' }}
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-900">{{ agent.agent_name }}</p>
+                                        {% if agent.team_name %}
+                                        <p class="text-xs text-gray-500">{{ agent.team_name }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-2 text-center text-sm text-gray-600">{{ agent.total_tickets }}</td>
+                            <td class="py-3 px-2 text-center">
+                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium {% if agent.response_attainment_pct >= 90 %}bg-emerald-100 text-emerald-800{% elif agent.response_attainment_pct >= 70 %}bg-amber-100 text-amber-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ "%.0f"|format(agent.response_attainment_pct) }}%
+                                </span>
+                            </td>
+                            <td class="py-3 px-2 text-center">
+                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium {% if agent.resolution_attainment_pct >= 90 %}bg-emerald-100 text-emerald-800{% elif agent.resolution_attainment_pct >= 70 %}bg-amber-100 text-amber-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ "%.0f"|format(agent.resolution_attainment_pct) }}%
+                                </span>
+                            </td>
+                            <td class="py-3 px-2 text-center">
+                                <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium {% if agent.overall_attainment_pct >= 90 %}bg-emerald-100 text-emerald-800{% elif agent.overall_attainment_pct >= 70 %}bg-amber-100 text-amber-800{% else %}bg-red-100 text-red-800{% endif %}">
+                                    {{ "%.0f"|format(agent.overall_attainment_pct) }}%
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if agent_stats|length > 10 %}
+            <p class="text-xs text-gray-500 mt-3">Showing top 10 of {{ agent_stats|length }} agents</p>
+            {% endif %}
+            {% else %}
+            <p class="text-sm text-gray-500">No agent data available for this period.</p>
+            {% endif %}
+        </div>
+
+        <!-- Team Performance Cards -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Team Performance</h2>
+            {% if team_stats %}
+            <div class="space-y-4">
+                {% for team in team_stats %}
+                <div class="p-4 bg-surface-50 rounded-xl">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="font-medium text-gray-900">{{ team.team_name }}</h3>
+                        <span class="text-sm text-gray-500">{{ team.total_tickets }} tickets</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500 mb-1">Response</p>
+                            <p class="text-lg font-semibold {% if team.response_attainment_pct >= 90 %}text-emerald-600{% elif team.response_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(team.response_attainment_pct) }}%</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500 mb-1">Resolution</p>
+                            <p class="text-lg font-semibold {% if team.resolution_attainment_pct >= 90 %}text-emerald-600{% elif team.resolution_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(team.resolution_attainment_pct) }}%</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500 mb-1">Overall</p>
+                            <p class="text-lg font-semibold {% if team.overall_attainment_pct >= 90 %}text-emerald-600{% elif team.overall_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(team.overall_attainment_pct) }}%</p>
+                        </div>
+                    </div>
+                    <!-- Progress bar -->
+                    <div class="mt-3 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div class="h-full {% if team.overall_attainment_pct >= 90 %}bg-emerald-500{% elif team.overall_attainment_pct >= 70 %}bg-amber-500{% else %}bg-red-500{% endif %}" style="width: {{ team.overall_attainment_pct }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">No team data available for this period.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Breakdown by Category & Priority -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- By Category -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">SLA by Category</h2>
+            {% if category_stats %}
+            <div class="space-y-3">
+                {% for cat in category_stats %}
+                <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-gray-900 capitalize">{{ cat.category }}</span>
+                        <span class="text-xs text-gray-500">({{ cat.total_tickets }} tickets)</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500">Response</p>
+                            <p class="text-sm font-medium {% if cat.response_attainment_pct >= 90 %}text-emerald-600{% elif cat.response_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(cat.response_attainment_pct) }}%</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500">Resolution</p>
+                            <p class="text-sm font-medium {% if cat.resolution_attainment_pct >= 90 %}text-emerald-600{% elif cat.resolution_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(cat.resolution_attainment_pct) }}%</p>
+                        </div>
+                        {% if cat.total_breaches > 0 %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800">
+                            {{ cat.total_breaches }} breach{{ 'es' if cat.total_breaches != 1 else '' }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">No category data available.</p>
+            {% endif %}
+        </div>
+
+        <!-- By Priority -->
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">SLA by Priority</h2>
+            {% if priority_stats %}
+            <div class="space-y-3">
+                {% for pri in priority_stats %}
+                {% set priority_colors = {'critical': 'red', 'high': 'orange', 'medium': 'amber', 'low': 'gray'} %}
+                {% set pri_color = priority_colors.get(pri.priority.lower(), 'gray') %}
+                <div class="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div class="flex items-center gap-3">
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-{{ pri_color }}-100 text-{{ pri_color }}-800 capitalize">
+                            {{ pri.priority }}
+                        </span>
+                        <span class="text-xs text-gray-500">({{ pri.total_tickets }} tickets)</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500">Response</p>
+                            <p class="text-sm font-medium {% if pri.response_attainment_pct >= 90 %}text-emerald-600{% elif pri.response_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(pri.response_attainment_pct) }}%</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500">Resolution</p>
+                            <p class="text-sm font-medium {% if pri.resolution_attainment_pct >= 90 %}text-emerald-600{% elif pri.resolution_attainment_pct >= 70 %}text-amber-600{% else %}text-red-600{% endif %}">{{ "%.0f"|format(pri.resolution_attainment_pct) }}%</p>
+                        </div>
+                        {% if pri.total_breaches > 0 %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-red-100 text-red-800">
+                            {{ pri.total_breaches }} breach{{ 'es' if pri.total_breaches != 1 else '' }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500">No priority data available.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Near Misses -->
+    {% if near_misses %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h2 class="text-lg font-display font-semibold text-gray-900">Near Misses</h2>
+                <p class="text-sm text-gray-500">Tickets that came within 10% of breaching SLA</p>
+            </div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                {{ near_misses|length }} near miss{{ 'es' if near_misses|length != 1 else '' }}
+            </span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full" data-testid="sla-near-misses-table">
+                <thead>
+                    <tr class="border-b border-gray-100">
+                        <th class="text-left py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket</th>
+                        <th class="text-left py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
+                        <th class="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th class="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Margin Used</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for ticket in near_misses %}
+                    <tr class="hover:bg-surface-50">
+                        <td class="py-3 px-2">
+                            <a href="/support/tickets/{{ ticket.ticket_id }}" class="text-sm font-medium text-primary-600 hover:text-primary-700">
+                                {{ ticket.ticket_number }}
+                            </a>
+                        </td>
+                        <td class="py-3 px-2 text-sm text-gray-900 max-w-xs truncate">{{ ticket.subject }}</td>
+                        <td class="py-3 px-2 text-center">
+                            <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium {% if ticket.sla_type == 'response' %}bg-blue-100 text-blue-800{% else %}bg-purple-100 text-purple-800{% endif %} capitalize">
+                                {{ ticket.sla_type }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-2 text-center">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium {% if ticket.margin_pct >= 0.95 %}bg-red-100 text-red-800{% else %}bg-amber-100 text-amber-800{% endif %}">
+                                {{ "%.0f"|format(ticket.margin_pct * 100) }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+{% if trends %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('sla-trend-chart').getContext('2d');
+    const trends = {{ trends | tojson }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: trends.map(t => t.period),
+            datasets: [
+                {
+                    label: 'Overall SLA',
+                    data: trends.map(t => t.overall_attainment_pct),
+                    borderColor: 'rgb(16, 185, 129)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                },
+                {
+                    label: 'Response SLA',
+                    data: trends.map(t => t.response_attainment_pct),
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 5],
+                    tension: 0.3,
+                },
+                {
+                    label: 'Resolution SLA',
+                    data: trends.map(t => t.resolution_attainment_pct),
+                    borderColor: 'rgb(139, 92, 246)',
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 5],
+                    tension: 0.3,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    min: 0,
+                    max: 100,
+                    ticks: {
+                        callback: function(value) {
+                            return value + '%';
+                        }
+                    },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

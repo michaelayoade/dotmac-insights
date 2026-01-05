@@ -1,0 +1,201 @@
+{% extends "layouts/module.html" %}
+
+{% set is_edit = opportunity is defined and opportunity.id %}
+
+{% block module_content %}
+<div class="max-w-3xl mx-auto">
+    <div class="flex items-center gap-3 mb-8">
+        <a
+            href="/crm/opportunities"
+            class="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-2xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">
+                {{ "Edit Opportunity" if is_edit else "New Opportunity" }}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ "Update opportunity details" if is_edit else "Add a new opportunity to the pipeline" }}
+            </p>
+        </div>
+    </div>
+
+    <form
+        action="{{ '/crm/opportunities/' ~ opportunity.id if is_edit else '/crm/opportunities' }}"
+        method="POST"
+        class="space-y-6"
+        data-testid="opportunity-form"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        {% if errors and errors.form %}
+        <div class="rounded-xl bg-red-50 text-red-700 px-4 py-3 text-sm" data-testid="form-error">
+            {{ errors.form }}
+        </div>
+        {% endif %}
+
+        <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6">
+            <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Opportunity Details</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div class="sm:col-span-2">
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Opportunity Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value="{{ form_data.name or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors and errors.name else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm"
+                        placeholder="e.g., ACME Annual Renewal"
+                    >
+                    {% if errors and errors.name %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="name">{{ errors.name }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="party_id" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Account <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="party_id"
+                        name="party_id"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset {{ 'ring-red-300 focus:ring-red-500' if errors and errors.party_id else 'ring-gray-200 focus:ring-primary-500' }} focus:ring-2 focus:ring-inset sm:text-sm"
+                    >
+                        <option value="">Select account</option>
+                        {% for account in account_options %}
+                        <option value="{{ account.id }}" {{ 'selected' if form_data.party_id == account.id else '' }}>
+                            {{ account.name or account.legal_name or ('Account #' ~ account.id) }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if errors and errors.party_id %}
+                    <p class="mt-1 text-sm text-red-600 field-error" data-error="party_id">{{ errors.party_id }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="stage_id" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Stage
+                    </label>
+                    <select
+                        id="stage_id"
+                        name="stage_id"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                        <option value="">Select stage</option>
+                        {% for stage in stages %}
+                        <option value="{{ stage.id }}" {{ 'selected' if form_data.stage_id == stage.id else '' }}>
+                            {{ stage.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="expected_close_date" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Expected Close Date
+                    </label>
+                    <input
+                        type="date"
+                        id="expected_close_date"
+                        name="expected_close_date"
+                        value="{{ form_data.expected_close_date or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="deal_value" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Deal Value
+                    </label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        id="deal_value"
+                        name="deal_value"
+                        value="{{ form_data.deal_value or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="probability" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Probability (%)
+                    </label>
+                    <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        id="probability"
+                        name="probability"
+                        value="{{ form_data.probability or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Currency (Naira)
+                    </label>
+                    <input
+                        type="text"
+                        id="currency"
+                        name="currency"
+                        value="{{ form_data.currency or 'NGN' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="source" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Source
+                    </label>
+                    <input
+                        type="text"
+                        id="source"
+                        name="source"
+                        value="{{ form_data.source or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                        placeholder="e.g., Referral"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="campaign" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Campaign
+                    </label>
+                    <input
+                        type="text"
+                        id="campaign"
+                        name="campaign"
+                        value="{{ form_data.campaign or '' }}"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="description" class="block text-sm font-medium text-gray-700 mb-1.5">
+                        Description
+                    </label>
+                    <textarea
+                        id="description"
+                        name="description"
+                        rows="4"
+                        class="block w-full rounded-xl border-0 py-2.5 px-4 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+                    >{{ form_data.description or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3">
+            <a href="/crm/opportunities" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">{{ "Save Changes" if is_edit else "Create Opportunity" }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

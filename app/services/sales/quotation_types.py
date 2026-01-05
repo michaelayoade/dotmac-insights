@@ -81,8 +81,12 @@ class QuotationCreateData:
 class QuotationUpdateData:
     """Data for updating a quotation (all fields optional)."""
 
+    quotation_to: Optional[str] = None
     party_name: Optional[str] = None
     customer_name: Optional[str] = None
+    company: Optional[str] = None
+    currency: Optional[str] = None
+    transaction_date: Optional[date] = None
     valid_till: Optional[date] = None
     order_type: Optional[str] = None
     sales_partner_id: Optional[int] = None

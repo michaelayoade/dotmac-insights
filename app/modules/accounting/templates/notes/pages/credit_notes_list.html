@@ -6,6 +6,18 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Credit Notes</h1>
         <p class="mt-1.5 text-gray-500 font-body">Manage accounts receivable credit notes</p>
     </div>
+    <div class="flex items-center gap-3">
+        <a
+            href="/accounting/credit-notes/new"
+            class="group inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 hover:shadow-primary-500/30 transition-all duration-200"
+            data-testid="new-credit-note-button"
+        >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            <span>Create Credit Note</span>
+        </a>
+    </div>
 </div>
 {% endblock %}
 

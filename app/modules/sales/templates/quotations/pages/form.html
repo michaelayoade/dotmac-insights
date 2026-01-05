@@ -1,0 +1,203 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <form
+        method="POST"
+        action="{% if is_edit %}/sales/quotations/{{ quotation_id }}{% else %}/sales/quotations{% endif %}"
+        class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+        data-testid="quotation-form"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="origin_system" value="local">
+        <input type="hidden" name="write_back_status" value="pending">
+
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h1 class="text-lg font-semibold text-gray-900">
+                {% if is_edit %}Edit Quotation{% else %}New Quotation{% endif %}
+            </h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {% if is_edit %}Update quotation details.{% else %}Create a quotation for a customer or lead.{% endif %}
+            </p>
+        </div>
+
+        <div class="px-6 py-6 space-y-6">
+            {% if errors.general %}
+            <div class="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 font-body">
+                {{ errors.general }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="quotation_to" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Quotation To
+                    </label>
+                    <select
+                        name="quotation_to"
+                        id="quotation_to"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-to-select"
+                    >
+                        <option value="Customer" {{ 'selected' if form_data.quotation_to == 'Customer' else '' }}>Customer</option>
+                        <option value="Lead" {{ 'selected' if form_data.quotation_to == 'Lead' else '' }}>Lead</option>
+                    </select>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="party_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Customer/Lead Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="party_name"
+                        id="party_name"
+                        required
+                        value="{{ form_data.party_name if form_data else '' }}"
+                        placeholder="Customer or lead"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.party_name else '' }}"
+                        data-testid="quotation-party-name"
+                    >
+                    {% if errors.party_name %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.party_name }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="customer_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Display Name
+                    </label>
+                    <input
+                        type="text"
+                        name="customer_name"
+                        id="customer_name"
+                        value="{{ form_data.customer_name if form_data else '' }}"
+                        placeholder="Optional display name"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-customer-name"
+                    >
+                </div>
+
+                <div>
+                    <label for="company" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Company
+                    </label>
+                    <input
+                        type="text"
+                        name="company"
+                        id="company"
+                        value="{{ form_data.company if form_data else '' }}"
+                        placeholder="Company"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-company"
+                    >
+                </div>
+
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Currency
+                    </label>
+                    <input
+                        type="text"
+                        name="currency"
+                        id="currency"
+                        value="{{ form_data.currency if form_data else 'NGN' }}"
+                        placeholder="NGN"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-currency"
+                    >
+                </div>
+
+                <div>
+                    <label for="transaction_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Quotation Date
+                    </label>
+                    <input
+                        type="date"
+                        name="transaction_date"
+                        id="transaction_date"
+                        value="{{ form_data.transaction_date if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-transaction-date"
+                    >
+                </div>
+
+                <div>
+                    <label for="valid_till" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Valid Till
+                    </label>
+                    <input
+                        type="date"
+                        name="valid_till"
+                        id="valid_till"
+                        value="{{ form_data.valid_till if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-valid-till"
+                    >
+                </div>
+
+                <div>
+                    <label for="order_type" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Order Type
+                    </label>
+                    <input
+                        type="text"
+                        name="order_type"
+                        id="order_type"
+                        value="{{ form_data.order_type if form_data else '' }}"
+                        placeholder="Standard"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-order-type"
+                    >
+                </div>
+
+                <div>
+                    <label for="source" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Source
+                    </label>
+                    <input
+                        type="text"
+                        name="source"
+                        id="source"
+                        value="{{ form_data.source if form_data else '' }}"
+                        placeholder="Website, Referral, etc."
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-source"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="campaign" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Campaign
+                    </label>
+                    <input
+                        type="text"
+                        name="campaign"
+                        id="campaign"
+                        value="{{ form_data.campaign if form_data else '' }}"
+                        placeholder="Campaign name"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="quotation-campaign"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/60 flex items-center justify-end gap-3">
+            <a
+                href="/sales/quotations"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-all"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all shadow-sm"
+                data-testid="quotation-submit"
+            >
+                {% if is_edit %}Save Changes{% else %}Create Quotation{% endif %}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

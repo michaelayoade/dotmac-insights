@@ -83,6 +83,7 @@ def substitute_path_params(path: str) -> str:
         "{entry_id}": "1",
         "{workflow_id}": "1",
         "{approval_id}": "1",
+        "{journey_id}": "1",
         "{tab_name}": "overview",
         "{list_id}": "1",
         "{year}": "2024",
@@ -255,6 +256,23 @@ MODULE_ROUTES = {
     "vehicles": [
         PageRoute("/vehicles", "vehicles_list", "vehicles"),
     ],
+    "marketing": [
+        PageRoute("/marketing", "dashboard", "marketing"),
+        PageRoute("/marketing/campaigns", "campaigns_list", "marketing"),
+        PageRoute("/marketing/journeys", "journeys_list", "marketing"),
+        PageRoute("/marketing/journeys/templates", "journey_templates", "marketing"),
+        PageRoute("/marketing/journeys/{journey_id}/builder", "journey_builder", "marketing", requires_id=True),
+        PageRoute("/marketing/social/calendar", "social_calendar", "marketing"),
+        PageRoute("/marketing/social/compose", "social_compose", "marketing"),
+        PageRoute("/marketing/social/posts", "social_posts", "marketing"),
+        PageRoute("/marketing/social/accounts", "social_accounts", "marketing"),
+        PageRoute("/marketing/email/campaigns", "email_campaigns", "marketing"),
+        PageRoute("/marketing/email/templates", "email_templates", "marketing"),
+        PageRoute("/marketing/email/analytics", "email_analytics", "marketing"),
+        PageRoute("/marketing/audiences", "audiences", "marketing"),
+        PageRoute("/marketing/integrations", "integrations", "marketing"),
+        PageRoute("/marketing/consent", "consent", "marketing"),
+    ],
     "reports": [
         PageRoute("/reports", "dashboard", "reports"),
         PageRoute("/reports/vat", "vat_report", "reports"),
@@ -401,6 +419,8 @@ class TestPageContentIntegrity:
         ("/accounting/invoices", "Invoices"),
         ("/support/tickets", "Tickets"),
         ("/hr/employees", "Employees"),
+        ("/marketing", "Marketing"),
+        ("/marketing/campaigns", "Campaigns"),
     ])
     def test_page_has_expected_content(self, path: str, expected_text: str, auth_cookies: dict):
         """Verify pages contain expected text."""

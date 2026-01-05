@@ -23,6 +23,7 @@ from app.middleware.metrics import get_metrics_response
 from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.validation_warnings import ValidationWarningsMiddleware
+from app.core.security import CSRF_TOKEN_NAME, set_csrf_cookie
 from app.observability.otel import setup_otel, shutdown_otel
 from app.middleware.license import enforce_license
 from app.services.rbac_sync import ensure_admin_has_all_permissions
@@ -100,6 +101,15 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+
+@app.middleware("http")
+async def csrf_cookie_middleware(request: Request, call_next):
+    response = await call_next(request)
+    token = getattr(request.state, "csrf_token", None)
+    if token and not request.cookies.get(CSRF_TOKEN_NAME):
+        set_csrf_cookie(response, token)
+    return response
 
 # Configure CORS
 if not settings.cors_origins_list:

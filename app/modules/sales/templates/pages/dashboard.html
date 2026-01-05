@@ -8,6 +8,17 @@
     </div>
     <!-- Period Filter -->
     <div class="flex items-center gap-3">
+        {% if has_scope("accounting:write") %}
+        <a
+            href="/accounting/invoices/new"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all shadow-sm hover:shadow group"
+        >
+            <svg class="w-4 h-4 transition-transform group-hover:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Create Invoice
+        </a>
+        {% endif %}
         <select
             name="period"
             class="rounded-xl border-0 py-2.5 pl-4 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"

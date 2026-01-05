@@ -56,6 +56,7 @@ def get_settings_nav(user, current_section: str = "support") -> list[dict]:
 
 SUPPORT_TABS = [
     {"id": "general", "label": "General", "href": "/settings/support"},
+    {"id": "tags", "label": "Tags", "href": "/settings/support/tags"},
     {"id": "escalations", "label": "Escalations", "href": "/settings/support/escalations"},
     {"id": "queues", "label": "Queues", "href": "/settings/support/queues"},
     {"id": "fields", "label": "Custom Fields", "href": "/settings/support/fields"},
@@ -268,3 +269,162 @@ async def templates_list(
 
     template = templates.get_template("modules/settings/templates/pages/support/templates.html")
     return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# TAGS MANAGEMENT
+# =============================================================================
+
+@router.get("/tags", response_class=HTMLResponse, dependencies=[RequireSupportSettingsRead])
+async def tags_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Support tags management."""
+    from app.models.support_tags import TicketTag
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["settings_nav"] = get_settings_nav(user, "support")
+    context["support_tabs"] = SUPPORT_TABS
+    context["current_tab"] = "tags"
+
+    # Get all tags
+    tags = db.query(TicketTag).order_by(TicketTag.name).all()
+
+    context["page_title"] = "Ticket Tags"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Settings", "href": "/settings"},
+        {"label": "Support", "href": "/settings/support"},
+        {"label": "Tags"},
+    ])
+
+    context["tags"] = tags
+    context["can_edit"] = user.has_scope("support:settings:write")
+
+    template = templates.get_template("modules/settings/templates/pages/support/tags.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/tags", response_class=HTMLResponse, dependencies=[RequireSupportSettingsWrite])
+async def create_tag(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _csrf: CSRFProtect,
+):
+    """Create a new tag."""
+    from app.models.support_tags import TicketTag
+    from fastapi.responses import RedirectResponse
+
+    form = await request.form()
+    name = form.get("name", "").strip()
+    color = form.get("color", "#6B7280").strip()
+    description = form.get("description", "").strip()
+
+    if not name:
+        set_flash(response, "Tag name is required.", "error")
+        return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+    # Check if tag exists
+    existing = db.query(TicketTag).filter(TicketTag.name == name).first()
+    if existing:
+        set_flash(response, f"Tag '{name}' already exists.", "error")
+        return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+    tag = TicketTag(
+        name=name,
+        color=color,
+        description=description or None,
+        is_active=True,
+        usage_count=0,
+    )
+    db.add(tag)
+    db.commit()
+
+    set_flash(response, f"Tag '{name}' created successfully.", "success")
+    return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+
+@router.post("/tags/{tag_id}/update", response_class=HTMLResponse, dependencies=[RequireSupportSettingsWrite])
+async def update_tag(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    tag_id: int,
+    _csrf: CSRFProtect,
+):
+    """Update a tag."""
+    from app.models.support_tags import TicketTag
+    from fastapi.responses import RedirectResponse
+
+    tag = db.query(TicketTag).filter(TicketTag.id == tag_id).first()
+    if not tag:
+        set_flash(response, "Tag not found.", "error")
+        return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+    form = await request.form()
+    name = form.get("name", "").strip()
+    color = form.get("color", "#6B7280").strip()
+    description = form.get("description", "").strip()
+    is_active = form.get("is_active") in ("true", "on", "1", True)
+
+    if not name:
+        set_flash(response, "Tag name is required.", "error")
+        return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+    # Check if name conflicts with another tag
+    existing = db.query(TicketTag).filter(TicketTag.name == name, TicketTag.id != tag_id).first()
+    if existing:
+        set_flash(response, f"Tag '{name}' already exists.", "error")
+        return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+    tag.name = name
+    tag.color = color
+    tag.description = description or None
+    tag.is_active = is_active
+    db.commit()
+
+    set_flash(response, f"Tag '{name}' updated successfully.", "success")
+    return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+
+@router.post("/tags/{tag_id}/delete", response_class=HTMLResponse, dependencies=[RequireSupportSettingsWrite])
+async def delete_tag(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    tag_id: int,
+    _csrf: CSRFProtect,
+):
+    """Delete a tag."""
+    from app.models.support_tags import TicketTag
+    from fastapi.responses import RedirectResponse
+
+    tag = db.query(TicketTag).filter(TicketTag.id == tag_id).first()
+    if not tag:
+        set_flash(response, "Tag not found.", "error")
+        return RedirectResponse(url="/settings/support/tags", status_code=303)
+
+    tag_name = tag.name
+
+    # If tag has usage, deactivate instead of delete
+    if tag.usage_count > 0:
+        tag.is_active = False
+        db.commit()
+        set_flash(response, f"Tag '{tag_name}' deactivated (in use by {tag.usage_count} tickets).", "info")
+    else:
+        db.delete(tag)
+        db.commit()
+        set_flash(response, f"Tag '{tag_name}' deleted successfully.", "success")
+
+    return RedirectResponse(url="/settings/support/tags", status_code=303)

@@ -89,15 +89,15 @@ class MarketingOAuthService:
             params["code_challenge_method"] = "S256"
 
         integration = self.integration_service.get_or_create_by_type(provider)
-        settings = integration.settings or {}
-        settings.update(
+        self.integration_service.set_oauth_state(integration, state)
+        integration_settings = integration.settings or {}
+        integration_settings.update(
             {
-                "oauth_state": state,
                 "code_verifier": code_verifier,
                 "callback_base_url": callback_base_url,
             }
         )
-        integration.settings = settings
+        integration.settings = integration_settings
 
         return f"{config.auth_url}?{urllib.parse.urlencode(params)}"
 
@@ -107,11 +107,11 @@ class MarketingOAuthService:
             raise ValidationError(f"Missing client_id for {provider}")
 
         integration = self.integration_service.get_or_create_by_type(provider)
-        settings = integration.settings or {}
-        if settings.get("oauth_state") != state:
+        integration_settings = integration.settings or {}
+        if not self.integration_service.validate_oauth_state(integration, state):
             raise ValidationError("Invalid OAuth state")
 
-        code_verifier = settings.get("code_verifier")
+        code_verifier = integration_settings.get("code_verifier")
         token_payload = await _exchange_code(
             config,
             code,
@@ -129,9 +129,10 @@ class MarketingOAuthService:
                 pass
         self.integration_service.store_credentials(integration, token_payload)
 
-        settings.pop("oauth_state", None)
-        settings.pop("code_verifier", None)
-        integration.settings = settings
+        integration_settings.pop("oauth_state", None)
+        integration_settings.pop("oauth_state_expires_at", None)
+        integration_settings.pop("code_verifier", None)
+        integration.settings = integration_settings
 
     async def refresh_token(self, provider: str, refresh_token: str) -> Dict[str, str]:
         config = _get_provider(provider)

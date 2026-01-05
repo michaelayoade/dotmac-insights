@@ -6,7 +6,7 @@
 .PHONY: help install clean lint format \
         test test-unit test-critical test-integration test-e2e test-coverage test-watch \
         test-frontend test-frontend-coverage test-frontend-e2e \
-        docker-up docker-down db-migrate db-upgrade db-downgrade
+        docker-up docker-down db-migrate db-upgrade db-downgrade db-head-check
 
 # =============================================================================
 # HELP
@@ -44,6 +44,7 @@ help:
 	@echo "  make db-migrate       - Create a new migration"
 	@echo "  make db-upgrade       - Apply all pending migrations"
 	@echo "  make db-downgrade     - Rollback last migration"
+	@echo "  make db-head-check    - Ensure Alembic has a single head"
 	@echo ""
 	@echo "Docker:"
 	@echo "  make docker-up        - Start development services"
@@ -202,6 +203,9 @@ db-upgrade:
 
 db-downgrade:
 	poetry run alembic downgrade -1
+
+db-head-check:
+	scripts/check_alembic_heads.sh
 
 # =============================================================================
 # DOCKER

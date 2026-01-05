@@ -303,6 +303,11 @@ async def sales_invoices_redirect():
     return RedirectResponse(url="/invoices", status_code=302)
 
 
+@router.get("/sales/invoices/new")
+async def sales_invoices_new_redirect():
+    return RedirectResponse(url="/accounting/invoices/new", status_code=302)
+
+
 @router.get("/sales/invoices/{path:path}")
 async def sales_invoices_path_redirect(path: str):
     return RedirectResponse(url=f"/invoices/{path}", status_code=302)

@@ -157,6 +157,7 @@ async def support_dashboard(
         backlog_aging = cached_analytics["backlog_aging"]
         sla_performance = cached_analytics["sla_performance"]
         patterns = cached_analytics["patterns"]
+        tag_breakdown = cached_analytics.get("tag_breakdown", [])
     else:
         # Fetch fresh analytics data
         filters_30d = AnalyticsFilters(days=30)
@@ -232,6 +233,11 @@ async def support_dashboard(
                 quietest_period="N/A", by_region=[], seasonal_factors=[],
             )
 
+        try:
+            tag_breakdown = analytics.get_tag_breakdown(filters_30d, limit=10)
+        except Exception:
+            tag_breakdown = []
+
         # Cache the results
         _set_cached_analytics(company_id, {
             "overview": overview,
@@ -244,6 +250,7 @@ async def support_dashboard(
             "backlog_aging": backlog_aging,
             "sla_performance": sla_performance,
             "patterns": patterns,
+            "tag_breakdown": tag_breakdown,
         })
 
     # Format distributions for template
@@ -347,6 +354,20 @@ async def support_dashboard(
             "pct_of_total": c.pct_of_total,
         }
         for c in channel_breakdown
+    ]
+
+    # Tag breakdown (top tags with growth indicators)
+    context["tag_breakdown"] = [
+        {
+            "tag_id": t.tag_id,
+            "tag_name": t.tag_name,
+            "color": t.color,
+            "ticket_count": t.ticket_count,
+            "pct_of_total": t.pct_of_total,
+            "growth_pct": t.growth_pct,
+            "prior_period_count": t.prior_period_count,
+        }
+        for t in tag_breakdown
     ]
 
     # Category breakdown
@@ -2561,65 +2582,168 @@ async def canned_delete(
 # =============================================================================
 
 @sla_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
-async def sla_list(
+async def sla_analytics_dashboard(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
-    q: Optional[str] = Query(None, description="Search query"),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(25, ge=10, le=100),
+    days: int = Query(30, ge=7, le=365, description="Period in days"),
 ):
-    """SLA policies list page."""
+    """SLA Analytics Dashboard - comprehensive SLA performance analytics."""
     from app.services.support import SLAService
-    service = SLAService(db, user)
+    analytics = SupportAnalyticsService(db, principal=user)
+    filters = AnalyticsFilters(days=days)
 
-    offset = (page - 1) * per_page
-    policies, total = service.list_policies(
-        is_active=None,
-        skip=offset,
-        limit=per_page,
-    )
+    # Get SLA analytics summary
+    try:
+        summary = analytics.get_sla_analytics_summary(filters)
+        summary_data = {
+            "overall_attainment_pct": summary.overall_attainment_pct,
+            "response_attainment_pct": summary.response_attainment_pct,
+            "resolution_attainment_pct": summary.resolution_attainment_pct,
+            "total_breaches": summary.total_breaches,
+            "response_breaches": summary.response_breaches,
+            "resolution_breaches": summary.resolution_breaches,
+            "total_tracked": summary.total_tracked,
+        }
+    except Exception:
+        summary_data = {
+            "overall_attainment_pct": 0,
+            "response_attainment_pct": 0,
+            "resolution_attainment_pct": 0,
+            "total_breaches": 0,
+            "response_breaches": 0,
+            "resolution_breaches": 0,
+            "total_tracked": 0,
+        }
 
-    # Apply search filter (service doesn't support search yet)
-    if q:
-        q_lower = q.lower()
-        policies = [p for p in policies if (
-            (p.name and q_lower in p.name.lower()) or
-            (p.description and q_lower in p.description.lower())
-        )]
-        total = len(policies)
+    # Get SLA trends for chart
+    try:
+        trends = analytics.get_sla_trends(filters, periods=6)
+        trends_data = [
+            {
+                "period": t.period,
+                "response_attainment_pct": t.response_attainment_pct,
+                "resolution_attainment_pct": t.resolution_attainment_pct,
+                "overall_attainment_pct": t.overall_attainment_pct,
+                "total_tickets": t.total_tickets,
+            }
+            for t in trends
+        ]
+    except Exception:
+        trends_data = []
 
-    # Sort by priority desc, name
-    policies = sorted(policies, key=lambda p: (-getattr(p, 'priority', 0), p.name or ""))
+    # Get agent SLA performance
+    try:
+        agent_stats = analytics.get_sla_attainment_by_agent(filters, limit=20)
+        agent_stats_data = [
+            {
+                "agent_id": a.agent_id,
+                "agent_name": a.agent_name,
+                "team_name": a.team_name,
+                "total_tickets": a.total_tickets,
+                "response_attainment_pct": a.response_attainment_pct,
+                "resolution_attainment_pct": a.resolution_attainment_pct,
+                "overall_attainment_pct": a.overall_attainment_pct,
+                "avg_response_hours": a.avg_response_hours,
+                "avg_resolution_hours": a.avg_resolution_hours,
+            }
+            for a in agent_stats
+        ]
+    except Exception:
+        agent_stats_data = []
 
-    # Get targets per policy
-    policy_targets = service.list_targets_for_policies([p.id for p in policies])
+    # Get team SLA performance
+    try:
+        team_stats = analytics.get_sla_attainment_by_team(filters)
+        team_stats_data = [
+            {
+                "team_id": t.team_id,
+                "team_name": t.team_name,
+                "total_tickets": t.total_tickets,
+                "response_attainment_pct": t.response_attainment_pct,
+                "resolution_attainment_pct": t.resolution_attainment_pct,
+                "overall_attainment_pct": t.overall_attainment_pct,
+            }
+            for t in team_stats
+        ]
+    except Exception:
+        team_stats_data = []
 
-    # Stats - get all policies for counting
-    all_policies, _ = service.list_policies(is_active=None, skip=0, limit=1000)
-    stats = {
-        "total": len(all_policies),
-        "active": len([p for p in all_policies if p.is_active]),
-    }
+    # Get SLA by category
+    try:
+        category_stats = analytics.get_sla_by_category(filters)
+        category_stats_data = [
+            {
+                "category": c.category,
+                "total_tickets": c.total_tickets,
+                "response_attainment_pct": c.response_attainment_pct,
+                "resolution_attainment_pct": c.resolution_attainment_pct,
+                "total_breaches": c.total_breaches,
+            }
+            for c in category_stats
+        ]
+    except Exception:
+        category_stats_data = []
+
+    # Get SLA by priority
+    try:
+        priority_stats = analytics.get_sla_by_priority(filters)
+        priority_stats_data = [
+            {
+                "priority": p.priority,
+                "total_tickets": p.total_tickets,
+                "response_attainment_pct": p.response_attainment_pct,
+                "resolution_attainment_pct": p.resolution_attainment_pct,
+                "total_breaches": p.total_breaches,
+            }
+            for p in priority_stats
+        ]
+    except Exception:
+        priority_stats_data = []
+
+    # Get near misses
+    try:
+        near_misses = analytics.get_sla_near_misses(filters, threshold_pct=0.9, limit=10)
+        near_misses_data = [
+            {
+                "ticket_id": n.ticket_id,
+                "ticket_number": n.ticket_number,
+                "subject": n.subject,
+                "sla_type": n.sla_type,
+                "target_time": n.target_time.isoformat() if n.target_time else None,
+                "actual_time": n.actual_time.isoformat() if n.actual_time else None,
+                "margin_pct": n.margin_pct,
+            }
+            for n in near_misses
+        ]
+    except Exception:
+        near_misses_data = []
+
+    # Get SLA policy count for "Configure" link
+    sla_service = SLAService(db, user)
+    all_policies, _ = sla_service.list_policies(is_active=None, skip=0, limit=1000)
+    policy_count = len(all_policies)
+    active_policy_count = len([p for p in all_policies if p.is_active])
 
     context = get_base_context(request, response, user, csrf_token)
-    context["policies"] = policies
-    context["policy_targets"] = policy_targets
-    context["stats"] = stats
-    context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
-
-    if is_htmx_request(request):
-        template = templates.get_template("modules/support/templates/partials/sla_table.html")
-        return HTMLResponse(template.render(context))
+    context["summary"] = summary_data
+    context["trends"] = trends_data
+    context["agent_stats"] = agent_stats_data
+    context["team_stats"] = team_stats_data
+    context["category_stats"] = category_stats_data
+    context["priority_stats"] = priority_stats_data
+    context["near_misses"] = near_misses_data
+    context["policy_count"] = policy_count
+    context["active_policy_count"] = active_policy_count
+    context["selected_days"] = days
 
     context["navigation"] = get_navigation_context(user)
-    context["page_title"] = "SLA Policies"
+    context["page_title"] = "SLA Analytics"
     context["breadcrumbs"] = build_breadcrumbs([
         {"label": "Support", "href": "/support/dashboard"},
-        {"label": "SLA Policies"},
+        {"label": "SLA Analytics"},
     ])
 
     template = templates.get_template("modules/support/templates/pages/sla_list.html")
@@ -3619,38 +3743,11 @@ channels_router = APIRouter(prefix="/support/channels", tags=["support-channels"
 webhooks_router = APIRouter(prefix="/support/webhooks", tags=["support-webhooks"])
 
 
-@tags_router.get("", response_class=HTMLResponse, dependencies=[RequireSupportRead])
-async def tags_list(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-):
-    """Support tags list."""
-    from app.services.support.tags import TagService
-
-    service = TagService(db, principal=user)
-    tags, tag_usage, recent_usage = service.list_with_usage(days=30)
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = "Ticket Tags"
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "Support", "href": "/support/dashboard"},
-        {"label": "Tags"},
-    ])
-
-    context["tags"] = tags
-    context["tag_usage"] = tag_usage
-    context["recent_usage"] = recent_usage
-    context["summary"] = {
-        "total_tags": len(tags),
-        "active_tags": sum(1 for t in tags if tag_usage.get(t.id, 0) > 0),
-    }
-
-    template = templates.get_template("modules/support/templates/pages/tags_list.html")
-    return HTMLResponse(template.render(context))
+@tags_router.get("", dependencies=[RequireSupportRead])
+async def tags_list_redirect():
+    """Redirect to tags settings page."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/settings/support/tags", status_code=301)
 
 
 # =============================================================================

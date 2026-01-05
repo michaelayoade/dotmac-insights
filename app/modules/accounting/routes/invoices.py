@@ -18,6 +18,7 @@ from app.services.accounting import AccountingSettingsService, InvoiceService, R
 from app.services.accounting.invoice_types import InvoiceFilters, InvoiceCreateData, InvoiceLineData
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginationParams
+from app.utils.company_context import get_company_context
 
 router = APIRouter()
 
@@ -163,7 +164,7 @@ async def invoices_table(
     )
 
 
-@router.get("/invoices/{invoice_id}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
+@router.get("/invoices/{invoice_id:int}", response_class=HTMLResponse, dependencies=[RequireAccountingRead])
 async def invoice_detail(
     request: Request,
     response: Response,
@@ -298,6 +299,7 @@ async def invoice_create(
         return HTMLResponse(template.render(context), status_code=422)
 
     service = _get_invoice_service(db, user)
+    company = get_company_context(allow_null=True)
     try:
         invoice = service.create_invoice(InvoiceCreateData(
             customer_account_id=customer_id,
@@ -305,6 +307,7 @@ async def invoice_create(
             due_date=due_date,
             description=description,
             lines=lines,
+            company=company,
         ))
         db.commit()
     except ValidationError as exc:

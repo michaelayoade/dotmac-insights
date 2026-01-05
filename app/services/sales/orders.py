@@ -232,6 +232,23 @@ class SalesOrderService:
 
         return order
 
+    def delete_order(self, order_id: int) -> None:
+        """Delete a sales order.
+
+        Args:
+            order_id: The order ID.
+
+        Raises:
+            NotFoundError: If order not found.
+            ValidationError: If order cannot be deleted.
+        """
+        order = self.get_order(order_id, include_items=False)
+
+        if order.status not in (SalesOrderStatus.DRAFT, SalesOrderStatus.ON_HOLD):
+            raise ValidationError(f"Cannot delete order in {order.status.value} status")
+
+        self.db.delete(order)
+
     def cancel_order(self, order_id: int, reason: Optional[str] = None) -> SalesOrder:
         """Cancel a sales order.
 
@@ -712,7 +729,6 @@ class SalesOrderService:
 
         total_qty = sum(item.qty for item in items)
         total = sum(item.amount for item in items)
-
         order.total_qty = total_qty
         order.total = total
         order.net_total = total

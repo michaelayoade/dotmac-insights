@@ -1,0 +1,217 @@
+{% extends "modules/settings/templates/layouts/settings.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div>
+        <nav class="flex items-center gap-2 text-sm text-gray-500 mb-2">{% for crumb in breadcrumbs %}{% if not crumb.is_current %}<a href="{{ crumb.href }}" class="hover:text-gray-700">{{ crumb.label }}</a><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>{% else %}<span class="text-gray-900 font-medium">{{ crumb.label }}</span>{% endif %}{% endfor %}</nav>
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">Ticket Tags</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Create and manage tags for ticket categorization</p>
+    </div>
+    {% if can_edit %}
+    <button type="button" onclick="document.getElementById('create-tag-modal').classList.remove('hidden')"
+            class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        New Tag
+    </button>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block settings_content %}
+<div class="mb-6 border-b border-gray-200">
+    <nav class="flex gap-6 -mb-px overflow-x-auto">{% for tab in support_tabs %}<a href="{{ tab.href }}" class="whitespace-nowrap pb-3 px-1 text-sm font-medium border-b-2 {{ 'border-primary-500 text-primary-600' if current_tab == tab.id else 'border-transparent text-gray-500 hover:text-gray-700' }}">{{ tab.label }}</a>{% endfor %}</nav>
+</div>
+
+<!-- Tags List -->
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100">
+    {% if tags %}
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200" data-testid="tags-table">
+            <thead class="bg-surface-50">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    {% if can_edit %}
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-100">
+                {% for tag in tags %}
+                <tr class="hover:bg-surface-50" data-testid="tag-row-{{ tag.id }}">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center gap-3">
+                            <span class="w-4 h-4 rounded-full flex-shrink-0" style="background-color: {{ tag.color or '#6B7280' }}"></span>
+                            <span class="text-sm font-medium text-gray-900">{{ tag.name }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="text-sm text-gray-500">{{ tag.description or '-' }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            {{ tag.usage_count }} ticket{{ 's' if tag.usage_count != 1 else '' }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% if tag.is_active %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">Active</span>
+                        {% else %}
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Inactive</span>
+                        {% endif %}
+                    </td>
+                    {% if can_edit %}
+                    <td class="px-6 py-4 text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <button type="button"
+                                    onclick="openEditModal({{ tag.id }}, '{{ tag.name }}', '{{ tag.color or '#6B7280' }}', '{{ tag.description or '' }}', {{ 'true' if tag.is_active else 'false' }})"
+                                    class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            <form action="/settings/support/tags/{{ tag.id }}/delete" method="POST" class="inline"
+                                  onsubmit="return confirm('Are you sure you want to {{ 'deactivate' if tag.usage_count > 0 else 'delete' }} this tag?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="text-gray-400 hover:text-red-600">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">No tags</h3>
+        <p class="mt-1 text-sm text-gray-500">Get started by creating a new tag.</p>
+        {% if can_edit %}
+        <div class="mt-6">
+            <button type="button" onclick="document.getElementById('create-tag-modal').classList.remove('hidden')"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                New Tag
+            </button>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Create Tag Modal -->
+<div id="create-tag-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="document.getElementById('create-tag-modal').classList.add('hidden')"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl sm:max-w-lg sm:w-full">
+            <form action="/settings/support/tags" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-900">Create Tag</h3>
+                </div>
+                <div class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" name="name" required
+                               class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" name="color" value="#6B7280" id="create-color-picker"
+                                   class="h-10 w-16 rounded border border-gray-200 cursor-pointer">
+                            <input type="text" id="create-color-text" value="#6B7280" readonly
+                                   class="w-28 px-4 py-2.5 border border-gray-200 rounded-xl bg-surface-50 text-sm font-mono">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                        <textarea name="description" rows="2"
+                                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-surface-50 rounded-b-2xl flex justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('create-tag-modal').classList.add('hidden')"
+                            class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-white font-medium text-gray-600 text-sm">Cancel</button>
+                    <button type="submit"
+                            class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">Create Tag</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Tag Modal -->
+<div id="edit-tag-modal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true">
+    <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="document.getElementById('edit-tag-modal').classList.add('hidden')"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl sm:max-w-lg sm:w-full">
+            <form id="edit-tag-form" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <div class="px-6 py-5 border-b border-gray-100">
+                    <h3 class="text-lg font-semibold text-gray-900">Edit Tag</h3>
+                </div>
+                <div class="px-6 py-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" name="name" id="edit-name" required
+                               class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Color</label>
+                        <div class="flex items-center gap-3">
+                            <input type="color" name="color" id="edit-color-picker"
+                                   class="h-10 w-16 rounded border border-gray-200 cursor-pointer">
+                            <input type="text" id="edit-color-text" readonly
+                                   class="w-28 px-4 py-2.5 border border-gray-200 rounded-xl bg-surface-50 text-sm font-mono">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                        <textarea name="description" id="edit-description" rows="2"
+                                  class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" name="is_active" id="edit-is-active" value="true"
+                                   class="rounded border-gray-300 text-primary-600">
+                            <span class="text-sm text-gray-700">Active</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="px-6 py-4 bg-surface-50 rounded-b-2xl flex justify-end gap-3">
+                    <button type="button" onclick="document.getElementById('edit-tag-modal').classList.add('hidden')"
+                            class="px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-white font-medium text-gray-600 text-sm">Cancel</button>
+                    <button type="submit"
+                            class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium text-sm">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Sync color picker with text display
+document.getElementById('create-color-picker').addEventListener('input', function(e) {
+    document.getElementById('create-color-text').value = e.target.value.toUpperCase();
+});
+
+document.getElementById('edit-color-picker').addEventListener('input', function(e) {
+    document.getElementById('edit-color-text').value = e.target.value.toUpperCase();
+});
+
+function openEditModal(id, name, color, description, isActive) {
+    document.getElementById('edit-tag-form').action = '/settings/support/tags/' + id + '/update';
+    document.getElementById('edit-name').value = name;
+    document.getElementById('edit-color-picker').value = color;
+    document.getElementById('edit-color-text').value = color.toUpperCase();
+    document.getElementById('edit-description').value = description;
+    document.getElementById('edit-is-active').checked = isActive;
+    document.getElementById('edit-tag-modal').classList.remove('hidden');
+}
+</script>
+{% endblock %}

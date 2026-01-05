@@ -5,6 +5,7 @@ HTMX-powered routes for CRM management.
 All routes delegate to services for business logic.
 """
 from datetime import datetime, date, timedelta
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException
@@ -28,9 +29,22 @@ from app.services.crm import (
     ActivityService,
     CampaignService,
 )
-from app.services.crm.lead_types import LeadCreateData, LeadFilters
-from app.services.crm.opportunity_types import OpportunityFilters
-from app.services.crm.activity_types import ActivityFilters
+from app.services.crm.lead_types import (
+    LeadCreateData,
+    LeadFilters,
+    LeadUpdateData,
+    LeadConversionData,
+)
+from app.services.crm.opportunity_types import (
+    OpportunityFilters,
+    OpportunityCreateData,
+    OpportunityUpdateData,
+)
+from app.services.crm.activity_types import (
+    ActivityFilters,
+    ActivityCreateData,
+    ActivityUpdateData,
+)
 from app.services.crm.campaign_types import CampaignFilters
 from app.services.types import PaginationParams
 from app.services.errors import NotFoundError, ValidationError, ConflictError
@@ -309,24 +323,34 @@ async def accounts_create(
         return HTMLResponse(template.render(context))
 
     service = get_party_service(db, user)
+    emails = []
+    if email:
+        emails.append({"address": email, "is_primary": True})
+
+    phones = []
+    if phone:
+        phones.append({"number": phone, "is_primary": True})
+
     create_data = PartyCreateData(
         type="organization",
         name=name or legal_name,
         legal_name=legal_name or None,
         trading_name=trading_name or None,
-        primary_email=email or None,
-        primary_phone=phone or None,
+        emails=emails,
+        phones=phones,
         tax_id=tax_id or None,
-        registration_number=registration_number or None,
-        website=website or None,
-        industry=industry or None,
         notes=notes or None,
+        custom_fields={
+            "registration_number": registration_number or None,
+            "website": website or None,
+            "industry": industry or None,
+        },
     )
 
     try:
         account = service.create_party(create_data)
         if account_type:
-            service.add_party_role(account.id, PartyRoleCreateData(role=account_type))
+            service.add_role(account.id, PartyRoleCreateData(role=account_type))
         db.commit()
     except ValidationError as exc:
         db.rollback()
@@ -393,6 +417,10 @@ async def accounts_edit(
         {"label": "Edit"},
     ])
     context["type_options"] = ACCOUNT_TYPE_OPTIONS
+    custom_fields = account.custom_fields or {}
+    registration_number_value = getattr(account, "registration_number", None) or custom_fields.get("registration_number", "")
+    website_value = getattr(account, "website", None) or custom_fields.get("website", "")
+    industry_value = getattr(account, "industry", None) or custom_fields.get("industry", "")
     context["form_data"] = {
         "name": account.name or "",
         "legal_name": account.legal_name or "",
@@ -401,9 +429,9 @@ async def accounts_edit(
         "phone": account.primary_phone or "",
         "account_type": account_type,
         "tax_id": account.tax_id or "",
-        "registration_number": account.registration_number or "",
-        "website": account.website or "",
-        "industry": account.industry or "",
+        "registration_number": registration_number_value,
+        "website": website_value,
+        "industry": industry_value,
         "notes": account.notes or "",
     }
     context["errors"] = {}
@@ -480,17 +508,21 @@ async def accounts_update(
         template = templates.get_template("modules/crm/templates/accounts/pages/form.html")
         return HTMLResponse(template.render(context))
 
+    emails = [{"address": email, "is_primary": True}] if email else []
+    phones = [{"number": phone, "is_primary": True}] if phone else []
     update_data = PartyUpdateData(
         name=name or legal_name,
         legal_name=legal_name or None,
         trading_name=trading_name or None,
-        primary_email=email or None,
-        primary_phone=phone or None,
+        emails=emails,
+        phones=phones,
         tax_id=tax_id or None,
-        registration_number=registration_number or None,
-        website=website or None,
-        industry=industry or None,
         notes=notes or None,
+        custom_fields={
+            "registration_number": registration_number or None,
+            "website": website or None,
+            "industry": industry or None,
+        },
     )
 
     try:
@@ -502,10 +534,10 @@ async def accounts_update(
                     existing_role = role
                     break
             if existing_role and existing_role.role != account_type:
-                service.remove_party_role(account_id, existing_role.id)
-                service.add_party_role(account_id, PartyRoleCreateData(role=account_type))
+                service.remove_role(account_id, existing_role.id)
+                service.add_role(account_id, PartyRoleCreateData(role=account_type))
             elif not existing_role:
-                service.add_party_role(account_id, PartyRoleCreateData(role=account_type))
+                service.add_role(account_id, PartyRoleCreateData(role=account_type))
         db.commit()
     except ValidationError as exc:
         db.rollback()
@@ -1249,6 +1281,56 @@ async def leads_new(
     return HTMLResponse(template.render(context))
 
 
+@router.get("/crm/leads/{lead_id}/edit", response_class=HTMLResponse)
+async def leads_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    lead_id: int,
+):
+    """Edit lead form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+
+    lead_service = get_lead_service(db)
+    try:
+        lead = lead_service.get_lead(lead_id)
+    except NotFoundError:
+        context["error"] = "Lead not found"
+        template = templates.get_template("modules/crm/templates/leads/pages/detail.html")
+        return HTMLResponse(template.render(context), status_code=404)
+
+    context["page_title"] = f"Edit Lead: {lead.name}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Leads", "href": "/crm/leads"},
+        {"label": lead.name, "href": f"/crm/leads/{lead.party_id}"},
+        {"label": "Edit"},
+    ])
+    context["source_options"] = LEAD_SOURCE_OPTIONS
+    context["qualification_options"] = LEAD_QUALIFICATION_OPTIONS
+    context["lead"] = lead
+    context["form_data"] = {
+        "type": lead.type,
+        "name": lead.name,
+        "first_name": lead.first_name,
+        "last_name": lead.last_name,
+        "primary_email": lead.primary_email,
+        "primary_phone": lead.primary_phone,
+        "source": lead.source,
+        "source_campaign": lead.source_campaign,
+        "qualification": lead.qualification,
+        "lead_score": lead.lead_score,
+        "notes": lead.notes,
+    }
+    context["errors"] = {}
+
+    template = templates.get_template("modules/crm/templates/leads/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
 @router.post("/crm/leads", response_class=HTMLResponse)
 async def leads_create(
     request: Request,
@@ -1351,6 +1433,217 @@ async def leads_create(
 
         template = templates.get_template("modules/crm/templates/leads/pages/form.html")
         return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/leads/{lead_id}", response_class=HTMLResponse)
+async def leads_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    lead_id: int,
+):
+    """Update a lead."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    first_name = (form.get("first_name") or "").strip() or None
+    last_name = (form.get("last_name") or "").strip() or None
+    primary_email = (form.get("primary_email") or "").strip() or None
+    primary_phone = (form.get("primary_phone") or "").strip() or None
+    source = (form.get("source") or "").strip() or None
+    source_campaign = (form.get("source_campaign") or "").strip() or None
+    qualification = (form.get("qualification") or "").strip() or None
+    lead_score_str = (form.get("lead_score") or "").strip()
+    notes = (form.get("notes") or "").strip() or None
+
+    lead_score = int(lead_score_str) if lead_score_str else None
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Name is required"
+
+    form_data = {
+        "type": (form.get("type") or "person").strip(),
+        "name": name,
+        "first_name": first_name,
+        "last_name": last_name,
+        "primary_email": primary_email,
+        "primary_phone": primary_phone,
+        "source": source,
+        "source_campaign": source_campaign,
+        "qualification": qualification,
+        "lead_score": lead_score,
+        "notes": notes,
+    }
+
+    lead_service = get_lead_service(db)
+    try:
+        lead = lead_service.get_lead(lead_id)
+    except NotFoundError:
+        context = get_base_context(request, response, user, csrf_token)
+        context["error"] = "Lead not found"
+        template = templates.get_template("modules/crm/templates/leads/pages/detail.html")
+        return HTMLResponse(template.render(context), status_code=404)
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit Lead: {lead.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Leads", "href": "/crm/leads"},
+            {"label": lead.name, "href": f"/crm/leads/{lead.party_id}"},
+            {"label": "Edit"},
+        ])
+        context["source_options"] = LEAD_SOURCE_OPTIONS
+        context["qualification_options"] = LEAD_QUALIFICATION_OPTIONS
+        context["lead"] = lead
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/leads/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    try:
+        update_data = LeadUpdateData(
+            name=name,
+            first_name=first_name,
+            last_name=last_name,
+            primary_email=primary_email,
+            primary_phone=primary_phone,
+            source=source,
+            source_campaign=source_campaign,
+            qualification=qualification,
+            lead_score=lead_score,
+            notes=notes,
+        )
+        lead_service.update_lead(lead_id, update_data)
+        db.commit()
+        return RedirectResponse(url=f"/crm/leads/{lead_id}", status_code=303)
+    except ValidationError as e:
+        errors["form"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit Lead: {lead.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Leads", "href": "/crm/leads"},
+            {"label": lead.name, "href": f"/crm/leads/{lead.party_id}"},
+            {"label": "Edit"},
+        ])
+        context["source_options"] = LEAD_SOURCE_OPTIONS
+        context["qualification_options"] = LEAD_QUALIFICATION_OPTIONS
+        context["lead"] = lead
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/leads/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+
+@router.post("/crm/leads/{lead_id}/delete", response_class=HTMLResponse)
+async def leads_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    lead_id: int,
+):
+    """Delete a lead (soft delete)."""
+    await validate_csrf(request)
+    lead_service = get_lead_service(db)
+    try:
+        lead_service.delete_lead(lead_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    redirect = RedirectResponse(url="/crm/leads", status_code=303)
+    set_flash(redirect, "Lead deleted successfully.", "success")
+    return redirect
+
+
+def _convert_lead_to_opportunity(
+    lead_service: LeadService,
+    lead_id: int,
+    opportunity_name: Optional[str] = None,
+    deal_value: Optional[float] = None,
+    stage_id: Optional[int] = None,
+):
+    conversion_data = LeadConversionData(
+        opportunity_name=opportunity_name,
+        deal_value=deal_value,
+        stage_id=stage_id,
+    )
+    return lead_service.convert_to_opportunity(lead_id, conversion_data)
+
+
+@router.get("/crm/leads/{lead_id}/convert/opportunity", response_class=HTMLResponse)
+async def leads_convert_to_opportunity_get(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    lead_id: int,
+):
+    """Convert lead to opportunity (GET fallback)."""
+    lead_service = get_lead_service(db)
+    try:
+        opportunity = _convert_lead_to_opportunity(lead_service, lead_id)
+        db.commit()
+        return RedirectResponse(url=f"/crm/opportunities/{opportunity.id}", status_code=303)
+    except NotFoundError:
+        context = get_base_context(request, response, user, csrf_token)
+        context["error"] = "Lead not found"
+        template = templates.get_template("modules/crm/templates/leads/pages/detail.html")
+        return HTMLResponse(template.render(context), status_code=404)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/crm/leads/{lead_id}/convert/opportunity", response_class=HTMLResponse)
+async def leads_convert_to_opportunity(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    lead_id: int,
+):
+    """Convert lead to opportunity."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    opportunity_name = (form.get("opportunity_name") or "").strip() or None
+    deal_value_str = (form.get("deal_value") or "").strip()
+    deal_value = float(deal_value_str) if deal_value_str else None
+    stage_id_str = (form.get("stage_id") or "").strip()
+    stage_id = int(stage_id_str) if stage_id_str else None
+
+    lead_service = get_lead_service(db)
+    try:
+        opportunity = _convert_lead_to_opportunity(
+            lead_service,
+            lead_id,
+            opportunity_name=opportunity_name,
+            deal_value=deal_value,
+            stage_id=stage_id,
+        )
+        db.commit()
+        return RedirectResponse(url=f"/crm/opportunities/{opportunity.id}", status_code=303)
+    except NotFoundError:
+        context = get_base_context(request, response, user, csrf_token)
+        context["error"] = "Lead not found"
+        template = templates.get_template("modules/crm/templates/leads/pages/detail.html")
+        return HTMLResponse(template.render(context), status_code=404)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/crm/leads/{lead_id}", response_class=HTMLResponse)
@@ -1469,6 +1762,413 @@ async def opportunities_list(
     return HTMLResponse(template.render(context))
 
 
+@router.get("/crm/opportunities/new", response_class=HTMLResponse)
+async def opportunities_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New opportunity form."""
+    opp_service = get_opportunity_service(db)
+    party_service = get_party_service(db, user)
+
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Opportunity"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Opportunities", "href": "/crm/opportunities"},
+        {"label": "New"},
+    ])
+    context["account_options"] = accounts.items
+    context["stages"] = opp_service.list_stages(active_only=True)
+    context["form_data"] = {}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/crm/templates/opportunities/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/opportunities", response_class=HTMLResponse)
+async def opportunities_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create a new opportunity."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    party_id_raw = (form.get("party_id") or "").strip()
+    stage_id_raw = (form.get("stage_id") or "").strip()
+    deal_value_raw = (form.get("deal_value") or "").strip()
+    probability_raw = (form.get("probability") or "").strip()
+    currency = (form.get("currency") or "NGN").strip() or "NGN"
+    expected_close_date_raw = (form.get("expected_close_date") or "").strip()
+    source = (form.get("source") or "").strip() or None
+    campaign = (form.get("campaign") or "").strip() or None
+    description = (form.get("description") or "").strip() or None
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Opportunity name is required"
+    if not party_id_raw:
+        errors["party_id"] = "Account is required"
+
+    party_id = None
+    stage_id = None
+    probability = None
+    deal_value = Decimal("0")
+    expected_close_date = None
+
+    if party_id_raw:
+        try:
+            party_id = int(party_id_raw)
+        except ValueError:
+            errors["party_id"] = "Account is invalid"
+
+    if stage_id_raw:
+        try:
+            stage_id = int(stage_id_raw)
+        except ValueError:
+            errors["stage_id"] = "Stage is invalid"
+
+    if probability_raw:
+        try:
+            probability = int(probability_raw)
+        except ValueError:
+            errors["probability"] = "Probability must be a number"
+
+    if deal_value_raw:
+        try:
+            deal_value = Decimal(deal_value_raw)
+        except (InvalidOperation, ValueError):
+            errors["deal_value"] = "Deal value must be a valid amount"
+
+    if expected_close_date_raw:
+        try:
+            expected_close_date = date.fromisoformat(expected_close_date_raw)
+        except ValueError:
+            errors["expected_close_date"] = "Expected close date is invalid"
+
+    form_data = {
+        "name": name,
+        "party_id": party_id,
+        "stage_id": stage_id,
+        "deal_value": deal_value_raw,
+        "probability": probability_raw,
+        "currency": currency,
+        "expected_close_date": expected_close_date_raw,
+        "source": source,
+        "campaign": campaign,
+        "description": description,
+    }
+
+    if errors:
+        opp_service = get_opportunity_service(db)
+        party_service = get_party_service(db, user)
+        accounts = party_service.list_parties(
+            PartyFilters(party_type="organization"),
+            PaginationParams(limit=200),
+        )
+
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Opportunity"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Opportunities", "href": "/crm/opportunities"},
+            {"label": "New"},
+        ])
+        context["account_options"] = accounts.items
+        context["stages"] = opp_service.list_stages(active_only=True)
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/opportunities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    opp_service = get_opportunity_service(db)
+    try:
+        create_data = OpportunityCreateData(
+            name=name,
+            party_id=party_id,
+            description=description,
+            stage_id=stage_id,
+            deal_value=deal_value,
+            probability=probability or 0,
+            currency=currency,
+            expected_close_date=expected_close_date,
+            source=source,
+            campaign=campaign,
+        )
+        opportunity = opp_service.create_opportunity(create_data)
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        errors["form"] = str(exc)
+        opp_service = get_opportunity_service(db)
+        party_service = get_party_service(db, user)
+        accounts = party_service.list_parties(
+            PartyFilters(party_type="organization"),
+            PaginationParams(limit=200),
+        )
+
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Opportunity"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Opportunities", "href": "/crm/opportunities"},
+            {"label": "New"},
+        ])
+        context["account_options"] = accounts.items
+        context["stages"] = opp_service.list_stages(active_only=True)
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/opportunities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    return RedirectResponse(url=f"/crm/opportunities/{opportunity.id}", status_code=303)
+
+
+@router.get("/crm/opportunities/{opp_id:int}/edit", response_class=HTMLResponse)
+async def opportunities_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    opp_id: int,
+):
+    """Edit opportunity form."""
+    opp_service = get_opportunity_service(db)
+    party_service = get_party_service(db, user)
+
+    try:
+        opportunity = opp_service.get_opportunity(opp_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit Opportunity: {opportunity.name}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Opportunities", "href": "/crm/opportunities"},
+        {"label": opportunity.name, "href": f"/crm/opportunities/{opp_id}"},
+        {"label": "Edit"},
+    ])
+    context["account_options"] = accounts.items
+    context["stages"] = opp_service.list_stages(active_only=True)
+    context["form_data"] = {
+        "name": opportunity.name,
+        "party_id": opportunity.party_id,
+        "stage_id": opportunity.stage_id,
+        "deal_value": opportunity.deal_value,
+        "probability": opportunity.probability,
+        "currency": opportunity.currency,
+        "expected_close_date": opportunity.expected_close_date.isoformat() if opportunity.expected_close_date else "",
+        "source": opportunity.source,
+        "campaign": opportunity.campaign,
+        "description": opportunity.description,
+    }
+    context["errors"] = {}
+    context["opportunity"] = opportunity
+
+    template = templates.get_template("modules/crm/templates/opportunities/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/opportunities/{opp_id:int}", response_class=HTMLResponse)
+async def opportunities_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    opp_id: int,
+):
+    """Update an opportunity."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    name = (form.get("name") or "").strip()
+    party_id_raw = (form.get("party_id") or "").strip()
+    stage_id_raw = (form.get("stage_id") or "").strip()
+    deal_value_raw = (form.get("deal_value") or "").strip()
+    probability_raw = (form.get("probability") or "").strip()
+    currency = (form.get("currency") or "NGN").strip() or "NGN"
+    expected_close_date_raw = (form.get("expected_close_date") or "").strip()
+    source = (form.get("source") or "").strip() or None
+    campaign = (form.get("campaign") or "").strip() or None
+    description = (form.get("description") or "").strip() or None
+
+    errors: dict[str, str] = {}
+    if not name:
+        errors["name"] = "Opportunity name is required"
+    if not party_id_raw:
+        errors["party_id"] = "Account is required"
+
+    party_id = None
+    stage_id = None
+    probability = None
+    deal_value = None
+    expected_close_date = None
+
+    if party_id_raw:
+        try:
+            party_id = int(party_id_raw)
+        except ValueError:
+            errors["party_id"] = "Account is invalid"
+
+    if stage_id_raw:
+        try:
+            stage_id = int(stage_id_raw)
+        except ValueError:
+            errors["stage_id"] = "Stage is invalid"
+
+    if probability_raw:
+        try:
+            probability = int(probability_raw)
+        except ValueError:
+            errors["probability"] = "Probability must be a number"
+
+    if deal_value_raw:
+        try:
+            deal_value = Decimal(deal_value_raw)
+        except (InvalidOperation, ValueError):
+            errors["deal_value"] = "Deal value must be a valid amount"
+
+    if expected_close_date_raw:
+        try:
+            expected_close_date = date.fromisoformat(expected_close_date_raw)
+        except ValueError:
+            errors["expected_close_date"] = "Expected close date is invalid"
+
+    form_data = {
+        "name": name,
+        "party_id": party_id,
+        "stage_id": stage_id,
+        "deal_value": deal_value_raw,
+        "probability": probability_raw,
+        "currency": currency,
+        "expected_close_date": expected_close_date_raw,
+        "source": source,
+        "campaign": campaign,
+        "description": description,
+    }
+
+    opp_service = get_opportunity_service(db)
+    party_service = get_party_service(db, user)
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+
+    try:
+        opportunity = opp_service.get_opportunity(opp_id)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit Opportunity: {opportunity.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Opportunities", "href": "/crm/opportunities"},
+            {"label": opportunity.name, "href": f"/crm/opportunities/{opp_id}"},
+            {"label": "Edit"},
+        ])
+        context["account_options"] = accounts.items
+        context["stages"] = opp_service.list_stages(active_only=True)
+        context["form_data"] = form_data
+        context["errors"] = errors
+        context["opportunity"] = opportunity
+
+        template = templates.get_template("modules/crm/templates/opportunities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    try:
+        update_data = OpportunityUpdateData(
+            name=name,
+            party_id=party_id,
+            stage_id=stage_id,
+            deal_value=deal_value,
+            probability=probability,
+            currency=currency,
+            expected_close_date=expected_close_date,
+            source=source,
+            campaign=campaign,
+            description=description,
+        )
+        opp_service.update_opportunity(opp_id, update_data)
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        errors["form"] = str(exc)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit Opportunity: {opportunity.name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Opportunities", "href": "/crm/opportunities"},
+            {"label": opportunity.name, "href": f"/crm/opportunities/{opp_id}"},
+            {"label": "Edit"},
+        ])
+        context["account_options"] = accounts.items
+        context["stages"] = opp_service.list_stages(active_only=True)
+        context["form_data"] = form_data
+        context["errors"] = errors
+        context["opportunity"] = opportunity
+
+        template = templates.get_template("modules/crm/templates/opportunities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    return RedirectResponse(url=f"/crm/opportunities/{opp_id}", status_code=303)
+
+
+@router.post("/crm/opportunities/{opp_id:int}/delete", response_class=HTMLResponse)
+async def opportunities_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    opp_id: int,
+):
+    """Delete an opportunity."""
+    await validate_csrf(request)
+    opp_service = get_opportunity_service(db)
+    try:
+        opp_service.delete_opportunity(opp_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    redirect = RedirectResponse(url="/crm/opportunities", status_code=303)
+    set_flash(redirect, "Opportunity deleted successfully.", "success")
+    return redirect
+
+
 @router.get("/crm/opportunities/table", response_class=HTMLResponse)
 async def opportunities_table(
     request: Request,
@@ -1500,7 +2200,7 @@ async def opportunities_table(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/crm/opportunities/{opp_id}", response_class=HTMLResponse)
+@router.get("/crm/opportunities/{opp_id:int}", response_class=HTMLResponse)
 async def opportunity_detail(
     request: Request,
     response: Response,
@@ -1623,6 +2323,518 @@ async def activities_list(
     return HTMLResponse(template.render(context))
 
 
+@router.get("/crm/activities/new", response_class=HTMLResponse)
+async def activities_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New activity form."""
+    party_service = get_party_service(db, user)
+    opp_service = get_opportunity_service(db)
+
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+    opportunities = opp_service.list_opportunities(
+        OpportunityFilters(),
+        PaginationParams(limit=200),
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Activity"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Activities", "href": "/crm/activities"},
+        {"label": "New"},
+    ])
+    context["account_options"] = accounts.items
+    context["opportunity_options"] = opportunities.data
+    context["type_options"] = [
+        {"value": "call", "label": "Call"},
+        {"value": "meeting", "label": "Meeting"},
+        {"value": "email", "label": "Email"},
+        {"value": "task", "label": "Task"},
+        {"value": "note", "label": "Note"},
+        {"value": "demo", "label": "Demo"},
+        {"value": "follow_up", "label": "Follow Up"},
+    ]
+    context["status_options"] = [
+        {"value": "planned", "label": "Planned"},
+        {"value": "completed", "label": "Completed"},
+        {"value": "cancelled", "label": "Cancelled"},
+    ]
+    context["priority_options"] = [
+        {"value": "low", "label": "Low"},
+        {"value": "medium", "label": "Medium"},
+        {"value": "high", "label": "High"},
+    ]
+    context["form_data"] = {}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/crm/templates/activities/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/activities", response_class=HTMLResponse)
+async def activities_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """Create a new activity."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    activity_type = (form.get("activity_type") or "").strip()
+    subject = (form.get("subject") or "").strip()
+    status = (form.get("status") or "planned").strip()
+    party_id_raw = (form.get("party_id") or "").strip()
+    opportunity_id_raw = (form.get("opportunity_id") or "").strip()
+    scheduled_at_raw = (form.get("scheduled_at") or "").strip()
+    duration_raw = (form.get("duration_minutes") or "").strip()
+    priority = (form.get("priority") or "medium").strip()
+    description = (form.get("description") or "").strip() or None
+
+    errors: dict[str, str] = {}
+    if not activity_type:
+        errors["activity_type"] = "Activity type is required"
+    if not subject:
+        errors["subject"] = "Subject is required"
+
+    party_id = None
+    opportunity_id = None
+    scheduled_at = None
+    duration_minutes = None
+
+    if party_id_raw:
+        try:
+            party_id = int(party_id_raw)
+        except ValueError:
+            errors["party_id"] = "Account is invalid"
+
+    if opportunity_id_raw:
+        try:
+            opportunity_id = int(opportunity_id_raw)
+        except ValueError:
+            errors["opportunity_id"] = "Opportunity is invalid"
+
+    if scheduled_at_raw:
+        try:
+            scheduled_at = datetime.fromisoformat(scheduled_at_raw)
+        except ValueError:
+            errors["scheduled_at"] = "Scheduled time is invalid"
+
+    if duration_raw:
+        try:
+            duration_minutes = int(duration_raw)
+        except ValueError:
+            errors["duration_minutes"] = "Duration must be a number"
+
+    form_data = {
+        "activity_type": activity_type,
+        "subject": subject,
+        "status": status,
+        "party_id": party_id,
+        "opportunity_id": opportunity_id,
+        "scheduled_at": scheduled_at_raw,
+        "duration_minutes": duration_raw,
+        "priority": priority,
+        "description": description,
+    }
+
+    party_service = get_party_service(db, user)
+    opp_service = get_opportunity_service(db)
+
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+    opportunities = opp_service.list_opportunities(
+        OpportunityFilters(),
+        PaginationParams(limit=200),
+    )
+
+    if errors:
+
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Activity"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Activities", "href": "/crm/activities"},
+            {"label": "New"},
+        ])
+        context["account_options"] = accounts.items
+        context["opportunity_options"] = opportunities.data
+        context["type_options"] = [
+            {"value": "call", "label": "Call"},
+            {"value": "meeting", "label": "Meeting"},
+            {"value": "email", "label": "Email"},
+            {"value": "task", "label": "Task"},
+            {"value": "note", "label": "Note"},
+            {"value": "demo", "label": "Demo"},
+            {"value": "follow_up", "label": "Follow Up"},
+        ]
+        context["status_options"] = [
+            {"value": "planned", "label": "Planned"},
+            {"value": "completed", "label": "Completed"},
+            {"value": "cancelled", "label": "Cancelled"},
+        ]
+        context["priority_options"] = [
+            {"value": "low", "label": "Low"},
+            {"value": "medium", "label": "Medium"},
+            {"value": "high", "label": "High"},
+        ]
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/activities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    activity_service = get_activity_service(db)
+    try:
+        create_data = ActivityCreateData(
+            activity_type=activity_type,
+            subject=subject,
+            status=status,
+            party_id=party_id,
+            opportunity_id=opportunity_id,
+            scheduled_at=scheduled_at,
+            duration_minutes=duration_minutes,
+            priority=priority,
+            description=description,
+        )
+        activity = activity_service.create_activity(create_data)
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        errors["form"] = str(exc)
+        form_data["activity_type"] = activity_type
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Activity"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Activities", "href": "/crm/activities"},
+            {"label": "New"},
+        ])
+        context["account_options"] = accounts.items
+        context["opportunity_options"] = opportunities.data
+        context["type_options"] = [
+            {"value": "call", "label": "Call"},
+            {"value": "meeting", "label": "Meeting"},
+            {"value": "email", "label": "Email"},
+            {"value": "task", "label": "Task"},
+            {"value": "note", "label": "Note"},
+            {"value": "demo", "label": "Demo"},
+            {"value": "follow_up", "label": "Follow Up"},
+        ]
+        context["status_options"] = [
+            {"value": "planned", "label": "Planned"},
+            {"value": "completed", "label": "Completed"},
+            {"value": "cancelled", "label": "Cancelled"},
+        ]
+        context["priority_options"] = [
+            {"value": "low", "label": "Low"},
+            {"value": "medium", "label": "Medium"},
+            {"value": "high", "label": "High"},
+        ]
+        context["form_data"] = form_data
+        context["errors"] = errors
+
+        template = templates.get_template("modules/crm/templates/activities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    return RedirectResponse(url=f"/crm/activities/{activity.id}", status_code=303)
+
+
+@router.get("/crm/activities/{activity_id:int}/edit", response_class=HTMLResponse)
+async def activities_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    activity_id: int,
+):
+    """Edit activity form."""
+    activity_service = get_activity_service(db)
+    party_service = get_party_service(db, user)
+    opp_service = get_opportunity_service(db)
+
+    try:
+        activity = activity_service.get_activity(activity_id, include_relations=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+    opportunities = opp_service.list_opportunities(
+        OpportunityFilters(),
+        PaginationParams(limit=200),
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit Activity: {activity.subject}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "CRM", "href": "/crm"},
+        {"label": "Activities", "href": "/crm/activities"},
+        {"label": activity.subject, "href": f"/crm/activities/{activity_id}"},
+        {"label": "Edit"},
+    ])
+    context["account_options"] = accounts.items
+    context["opportunity_options"] = opportunities.data
+    context["type_options"] = [
+        {"value": "call", "label": "Call"},
+        {"value": "meeting", "label": "Meeting"},
+        {"value": "email", "label": "Email"},
+        {"value": "task", "label": "Task"},
+        {"value": "note", "label": "Note"},
+        {"value": "demo", "label": "Demo"},
+        {"value": "follow_up", "label": "Follow Up"},
+    ]
+    context["status_options"] = [
+        {"value": "planned", "label": "Planned"},
+        {"value": "completed", "label": "Completed"},
+        {"value": "cancelled", "label": "Cancelled"},
+    ]
+    context["priority_options"] = [
+        {"value": "low", "label": "Low"},
+        {"value": "medium", "label": "Medium"},
+        {"value": "high", "label": "High"},
+    ]
+    context["form_data"] = {
+        "activity_type": activity.activity_type.value if activity.activity_type else "",
+        "subject": activity.subject,
+        "status": activity.status.value if activity.status else "planned",
+        "party_id": activity.party_id,
+        "opportunity_id": activity.opportunity_id,
+        "scheduled_at": activity.scheduled_at.isoformat() if activity.scheduled_at else "",
+        "duration_minutes": activity.duration_minutes,
+        "priority": activity.priority,
+        "description": activity.description,
+    }
+    context["errors"] = {}
+    context["activity"] = activity
+
+    template = templates.get_template("modules/crm/templates/activities/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/crm/activities/{activity_id:int}", response_class=HTMLResponse)
+async def activities_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    activity_id: int,
+):
+    """Update an activity."""
+    await validate_csrf(request)
+    form = await request.form()
+
+    activity_type = (form.get("activity_type") or "").strip()
+    subject = (form.get("subject") or "").strip()
+    status = (form.get("status") or "planned").strip()
+    party_id_raw = (form.get("party_id") or "").strip()
+    opportunity_id_raw = (form.get("opportunity_id") or "").strip()
+    scheduled_at_raw = (form.get("scheduled_at") or "").strip()
+    duration_raw = (form.get("duration_minutes") or "").strip()
+    priority = (form.get("priority") or "medium").strip()
+    description = (form.get("description") or "").strip() or None
+
+    errors: dict[str, str] = {}
+    if not activity_type:
+        errors["activity_type"] = "Activity type is required"
+    if not subject:
+        errors["subject"] = "Subject is required"
+
+    party_id = None
+    opportunity_id = None
+    scheduled_at = None
+    duration_minutes = None
+
+    if party_id_raw:
+        try:
+            party_id = int(party_id_raw)
+        except ValueError:
+            errors["party_id"] = "Account is invalid"
+
+    if opportunity_id_raw:
+        try:
+            opportunity_id = int(opportunity_id_raw)
+        except ValueError:
+            errors["opportunity_id"] = "Opportunity is invalid"
+
+    if scheduled_at_raw:
+        try:
+            scheduled_at = datetime.fromisoformat(scheduled_at_raw)
+        except ValueError:
+            errors["scheduled_at"] = "Scheduled time is invalid"
+
+    if duration_raw:
+        try:
+            duration_minutes = int(duration_raw)
+        except ValueError:
+            errors["duration_minutes"] = "Duration must be a number"
+
+    form_data = {
+        "activity_type": activity_type,
+        "subject": subject,
+        "status": status,
+        "party_id": party_id,
+        "opportunity_id": opportunity_id,
+        "scheduled_at": scheduled_at_raw,
+        "duration_minutes": duration_raw,
+        "priority": priority,
+        "description": description,
+    }
+
+    activity_service = get_activity_service(db)
+    party_service = get_party_service(db, user)
+    opp_service = get_opportunity_service(db)
+
+    accounts = party_service.list_parties(
+        PartyFilters(party_type="organization"),
+        PaginationParams(limit=200),
+    )
+    opportunities = opp_service.list_opportunities(
+        OpportunityFilters(),
+        PaginationParams(limit=200),
+    )
+
+    try:
+        activity = activity_service.get_activity(activity_id, include_relations=True)
+    except NotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit Activity: {activity.subject}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Activities", "href": "/crm/activities"},
+            {"label": activity.subject, "href": f"/crm/activities/{activity_id}"},
+            {"label": "Edit"},
+        ])
+        context["account_options"] = accounts.items
+        context["opportunity_options"] = opportunities.data
+        context["type_options"] = [
+            {"value": "call", "label": "Call"},
+            {"value": "meeting", "label": "Meeting"},
+            {"value": "email", "label": "Email"},
+            {"value": "task", "label": "Task"},
+            {"value": "note", "label": "Note"},
+            {"value": "demo", "label": "Demo"},
+            {"value": "follow_up", "label": "Follow Up"},
+        ]
+        context["status_options"] = [
+            {"value": "planned", "label": "Planned"},
+            {"value": "completed", "label": "Completed"},
+            {"value": "cancelled", "label": "Cancelled"},
+        ]
+        context["priority_options"] = [
+            {"value": "low", "label": "Low"},
+            {"value": "medium", "label": "Medium"},
+            {"value": "high", "label": "High"},
+        ]
+        context["form_data"] = form_data
+        context["errors"] = errors
+        context["activity"] = activity
+
+        template = templates.get_template("modules/crm/templates/activities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    try:
+        update_data = ActivityUpdateData(
+            subject=subject,
+            description=description,
+            status=status,
+            scheduled_at=scheduled_at,
+            duration_minutes=duration_minutes,
+            priority=priority,
+        )
+        activity_service.update_activity(activity_id, update_data)
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        errors["form"] = str(exc)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit Activity: {activity.subject}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "CRM", "href": "/crm"},
+            {"label": "Activities", "href": "/crm/activities"},
+            {"label": activity.subject, "href": f"/crm/activities/{activity_id}"},
+            {"label": "Edit"},
+        ])
+        context["account_options"] = accounts.items
+        context["opportunity_options"] = opportunities.data
+        context["type_options"] = [
+            {"value": "call", "label": "Call"},
+            {"value": "meeting", "label": "Meeting"},
+            {"value": "email", "label": "Email"},
+            {"value": "task", "label": "Task"},
+            {"value": "note", "label": "Note"},
+            {"value": "demo", "label": "Demo"},
+            {"value": "follow_up", "label": "Follow Up"},
+        ]
+        context["status_options"] = [
+            {"value": "planned", "label": "Planned"},
+            {"value": "completed", "label": "Completed"},
+            {"value": "cancelled", "label": "Cancelled"},
+        ]
+        context["priority_options"] = [
+            {"value": "low", "label": "Low"},
+            {"value": "medium", "label": "Medium"},
+            {"value": "high", "label": "High"},
+        ]
+        context["form_data"] = form_data
+        context["errors"] = errors
+        context["activity"] = activity
+
+        template = templates.get_template("modules/crm/templates/activities/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    return RedirectResponse(url=f"/crm/activities/{activity_id}", status_code=303)
+
+
+@router.post("/crm/activities/{activity_id:int}/delete", response_class=HTMLResponse)
+async def activities_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    activity_id: int,
+):
+    """Delete an activity."""
+    await validate_csrf(request)
+    activity_service = get_activity_service(db)
+    try:
+        activity_service.delete_activity(activity_id)
+        db.commit()
+    except NotFoundError as exc:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    redirect = RedirectResponse(url="/crm/activities", status_code=303)
+    set_flash(redirect, "Activity deleted successfully.", "success")
+    return redirect
+
+
 @router.get("/crm/activities/table", response_class=HTMLResponse)
 async def activities_table(
     request: Request,
@@ -1654,7 +2866,7 @@ async def activities_table(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/crm/activities/{activity_id}", response_class=HTMLResponse)
+@router.get("/crm/activities/{activity_id:int}", response_class=HTMLResponse)
 async def activity_detail(
     request: Request,
     response: Response,

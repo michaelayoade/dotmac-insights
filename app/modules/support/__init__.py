@@ -57,7 +57,7 @@ NAVIGATION = [
             {"label": "Teams", "href": "/support/teams", "icon": "users"},
             {"label": "Agents", "href": "/support/agents", "icon": "user"},
             {"label": "Escalations", "href": "/support/escalations", "icon": "arrow-up"},
-            {"label": "Tags", "href": "/support/tags", "icon": "tag"},
+            {"label": "Tags", "href": "/settings/support/tags", "icon": "tag"},
             {"label": "Channels", "href": "/support/channels", "icon": "wifi"},
         ],
     },

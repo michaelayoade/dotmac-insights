@@ -159,6 +159,8 @@ def ensure_csrf_token(request: Request, response: Response) -> str:
     if not token:
         token = generate_csrf_token()
         set_csrf_cookie(response, token)
+    # Store on request for middleware to attach to outgoing responses.
+    request.state.csrf_token = token
     return token
 
 

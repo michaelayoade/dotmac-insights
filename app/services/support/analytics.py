@@ -30,6 +30,7 @@ from app.models.agent import Team, TeamMember
 from app.models.support_automation import AutomationRule, AutomationLog
 from app.models.support_kb import KBArticle, KBArticleFeedback
 from app.models.support_csat import CSATSurvey, CSATResponse
+from app.models.support_tags import TicketTag
 
 from .types import (
     AnalyticsFilters,
@@ -49,6 +50,15 @@ from .types import (
     AutomationEffectiveness,
     KBDeflection,
     E2EReport,
+    TagStats,
+    TagTrend,
+    AgentSLAStats,
+    TeamSLAStats,
+    NearMissTicket,
+    SLATrendPoint,
+    CategorySLAStats,
+    PrioritySLAStats,
+    SLAAnalyticsSummary,
 )
 
 if TYPE_CHECKING:
@@ -762,6 +772,182 @@ class SupportAnalyticsService:
         ]
 
     # =========================================================================
+    # TAG ANALYTICS
+    # =========================================================================
+
+    def get_tag_breakdown(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+        limit: int = 10,
+    ) -> List[TagStats]:
+        """Get tag usage breakdown with growth indicators.
+
+        Returns top tags by ticket count with comparison to prior period.
+
+        Args:
+            filters: Date range and other filters.
+            limit: Maximum tags to return.
+
+        Returns:
+            List of TagStats with usage counts and growth percentages.
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        # Calculate prior period for growth comparison
+        period_days = filters.days or 30
+        prior_start = start_dt - timedelta(days=period_days)
+        prior_end = start_dt
+
+        # Get all active tags
+        tags = (
+            self.db.query(TicketTag)
+            .filter(TicketTag.is_active == True)
+            .order_by(TicketTag.usage_count.desc())
+            .limit(limit * 2)  # Get more to ensure we have enough after filtering
+            .all()
+        )
+
+        if not tags:
+            return []
+
+        # Count current period usage per tag
+        current_counts: Dict[str, int] = {}
+        prior_counts: Dict[str, int] = {}
+
+        for tag in tags:
+            # Current period count
+            current_count = (
+                self.db.query(func.count(UnifiedTicket.id))
+                .filter(
+                    UnifiedTicket.is_deleted == False,
+                    UnifiedTicket.created_at >= start_dt,
+                    UnifiedTicket.tags.contains([tag.name]),
+                )
+            )
+            if end_dt:
+                current_count = current_count.filter(UnifiedTicket.created_at <= end_dt)
+            current_counts[tag.name] = current_count.scalar() or 0
+
+            # Prior period count
+            prior_count = (
+                self.db.query(func.count(UnifiedTicket.id))
+                .filter(
+                    UnifiedTicket.is_deleted == False,
+                    UnifiedTicket.created_at >= prior_start,
+                    UnifiedTicket.created_at < prior_end,
+                    UnifiedTicket.tags.contains([tag.name]),
+                )
+                .scalar() or 0
+            )
+            prior_counts[tag.name] = prior_count
+
+        # Calculate total tickets in period for percentage
+        total_tickets = (
+            self.db.query(func.count(UnifiedTicket.id))
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+            )
+        )
+        if end_dt:
+            total_tickets = total_tickets.filter(UnifiedTicket.created_at <= end_dt)
+        total_tickets = total_tickets.scalar() or 1  # Avoid division by zero
+
+        # Build results sorted by current count
+        results = []
+        for tag in tags:
+            current = current_counts.get(tag.name, 0)
+            prior = prior_counts.get(tag.name, 0)
+
+            # Calculate growth percentage
+            if prior > 0:
+                growth_pct = round((current - prior) / prior * 100, 1)
+            elif current > 0:
+                growth_pct = 100.0  # New tag with usage
+            else:
+                growth_pct = 0.0
+
+            results.append(TagStats(
+                tag_id=tag.id,
+                tag_name=tag.name,
+                color=tag.color or "#6B7280",  # Default gray
+                ticket_count=current,
+                pct_of_total=round(current / total_tickets * 100, 1) if total_tickets > 0 else 0,
+                growth_pct=growth_pct,
+                prior_period_count=prior,
+            ))
+
+        # Sort by ticket count descending and limit
+        results.sort(key=lambda x: x.ticket_count, reverse=True)
+        return results[:limit]
+
+    def get_tag_trends(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+        top_n: int = 5,
+    ) -> List[TagTrend]:
+        """Get daily tag usage trends for top tags.
+
+        Returns daily counts for sparkline visualization.
+
+        Args:
+            filters: Date range filters.
+            top_n: Number of top tags to return trends for.
+
+        Returns:
+            List of TagTrend with daily counts.
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        # Get top tags first
+        top_tags = self.get_tag_breakdown(filters, limit=top_n)
+        if not top_tags:
+            return []
+
+        results = []
+        for tag_stat in top_tags:
+            # Get daily counts for this tag
+            daily_query = (
+                self.db.query(
+                    func.date(UnifiedTicket.created_at).label("date"),
+                    func.count(UnifiedTicket.id).label("count"),
+                )
+                .filter(
+                    UnifiedTicket.is_deleted == False,
+                    UnifiedTicket.created_at >= start_dt,
+                    UnifiedTicket.tags.contains([tag_stat.tag_name]),
+                )
+            )
+            if end_dt:
+                daily_query = daily_query.filter(UnifiedTicket.created_at <= end_dt)
+
+            daily_data = (
+                daily_query
+                .group_by(func.date(UnifiedTicket.created_at))
+                .order_by(func.date(UnifiedTicket.created_at))
+                .all()
+            )
+
+            daily_counts = [
+                {"date": str(row.date), "count": row.count}
+                for row in daily_data
+            ]
+
+            # Get tag details
+            tag = self.db.query(TicketTag).filter(TicketTag.id == tag_stat.tag_id).first()
+
+            results.append(TagTrend(
+                tag_id=tag_stat.tag_id,
+                tag_name=tag_stat.tag_name,
+                color=tag.color if tag else "#6B7280",
+                daily_counts=daily_counts,
+            ))
+
+        return results
+
+    # =========================================================================
     # SLA PERFORMANCE
     # =========================================================================
 
@@ -872,6 +1058,804 @@ class SupportAnalyticsService:
             )
             for row in results
         ]
+
+    def get_sla_analytics_summary(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+    ) -> SLAAnalyticsSummary:
+        """Get overall SLA analytics summary stats.
+
+        Provides key metrics for the SLA dashboard header cards.
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        # Query tickets with SLA tracking
+        query = (
+            self.db.query(
+                # Response SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at > UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_breached"),
+                # Resolution SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at > UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_breached"),
+                func.count(UnifiedTicket.id).label("total"),
+            )
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+            )
+        )
+        if end_dt:
+            query = query.filter(UnifiedTicket.created_at <= end_dt)
+
+        row = query.first()
+
+        response_met = row.response_met or 0
+        response_breached = row.response_breached or 0
+        resolution_met = row.resolution_met or 0
+        resolution_breached = row.resolution_breached or 0
+
+        response_total = response_met + response_breached
+        resolution_total = resolution_met + resolution_breached
+        overall_met = response_met + resolution_met
+        overall_total = response_total + resolution_total
+
+        return SLAAnalyticsSummary(
+            overall_attainment_pct=round(overall_met / max(overall_total, 1) * 100, 1),
+            response_attainment_pct=round(response_met / max(response_total, 1) * 100, 1),
+            resolution_attainment_pct=round(resolution_met / max(resolution_total, 1) * 100, 1),
+            total_breaches=response_breached + resolution_breached,
+            response_breaches=response_breached,
+            resolution_breaches=resolution_breached,
+            total_tracked=overall_total,
+            period_days=filters.days,
+        )
+
+    def get_sla_attainment_by_agent(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+        limit: int = 50,
+    ) -> List[AgentSLAStats]:
+        """Get SLA attainment broken down by agent.
+
+        Returns per-agent metrics including response/resolution attainment.
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        # Calculate response and resolution time expressions
+        response_hours = func.extract(
+            "epoch", UnifiedTicket.first_responded_at - UnifiedTicket.created_at
+        ) / 3600
+        resolution_hours = func.extract(
+            "epoch", UnifiedTicket.resolved_at - UnifiedTicket.created_at
+        ) / 3600
+
+        query = (
+            self.db.query(
+                Party.id.label("agent_id"),
+                Party.name.label("agent_name"),
+                func.count(UnifiedTicket.id).label("total_tickets"),
+                # Response SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at > UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_breached"),
+                # Resolution SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at > UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_breached"),
+                func.avg(response_hours).label("avg_response_hours"),
+                func.avg(resolution_hours).label("avg_resolution_hours"),
+            )
+            .select_from(Party)
+            .join(PartyRole, and_(
+                PartyRole.party_id == Party.id,
+                PartyRole.role == "support_agent",
+                PartyRole.status == "active",
+                PartyRole.until.is_(None),
+            ))
+            .outerjoin(
+                UnifiedTicket,
+                and_(
+                    UnifiedTicket.assigned_to_party_id == Party.id,
+                    UnifiedTicket.created_at >= start_dt,
+                    UnifiedTicket.created_at <= end_dt if end_dt else True,
+                    UnifiedTicket.is_deleted == False,
+                ),
+            )
+            .filter(Party.status == "active")
+        )
+
+        if filters.team_id:
+            query = query.join(TeamMember, TeamMember.party_id == Party.id).filter(
+                TeamMember.team_id == filters.team_id
+            )
+
+        results = (
+            query.group_by(Party.id, Party.name)
+            .order_by(func.count(UnifiedTicket.id).desc())
+            .limit(limit)
+            .all()
+        )
+
+        # Get team names for agents
+        agent_teams = self._get_agent_teams([r.agent_id for r in results])
+
+        stats = []
+        for row in results:
+            total = row.total_tickets or 0
+            response_met = row.response_met or 0
+            response_breached = row.response_breached or 0
+            resolution_met = row.resolution_met or 0
+            resolution_breached = row.resolution_breached or 0
+
+            response_total = response_met + response_breached
+            resolution_total = resolution_met + resolution_breached
+            overall_met = response_met + resolution_met
+            overall_total = response_total + resolution_total
+
+            stats.append(AgentSLAStats(
+                agent_id=row.agent_id,
+                agent_name=row.agent_name or f"Agent {row.agent_id}",
+                team_name=agent_teams.get(row.agent_id),
+                total_tickets=total,
+                response_met=response_met,
+                response_breached=response_breached,
+                response_attainment_pct=round(response_met / max(response_total, 1) * 100, 1),
+                resolution_met=resolution_met,
+                resolution_breached=resolution_breached,
+                resolution_attainment_pct=round(resolution_met / max(resolution_total, 1) * 100, 1),
+                overall_attainment_pct=round(overall_met / max(overall_total, 1) * 100, 1),
+                avg_response_hours=round(float(row.avg_response_hours), 2) if row.avg_response_hours else None,
+                avg_resolution_hours=round(float(row.avg_resolution_hours), 2) if row.avg_resolution_hours else None,
+            ))
+
+        return stats
+
+    def get_sla_attainment_by_team(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+    ) -> List[TeamSLAStats]:
+        """Get SLA attainment broken down by team.
+
+        Returns per-team metrics including response/resolution attainment.
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        query = (
+            self.db.query(
+                Team.id.label("team_id"),
+                Team.name.label("team_name"),
+                func.count(distinct(UnifiedTicket.id)).label("total_tickets"),
+                # Response SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at > UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_breached"),
+                # Resolution SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at > UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_breached"),
+            )
+            .select_from(Team)
+            .outerjoin(TeamMember, TeamMember.team_id == Team.id)
+            .outerjoin(Party, Party.id == TeamMember.party_id)
+            .outerjoin(
+                UnifiedTicket,
+                and_(
+                    UnifiedTicket.assigned_to_party_id == Party.id,
+                    UnifiedTicket.created_at >= start_dt,
+                    UnifiedTicket.created_at <= end_dt if end_dt else True,
+                    UnifiedTicket.is_deleted == False,
+                ),
+            )
+            .filter(Team.is_active == True)
+        )
+
+        if filters.team_id:
+            query = query.filter(Team.id == filters.team_id)
+
+        results = (
+            query.group_by(Team.id, Team.name)
+            .order_by(func.count(distinct(UnifiedTicket.id)).desc())
+            .all()
+        )
+
+        stats = []
+        for row in results:
+            total = row.total_tickets or 0
+            response_met = row.response_met or 0
+            response_breached = row.response_breached or 0
+            resolution_met = row.resolution_met or 0
+            resolution_breached = row.resolution_breached or 0
+
+            response_total = response_met + response_breached
+            resolution_total = resolution_met + resolution_breached
+            overall_met = response_met + resolution_met
+            overall_total = response_total + resolution_total
+
+            stats.append(TeamSLAStats(
+                team_id=row.team_id,
+                team_name=row.team_name,
+                total_tickets=total,
+                response_met=response_met,
+                response_breached=response_breached,
+                response_attainment_pct=round(response_met / max(response_total, 1) * 100, 1),
+                resolution_met=resolution_met,
+                resolution_breached=resolution_breached,
+                resolution_attainment_pct=round(resolution_met / max(resolution_total, 1) * 100, 1),
+                overall_attainment_pct=round(overall_met / max(overall_total, 1) * 100, 1),
+            ))
+
+        return stats
+
+    def get_sla_near_misses(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+        threshold_pct: float = 0.9,
+        limit: int = 20,
+    ) -> List[NearMissTicket]:
+        """Get tickets that came close to breaching SLA.
+
+        Near misses are tickets where actual time was within threshold_pct
+        of the SLA target (e.g., 0.9 = within 90% of target).
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        results = []
+
+        # Check response SLA near misses
+        response_query = (
+            self.db.query(UnifiedTicket)
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+                UnifiedTicket.response_by.isnot(None),
+                UnifiedTicket.first_responded_at.isnot(None),
+                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,  # Met SLA
+            )
+        )
+        if end_dt:
+            response_query = response_query.filter(UnifiedTicket.created_at <= end_dt)
+
+        for ticket in response_query.all():
+            # Calculate what % of the SLA target was used
+            target_duration = (ticket.response_by - ticket.created_at).total_seconds()
+            actual_duration = (ticket.first_responded_at - ticket.created_at).total_seconds()
+
+            if target_duration > 0:
+                margin_pct = actual_duration / target_duration
+                if margin_pct >= threshold_pct:
+                    results.append(NearMissTicket(
+                        ticket_id=ticket.id,
+                        ticket_number=ticket.ticket_number,
+                        subject=ticket.subject,
+                        sla_type="response",
+                        target_time=ticket.response_by,
+                        actual_time=ticket.first_responded_at,
+                        margin_pct=round(margin_pct, 3),
+                    ))
+
+        # Check resolution SLA near misses
+        resolution_query = (
+            self.db.query(UnifiedTicket)
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+                UnifiedTicket.resolution_by.isnot(None),
+                UnifiedTicket.resolved_at.isnot(None),
+                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,  # Met SLA
+            )
+        )
+        if end_dt:
+            resolution_query = resolution_query.filter(UnifiedTicket.created_at <= end_dt)
+
+        for ticket in resolution_query.all():
+            target_duration = (ticket.resolution_by - ticket.created_at).total_seconds()
+            actual_duration = (ticket.resolved_at - ticket.created_at).total_seconds()
+
+            if target_duration > 0:
+                margin_pct = actual_duration / target_duration
+                if margin_pct >= threshold_pct:
+                    results.append(NearMissTicket(
+                        ticket_id=ticket.id,
+                        ticket_number=ticket.ticket_number,
+                        subject=ticket.subject,
+                        sla_type="resolution",
+                        target_time=ticket.resolution_by,
+                        actual_time=ticket.resolved_at,
+                        margin_pct=round(margin_pct, 3),
+                    ))
+
+        # Sort by margin (closest to breach first) and limit
+        results.sort(key=lambda x: x.margin_pct, reverse=True)
+        return results[:limit]
+
+    def get_sla_trends(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+        periods: int = 6,
+    ) -> List[SLATrendPoint]:
+        """Get SLA attainment trend over time periods.
+
+        Returns monthly data points for trend visualization.
+        """
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        query = (
+            self.db.query(
+                extract("year", UnifiedTicket.created_at).label("year"),
+                extract("month", UnifiedTicket.created_at).label("month"),
+                # Response SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_total"),
+                # Resolution SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_total"),
+                func.count(UnifiedTicket.id).label("total_tickets"),
+            )
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+            )
+        )
+        if end_dt:
+            query = query.filter(UnifiedTicket.created_at <= end_dt)
+
+        results = (
+            query.group_by(
+                extract("year", UnifiedTicket.created_at),
+                extract("month", UnifiedTicket.created_at),
+            )
+            .order_by(
+                extract("year", UnifiedTicket.created_at).desc(),
+                extract("month", UnifiedTicket.created_at).desc(),
+            )
+            .limit(periods)
+            .all()
+        )
+
+        # Reverse to chronological order
+        results = list(reversed(results))
+
+        return [
+            SLATrendPoint(
+                period=f"{int(row.year)}-{int(row.month):02d}",
+                response_attainment_pct=round(
+                    (row.response_met or 0) / max(row.response_total or 1, 1) * 100, 1
+                ),
+                resolution_attainment_pct=round(
+                    (row.resolution_met or 0) / max(row.resolution_total or 1, 1) * 100, 1
+                ),
+                overall_attainment_pct=round(
+                    ((row.response_met or 0) + (row.resolution_met or 0)) /
+                    max((row.response_total or 0) + (row.resolution_total or 0), 1) * 100, 1
+                ),
+                total_tickets=row.total_tickets or 0,
+            )
+            for row in results
+        ]
+
+    def get_sla_by_category(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+    ) -> List[CategorySLAStats]:
+        """Get SLA performance broken down by ticket category/type."""
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        query = (
+            self.db.query(
+                UnifiedTicket.ticket_type.label("category"),
+                func.count(UnifiedTicket.id).label("total_tickets"),
+                # Response SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at > UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_breached"),
+                # Resolution SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at > UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_breached"),
+            )
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+                UnifiedTicket.ticket_type.isnot(None),
+            )
+        )
+        if end_dt:
+            query = query.filter(UnifiedTicket.created_at <= end_dt)
+
+        results = (
+            query.group_by(UnifiedTicket.ticket_type)
+            .order_by(func.count(UnifiedTicket.id).desc())
+            .all()
+        )
+
+        stats = []
+        for row in results:
+            response_met = row.response_met or 0
+            response_breached = row.response_breached or 0
+            resolution_met = row.resolution_met or 0
+            resolution_breached = row.resolution_breached or 0
+
+            response_total = response_met + response_breached
+            resolution_total = resolution_met + resolution_breached
+
+            category_name = row.category.value if hasattr(row.category, "value") else str(row.category)
+
+            stats.append(CategorySLAStats(
+                category=category_name,
+                total_tickets=row.total_tickets or 0,
+                response_attainment_pct=round(response_met / max(response_total, 1) * 100, 1),
+                resolution_attainment_pct=round(resolution_met / max(resolution_total, 1) * 100, 1),
+                total_breaches=response_breached + resolution_breached,
+            ))
+
+        return stats
+
+    def get_sla_by_priority(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+    ) -> List[PrioritySLAStats]:
+        """Get SLA performance broken down by priority level."""
+        filters = filters or AnalyticsFilters()
+        start_dt, end_dt = self._get_date_range(filters)
+
+        query = (
+            self.db.query(
+                UnifiedTicket.priority.label("priority"),
+                func.count(UnifiedTicket.id).label("total_tickets"),
+                # Response SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at <= UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.response_by.isnot(None),
+                                UnifiedTicket.first_responded_at.isnot(None),
+                                UnifiedTicket.first_responded_at > UnifiedTicket.response_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("response_breached"),
+                # Resolution SLA
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at <= UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_met"),
+                func.sum(
+                    case(
+                        (
+                            and_(
+                                UnifiedTicket.resolution_by.isnot(None),
+                                UnifiedTicket.resolved_at.isnot(None),
+                                UnifiedTicket.resolved_at > UnifiedTicket.resolution_by,
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("resolution_breached"),
+            )
+            .filter(
+                UnifiedTicket.is_deleted == False,
+                UnifiedTicket.created_at >= start_dt,
+                UnifiedTicket.priority.isnot(None),
+            )
+        )
+        if end_dt:
+            query = query.filter(UnifiedTicket.created_at <= end_dt)
+
+        results = (
+            query.group_by(UnifiedTicket.priority)
+            .order_by(func.count(UnifiedTicket.id).desc())
+            .all()
+        )
+
+        # Priority order for sorting
+        priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+        stats = []
+        for row in results:
+            response_met = row.response_met or 0
+            response_breached = row.response_breached or 0
+            resolution_met = row.resolution_met or 0
+            resolution_breached = row.resolution_breached or 0
+
+            response_total = response_met + response_breached
+            resolution_total = resolution_met + resolution_breached
+
+            priority_name = row.priority.value if hasattr(row.priority, "value") else str(row.priority)
+
+            stats.append(PrioritySLAStats(
+                priority=priority_name,
+                total_tickets=row.total_tickets or 0,
+                response_attainment_pct=round(response_met / max(response_total, 1) * 100, 1),
+                resolution_attainment_pct=round(resolution_met / max(resolution_total, 1) * 100, 1),
+                total_breaches=response_breached + resolution_breached,
+            ))
+
+        # Sort by priority order
+        stats.sort(key=lambda x: priority_order.get(x.priority.lower(), 99))
+        return stats
+
+    def _get_agent_teams(self, agent_ids: List[int]) -> Dict[int, str]:
+        """Get team names for a list of agent party IDs."""
+        if not agent_ids:
+            return {}
+
+        try:
+            results = (
+                self.db.query(TeamMember.party_id, Team.name)
+                .join(Team, Team.id == TeamMember.team_id)
+                .filter(
+                    TeamMember.party_id.in_(agent_ids),
+                    TeamMember.is_active == True,
+                )
+                .all()
+            )
+            return {r.party_id: r.name for r in results}
+        except Exception:
+            return {}
 
     # =========================================================================
     # BACKLOG AGING

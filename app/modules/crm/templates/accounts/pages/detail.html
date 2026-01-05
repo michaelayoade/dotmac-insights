@@ -15,7 +15,7 @@
     <button
         type="button"
         class="inline-flex items-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
-        @click="showDeleteModal = true"
+        onclick="document.getElementById('confirm-delete-modal').classList.remove('hidden')"
         data-testid="delete-account-button"
     >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,11 +132,11 @@
                             </div>
                             <div class="flex justify-between">
                                 <dt class="text-sm text-gray-500">Registration Number</dt>
-                                <dd class="text-sm font-medium text-gray-900">{{ account.registration_number or '-' }}</dd>
+                                <dd class="text-sm font-medium text-gray-900">{{ account.custom_fields.get("registration_number") or '-' }}</dd>
                             </div>
                             <div class="flex justify-between">
                                 <dt class="text-sm text-gray-500">Industry</dt>
-                                <dd class="text-sm font-medium text-gray-900">{{ account.industry or '-' }}</dd>
+                                <dd class="text-sm font-medium text-gray-900">{{ account.custom_fields.get("industry") or '-' }}</dd>
                             </div>
                         </dl>
                     </div>
@@ -162,8 +162,8 @@
                             <div class="flex justify-between">
                                 <dt class="text-sm text-gray-500">Website</dt>
                                 <dd class="text-sm font-medium text-gray-900">
-                                    {% if account.website %}
-                                    <a href="{{ account.website }}" target="_blank" class="text-primary-600 hover:text-primary-700">{{ account.website }}</a>
+                                    {% if account.custom_fields.get("website") %}
+                                    <a href="{{ account.custom_fields.get("website") }}" target="_blank" class="text-primary-600 hover:text-primary-700">{{ account.custom_fields.get("website") }}</a>
                                     {% else %}-{% endif %}
                                 </dd>
                             </div>
@@ -206,32 +206,19 @@
     </div>
 
     <div
-        x-show="showDeleteModal"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="fixed inset-0 z-50 overflow-y-auto"
+        id="confirm-delete-modal"
+        class="confirm-dialog hidden fixed inset-0 z-50 overflow-y-auto"
         aria-labelledby="modal-title"
         role="dialog"
         aria-modal="true"
-        @keydown.escape.window="showDeleteModal = false"
     >
         <div class="flex min-h-screen items-center justify-center p-4">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" @click="showDeleteModal = false"></div>
-
             <div
-                x-show="showDeleteModal"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
-            >
+                class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+                onclick="document.getElementById('confirm-delete-modal').classList.add('hidden')"
+            ></div>
+
+            <div class="relative bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
                 <div class="text-center">
                     <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
                         <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -246,7 +233,7 @@
                         <button
                             type="button"
                             class="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-xl ring-1 ring-gray-200 hover:bg-gray-50 transition-colors"
-                            @click="showDeleteModal = false"
+                            onclick="document.getElementById('confirm-delete-modal').classList.add('hidden')"
                         >
                             Cancel
                         </button>

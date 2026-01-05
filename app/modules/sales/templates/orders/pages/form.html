@@ -1,0 +1,190 @@
+{% extends "layouts/app.html" %}
+
+{% set is_edit = order is defined and order.id %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <form
+        method="POST"
+        action="{{ '/sales/orders/' ~ order.id if is_edit else '/sales/orders' }}"
+        class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+        data-testid="sales-order-form"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h1 class="text-lg font-semibold text-gray-900">{{ "Edit Sales Order" if is_edit else "New Sales Order" }}</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">
+                {{ "Update the order details." if is_edit else "Create a draft order to track delivery and billing." }}
+            </p>
+        </div>
+
+        <div class="px-6 py-6 space-y-6">
+            {% if errors.general %}
+            <div class="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 font-body">
+                {{ errors.general }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label for="customer" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Customer <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        name="customer"
+                        id="customer"
+                        {% if not is_edit %}required{% endif %}
+                        value="{{ form_data.customer if form_data else '' }}"
+                        placeholder="Customer name or code"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.customer else '' }}"
+                        {% if is_edit %}disabled{% endif %}
+                        data-testid="sales-order-customer"
+                    >
+                    {% if errors.customer %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.customer }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="customer_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Customer Display Name
+                    </label>
+                    <input
+                        type="text"
+                        name="customer_name"
+                        id="customer_name"
+                        value="{{ form_data.customer_name if form_data else '' }}"
+                        placeholder="Optional display name"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-customer-name"
+                    >
+                </div>
+
+                <div>
+                    <label for="company" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Company
+                    </label>
+                    <input
+                        type="text"
+                        name="company"
+                        id="company"
+                        value="{{ form_data.company if form_data else '' }}"
+                        placeholder="Company"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        {% if is_edit %}disabled{% endif %}
+                        data-testid="sales-order-company"
+                    >
+                </div>
+
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Currency
+                    </label>
+                    <input
+                        type="text"
+                        name="currency"
+                        id="currency"
+                        value="{{ form_data.currency if form_data else 'NGN' }}"
+                        placeholder="NGN"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        {% if is_edit %}disabled{% endif %}
+                        data-testid="sales-order-currency"
+                    >
+                </div>
+
+                <div>
+                    <label for="transaction_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Order Date
+                    </label>
+                    <input
+                        type="date"
+                        name="transaction_date"
+                        id="transaction_date"
+                        value="{{ form_data.transaction_date if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        {% if is_edit %}disabled{% endif %}
+                        data-testid="sales-order-transaction-date"
+                    >
+                </div>
+
+                <div>
+                    <label for="delivery_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Delivery Date
+                    </label>
+                    <input
+                        type="date"
+                        name="delivery_date"
+                        id="delivery_date"
+                        value="{{ form_data.delivery_date if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-delivery-date"
+                    >
+                </div>
+
+                <div>
+                    <label for="order_type" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Order Type
+                    </label>
+                    <input
+                        type="text"
+                        name="order_type"
+                        id="order_type"
+                        value="{{ form_data.order_type if form_data else '' }}"
+                        placeholder="Standard"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-type"
+                    >
+                </div>
+
+                <div>
+                    <label for="source" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Source
+                    </label>
+                    <input
+                        type="text"
+                        name="source"
+                        id="source"
+                        value="{{ form_data.source if form_data else '' }}"
+                        placeholder="Website, Referral, etc."
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-source"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="campaign" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Campaign
+                    </label>
+                    <input
+                        type="text"
+                        name="campaign"
+                        id="campaign"
+                        value="{{ form_data.campaign if form_data else '' }}"
+                        placeholder="Campaign name"
+                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-campaign"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/60 flex items-center justify-end gap-3">
+            <a
+                href="/sales/orders"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-all"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all shadow-sm"
+                data-testid="sales-order-submit"
+            >
+                {{ "Save Changes" if is_edit else "Create Order" }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

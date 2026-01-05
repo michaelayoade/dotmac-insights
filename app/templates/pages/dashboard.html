@@ -30,7 +30,7 @@
 {% block content %}
 <!-- Stats Grid -->
 <div id="dashboard-stats"
-     class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4 mb-10"
+     class="relative grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-6 mb-10"
      data-testid="stats-grid"
      hx-get="/dashboard/stats"
      hx-trigger="every 60s"
@@ -38,7 +38,7 @@
      hx-indicator="#page-loader">
     {% if stats %}
         {% for stat in stats %}
-        <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-{{ stat.key | default(loop.index) }}">
+        <a href="{{ stat.href | default('#') }}" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-{{ stat.key | default(loop.index) }}">
             <div class="flex items-start justify-between">
                 <div class="flex-1 min-w-0">
                     <dt class="text-sm font-medium text-gray-500 font-body">{{ stat.label }}</dt>
@@ -74,6 +74,14 @@
                     <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                     </svg>
+                    {% elif stat.icon == 'megaphone' %}
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                    </svg>
+                    {% elif stat.icon == 'repeat' %}
+                    <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
                     {% else %}
                     <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
@@ -83,11 +91,11 @@
             </div>
             <!-- Hover accent line -->
             <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r {{ stat.accent_gradient | default('from-primary-400 to-primary-600') }} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        </div>
+        </a>
         {% endfor %}
     {% else %}
     <!-- Placeholder stats when no data -->
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-contacts">
+    <a href="/parties" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-contacts">
         <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Total Contacts</dt>
@@ -103,9 +111,9 @@
             </div>
         </div>
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-primary-400 to-primary-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-    </div>
+    </a>
 
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-tickets">
+    <a href="/support/tickets?status=open" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-tickets">
         <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Open Tickets</dt>
@@ -121,9 +129,9 @@
             </div>
         </div>
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-amber-400 to-amber-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-    </div>
+    </a>
 
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-revenue">
+    <a href="/accounting/invoices?status=paid" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-revenue">
         <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Revenue (MTD)</dt>
@@ -139,9 +147,9 @@
             </div>
         </div>
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-    </div>
+    </a>
 
-    <div class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300" data-testid="stat-card-invoices">
+    <a href="/accounting/invoices?status=pending" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-invoices">
         <div class="flex items-start justify-between">
             <div class="flex-1 min-w-0">
                 <dt class="text-sm font-medium text-gray-500 font-body">Pending Invoices</dt>
@@ -157,10 +165,46 @@
             </div>
         </div>
         <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-red-400 to-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-    </div>
+    </a>
+
+    <a href="/marketing/campaigns" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-campaigns">
+        <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+                <dt class="text-sm font-medium text-gray-500 font-body">Active Campaigns</dt>
+                <dd class="mt-2 flex items-baseline gap-2">
+                    <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                </dd>
+                <p class="mt-1 text-xs text-gray-400 font-body">Marketing campaigns</p>
+            </div>
+            <div class="flex-shrink-0 p-3 rounded-xl bg-purple-50 text-purple-600 group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    </a>
+
+    <a href="/subscriptions?status=active" class="group relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 hover:shadow-warm-md hover:ring-gray-200 transition-all duration-300 block cursor-pointer" data-testid="stat-card-subscriptions">
+        <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+                <dt class="text-sm font-medium text-gray-500 font-body">Active Subscriptions</dt>
+                <dd class="mt-2 flex items-baseline gap-2">
+                    <span class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight">--</span>
+                </dd>
+                <p class="mt-1 text-xs text-gray-400 font-body">Service plans</p>
+            </div>
+            <div class="flex-shrink-0 p-3 rounded-xl bg-blue-50 text-blue-600 group-hover:scale-110 transition-transform duration-300">
+                <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+            </div>
+        </div>
+        <div class="absolute bottom-0 left-6 right-6 h-0.5 bg-gradient-to-r from-blue-400 to-blue-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    </a>
     {% endif %}
-    <div class="htmx-indicator pointer-events-none absolute inset-0 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-4" aria-hidden="true">
-        {% for _ in range(4) %}
+    <div class="htmx-indicator pointer-events-none absolute inset-0 grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3 xl:grid-cols-6" aria-hidden="true">
+        {% for _ in range(6) %}
         <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-5 sm:p-6 animate-pulse">
             <div class="flex items-start justify-between">
                 <div class="flex-1 space-y-3">
@@ -300,6 +344,27 @@
                     <p class="text-xs text-gray-500 font-body">Bill a customer</p>
                 </div>
                 <svg class="w-4 h-4 text-gray-400 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endif %}
+
+            {% if has_scope('crm:write') %}
+            <a
+                href="/crm/leads/new"
+                class="group flex items-center gap-4 rounded-xl p-3 hover:bg-surface-50 transition-all duration-200"
+                data-testid="quick-action-new-lead"
+            >
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-100 group-hover:scale-105 transition-all duration-200">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 font-body">New Lead</p>
+                    <p class="text-xs text-gray-500 font-body">Create a sales lead</p>
+                </div>
+                <svg class="w-4 h-4 text-gray-400 group-hover:text-blue-500 group-hover:translate-x-0.5 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
             </a>

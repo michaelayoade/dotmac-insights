@@ -183,6 +183,8 @@ class QuotationService:
             source=data.source,
             campaign=data.campaign,
             status=QuotationStatus.DRAFT,
+            origin_system="local",
+            write_back_status="pending",
         )
 
         self.db.add(quote)
@@ -216,9 +218,9 @@ class QuotationService:
 
         # Update simple fields
         update_fields = [
-            "party_name", "customer_name", "valid_till", "order_type",
-            "sales_partner_id", "territory_id", "source", "campaign",
-            "order_lost_reason",
+            "quotation_to", "party_name", "customer_name", "company", "currency",
+            "transaction_date", "valid_till", "order_type", "sales_partner_id",
+            "territory_id", "source", "campaign", "order_lost_reason",
         ]
         for field_name in update_fields:
             value = getattr(data, field_name, None)

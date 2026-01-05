@@ -68,7 +68,14 @@
                 {% if activity.status not in ['completed', 'cancelled'] %}
                 <button type="button" class="btn btn-success">Mark Complete</button>
                 {% endif %}
-                <button type="button" class="btn btn-secondary">Edit</button>
+                <a href="/crm/activities/{{ activity.id }}/edit" class="btn btn-secondary">Edit</a>
+                <button
+                    type="button"
+                    class="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50"
+                    onclick="document.getElementById('confirm-delete-modal').classList.remove('hidden')"
+                >
+                    Delete
+                </button>
             </div>
         </div>
     </div>
@@ -142,6 +149,32 @@
                     </dl>
                 </div>
             </div>
+        </div>
+    </div>
+    <div
+        id="confirm-delete-modal"
+        class="confirm-dialog hidden fixed inset-0 z-40 flex items-center justify-center bg-gray-900/40 p-4"
+        data-confirm
+    >
+        <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-warm-xl">
+            <h3 class="text-lg font-semibold text-gray-900">Delete activity</h3>
+            <p class="mt-2 text-sm text-gray-600">This will permanently remove the activity.</p>
+            <form method="POST" action="/crm/activities/{{ activity.id }}/delete" class="mt-6 flex justify-end gap-3">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button
+                    type="button"
+                    class="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+                    onclick="document.getElementById('confirm-delete-modal').classList.add('hidden')"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700"
+                >
+                    Delete
+                </button>
+            </form>
         </div>
     </div>
     {% endif %}

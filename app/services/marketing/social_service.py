@@ -1,7 +1,7 @@
 """Social media service stubs for the Marketing module."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any
 
 from sqlalchemy.orm import Session
@@ -62,8 +62,16 @@ class SocialMediaService:
             )
         return results
 
+    def list_accounts_for_compose(self) -> List[SocialAccount]:
+        """Return accounts for compose UI in a stable, human-friendly order."""
+        return (
+            self.db.query(SocialAccount)
+            .order_by(SocialAccount.platform.asc(), SocialAccount.display_name.asc().nullslast())
+            .all()
+        )
+
     def list_calendar_days(self) -> List[Dict[str, Any]]:
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         days: List[Dict[str, Any]] = []
         for offset in range(5):
             day = today + timedelta(days=offset)

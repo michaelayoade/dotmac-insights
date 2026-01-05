@@ -166,8 +166,9 @@ def _paginate_query(
             items = [row[0] for row in rows]
             return PaginatedResult(items=items, total=total, offset=offset, limit=limit)
         except Exception:
-            # Fall back to two-query approach if window function fails
-            pass
+            # Clear failed transaction before falling back.
+            if query.session is not None:
+                query.session.rollback()
 
     # Fallback: two separate queries
     total = query.count()
@@ -203,8 +204,8 @@ def _paginate_select(
             items = [row[0] for row in rows]
             return PaginatedResult(items=items, total=total, offset=offset, limit=limit)
         except Exception:
-            # Fall back to two-query approach if window function fails
-            pass
+            # Clear failed transaction before falling back.
+            db.rollback()
 
     # Fallback: two separate queries
     # Get count using subquery

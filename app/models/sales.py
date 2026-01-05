@@ -161,6 +161,10 @@ class Quotation(SoftDeleteMixin, Base):
     status: Mapped[QuotationStatus] = mapped_column(Enum(QuotationStatus), default=QuotationStatus.DRAFT, index=True)
     docstatus: Mapped[int] = mapped_column(default=0)
 
+    # Origin
+    origin_system: Mapped[str] = mapped_column(String(50), default="local")
+    write_back_status: Mapped[str] = mapped_column(String(50), default="pending")
+
     # Sales team (TEXT fields for ERPNext sync)
     sales_partner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     territory: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
