@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.models.accounting import Account, AccountType, GLEntry
 from app.services.errors import NotFoundError, ValidationError
 
-from app.api.accounting.helpers import (
+from .account_utils import (
     get_accounts_by_erpnext_id,
     get_effective_root_type,
     is_cogs_account,

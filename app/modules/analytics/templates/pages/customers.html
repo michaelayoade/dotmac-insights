@@ -6,7 +6,59 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Customer Analytics</h1>
         <p class="mt-1.5 text-gray-500 font-body">Segments, health indicators, and churn analysis</p>
     </div>
+    <div class="flex items-center gap-3">
+        <a href="/api/v1/analytics/exports/customers?format=csv{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}"
+           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-surface-50">
+            {% include "components/icons/receipt.html" %}
+            CSV
+        </a>
+        <a href="/api/v1/analytics/exports/customers?format=pdf{% if start_date %}&start_date={{ start_date }}{% endif %}{% if end_date %}&end_date={{ end_date }}{% endif %}"
+           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-surface-50">
+            {% include "components/icons/file-text.html" %}
+            PDF
+        </a>
+    </div>
 </div>
+<form class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <input type="date" name="start_date" value="{{ start_date }}"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <input type="date" name="end_date" value="{{ end_date }}"
+                class="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+        </div>
+        <div class="flex gap-2">
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">
+                Apply
+            </button>
+            <a href="/analytics/customers" class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 font-medium text-gray-700">
+                Reset
+            </a>
+        </div>
+    </div>
+</form>
+
+{% if comparison %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 mb-8">
+    <h3 class="text-sm font-semibold text-gray-900 mb-3">Period Comparison</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="rounded-xl bg-gray-50 p-4">
+            <div class="text-xs text-gray-500">New Customers</div>
+            <div class="text-xl font-semibold text-gray-900 mt-1">{{ comparison.current.new | default(0) }}</div>
+            <div class="text-sm text-gray-500">Previous: {{ comparison.previous.new | default(0) }}</div>
+        </div>
+        <div class="rounded-xl bg-gray-50 p-4">
+            <div class="text-xs text-gray-500">Churned Customers</div>
+            <div class="text-xl font-semibold text-gray-900 mt-1">{{ comparison.current.churned | default(0) }}</div>
+            <div class="text-sm text-gray-500">Previous: {{ comparison.previous.churned | default(0) }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -87,6 +139,121 @@
             <div class="text-sm text-orange-600 mt-1">Recent Cancellations</div>
             <div class="text-xs text-orange-500 mt-0.5">Last 30 days</div>
         </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tenure Segments -->
+{% if segments.by_tenure %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Customer Tenure</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {% for row in segments.by_tenure %}
+        <div class="text-center p-4 rounded-xl bg-gray-50">
+            <div class="text-xl font-bold text-gray-900">{{ row.count | default(0) }}</div>
+            <div class="text-xs text-gray-500">{{ row.segment }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- MRR Tiers -->
+{% if segments.by_mrr_tier %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">MRR Tiers</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {% for row in segments.by_mrr_tier %}
+        <div class="text-center p-4 rounded-xl bg-gray-50">
+            <div class="text-xl font-bold text-gray-900">{{ row.count | default(0) }}</div>
+            <div class="text-xs text-gray-500">{{ row.segment }}</div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Geographic Distribution -->
+{% if segments.by_city %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Top Cities</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Customers</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">MRR</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for row in segments.by_city %}
+                <tr class="hover:bg-surface-50">
+                    <td class="px-4 py-3 text-sm text-gray-900">{{ row.city }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ row.count }}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 text-right">{{ "{:,.0f}".format(row.mrr | default(0)) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- POP Distribution -->
+{% if segments.by_pop %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Customers by POP</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">POP</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Customers</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">MRR</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for row in segments.by_pop %}
+                <tr class="hover:bg-surface-50">
+                    <td class="px-4 py-3 text-sm text-gray-900">{{ row.pop_name }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">{{ row.city }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ row.customer_count }}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900 text-right">{{ "{:,.0f}".format(row.mrr | default(0)) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Churn Trend -->
+{% if churn and churn.data %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Churn Trend</h3>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+            <thead>
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Churned</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Churn Rate</th>
+                    <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Active Base</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for row in churn.data %}
+                <tr class="hover:bg-surface-50">
+                    <td class="px-4 py-3 text-sm text-gray-700">{{ row.period }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ row.churned_count }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ "{:.2f}%".format(row.churn_rate | default(0)) }}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600 text-right">{{ "{:.0f}".format(row.active_base | default(0)) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endif %}

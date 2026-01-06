@@ -70,19 +70,6 @@ NAVIGATION = [
         ],
     },
     {
-        "section": "Sales",
-        "href": "/sales",
-        "icon": "shopping-cart",
-        "scope": "sales:read",
-        "order": 20,
-        "links": [
-            {"label": "Quotations", "href": "/sales/quotations", "icon": "file-text", "scope": "sales:read"},
-            {"label": "Orders", "href": "/sales/orders", "icon": "shopping-bag", "scope": "sales:read"},
-            {"label": "Invoices", "href": "/accounting/invoices", "icon": "credit-card", "scope": "accounting:read"},
-            {"label": "Credit Notes", "href": "/accounting/credit-notes", "icon": "file-minus", "scope": "accounting:read"},
-        ],
-    },
-    {
         "section": "Support",
         "href": "/support",
         "icon": "life-buoy",

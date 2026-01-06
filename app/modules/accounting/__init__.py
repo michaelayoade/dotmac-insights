@@ -27,8 +27,8 @@ from app.web.module_types import ModuleConfig
 # =============================================================================
 
 MODULE_CONFIG = ModuleConfig(
-    id="finance",
-    name="Finance",
+    id="accounting",
+    name="Accounting",
     description="Accounting, purchasing, expenses, assets, and reporting",
     icon="book",
     prefix="/accounting",

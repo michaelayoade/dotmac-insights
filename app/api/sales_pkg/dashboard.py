@@ -89,6 +89,8 @@ async def get_finance_dashboard(
         Invoice.status,
         func.count(Invoice.id).label("count"),
         func.sum(Invoice.total_amount).label("total")
+    ).filter(
+        Invoice.is_deleted == False,
     )
     if currency:
         invoice_summary_query = invoice_summary_query.filter(Invoice.currency == currency)
@@ -100,11 +102,35 @@ async def get_finance_dashboard(
     }
 
     # Outstanding balance
-    outstanding_query = db.query(func.sum(Invoice.total_amount - Invoice.amount_paid)).filter(
-        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID])
+    outstanding_query = db.query(
+        func.sum(
+            func.coalesce(
+                Invoice.balance,
+                Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+            )
+        )
+    ).filter(
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
+        Invoice.is_deleted == False,
+        func.coalesce(
+            Invoice.balance,
+            Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+        ) > 0,
     )
-    overdue_query = db.query(func.sum(Invoice.total_amount - Invoice.amount_paid)).filter(
-        Invoice.status == InvoiceStatus.OVERDUE
+    overdue_query = db.query(
+        func.sum(
+            func.coalesce(
+                Invoice.balance,
+                Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+            )
+        )
+    ).filter(
+        Invoice.status == InvoiceStatus.OVERDUE,
+        Invoice.is_deleted == False,
+        func.coalesce(
+            Invoice.balance,
+            Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+        ) > 0,
     )
     if currency:
         outstanding_query = outstanding_query.filter(Invoice.currency == currency)
@@ -120,7 +146,8 @@ async def get_finance_dashboard(
         Payment.payment_date >= thirty_days_ago
     )
     invoiced_30d_query = db.query(func.sum(Invoice.total_amount)).filter(
-        Invoice.invoice_date >= thirty_days_ago
+        Invoice.invoice_date >= thirty_days_ago,
+        Invoice.is_deleted == False,
     )
     if currency:
         collections_30d_query = collections_30d_query.filter(Payment.currency == currency)
@@ -280,8 +307,8 @@ class CustomerRevenueResponse(BaseModel):
     """Revenue breakdown by customer."""
 
     rank: int
-    party_id: int
-    party_name: str
+    customer_id: int
+    customer_name: str
     order_count: int
     revenue: float
     avg_order_value: float
@@ -533,8 +560,8 @@ async def get_revenue_by_customer(
     return [
         CustomerRevenueResponse(
             rank=c.rank,
-            party_id=c.party_id,
-            party_name=c.party_name,
+            customer_id=c.party_id,
+            customer_name=c.party_name,
             order_count=c.order_count,
             revenue=float(c.revenue),
             avg_order_value=float(c.avg_order_value),

@@ -165,7 +165,7 @@
                 <td class="px-4 py-3 text-gray-700">{{ invoice.invoice_date.date() if invoice.invoice_date else '-' }}</td>
                 <td class="px-4 py-3 text-gray-700">{{ invoice.status.value }}</td>
                 <td class="px-4 py-3 text-right text-gray-900">{{ invoice.currency }} {{ "{:,.2f}".format(invoice.total_amount) }}</td>
-                <td class="px-4 py-3 text-right text-gray-900">{{ invoice.currency }} {{ "{:,.2f}".format(invoice.balance or (invoice.total_amount - (invoice.amount_paid or 0))) }}</td>
+                <td class="px-4 py-3 text-right text-gray-900">{{ invoice.currency }} {{ "{:,.2f}".format(invoice.balance if invoice.balance is not none else (invoice.total_amount - (invoice.amount_paid or 0))) }}</td>
             </tr>
             {% endfor %}
             {% else %}

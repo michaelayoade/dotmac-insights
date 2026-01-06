@@ -18,6 +18,7 @@ import httpx
 import structlog
 
 from app.models.employee import Employee, EmploymentStatus
+from app.models.party import Party, PartyExternalId, PartyType
 from app.models.hr import Department, Designation, ERPNextUser, HDTeam, HDTeamMember
 from app.models.hr_attendance import Attendance, AttendanceStatus
 from app.models.hr_leave import (
@@ -376,8 +377,22 @@ async def sync_erpnext_users(
             "User",
             fields=["name", "email", "full_name", "first_name", "last_name", "enabled", "user_type"],
         )
+        party_ext_ids = (
+            sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "erpnext",
+                PartyExternalId.external_key_type == "user_id",
+            )
+            .all()
+        )
+        party_by_ext = {p.external_id: p.party_id for p in party_ext_ids}
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
 
         for user_data in users:
+            erpnext_id = user_data.get("name")
             email = user_data.get("email") or user_data.get("name")
             if not email:
                 continue
@@ -394,19 +409,60 @@ async def sync_erpnext_users(
             if employee:
                 employee_id = employee.id
 
+            party_id = employee.party_id if employee and employee.party_id else None
+            if not party_id and erpnext_id:
+                party_id = party_by_ext.get(str(erpnext_id))
+
+            if not party_id:
+                party = party_email_index.get(email.lower())
+                if party:
+                    party_id = party.id
+
+            if not party_id:
+                party = Party(
+                    type=PartyType.PERSON.value,
+                    name=user_data.get("full_name") or email,
+                    primary_email=email,
+                    emails=[
+                        {
+                            "address": email,
+                            "label": "primary",
+                            "is_primary": True,
+                            "verified": False,
+                        }
+                    ],
+                )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+                party_id = party.id
+                party_email_index[email.lower()] = party
+
+            if party_id and erpnext_id and str(erpnext_id) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party_id,
+                        system="erpnext",
+                        external_id=str(erpnext_id),
+                        external_key_type="user_id",
+                        is_primary=True,
+                    )
+                )
+                party_by_ext[str(erpnext_id)] = party_id
+
             if existing:
-                existing.erpnext_id = user_data.get("name")
+                existing.erpnext_id = erpnext_id
                 existing.full_name = user_data.get("full_name")
                 existing.first_name = user_data.get("first_name")
                 existing.last_name = user_data.get("last_name")
                 existing.enabled = user_data.get("enabled", 1) == 1
                 existing.user_type = user_data.get("user_type")
                 existing.employee_id = employee_id
+                existing.party_id = party_id
                 existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
                 erpnext_user = ERPNextUser(
-                    erpnext_id=user_data.get("name"),
+                    erpnext_id=erpnext_id,
                     email=email,
                     full_name=user_data.get("full_name"),
                     first_name=user_data.get("first_name"),
@@ -414,6 +470,7 @@ async def sync_erpnext_users(
                     enabled=user_data.get("enabled", 1) == 1,
                     user_type=user_data.get("user_type"),
                     employee_id=employee_id,
+                    party_id=party_id,
                 )
                 sync_client.db.add(erpnext_user)
                 sync_client.increment_created()

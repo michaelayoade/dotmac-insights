@@ -56,7 +56,7 @@ async def vehicles_list(
         sort_by=sort,
         sort_order=dir,
     )
-    pagination = PaginationParams(page=page, limit=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     result = service.list_vehicles(filters, pagination)
     vehicles = result.items

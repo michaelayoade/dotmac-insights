@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import BigInteger, String, Text, Enum, Date, ForeignKey
+from sqlalchemy import BigInteger, String, Text, Enum, Date, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from typing import List
@@ -12,6 +12,7 @@ from app.models.validation import SoftValidationMixin
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
+    from app.models.party import Party
     from app.models.document_lines import SalesOrderItem, QuotationItem
     # Forward references for sales FKs (Territory and SalesPerson are defined later in this file)
 
@@ -43,6 +44,43 @@ class SalesOrder(Base):
         BigInteger,
         ForeignKey("customer_accounts.id"),
         nullable=True,
+    )
+    quotation_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("quotations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Contact info
+    contact_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Address info
+    billing_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    shipping_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    billing_address_line1: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    billing_address_line2: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    billing_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    billing_state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    billing_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    billing_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    billing_gps_lat: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    billing_gps_lng: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    shipping_address_line1: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shipping_address_line2: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shipping_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shipping_state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shipping_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    shipping_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shipping_gps_lat: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    shipping_gps_lng: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
 
     # Order details
@@ -99,6 +137,12 @@ class SalesOrder(Base):
     items: Mapped[List["SalesOrderItem"]] = relationship(
         back_populates="sales_order", cascade="all, delete-orphan"
     )
+    quotation: Mapped[Optional["Quotation"]] = relationship(
+        "Quotation",
+        foreign_keys=[quotation_id],
+        backref="sales_orders"
+    )
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     sales_partner_rel: Mapped[Optional["SalesPerson"]] = relationship(
         "SalesPerson",
         foreign_keys=[sales_partner_id],
@@ -137,6 +181,43 @@ class Quotation(SoftDeleteMixin, Base):
     quotation_to: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Customer or Lead
     party_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     customer_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    customer_account_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("customer_accounts.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    lead_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("erpnext_leads.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    # Contact info
+    contact_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    contact_phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # Address info
+    billing_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    shipping_address: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    billing_address_line1: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    billing_address_line2: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    billing_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    billing_state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    billing_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    billing_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    billing_gps_lat: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    billing_gps_lng: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    shipping_address_line1: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shipping_address_line2: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    shipping_city: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shipping_state: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shipping_postal_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    shipping_country: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    shipping_gps_lat: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
+    shipping_gps_lng: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 6), nullable=True)
 
     # Order details
     order_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -210,6 +291,8 @@ class Quotation(SoftDeleteMixin, Base):
         back_populates="quotation", cascade="all, delete-orphan"
     )
     party = relationship("Party", backref="quotations")
+    customer_account = relationship("CustomerAccount", backref="quotations")
+    lead = relationship("ERPNextLead", backref="quotations")
     converted_subscription = relationship("Subscription", backref="source_quotation")
     sales_partner_rel: Mapped[Optional["SalesPerson"]] = relationship(
         "SalesPerson",
@@ -284,11 +367,20 @@ class ERPNextLead(Base):
         nullable=True,
         index=True,
     )
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    party = relationship("Party", backref="erpnext_leads")
 
     def __repr__(self) -> str:
         return f"<ERPNextLead {self.lead_name}>"
@@ -429,6 +521,12 @@ class SalesPerson(Base):
 
     # FK to Employee
     employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     enabled: Mapped[bool] = mapped_column(default=True)
 
@@ -446,6 +544,7 @@ class SalesPerson(Base):
 
     # Relationships
     employee_rel: Mapped[Optional["Employee"]] = relationship()
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<SalesPerson {self.sales_person_name}>"

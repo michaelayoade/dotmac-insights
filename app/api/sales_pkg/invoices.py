@@ -35,7 +35,8 @@ router = APIRouter()
 async def list_invoices(
     status: Optional[str] = None,
     customer_account_id: Optional[int] = None,
-    party_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
+    party_id: Optional[int] = Query(None, include_in_schema=False),
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     min_amount: Optional[float] = None,
@@ -61,11 +62,12 @@ async def list_invoices(
 
     if customer_account_id:
         query = query.filter(Invoice.customer_account_id == customer_account_id)
-    elif party_id:
+    elif customer_id or party_id:
+        customer_party_id = customer_id or party_id
         query = query.join(
             CustomerAccount,
             CustomerAccount.id == Invoice.customer_account_id,
-        ).filter(CustomerAccount.party_id == party_id)
+        ).filter(CustomerAccount.party_id == customer_party_id)
 
     start_dt = _parse_iso_utc(start_date, "start_date")
     end_dt = _parse_iso_utc(end_date, "end_date")
@@ -115,7 +117,7 @@ async def list_invoices(
     invoice_rows = (
         query.outerjoin(CustomerAccount, Invoice.customer_account_id == CustomerAccount.id)
         .outerjoin(Party, CustomerAccount.party_id == Party.id)
-        .add_columns(Party.name.label("party_name"), CustomerAccount.party_id.label("party_id"))
+        .add_columns(Party.name.label("customer_name"), CustomerAccount.party_id.label("customer_id"))
         .order_by(order_clause, Invoice.id.desc())
         .offset(offset)
         .limit(limit)
@@ -131,8 +133,8 @@ async def list_invoices(
                 "id": inv.id,
                 "invoice_number": inv.invoice_number,
                 "customer_account_id": inv.customer_account_id,
-                "party_id": party_id,
-                "party_name": party_name,
+                "customer_id": customer_id,
+                "customer_name": customer_name,
                 "total_amount": float(inv.total_amount),
                 "amount_paid": float(inv.amount_paid or 0),
                 "balance": float(inv.total_amount - (inv.amount_paid or 0)),
@@ -143,7 +145,7 @@ async def list_invoices(
                 "days_overdue": inv.days_overdue,
                 "source": inv.source.value if inv.source else None,
             }
-            for inv, party_name, party_id in invoice_rows
+            for inv, customer_name, customer_id in invoice_rows
         ],
     }
 

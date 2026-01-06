@@ -121,8 +121,13 @@ class PaymentAllocationService:
         if doc_type == "invoice":
             from app.models.invoice import InvoiceStatus
 
+            prior_balance = (
+                doc.balance
+                if doc.balance is not None
+                else (doc.total_amount - (doc.amount_paid or Decimal("0")))
+            )
             doc.amount_paid = (doc.amount_paid or Decimal("0")) + amount_paid
-            doc.balance = doc.total_amount - doc.amount_paid
+            doc.balance = prior_balance - amount_paid
             if doc.balance <= 0:
                 doc.status = InvoiceStatus.PAID
             elif doc.amount_paid > 0:

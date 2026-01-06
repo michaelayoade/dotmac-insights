@@ -1,0 +1,91 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="min-w-0">
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Revenue Trends</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Revenue over time from completed payments</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <select
+            name="interval"
+            class="rounded-xl border-0 py-2.5 pl-4 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/finance/analytics/revenue"
+            hx-target="body"
+            hx-push-url="true"
+            hx-trigger="change"
+            hx-include="[name='months']"
+        >
+            <option value="month" {% if interval == 'month' %}selected{% endif %}>Monthly</option>
+            <option value="week" {% if interval == 'week' %}selected{% endif %}>Weekly</option>
+        </select>
+        <select
+            name="months"
+            class="rounded-xl border-0 py-2.5 pl-4 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
+            hx-get="/finance/analytics/revenue"
+            hx-target="body"
+            hx-push-url="true"
+            hx-trigger="change"
+            hx-include="[name='interval']"
+        >
+            <option value="6" {% if months == 6 %}selected{% endif %}>6 months</option>
+            <option value="12" {% if months == 12 %}selected{% endif %}>12 months</option>
+            <option value="24" {% if months == 24 %}selected{% endif %}>24 months</option>
+        </select>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    {% if error %}
+    <div class="rounded-xl bg-amber-50 border border-amber-200 p-4">
+        <p class="text-sm text-amber-700">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if revenue_trend and revenue_trend.data %}
+    <!-- Revenue Table -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Revenue by {{ interval | title }}</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Payments</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for item in revenue_trend.data %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ item.period }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ item.payment_count }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">₦{{ "{:,.0f}".format(item.revenue) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="bg-gray-50">
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Total</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-bold">
+                            {{ revenue_trend.data | sum(attribute='payment_count') }}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold">
+                            ₦{{ "{:,.0f}".format(revenue_trend.data | sum(attribute='revenue')) }}
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-8 text-center">
+        <p class="text-gray-500">No revenue data available for the selected period.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -18,7 +18,9 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.sales import Quotation, QuotationStatus
+from app.models.sales import Quotation, QuotationStatus, ERPNextLead
+from app.models.party import CustomerAccount, Party
+from app.utils.normalizers import normalize_phone
 from app.models.document_lines import QuotationItem
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError
@@ -78,11 +80,16 @@ class QuotationService:
         if filters:
             if filters.search:
                 like = f"%{filters.search}%"
+                query = query.outerjoin(Party, Quotation.party_id == Party.id)
                 query = query.filter(
                     or_(
                         Quotation.party_name.ilike(like),
                         Quotation.customer_name.ilike(like),
                         Quotation.erpnext_id.ilike(like),
+                        Party.name.ilike(like),
+                        Party.legal_name.ilike(like),
+                        Party.trading_name.ilike(like),
+                        Party.primary_email.ilike(like),
                     )
                 )
 
@@ -94,11 +101,12 @@ class QuotationService:
                     pass
 
             if filters.party_id:
-                # If party_id filter provided, join with party table
-                pass  # Quotation doesn't have party_id FK in current model
+                query = query.filter(Quotation.party_id == filters.party_id)
 
             if filters.party_name:
                 query = query.filter(Quotation.party_name == filters.party_name)
+            if filters.customer_name:
+                query = query.filter(Quotation.customer_name == filters.customer_name)
 
             if filters.sales_partner_id:
                 query = query.filter(Quotation.sales_partner_id == filters.sales_partner_id)
@@ -169,10 +177,137 @@ class QuotationService:
         Returns:
             The created Quotation (not yet committed).
         """
+        party_name = data.party_name
+        customer_name = data.customer_name
+        contact_name = data.contact_name
+        contact_email = data.contact_email
+        contact_phone = data.contact_phone
+        billing_address = data.billing_address
+        shipping_address = data.shipping_address
+        billing_address_line1 = data.billing_address_line1
+        billing_address_line2 = data.billing_address_line2
+        billing_city = data.billing_city
+        billing_state = data.billing_state
+        billing_postal_code = data.billing_postal_code
+        billing_country = data.billing_country
+        billing_gps_lat = data.billing_gps_lat
+        billing_gps_lng = data.billing_gps_lng
+        shipping_address_line1 = data.shipping_address_line1
+        shipping_address_line2 = data.shipping_address_line2
+        shipping_city = data.shipping_city
+        shipping_state = data.shipping_state
+        shipping_postal_code = data.shipping_postal_code
+        shipping_country = data.shipping_country
+        shipping_gps_lat = data.shipping_gps_lat
+        shipping_gps_lng = data.shipping_gps_lng
+        party_id = None
+
+        if data.customer_account_id:
+            account = (
+                self.db.query(CustomerAccount)
+                .join(Party, CustomerAccount.party_id == Party.id)
+                .filter(CustomerAccount.id == data.customer_account_id)
+                .first()
+            )
+            if account and account.party:
+                party = account.party
+                party_name = party_name or party.name or party.legal_name or party.trading_name
+                customer_name = customer_name or party_name
+                contact_name = contact_name or party_name
+                contact_email = contact_email or party.primary_email
+                contact_phone = contact_phone or party.primary_phone
+                party_id = party.id
+                if party.addresses:
+                    address = party.addresses[0] if isinstance(party.addresses[0], dict) else {}
+                    billing_address_line1 = billing_address_line1 or address.get("address_line1") or address.get("line1") or address.get("street_1") or address.get("address")
+                    billing_address_line2 = billing_address_line2 or address.get("address_line2") or address.get("line2") or address.get("street_2")
+                    billing_city = billing_city or address.get("city")
+                    billing_state = billing_state or address.get("state")
+                    billing_postal_code = billing_postal_code or address.get("postal_code") or address.get("zip") or address.get("zip_code")
+                    billing_country = billing_country or address.get("country")
+                    billing_gps_lat = billing_gps_lat or address.get("gps_lat")
+                    billing_gps_lng = billing_gps_lng or address.get("gps_lng")
+                    shipping_address_line1 = shipping_address_line1 or billing_address_line1
+                    shipping_address_line2 = shipping_address_line2 or billing_address_line2
+                    shipping_city = shipping_city or billing_city
+                    shipping_state = shipping_state or billing_state
+                    shipping_postal_code = shipping_postal_code or billing_postal_code
+                    shipping_country = shipping_country or billing_country
+                    shipping_gps_lat = shipping_gps_lat or billing_gps_lat
+                    shipping_gps_lng = shipping_gps_lng or billing_gps_lng
+
+        if data.lead_id:
+            lead = self.db.query(ERPNextLead).filter(ERPNextLead.id == data.lead_id).first()
+            if lead:
+                party_name = party_name or lead.lead_name
+                customer_name = customer_name or lead.lead_name
+                contact_name = contact_name or lead.lead_name
+                contact_email = contact_email or lead.email_id
+                contact_phone = contact_phone or lead.phone or lead.mobile_no
+
+        if not party_name:
+            raise ValidationError("Customer or lead name is required")
+
+        phone_country = billing_country or shipping_country or "NG"
+        if contact_phone:
+            normalized = normalize_phone(contact_phone, country=phone_country)
+            if not normalized.is_valid:
+                raise ValidationError(normalized.error or "Invalid phone number")
+            contact_phone = normalized.normalized
+
+        if not billing_address and billing_address_line1:
+            billing_address = self._compose_address(
+                billing_address_line1,
+                billing_address_line2,
+                billing_city,
+                billing_state,
+                billing_postal_code,
+                billing_country,
+            )
+        if not shipping_address and shipping_address_line1:
+            shipping_address = self._compose_address(
+                shipping_address_line1,
+                shipping_address_line2,
+                shipping_city,
+                shipping_state,
+                shipping_postal_code,
+                shipping_country,
+            )
+
+        status = QuotationStatus.DRAFT
+        if data.status:
+            try:
+                status = QuotationStatus(data.status.lower())
+            except ValueError:
+                raise ValidationError(f"Invalid quotation status: {data.status}")
+
         quote = Quotation(
             quotation_to=data.quotation_to,
-            party_name=data.party_name,
-            customer_name=data.customer_name or data.party_name,
+            party_name=party_name,
+            customer_name=customer_name or party_name,
+            customer_account_id=data.customer_account_id,
+            lead_id=data.lead_id,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            billing_address=billing_address,
+            shipping_address=shipping_address,
+            billing_address_line1=billing_address_line1,
+            billing_address_line2=billing_address_line2,
+            billing_city=billing_city,
+            billing_state=billing_state,
+            billing_postal_code=billing_postal_code,
+            billing_country=billing_country,
+            billing_gps_lat=billing_gps_lat,
+            billing_gps_lng=billing_gps_lng,
+            shipping_address_line1=shipping_address_line1,
+            shipping_address_line2=shipping_address_line2,
+            shipping_city=shipping_city,
+            shipping_state=shipping_state,
+            shipping_postal_code=shipping_postal_code,
+            shipping_country=shipping_country,
+            shipping_gps_lat=shipping_gps_lat,
+            shipping_gps_lng=shipping_gps_lng,
             company=data.company,
             currency=data.currency,
             transaction_date=data.transaction_date or date.today(),
@@ -182,9 +317,10 @@ class QuotationService:
             territory_id=data.territory_id,
             source=data.source,
             campaign=data.campaign,
-            status=QuotationStatus.DRAFT,
+            status=status,
             origin_system="local",
             write_back_status="pending",
+            party_id=party_id,
         )
 
         self.db.add(quote)
@@ -218,14 +354,59 @@ class QuotationService:
 
         # Update simple fields
         update_fields = [
-            "quotation_to", "party_name", "customer_name", "company", "currency",
-            "transaction_date", "valid_till", "order_type", "sales_partner_id",
-            "territory_id", "source", "campaign", "order_lost_reason",
+            "quotation_to", "party_name", "customer_name", "customer_account_id", "lead_id",
+            "contact_name", "contact_email", "contact_phone", "billing_address", "shipping_address",
+            "billing_address_line1", "billing_address_line2", "billing_city", "billing_state",
+            "billing_postal_code", "billing_country", "billing_gps_lat", "billing_gps_lng",
+            "shipping_address_line1", "shipping_address_line2", "shipping_city", "shipping_state",
+            "shipping_postal_code", "shipping_country", "shipping_gps_lat", "shipping_gps_lng",
+            "company", "currency", "transaction_date", "valid_till", "order_type",
+            "sales_partner_id", "territory_id", "source", "campaign", "order_lost_reason",
         ]
         for field_name in update_fields:
             value = getattr(data, field_name, None)
             if value is not None:
                 setattr(quote, field_name, value)
+
+        if data.status:
+            try:
+                quote.status = QuotationStatus(data.status.lower())
+            except ValueError:
+                raise ValidationError(f"Invalid quotation status: {data.status}")
+
+        if data.contact_phone is not None:
+            phone_country = quote.billing_country or quote.shipping_country or "NG"
+            if data.contact_phone:
+                normalized = normalize_phone(data.contact_phone, country=phone_country)
+                if not normalized.is_valid:
+                    raise ValidationError(normalized.error or "Invalid phone number")
+                quote.contact_phone = normalized.normalized
+            else:
+                quote.contact_phone = None
+
+        if data.billing_address_line1 and not data.billing_address:
+            quote.billing_address = self._compose_address(
+                quote.billing_address_line1,
+                quote.billing_address_line2,
+                quote.billing_city,
+                quote.billing_state,
+                quote.billing_postal_code,
+                quote.billing_country,
+            )
+        if data.shipping_address_line1 and not data.shipping_address:
+            quote.shipping_address = self._compose_address(
+                quote.shipping_address_line1,
+                quote.shipping_address_line2,
+                quote.shipping_city,
+                quote.shipping_state,
+                quote.shipping_postal_code,
+                quote.shipping_country,
+            )
+
+        if data.items is not None:
+            self.db.query(QuotationItem).filter(QuotationItem.quotation_id == quote.id).delete()
+            for item_data in data.items:
+                self.add_line_item(quote.id, item_data)
 
         return quote
 
@@ -276,6 +457,9 @@ class QuotationService:
             amount = amount * (1 - data.discount_percentage / 100)
         elif data.discount_amount:
             amount = amount - data.discount_amount
+        tax_amount = data.tax_amount
+        if data.tax_rate and not data.tax_amount:
+            tax_amount = amount * (data.tax_rate / 100)
 
         item = QuotationItem(
             quotation_id=quotation_id,
@@ -288,6 +472,11 @@ class QuotationService:
             discount_percentage=data.discount_percentage,
             discount_amount=data.discount_amount,
             amount=amount,
+            net_amount=amount,
+            tax_code_id=data.tax_code_id,
+            tax_rate=data.tax_rate,
+            tax_amount=tax_amount,
+            is_tax_inclusive=data.is_tax_inclusive,
             warehouse=data.warehouse,
         )
 
@@ -329,6 +518,14 @@ class QuotationService:
             item.discount_amount = data.discount_amount
         if data.description is not None:
             item.description = data.description
+        if data.tax_code_id is not None:
+            item.tax_code_id = data.tax_code_id
+        if data.tax_rate is not None:
+            item.tax_rate = data.tax_rate
+        if data.tax_amount is not None:
+            item.tax_amount = data.tax_amount
+        if data.is_tax_inclusive is not None:
+            item.is_tax_inclusive = data.is_tax_inclusive
 
         # Recalculate amount
         amount = item.qty * item.rate
@@ -337,6 +534,9 @@ class QuotationService:
         elif item.discount_amount:
             amount = amount - item.discount_amount
         item.amount = amount
+        item.net_amount = amount
+        if item.tax_rate and not item.tax_amount:
+            item.tax_amount = amount * (item.tax_rate / 100)
 
         self._recalculate_totals(quote)
         return item
@@ -508,6 +708,13 @@ class QuotationService:
         order = SalesOrder(
             customer=quote.party_name,
             customer_name=quote.customer_name,
+            customer_account_id=quote.customer_account_id,
+            contact_name=quote.contact_name,
+            contact_email=quote.contact_email,
+            contact_phone=quote.contact_phone,
+            billing_address=quote.billing_address,
+            shipping_address=quote.shipping_address,
+            quotation_id=quote.id,
             company=quote.company,
             currency=quote.currency,
             transaction_date=date.today(),
@@ -543,6 +750,11 @@ class QuotationService:
                 uom=q_item.uom,
                 discount_percentage=q_item.discount_percentage,
                 discount_amount=q_item.discount_amount,
+                net_amount=q_item.net_amount,
+                tax_code_id=q_item.tax_code_id,
+                tax_rate=q_item.tax_rate,
+                tax_amount=q_item.tax_amount,
+                is_tax_inclusive=q_item.is_tax_inclusive,
                 warehouse=q_item.warehouse,
             )
             self.db.add(so_item)
@@ -637,9 +849,23 @@ class QuotationService:
 
         total_qty = sum(item.qty for item in items)
         total = sum(item.amount for item in items)
+        total_taxes = sum((item.tax_amount or Decimal("0")) for item in items)
 
         quote.total_qty = total_qty
         quote.total = total
         quote.net_total = total
-        quote.grand_total = total + quote.total_taxes_and_charges
+        quote.total_taxes_and_charges = total_taxes
+        quote.grand_total = total + total_taxes
         quote.rounded_total = round(quote.grand_total, 0)
+
+    @staticmethod
+    def _compose_address(
+        line1: Optional[str],
+        line2: Optional[str],
+        city: Optional[str],
+        state: Optional[str],
+        postal_code: Optional[str],
+        country: Optional[str],
+    ) -> str:
+        parts = [line1, line2, city, state, postal_code, country]
+        return ", ".join([part for part in parts if part])

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, case, and_, or_, desc, asc, exists, text
 from typing import Dict, Any, List, Optional, cast
@@ -26,6 +27,11 @@ from app.models.network_monitor import NetworkMonitor, MonitorState
 from app.models.ipv4_network import IPv4Network
 from app.auth import Require, Principal, get_current_principal
 from app.cache import cached, CACHE_TTL
+from app.services.analytics.service import AnalyticsService
+from app.services.analytics.export_service import AnalyticsExportService, AnalyticsExportError, WEASYPRINT_AVAILABLE
+from app.services.field_service import FieldServiceAnalyticsService, AnalyticsFilters
+from app.services.hr import HRAnalyticsService
+from app.services.insights import InsightsService
 
 router = APIRouter()
 
@@ -46,6 +52,33 @@ def get_db_with_timeout(db: Session = Depends(get_db)) -> Session:
     """Dependency that applies statement timeout for analytics-heavy queries."""
     _apply_statement_timeout(db)
     return db
+
+
+def get_analytics_service(
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
+) -> AnalyticsService:
+    """Dependency for analytics service with statement timeout and principal."""
+    return AnalyticsService(db, principal)
+
+
+def _export_headers(base_filename: str, extension: str) -> Dict[str, str]:
+    """Build Content-Disposition headers for streamed exports."""
+    filename = base_filename or "analytics-export"
+    filename = filename.replace(" ", "_").lower()
+    return {
+        "Content-Disposition": f"attachment; filename={filename}.{extension}",
+        "Cache-Control": "no-store",
+    }
+
+
+def _stream_export(content: bytes, media_type: str, base_filename: str, extension: str) -> StreamingResponse:
+    """Create a streaming response for file export."""
+    return StreamingResponse(
+        iter([content]),
+        media_type=media_type,
+        headers=_export_headers(base_filename, extension),
+    )
 
 
 def _parse_date_param(date_str: Optional[str], field: str) -> Optional[datetime]:
@@ -180,58 +213,20 @@ async def _get_overview_impl(currency: Optional[str], db: Session, principal: Pr
 @router.get("/overview", dependencies=[Depends(Require("analytics:read"))])
 async def get_overview(
     currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
-    db: Session = Depends(get_db_with_timeout),
-    principal: Principal = Depends(get_current_principal),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get high-level overview metrics."""
-    return cast(Dict[str, Any], await _get_overview_impl(currency, db, principal))
+    return await service.get_overview(currency)
 
 
 @router.get("/revenue", dependencies=[Depends(Require("analytics:read"))])
 async def get_revenue_summary(
     currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
     months: int = Query(default=12, le=36),
-    db: Session = Depends(get_db_with_timeout),
-    principal: Principal = Depends(get_current_principal),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Revenue summary alias endpoint (avoids 404)."""
-    resolved_currency = _resolve_currency(db, [], currency)
-    mrr = calculate_mrr(db, currency=resolved_currency)
-    outstanding = (
-        db.query(func.coalesce(func.sum(Invoice.balance), 0))
-        .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]))
-        .scalar() or 0
-    )
-    revenue_trend = db.query(
-        extract("year", Payment.payment_date).label("year"),
-        extract("month", Payment.payment_date).label("month"),
-        func.sum(Payment.amount).label("total"),
-    ).filter(
-        Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
-        Payment.payment_date.isnot(None),
-        Payment.payment_date >= datetime.now(timezone.utc) - timedelta(days=months * 30),
-    ).group_by(
-        extract("year", Payment.payment_date),
-        extract("month", Payment.payment_date),
-    ).order_by(
-        extract("year", Payment.payment_date),
-        extract("month", Payment.payment_date),
-    ).all()
-
-    return {
-        "mrr": mrr,
-        "outstanding": float(outstanding),
-        "currency": resolved_currency,
-        "revenue_trend": [
-            {
-                "year": int(row.year),
-                "month": int(row.month),
-                "period": f"{int(row.year)}-{int(row.month):02d}",
-                "revenue": float(row.total or 0),
-            }
-            for row in revenue_trend
-        ],
-    }
+    return await service.get_revenue_summary(currency=currency, months=months)
 
 
 @router.get("/revenue/trend", dependencies=[Depends(Require("analytics:read"))])
@@ -239,49 +234,14 @@ async def get_revenue_trend(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> List[Dict[str, Any]]:
     """Get monthly revenue trend from payments."""
-    if start_date and end_date:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-    else:
-        end_dt = datetime.now(timezone.utc)
-        start_dt = end_dt - timedelta(days=months * 30)
-
-    payments = (
-        db.query(
-            extract("year", Payment.payment_date).label("year"),
-            extract("month", Payment.payment_date).label("month"),
-            func.sum(Payment.amount).label("total"),
-            func.count(Payment.id).label("count"),
-        )
-        .filter(
-            Payment.payment_date >= start_dt,
-            Payment.payment_date <= end_dt,
-            Payment.status.in_([PaymentStatus.COMPLETED, PaymentStatus.POSTED]),
-        )
-        .group_by(
-            extract("year", Payment.payment_date),
-            extract("month", Payment.payment_date),
-        )
-        .order_by(
-            extract("year", Payment.payment_date),
-            extract("month", Payment.payment_date),
-        )
-        .all()
+    return await service.get_revenue_trend(
+        months=months,
+        start_date=start_date,
+        end_date=end_date,
     )
-
-    return [
-        {
-            "year": int(p.year),
-            "month": int(p.month),
-            "period": f"{int(p.year)}-{int(p.month):02d}",
-            "revenue": float(p.total or 0),
-            "payment_count": p.count,
-        }
-        for p in payments
-    ]
 
 
 @router.get("/churn/trend", dependencies=[Depends(Require("analytics:read"))])
@@ -289,93 +249,10 @@ async def get_churn_trend(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get monthly churn trend with churn rates based on subscription expiration (no active renewal)."""
-    end_dt = _parse_date_param(end_date, "end_date") or datetime.now(timezone.utc)
-    start_dt = _parse_date_param(start_date, "start_date") or (end_dt - timedelta(days=months * 30))
-
-    # Determine churn events: customers whose latest subscription end_date fell in period and have no active subs
-    last_end_sub = (
-        db.query(
-            Subscription.party_id.label("party_id"),
-            func.max(Subscription.end_date).label("last_end_date"),
-        )
-        .filter(Subscription.end_date.isnot(None))
-        .group_by(Subscription.party_id)
-        .subquery()
-    )
-
-    active_sub_exists = (
-        db.query(Subscription.id)
-        .filter(
-            Subscription.party_id == last_end_sub.c.party_id,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        )
-        .exists()
-    )
-
-    churn_candidates = (
-        db.query(
-            func.date_trunc("month", last_end_sub.c.last_end_date).label("period_start"),
-            func.count(last_end_sub.c.party_id).label("churned"),
-        )
-        .filter(
-            last_end_sub.c.last_end_date >= start_dt,
-            last_end_sub.c.last_end_date <= end_dt,
-            ~active_sub_exists,
-        )
-        .group_by(func.date_trunc("month", last_end_sub.c.last_end_date))
-        .all()
-    )
-
-    churn_map: Dict[str, int] = {
-        row.period_start.strftime("%Y-%m"): int(row.churned) for row in churn_candidates
-    }
-
-    def _active_count_at(point: datetime) -> int:
-        return (
-            db.query(func.count(func.distinct(Subscription.party_id)))
-            .filter(
-                Subscription.status == SubscriptionStatus.ACTIVE,
-                Subscription.start_date <= point,
-                or_(Subscription.end_date.is_(None), Subscription.end_date >= point),
-            )
-            .scalar()
-            or 0
-        )
-
-    active_start = _active_count_at(start_dt)
-
-    data = []
-    current = datetime(start_dt.year, start_dt.month, 1)
-    while current <= end_dt:
-        period_key = current.strftime("%Y-%m")
-        churned = churn_map.get(period_key, 0)
-
-        # Active at end of period
-        period_end = (current + timedelta(days=32)).replace(day=1) - timedelta(seconds=1)
-        active_end = _active_count_at(period_end)
-
-        active_base = (active_start + active_end) / 2 if (active_start or active_end) else 0
-        churn_rate = round(churned / active_base * 100, 2) if active_base > 0 else 0
-
-        data.append(
-            {
-                "period": period_key,
-                "churned_count": churned,
-                "churn_rate": churn_rate,
-                "active_base": active_base,
-            }
-        )
-
-        active_start = active_end
-        current = (current + timedelta(days=32)).replace(day=1)
-
-    return {
-        "period": {"start": start_dt.date().isoformat(), "end": end_dt.date().isoformat()},
-        "data": data,
-    }
+    return await service.get_churn_trend(months=months, start_date=start_date, end_date=end_date)
 
 
 @cached("pop_performance", ttl=CACHE_TTL["long"], include_principal=True)
@@ -518,196 +395,36 @@ async def get_pop_performance(
 
 @router.get("/customers", dependencies=[Depends(Require("analytics:read"))])
 async def get_customer_summary(
-    db: Session = Depends(get_db_with_timeout),
-    principal: Principal = Depends(get_current_principal),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Customer summary alias endpoint (avoids 404)."""
-    total = db.query(func.count(CustomerAccount.id)).scalar() or 0
-    active = db.query(func.count(CustomerAccount.id)).filter(CustomerAccount.status == "active").scalar() or 0
-    churned = db.query(func.count(CustomerAccount.id)).filter(CustomerAccount.status == "cancelled").scalar() or 0
-    new_last_30 = db.query(func.count(CustomerAccount.id)).filter(
-        CustomerAccount.created_at >= datetime.now(timezone.utc) - timedelta(days=30)
-    ).scalar() or 0
-
-    by_status = db.query(
-        CustomerAccount.status,
-        func.count(CustomerAccount.id).label("count")
-    ).group_by(CustomerAccount.status).all()
-
-    return {
-        "total_customers": total,
-        "active_customers": active,
-        "churned_customers": churned,
-        "new_last_30_days": new_last_30,
-        "by_status": {
-            (row.status if row.status else "unknown"): row.count for row in by_status
-        },
-    }
+    return await service.get_customer_summary()
 
 
 @router.get("/support/metrics", dependencies=[Depends(Require("analytics:read"))])
 async def get_support_metrics(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get support/ticket metrics."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
-
-    # Total conversations in period
-    total = db.query(Conversation).filter(Conversation.created_at >= start_date).count()
-
-    # By status
-    open_count = db.query(Conversation).filter(
-        Conversation.created_at >= start_date,
-        Conversation.status == ConversationStatus.OPEN,
-    ).count()
-
-    resolved_count = db.query(Conversation).filter(
-        Conversation.created_at >= start_date,
-        Conversation.status == ConversationStatus.RESOLVED,
-    ).count()
-
-    # Average response time
-    avg_response = (
-        db.query(func.avg(Conversation.first_response_time_seconds))
-        .filter(
-            Conversation.created_at >= start_date,
-            Conversation.first_response_time_seconds.isnot(None),
-        )
-        .scalar()
-    )
-
-    # Average resolution time
-    avg_resolution = (
-        db.query(func.avg(Conversation.resolution_time_seconds))
-        .filter(
-            Conversation.created_at >= start_date,
-            Conversation.resolution_time_seconds.isnot(None),
-        )
-        .scalar()
-    )
-
-    # By channel
-    by_channel = (
-        db.query(
-            Conversation.channel,
-            func.count(Conversation.id).label("count"),
-        )
-        .filter(Conversation.created_at >= start_date)
-        .group_by(Conversation.channel)
-        .all()
-    )
-
-    return {
-        "period_days": days,
-        "total_conversations": total,
-        "open": open_count,
-        "resolved": resolved_count,
-        "resolution_rate": round(resolved_count / total * 100, 2) if total > 0 else 0,
-        "avg_first_response_hours": round(float(avg_response or 0) / 3600, 2),
-        "avg_resolution_hours": round(float(avg_resolution or 0) / 3600, 2),
-        "by_channel": {c.channel: c.count for c in by_channel if c.channel},
-    }
+    return await service.get_support_metrics(days=days)
 
 
 @router.get("/invoices/aging", dependencies=[Depends(Require("analytics:read"))])
-async def get_invoice_aging(db: Session = Depends(get_db_with_timeout)) -> Dict[str, Any]:
+async def get_invoice_aging(
+    service: AnalyticsService = Depends(get_analytics_service),
+) -> Dict[str, Any]:
     """Get invoice aging report using SQL-based bucket calculation."""
-    today = func.current_date()
-    days_overdue = func.greatest(
-        func.date_part('day', today - func.coalesce(Invoice.due_date, Invoice.invoice_date)),
-        0
-    )
-
-    # SQL CASE for aging buckets
-    aging_bucket = case(
-        (days_overdue <= 0, 'current'),
-        (days_overdue <= 30, '1_30_days'),
-        (days_overdue <= 60, '31_60_days'),
-        (days_overdue <= 90, '61_90_days'),
-        else_='over_90_days'
-    )
-
-    # Single aggregated query
-    aging_data = (
-        db.query(
-            aging_bucket.label("bucket"),
-            func.count(Invoice.id).label("count"),
-            func.sum(func.coalesce(Invoice.balance, Invoice.total_amount, 0)).label("amount"),
-        )
-        .filter(Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]))
-        .group_by(aging_bucket)
-        .all()
-    )
-
-    # Initialize all buckets
-    aging: Dict[str, Dict[str, float]] = {
-        "current": {"count": 0.0, "amount": 0.0},
-        "1_30_days": {"count": 0.0, "amount": 0.0},
-        "31_60_days": {"count": 0.0, "amount": 0.0},
-        "61_90_days": {"count": 0.0, "amount": 0.0},
-        "over_90_days": {"count": 0.0, "amount": 0.0},
-    }
-
-    # Populate from query results
-    for row in aging_data:
-        if row.bucket in aging:
-            aging[row.bucket]["count"] = float(row.count or 0)
-            aging[row.bucket]["amount"] = float(row.amount or 0)
-
-    total_outstanding = sum(a["amount"] for a in aging.values())
-
-    return {
-        "total_outstanding": total_outstanding,
-        "aging": aging,
-    }
+    return await service.get_invoice_aging()
 
 
 @router.get("/customers/by-plan", dependencies=[Depends(Require("analytics:read"))])
 async def get_customers_by_plan(
     currency: Optional[str] = Query(default=None, description="Currency code to use for MRR calculations"),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> List[Dict[str, Any]]:
     """Get customer distribution by plan."""
-    resolved_currency = _resolve_currency(db, [], currency)
-
-    # MRR normalized by billing cycle
-    mrr_case = case(
-        (Subscription.billing_cycle == "quarterly", Subscription.price / 3),
-        (Subscription.billing_cycle == "yearly", Subscription.price / 12),
-        else_=Subscription.price
-    )
-
-    query = (
-        db.query(
-            Subscription.plan_name,
-            func.count(func.distinct(Subscription.party_id)).label("customer_count"),
-            func.count(Subscription.id).label("subscription_count"),
-            func.sum(mrr_case).label("mrr"),
-        )
-        .filter(Subscription.status == SubscriptionStatus.ACTIVE)
-    )
-
-    if resolved_currency:
-        query = query.filter(Subscription.currency == resolved_currency)
-
-    plans = (
-        query
-        .group_by(Subscription.plan_name)
-        .order_by(func.count(func.distinct(Subscription.party_id)).desc())
-        .all()
-    )
-
-    return [
-        {
-            "plan_name": p.plan_name,
-            "customer_count": p.customer_count,
-            "subscription_count": p.subscription_count,
-            "mrr": float(p.mrr or 0),
-            "currency": resolved_currency,
-        }
-        for p in plans
-    ]
+    return await service.get_customers_by_plan(currency=currency)
 
 
 # ==============================================================================
@@ -772,146 +489,27 @@ async def get_days_sales_outstanding(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db_with_timeout),
-    principal: Principal = Depends(get_current_principal),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Calculate Days Sales Outstanding (DSO) trend - measures collection efficiency."""
-    if start_date and end_date:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-
-        results = []
-        current = start_dt
-        while current < end_dt:
-            period_end = min(current + timedelta(days=30), end_dt)
-
-            invoiced = (
-                db.query(func.sum(Invoice.total_amount))
-                .filter(
-                    Invoice.invoice_date >= current,
-                    Invoice.invoice_date < period_end,
-                )
-                .scalar()
-            ) or Decimal("0")
-
-            avg_receivables = (
-                db.query(func.sum(Invoice.balance))
-                .filter(
-                    Invoice.invoice_date < period_end,
-                    Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID])
-                )
-                .scalar()
-            ) or Decimal("0")
-
-            dso = float((avg_receivables / invoiced) * 30) if invoiced > 0 else 0
-
-            results.append({
-                "year": current.year,
-                "month": current.month,
-                "period": f"{current.year}-{current.month:02d}",
-                "dso": round(dso, 1),
-                "invoiced": float(invoiced),
-                "outstanding": float(avg_receivables),
-            })
-
-            current = period_end
-
-        dso_values = [float(cast(Any, r["dso"])) for r in results]
-        return {
-            "trend": results,
-            "current_dso": dso_values[-1] if dso_values else 0,
-            "average_dso": round(sum(dso_values) / len(dso_values), 1) if dso_values else 0,
-        }
-
-    return cast(Dict[str, Any], await _get_dso_impl(months, db, principal))
+    return await service.get_dso(months=months, start_date=start_date, end_date=end_date)
 
 
 @router.get("/revenue/by-territory", dependencies=[Depends(Require("analytics:read"))])
 async def get_revenue_by_territory(
     months: int = Query(default=12, le=24),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> List[Dict[str, Any]]:
     """Get MRR and customer distribution by territory/region."""
-    mrr_case = case(
-        (Subscription.billing_cycle == "quarterly", Subscription.price / 3),
-        (Subscription.billing_cycle == "yearly", Subscription.price / 12),
-        else_=Subscription.price
-    )
-
-    # Group by customer type (territory approximation for ISP)
-    segment_expr = func.coalesce(PartyRole.metadata_["customer_type"].astext, "Unknown")
-    by_type = (
-        db.query(
-            segment_expr.label("segment"),
-            func.count(func.distinct(Subscription.party_id)).label("customer_count"),
-            func.sum(mrr_case).label("mrr"),
-        )
-        .outerjoin(
-            PartyRole,
-            and_(PartyRole.party_id == Subscription.party_id, PartyRole.role == "customer"),
-        )
-        .filter(
-            Subscription.status == SubscriptionStatus.ACTIVE,
-        )
-        .group_by(segment_expr)
-        .all()
-    )
-
-    return [
-        {
-            "territory": t.segment or "Unknown",
-            "customer_count": t.customer_count,
-            "mrr": float(t.mrr or 0),
-        }
-        for t in by_type
-    ]
+    return await service.get_revenue_by_territory(months=months)
 
 
 @router.get("/revenue/cohort", dependencies=[Depends(Require("analytics:read"))])
 async def get_revenue_cohort(
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Analyze revenue by customer signup cohort."""
-    from sqlalchemy import literal_column
-
-    # Define cohort expression once and reference by label in GROUP BY
-    cohort_expr = func.to_char(func.date_trunc('month', PartyRole.since), 'YYYY-MM')
-
-    cohorts = (
-        db.query(
-            cohort_expr.label("cohort_month"),
-            func.count(PartyRole.party_id).label("total_customers"),
-            func.sum(case((PartyRole.status == "active", 1), else_=0)).label("active"),
-            func.sum(case((PartyRole.status != "active", 1), else_=0)).label("churned"),
-        )
-        .filter(
-            PartyRole.role == "customer",
-            PartyRole.since.isnot(None),
-        )
-        .group_by(literal_column("1"))  # Group by first column (cohort_month)
-        .order_by(literal_column("1"))
-        .all()
-    )
-
-    results = []
-    for c in cohorts:
-        if c.cohort_month:
-            retention = (c.active / c.total_customers * 100) if c.total_customers > 0 else 0
-            results.append({
-                "cohort": c.cohort_month,
-                "total_customers": c.total_customers,
-                "active": c.active,
-                "churned": c.churned,
-                "retention_rate": round(retention, 1),
-            })
-
-    return {
-        "cohorts": results[-12:],  # Last 12 cohorts
-        "summary": {
-            "avg_retention": round(sum(r["retention_rate"] for r in results) / len(results), 1) if results else 0,
-            "total_cohorts": len(results),
-        }
-    }
+    return await service.get_revenue_cohort()
 
 
 # ==============================================================================
@@ -1216,87 +814,28 @@ async def _get_sla_attainment_impl(days: int, db: Session, principal: Principal)
 @router.get("/support/sla-attainment", dependencies=[Depends(Require("analytics:read"))])
 async def get_sla_attainment(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db_with_timeout),
-    principal: Principal = Depends(get_current_principal),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get SLA attainment metrics for tickets."""
-    return cast(Dict[str, Any], await _get_sla_attainment_impl(days, db, principal))
+    return await service.get_sla_attainment(days=days)
 
 
 @router.get("/support/agent-productivity", dependencies=[Depends(Require("analytics:read"))])
 async def get_agent_productivity(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> List[Dict[str, Any]]:
     """Get ticket handling metrics by assigned employee/agent."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
-
-    agents = (
-        db.query(
-            Employee.id,
-            Employee.name,
-            Employee.department,
-            func.count(Ticket.id).label("total_tickets"),
-            func.sum(case((Ticket.status == TicketStatus.RESOLVED, 1), else_=0)).label("resolved"),
-            func.sum(case((Ticket.status == TicketStatus.CLOSED, 1), else_=0)).label("closed"),
-            func.avg(
-                func.extract('epoch', Ticket.resolution_date - Ticket.opening_date) / 3600
-            ).label("avg_resolution_hours"),
-        )
-        .join(Ticket, Ticket.assigned_employee_id == Employee.id)
-        .filter(Ticket.created_at >= start_date)
-        .group_by(Employee.id, Employee.name, Employee.department)
-        .order_by(desc("total_tickets"))
-        .all()
-    )
-
-    return [
-        {
-            "employee_id": a.id,
-            "name": a.name,
-            "department": a.department,
-            "total_tickets": a.total_tickets,
-            "resolved": a.resolved or 0,
-            "closed": a.closed or 0,
-            "resolution_rate": round((a.resolved or 0) / a.total_tickets * 100, 1) if a.total_tickets > 0 else 0,
-            "avg_resolution_hours": round(float(a.avg_resolution_hours or 0), 2),
-        }
-        for a in agents
-    ]
+    return await service.get_agent_productivity(days=days)
 
 
 @router.get("/support/by-type", dependencies=[Depends(Require("analytics:read"))])
 async def get_tickets_by_type(
     days: int = Query(default=30, le=90),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get ticket distribution by type/category."""
-    start_date = datetime.now(timezone.utc) - timedelta(days=days)
-
-    by_type = (
-        db.query(
-            Ticket.ticket_type,
-            func.count(Ticket.id).label("count"),
-            func.sum(case((Ticket.status == TicketStatus.RESOLVED, 1), else_=0)).label("resolved"),
-        )
-        .filter(Ticket.created_at >= start_date)
-        .group_by(Ticket.ticket_type)
-        .order_by(desc("count"))
-        .all()
-    )
-
-    return {
-        "by_type": [
-            {
-                "type": t.ticket_type or "Unclassified",
-                "count": t.count,
-                "resolved": t.resolved or 0,
-                "resolution_rate": round((int(getattr(t, "resolved", 0) or 0)) / int(getattr(t, "count", 1) or 1) * 100, 1) if getattr(t, "count", 0) else 0,
-            }
-            for t in by_type
-        ],
-        "total": sum(t.count for t in by_type),
-    }
+    return await service.get_tickets_by_type(days=days)
 
 
 # ==============================================================================
@@ -1409,43 +948,14 @@ async def get_expenses_by_category(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get expense breakdown by category."""
-    if start_date and end_date:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-    else:
-        end_dt = datetime.now(timezone.utc)
-        start_dt = end_dt - timedelta(days=months * 30)
-
-    by_category = (
-        db.query(
-            Expense.category,
-            func.count(Expense.id).label("count"),
-            func.sum(Expense.total_sanctioned_amount).label("total"),
-        )
-        .filter(
-            Expense.expense_date >= start_dt,
-            Expense.expense_date <= end_dt,
-            Expense.status.in_([ExpenseStatus.APPROVED, ExpenseStatus.PAID]),
-        )
-        .group_by(Expense.category)
-        .order_by(desc("total"))
-        .all()
+    return await service.get_expenses_by_category(
+        months=months,
+        start_date=start_date,
+        end_date=end_date,
     )
-
-    return {
-        "by_category": [
-            {
-                "category": c.category or "Uncategorized",
-                "count": c.count,
-                "total": float(c.total or 0),
-            }
-            for c in by_category
-        ],
-        "total_expenses": sum(float(c.total or 0) for c in by_category),
-    }
 
 
 @router.get("/expenses/by-cost-center", dependencies=[Depends(Require("analytics:read"))])
@@ -1453,43 +963,14 @@ async def get_expenses_by_cost_center(
     months: int = Query(default=12, le=24),
     start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
-    db: Session = Depends(get_db_with_timeout),
+    service: AnalyticsService = Depends(get_analytics_service),
 ) -> Dict[str, Any]:
     """Get expense breakdown by cost center (department)."""
-    if start_date and end_date:
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-    else:
-        end_dt = datetime.now(timezone.utc)
-        start_dt = end_dt - timedelta(days=months * 30)
-
-    by_cost_center = (
-        db.query(
-            Expense.cost_center,
-            func.count(Expense.id).label("count"),
-            func.sum(Expense.total_sanctioned_amount).label("total"),
-        )
-        .filter(
-            Expense.expense_date >= start_dt,
-            Expense.expense_date <= end_dt,
-            Expense.status.in_([ExpenseStatus.APPROVED, ExpenseStatus.PAID]),
-        )
-        .group_by(Expense.cost_center)
-        .order_by(desc("total"))
-        .all()
+    return await service.get_expenses_by_cost_center(
+        months=months,
+        start_date=start_date,
+        end_date=end_date,
     )
-
-    return {
-        "by_cost_center": [
-            {
-                "cost_center": cc.cost_center or "Unassigned",
-                "count": cc.count,
-                "total": float(cc.total or 0),
-            }
-            for cc in by_cost_center
-        ],
-        "total_expenses": sum(float(cc.total or 0) for cc in by_cost_center),
-    }
 
 
 @router.get("/expenses/trend", dependencies=[Depends(Require("analytics:read"))])
@@ -1717,3 +1198,523 @@ async def get_metrics_by_department(
             departments[cost_center]["expense_total"] = float(et.expense_total or 0)
 
     return list(departments.values())
+
+
+# ==============================================================================
+# Analytics Exports
+# ==============================================================================
+
+
+@router.get("/exports/{report}", dependencies=[Depends(Require("analytics:read"))])
+async def export_analytics_report(
+    report: str,
+    format: str = Query("csv", description="Export format: csv or pdf"),
+    days: int = Query(30, le=90),
+    months: int = Query(12, le=24),
+    start_date: Optional[str] = Query(default=None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(default=None, description="End date (YYYY-MM-DD)"),
+    db: Session = Depends(get_db_with_timeout),
+    principal: Principal = Depends(get_current_principal),
+) -> StreamingResponse:
+    """Export analytics reports to CSV or PDF."""
+    export_format = format.lower()
+    if export_format not in ("csv", "pdf"):
+        raise HTTPException(status_code=400, detail="Format must be csv or pdf")
+
+    if export_format == "pdf" and not WEASYPRINT_AVAILABLE:
+        raise HTTPException(status_code=400, detail="PDF export not available (install weasyprint)")
+
+    analytics = AnalyticsService(db, principal)
+    insights = InsightsService(db, principal=principal)
+    export_service = AnalyticsExportService()
+
+    sections: List[Dict[str, Any]] = []
+    title = "Analytics Export"
+
+    if report == "revenue":
+        title = "Revenue Analytics"
+        overview = await analytics.get_overview()
+        dso = await analytics.get_dso(months=months, start_date=start_date, end_date=end_date)
+        aging = await analytics.get_invoice_aging()
+        territories = await analytics.get_revenue_by_territory(months=months)
+        trend = await analytics.get_revenue_trend(months=months, start_date=start_date, end_date=end_date)
+        plans = await analytics.get_customers_by_plan()
+        cohorts = await analytics.get_revenue_cohort()
+
+        sections = [
+            {
+                "title": "Summary",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "MRR", "Value": overview.get("revenue", {}).get("mrr", 0)},
+                    {"Metric": "Outstanding", "Value": overview.get("revenue", {}).get("outstanding", 0)},
+                    {"Metric": "Overdue Invoices", "Value": overview.get("revenue", {}).get("overdue_invoices", 0)},
+                    {"Metric": "Currency", "Value": overview.get("revenue", {}).get("currency", "")},
+                ],
+            },
+            {
+                "title": "DSO Trend",
+                "columns": ["Period", "DSO", "Invoiced", "Outstanding"],
+                "rows": [
+                    {
+                        "Period": row["period"],
+                        "DSO": row["dso"],
+                        "Invoiced": row["invoiced"],
+                        "Outstanding": row["outstanding"],
+                    }
+                    for row in dso.get("trend", [])
+                ],
+            },
+            {
+                "title": "Invoice Aging",
+                "columns": ["Bucket", "Count", "Amount"],
+                "rows": [
+                    {
+                        "Bucket": bucket.replace("_", " "),
+                        "Count": data.get("count", 0),
+                        "Amount": data.get("amount", 0),
+                    }
+                    for bucket, data in aging.get("aging", {}).items()
+                ],
+            },
+            {
+                "title": "Revenue by Territory",
+                "columns": ["Territory", "Customers", "MRR"],
+                "rows": [
+                    {
+                        "Territory": row.get("territory", "Unknown"),
+                        "Customers": row.get("customer_count", 0),
+                        "MRR": row.get("mrr", 0),
+                    }
+                    for row in territories
+                ],
+            },
+            {
+                "title": "Revenue Trend",
+                "columns": ["Period", "Payments", "Revenue"],
+                "rows": [
+                    {
+                        "Period": row.get("period"),
+                        "Payments": row.get("payment_count", 0),
+                        "Revenue": row.get("revenue", 0),
+                    }
+                    for row in trend
+                ],
+            },
+            {
+                "title": "Customers by Plan",
+                "columns": ["Plan", "Customers", "Subscriptions", "MRR"],
+                "rows": [
+                    {
+                        "Plan": row.get("plan_name") or "Unspecified",
+                        "Customers": row.get("customer_count", 0),
+                        "Subscriptions": row.get("subscription_count", 0),
+                        "MRR": row.get("mrr", 0),
+                    }
+                    for row in plans
+                ],
+            },
+            {
+                "title": "Cohort Retention",
+                "columns": ["Cohort", "Total", "Active", "Churned", "Retention Rate"],
+                "rows": [
+                    {
+                        "Cohort": row.get("cohort"),
+                        "Total": row.get("total_customers"),
+                        "Active": row.get("active"),
+                        "Churned": row.get("churned"),
+                        "Retention Rate": row.get("retention_rate"),
+                    }
+                    for row in cohorts.get("cohorts", [])
+                ],
+            },
+        ]
+
+    elif report == "customers":
+        title = "Customer Analytics"
+        customers = await analytics.get_customer_summary()
+        segments = insights.get_customer_segments()
+        health = insights.get_customer_health()
+        churn = await analytics.get_churn_trend(months=months, start_date=start_date, end_date=end_date)
+
+        sections = [
+            {
+                "title": "Summary",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Total Customers", "Value": customers.get("total_customers", 0)},
+                    {"Metric": "Active Customers", "Value": customers.get("active_customers", 0)},
+                    {"Metric": "Churned Customers", "Value": customers.get("churned_customers", 0)},
+                    {"Metric": "New Customers (30d)", "Value": customers.get("new_last_30_days", 0)},
+                ],
+            },
+            {
+                "title": "Health Indicators",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Overdue Customers", "Value": health.payment_behavior.customers_with_overdue},
+                    {"Metric": "High Support Customers", "Value": health.support_intensity.high_support_customers},
+                    {"Metric": "Recent Cancellations", "Value": health.churn_indicators.recently_cancelled_30d},
+                ],
+            },
+            {
+                "title": "Segments by Status",
+                "columns": ["Status", "Customers", "MRR"],
+                "rows": [
+                    {"Status": row["status"], "Customers": row["count"], "MRR": row.get("mrr", 0)}
+                    for row in segments.by_status
+                ],
+            },
+            {
+                "title": "Segments by Type",
+                "columns": ["Type", "Customers", "MRR"],
+                "rows": [
+                    {"Type": row["type"], "Customers": row["count"], "MRR": row.get("mrr", 0)}
+                    for row in segments.by_type
+                ],
+            },
+            {
+                "title": "Tenure Segments",
+                "columns": ["Segment", "Customers"],
+                "rows": [
+                    {"Segment": row["segment"], "Customers": row["count"]}
+                    for row in segments.by_tenure
+                ],
+            },
+            {
+                "title": "MRR Tiers",
+                "columns": ["Tier", "Customers"],
+                "rows": [
+                    {"Tier": row["segment"], "Customers": row["count"]}
+                    for row in segments.by_mrr_tier
+                ],
+            },
+            {
+                "title": "Top Cities",
+                "columns": ["City", "Customers", "MRR"],
+                "rows": [
+                    {"City": row["city"], "Customers": row["count"], "MRR": row.get("mrr", 0)}
+                    for row in segments.by_city
+                ],
+            },
+            {
+                "title": "POP Distribution",
+                "columns": ["POP", "City", "Customers", "MRR"],
+                "rows": [
+                    {
+                        "POP": row["pop_name"],
+                        "City": row.get("city") or "",
+                        "Customers": row.get("customer_count", 0),
+                        "MRR": row.get("mrr", 0),
+                    }
+                    for row in segments.by_pop
+                ],
+            },
+            {
+                "title": "Churn Trend",
+                "columns": ["Period", "Churned", "Churn Rate", "Active Base"],
+                "rows": [
+                    {
+                        "Period": row["period"],
+                        "Churned": row["churned_count"],
+                        "Churn Rate": row["churn_rate"],
+                        "Active Base": row["active_base"],
+                    }
+                    for row in churn.get("data", [])
+                ],
+            },
+        ]
+
+    elif report == "support":
+        title = "Support Analytics"
+        parsed_start = _parse_date_param(start_date, "start_date")
+        parsed_end = _parse_date_param(end_date, "end_date")
+        if parsed_end:
+            parsed_end = parsed_end.replace(hour=23, minute=59, second=59)
+        metrics = await analytics.get_support_metrics(days=days, start_date=parsed_start, end_date=parsed_end)
+        sla = await analytics.get_sla_attainment(days=days)
+        agents = await analytics.get_agent_productivity(days=days)
+        ticket_types = await analytics.get_tickets_by_type(days=days)
+
+        sections = [
+            {
+                "title": "Summary",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Total Conversations", "Value": metrics.get("total_conversations", 0)},
+                    {"Metric": "Open", "Value": metrics.get("open", 0)},
+                    {"Metric": "Resolved", "Value": metrics.get("resolved", 0)},
+                    {"Metric": "Resolution Rate", "Value": metrics.get("resolution_rate", 0)},
+                    {"Metric": "Avg First Response (hrs)", "Value": metrics.get("avg_first_response_hours", 0)},
+                    {"Metric": "Avg Resolution (hrs)", "Value": metrics.get("avg_resolution_hours", 0)},
+                ],
+            },
+            {
+                "title": "SLA Attainment",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "SLA Met", "Value": sla.get("sla_attainment", {}).get("met", 0)},
+                    {"Metric": "SLA Breached", "Value": sla.get("sla_attainment", {}).get("breached", 0)},
+                    {"Metric": "Attainment Rate", "Value": sla.get("sla_attainment", {}).get("rate", 0)},
+                ],
+            },
+            {
+                "title": "Channels",
+                "columns": ["Channel", "Count"],
+                "rows": [
+                    {"Channel": channel, "Count": count}
+                    for channel, count in (metrics.get("by_channel") or {}).items()
+                ],
+            },
+            {
+                "title": "Ticket Types",
+                "columns": ["Type", "Total", "Resolved", "Resolution Rate"],
+                "rows": [
+                    {
+                        "Type": row.get("type"),
+                        "Total": row.get("count", 0),
+                        "Resolved": row.get("resolved", 0),
+                        "Resolution Rate": row.get("resolution_rate", 0),
+                    }
+                    for row in ticket_types.get("by_type", [])
+                ],
+            },
+            {
+                "title": "Agent Productivity",
+                "columns": ["Agent", "Department", "Tickets", "Resolved", "Resolution Rate", "Avg Hours"],
+                "rows": [
+                    {
+                        "Agent": row.get("name"),
+                        "Department": row.get("department") or "",
+                        "Tickets": row.get("total_tickets", 0),
+                        "Resolved": row.get("resolved", 0),
+                        "Resolution Rate": row.get("resolution_rate", 0),
+                        "Avg Hours": row.get("avg_resolution_hours", 0),
+                    }
+                    for row in agents
+                ],
+            },
+        ]
+
+    elif report == "operations":
+        title = "Operations Analytics"
+        field_service = FieldServiceAnalyticsService(db, principal=principal)
+        parsed_start = _parse_date_param(start_date, "start_date")
+        parsed_end = _parse_date_param(end_date, "end_date")
+        if parsed_end:
+            parsed_end = parsed_end.replace(hour=23, minute=59, second=59)
+        if parsed_start and parsed_end:
+            start_dt = parsed_start.date()
+            end_dt = parsed_end.date()
+        else:
+            end_dt = datetime.now(timezone.utc).date()
+            start_dt = end_dt - timedelta(days=months * 30)
+        filters = AnalyticsFilters(start_date=start_dt, end_date=end_dt)
+        dashboard = field_service.get_dashboard_metrics(filters)
+        order_breakdown = field_service.get_order_type_breakdown(filters)
+        expenses = await analytics.get_expenses_by_category(months=months, start_date=start_date, end_date=end_date)
+        cost_centers = await analytics.get_expenses_by_cost_center(months=months, start_date=start_date, end_date=end_date)
+
+        sections = [
+            {
+                "title": "Field Service Summary",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Completion Rate", "Value": dashboard.completion_rate},
+                    {"Metric": "Avg Rating", "Value": dashboard.avg_customer_rating},
+                    {"Metric": "Avg Completion Time (hrs)", "Value": dashboard.avg_completion_time_hours},
+                    {"Metric": "Total Revenue", "Value": float(dashboard.total_revenue or 0)},
+                ],
+            },
+            {
+                "title": "Service Order Types",
+                "columns": ["Type", "Orders", "Share", "Revenue"],
+                "rows": [
+                    {
+                        "Type": row.order_type,
+                        "Orders": row.count,
+                        "Share": row.percentage,
+                        "Revenue": float(row.revenue or 0),
+                    }
+                    for row in order_breakdown
+                ],
+            },
+            {
+                "title": "Expenses by Category",
+                "columns": ["Category", "Count", "Total"],
+                "rows": [
+                    {
+                        "Category": row.get("category"),
+                        "Count": row.get("count", 0),
+                        "Total": row.get("total", 0),
+                    }
+                    for row in expenses.get("by_category", [])
+                ],
+            },
+            {
+                "title": "Expenses by Cost Center",
+                "columns": ["Cost Center", "Count", "Total"],
+                "rows": [
+                    {
+                        "Cost Center": row.get("cost_center"),
+                        "Count": row.get("count", 0),
+                        "Total": row.get("total", 0),
+                    }
+                    for row in cost_centers.get("by_cost_center", [])
+                ],
+            },
+        ]
+
+    elif report == "hr":
+        title = "HR Analytics"
+        hr_service = HRAnalyticsService(db, principal=principal)
+        workforce = hr_service.get_workforce_analytics()
+        turnover = hr_service.get_turnover_analytics()
+
+        sections = [
+            {
+                "title": "Workforce Snapshot",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Total Headcount", "Value": workforce.total_headcount},
+                    {"Metric": "Active Employees", "Value": workforce.active_employees},
+                    {"Metric": "On Leave", "Value": workforce.on_leave},
+                    {"Metric": "Terminated", "Value": workforce.terminated},
+                    {"Metric": "Avg Tenure (months)", "Value": workforce.avg_tenure_months},
+                    {"Metric": "New Hires (30d)", "Value": workforce.new_hires_30d},
+                    {"Metric": "Separations (30d)", "Value": workforce.separations_30d},
+                ],
+            },
+            {
+                "title": "Headcount by Department",
+                "columns": ["Department", "Count"],
+                "rows": [
+                    {"Department": row.department_name, "Count": row.total_employees}
+                    for row in workforce.headcount_by_department
+                ],
+            },
+            {
+                "title": "Headcount by Designation",
+                "columns": ["Designation", "Count"],
+                "rows": [
+                    {"Designation": row.designation_name, "Count": row.employee_count}
+                    for row in workforce.headcount_by_designation
+                ],
+            },
+            {
+                "title": "Turnover Summary",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Total Separations", "Value": turnover.total_separations},
+                    {"Metric": "Voluntary", "Value": turnover.voluntary_separations},
+                    {"Metric": "Involuntary", "Value": turnover.involuntary_separations},
+                    {"Metric": "Turnover Rate", "Value": turnover.turnover_rate},
+                    {"Metric": "Avg Tenure at Exit (months)", "Value": turnover.avg_tenure_at_exit_months},
+                ],
+            },
+        ]
+
+    elif report == "insights":
+        title = "Data Insights"
+        completeness = insights.get_data_completeness()
+        anomalies = insights.detect_anomalies()
+        availability = insights.get_data_availability()
+
+        sections = [
+            {
+                "title": "Data Completeness",
+                "columns": ["Metric", "Value"],
+                "rows": [
+                    {"Metric": "Total Customers", "Value": completeness.summary.get("total_customers", 0)},
+                    {"Metric": "Critical Completeness", "Value": completeness.summary.get("critical_completeness_score", 0)},
+                    {"Metric": "Overall Completeness", "Value": completeness.summary.get("overall_completeness_score", 0)},
+                    {"Metric": "Grade", "Value": completeness.summary.get("grade", "")},
+                ],
+            },
+            {
+                "title": "Recommendations",
+                "columns": ["Priority", "Category", "Issue", "Action"],
+                "rows": [
+                    {
+                        "Priority": rec.priority,
+                        "Category": rec.category,
+                        "Issue": rec.issue,
+                        "Action": rec.action,
+                    }
+                    for rec in completeness.recommendations
+                ],
+            },
+            {
+                "title": "Anomalies",
+                "columns": ["Type", "Severity", "Description"],
+                "rows": [
+                    {
+                        "Type": anomaly.type,
+                        "Severity": anomaly.severity,
+                        "Description": anomaly.description,
+                    }
+                    for anomaly in anomalies.anomalies
+                ],
+            },
+            {
+                "title": "Patterns",
+                "columns": ["Type", "Insight"],
+                "rows": [
+                    {
+                        "Type": pattern.type,
+                        "Insight": pattern.description,
+                    }
+                    for pattern in anomalies.patterns
+                ],
+            },
+            {
+                "title": "Source Coverage",
+                "columns": ["Source", "Metric", "Count"],
+                "rows": [
+                    {
+                        "Source": source,
+                        "Metric": metric.replace("_", " "),
+                        "Count": count,
+                    }
+                    for source, data in availability.data_by_source.items()
+                    for metric, count in data.items()
+                ],
+            },
+            {
+                "title": "Missing Critical Data",
+                "columns": ["Entity", "Field", "Count", "Impact", "Description"],
+                "rows": [
+                    {
+                        "Entity": item.entity,
+                        "Field": item.field,
+                        "Count": item.count,
+                        "Impact": item.impact,
+                        "Description": item.description,
+                    }
+                    for item in availability.missing_critical_data
+                ],
+            },
+        ]
+
+    else:
+        raise HTTPException(status_code=404, detail="Unknown analytics report")
+
+    try:
+        if export_format == "csv":
+            csv_content = export_service.export_csv(title, sections)
+            return _stream_export(
+                csv_content.encode("utf-8"),
+                "text/csv",
+                f"{report}-analytics",
+                "csv",
+            )
+
+        pdf_content = export_service.export_pdf(title, sections)
+        return _stream_export(
+            pdf_content,
+            "application/pdf",
+            f"{report}-analytics",
+            "pdf",
+        )
+    except AnalyticsExportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

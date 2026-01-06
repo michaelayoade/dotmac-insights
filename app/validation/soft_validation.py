@@ -675,14 +675,17 @@ def _rule_invoice(session: Session, instance: Any, model_name: str, record_id: A
         _warn(model_name, "total_amount", "total_amount is less than amount", record_id, "invalid_amount")
     if amount_paid > total_amount:
         _warn(model_name, "amount_paid", "amount_paid exceeds total_amount", record_id, "invalid_amount")
-    if balance is not None and abs((total_amount - amount_paid) - balance) > Decimal("0.01"):
-        _warn(model_name, "balance", "balance does not match total_amount minus amount_paid", record_id, "inconsistent_total")
+    if balance is not None and balance < Decimal("-0.01"):
+        _warn(model_name, "balance", "balance should not be negative", record_id, "invalid_amount")
 
     status = getattr(instance, "status", None)
     if status == InvoiceStatus.PAID:
         if getattr(instance, "paid_date", None) is None:
             _warn(model_name, "paid_date", "paid_date is required when status=paid", record_id, "missing_required")
-        if amount_paid + Decimal("0.01") < total_amount:
+        if balance is not None:
+            if balance > Decimal("0.01"):
+                _warn(model_name, "balance", "balance should be zero when status=paid", record_id, "inconsistent_total")
+        elif amount_paid + Decimal("0.01") < total_amount:
             _warn(model_name, "amount_paid", "amount_paid is less than total_amount for paid invoice", record_id, "inconsistent_total")
 
     invoice_date = getattr(instance, "invoice_date", None)

@@ -216,10 +216,20 @@ async def get_invoice_aging(
     aging_query = db.query(
         aging_bucket.label("bucket"),
         func.count(Invoice.id).label("count"),
-        func.sum(Invoice.total_amount - Invoice.amount_paid).label("outstanding"),
+        func.sum(
+            func.coalesce(
+                Invoice.balance,
+                Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+            )
+        ).label("outstanding"),
     ).filter(
         Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
         Invoice.due_date.isnot(None),
+        Invoice.is_deleted == False,
+        func.coalesce(
+            Invoice.balance,
+            Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+        ) > 0,
     )
 
     if currency:
@@ -278,9 +288,19 @@ async def get_revenue_by_currency(
     # Outstanding by currency
     outstanding = db.query(
         Invoice.currency,
-        func.sum(Invoice.total_amount - Invoice.amount_paid).label("outstanding"),
+        func.sum(
+            func.coalesce(
+                Invoice.balance,
+                Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+            )
+        ).label("outstanding"),
     ).filter(
-        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID])
+        Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
+        Invoice.is_deleted == False,
+        func.coalesce(
+            Invoice.balance,
+            Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+        ) > 0,
     ).group_by(Invoice.currency).all()
 
     outstanding_map = {row.currency: float(row.outstanding or 0) for row in outstanding}

@@ -717,7 +717,7 @@ async def teams_list(
     """Field teams list page."""
     service = TeamService(db)
     filters = TeamFilters(search=q)
-    pagination = PaginationParams(page=page, limit=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     result = service.list_teams(filters, pagination)
 
@@ -1090,7 +1090,7 @@ async def technicians_list(
     """Technicians list page - employees with field team memberships."""
     service = TeamService(db)
     filters = TechnicianFilters(search=q)
-    pagination = PaginationParams(page=page, limit=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     result = service.list_technicians(filters, pagination)
 

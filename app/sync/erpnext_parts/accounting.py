@@ -37,7 +37,14 @@ from app.models.accounting import (
     PurchaseInvoiceStatus,
     Supplier,
 )
-from app.models.party import CustomerAccount, PartyExternalId
+from app.models.party import (
+    CustomerAccount,
+    Party,
+    PartyExternalId,
+    PartyRole,
+    PartyType,
+    SupplierAccount,
+)
 from app.models.employee import Employee
 from app.models.expense import Expense, ExpenseStatus
 from app.models.invoice import Invoice, InvoiceSource, InvoiceStatus
@@ -592,11 +599,100 @@ async def sync_suppliers(
             fields=["*"],
         )
 
+        party_exts = (
+            sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "erpnext",
+                PartyExternalId.external_key_type == "supplier_id",
+            )
+            .all()
+        )
+        party_by_ext = {p.external_id: p.party_id for p in party_exts}
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
+
         for sup_data in suppliers:
             erpnext_id = sup_data.get("name")
             existing = sync_client.db.query(Supplier).filter(
                 Supplier.erpnext_id == erpnext_id
             ).first()
+
+            # Link or create party for this supplier
+            party = None
+            if existing and existing.party_id:
+                party = sync_client.db.query(Party).get(existing.party_id)
+
+            if not party and erpnext_id:
+                party_id = party_by_ext.get(str(erpnext_id))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
+
+            email = (sup_data.get("email_id") or "").strip().lower()
+            if not party and email:
+                party = party_email_index.get(email)
+
+            if not party:
+                party = Party(
+                    type=PartyType.ORGANIZATION.value,
+                    name=sup_data.get("supplier_name") or None,
+                    emails=[],
+                    phones=[],
+                )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+
+            if email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email for e in emails):
+                    emails.append(
+                        {
+                            "address": email,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+                    party_email_index[email] = party
+
+            phone = sup_data.get("mobile_no") or None
+            if phone:
+                phones = list(party.phones or [])
+                if not any((p.get("number") or "") == phone for p in phones):
+                    phones.append(
+                        {
+                            "number": phone,
+                            "label": "primary",
+                            "is_primary": len(phones) == 0,
+                            "can_sms": False,
+                            "can_whatsapp": False,
+                        }
+                    )
+                    party.phones = phones
+
+            if not party.name:
+                party.name = sup_data.get("supplier_name") or party.name
+
+            if erpnext_id and str(erpnext_id) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="erpnext",
+                        external_id=str(erpnext_id),
+                        external_key_type="supplier_id",
+                    )
+                )
+                party_by_ext[str(erpnext_id)] = party.id
+
+            has_supplier_role = (
+                sync_client.db.query(PartyRole)
+                .filter(PartyRole.party_id == party.id, PartyRole.role == "supplier", PartyRole.until.is_(None))
+                .first()
+            )
+            if not has_supplier_role:
+                sync_client.db.add(PartyRole(party_id=party.id, role="supplier"))
 
             if existing:
                 existing.supplier_name = sup_data.get("supplier_name", "")
@@ -618,6 +714,7 @@ async def sync_suppliers(
                 existing.disabled = sup_data.get("disabled", 0) == 1
                 existing.is_frozen = sup_data.get("is_frozen", 0) == 1
                 existing.on_hold = sup_data.get("on_hold", 0) == 1
+                existing.party_id = party.id
                 existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
@@ -642,9 +739,35 @@ async def sync_suppliers(
                     disabled=sup_data.get("disabled", 0) == 1,
                     is_frozen=sup_data.get("is_frozen", 0) == 1,
                     on_hold=sup_data.get("on_hold", 0) == 1,
+                    party_id=party.id,
                 )
                 sync_client.db.add(supplier)
                 sync_client.increment_created()
+
+            sync_client.db.flush()
+
+            supplier_ref = existing or supplier
+            supplier_account = (
+                sync_client.db.query(SupplierAccount)
+                .filter(SupplierAccount.party_id == party.id)
+                .first()
+            )
+            if not supplier_account:
+                supplier_account = SupplierAccount(
+                    party_id=party.id,
+                    account_number=str(erpnext_id or f"SUP-{party.id}"),
+                    status="active",
+                    supplier_id=supplier_ref.id,
+                    external_ids={"erpnext_id": erpnext_id},
+                )
+                sync_client.db.add(supplier_account)
+            else:
+                supplier_account.supplier_id = supplier_ref.id
+                if erpnext_id:
+                    external_ids = dict(supplier_account.external_ids or {})
+                    if external_ids.get("erpnext_id") != erpnext_id:
+                        external_ids["erpnext_id"] = erpnext_id
+                        supplier_account.external_ids = external_ids
 
         sync_client.db.commit()
         sync_client.complete_sync()

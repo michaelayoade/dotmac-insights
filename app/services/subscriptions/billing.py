@@ -652,12 +652,13 @@ class BillingService:
                     InvoiceStatus.PARTIALLY_PAID,
                     InvoiceStatus.OVERDUE,
                 ]),
+                Invoice.is_deleted == False,
             )
             .all()
         )
 
         return sum(
-            (inv.total_amount - inv.amount_paid)
+            (inv.balance or (inv.total_amount - (inv.amount_paid or Decimal("0"))))
             for inv in outstanding_invoices
         )
 

@@ -8,7 +8,8 @@ from typing import Any, Optional
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from app.models.network import Router, Pop
+from app.models.router import Router
+from app.models.pop import Pop
 from app.models.party import Party, PartyStatus
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.tariff import Tariff, TariffType

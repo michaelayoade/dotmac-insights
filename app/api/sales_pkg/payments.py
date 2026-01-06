@@ -35,7 +35,8 @@ async def list_payments(
     status: Optional[str] = None,
     payment_method: Optional[str] = None,
     customer_account_id: Optional[int] = None,
-    party_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
+    party_id: Optional[int] = Query(None, include_in_schema=False),
     invoice_id: Optional[int] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -68,11 +69,12 @@ async def list_payments(
 
     if customer_account_id:
         query = query.filter(Payment.customer_account_id == customer_account_id)
-    elif party_id:
+    elif customer_id or party_id:
+        customer_party_id = customer_id or party_id
         query = query.join(
             CustomerAccount,
             CustomerAccount.id == Payment.customer_account_id,
-        ).filter(CustomerAccount.party_id == party_id)
+        ).filter(CustomerAccount.party_id == customer_party_id)
 
     if invoice_id:
         query = query.filter(Payment.invoice_id == invoice_id)
@@ -128,7 +130,7 @@ async def list_payments(
     payment_rows = (
         query.outerjoin(CustomerAccount, Payment.customer_account_id == CustomerAccount.id)
         .outerjoin(Party, CustomerAccount.party_id == Party.id)
-        .add_columns(Party.name.label("party_name"), CustomerAccount.party_id.label("party_id"))
+        .add_columns(Party.name.label("customer_name"), CustomerAccount.party_id.label("customer_id"))
         .order_by(order_clause, Payment.id.desc())
         .offset(offset)
         .limit(limit)
@@ -144,8 +146,8 @@ async def list_payments(
                 "id": p.id,
                 "receipt_number": p.receipt_number,
                 "customer_account_id": p.customer_account_id,
-                "party_id": party_id,
-                "party_name": party_name,
+                "customer_id": customer_id,
+                "customer_name": customer_name,
                 "invoice_id": p.invoice_id,
                 "amount": float(p.amount),
                 "currency": p.currency,
@@ -158,7 +160,7 @@ async def list_payments(
                 "source": p.source.value if p.source else None,
                 "write_back_status": getattr(p, "write_back_status", None),
             }
-            for p, party_name, party_id in payment_rows
+            for p, customer_name, customer_id in payment_rows
         ],
     }
 
@@ -175,20 +177,20 @@ async def get_payment(
         raise HTTPException(status_code=404, detail="Payment not found")
 
     customer_account = None
-    party_id = None
-    party_name = None
+    customer_id = None
+    customer_name = None
     if payment.customer_account and payment.customer_account.party:
         party = payment.customer_account.party
-        party_id = party.id
-        party_name = party.name
-        if not party_name:
-            party_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
-        if not party_name:
-            party_name = party.legal_name or party.trading_name
+        customer_id = party.id
+        customer_name = party.name
+        if not customer_name:
+            customer_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+        if not customer_name:
+            customer_name = party.legal_name or party.trading_name
         customer_account = {
             "id": payment.customer_account.id,
-            "party_id": party.id,
-            "name": party_name,
+            "customer_id": party.id,
+            "customer_name": customer_name,
         }
 
     invoice = None
@@ -214,8 +216,8 @@ async def get_payment(
             "erpnext_id": payment.erpnext_id,
         },
         "customer_account_id": payment.customer_account_id,
-        "party_id": party_id,
-        "party_name": party_name,
+        "customer_id": customer_id,
+        "customer_name": customer_name,
         "customer_account": customer_account,
         "invoice": invoice,
         "references": [
@@ -237,7 +239,8 @@ async def get_payment(
 @router.get("/credit-notes", dependencies=[Depends(Require("explorer:read"))])
 async def list_credit_notes(
     customer_account_id: Optional[int] = None,
-    party_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
+    party_id: Optional[int] = Query(None, include_in_schema=False),
     invoice_id: Optional[int] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -257,11 +260,12 @@ async def list_credit_notes(
         query = query.join(Invoice, CreditNote.invoice_id == Invoice.id).filter(
             Invoice.customer_account_id == customer_account_id
         )
-    elif party_id:
+    elif customer_id or party_id:
+        customer_party_id = customer_id or party_id
         query = query.join(Invoice, CreditNote.invoice_id == Invoice.id).join(
             CustomerAccount,
             CustomerAccount.id == Invoice.customer_account_id,
-        ).filter(CustomerAccount.party_id == party_id)
+        ).filter(CustomerAccount.party_id == customer_party_id)
 
     if invoice_id:
         query = query.filter(CreditNote.invoice_id == invoice_id)
@@ -306,8 +310,8 @@ async def list_credit_notes(
         .outerjoin(Party, CustomerAccount.party_id == Party.id)
         .add_columns(
             CustomerAccount.id.label("customer_account_id"),
-            CustomerAccount.party_id.label("party_id"),
-            Party.name.label("party_name"),
+            CustomerAccount.party_id.label("customer_id"),
+            Party.name.label("customer_name"),
         )
         .order_by(order_clause, CreditNote.id.desc())
         .offset(offset)
@@ -324,8 +328,8 @@ async def list_credit_notes(
                 "id": cn.id,
                 "credit_note_number": cn.credit_number,
                 "customer_account_id": customer_account_id,
-                "party_id": party_id,
-                "party_name": party_name,
+                "customer_id": customer_id,
+                "customer_name": customer_name,
                 "invoice_id": cn.invoice_id,
                 "amount": float(cn.amount) if cn.amount else 0,
                 "currency": cn.currency,
@@ -337,6 +341,6 @@ async def list_credit_notes(
                     "splynx_id": cn.splynx_id,
                 },
             }
-            for cn, customer_account_id, party_id, party_name in credit_note_rows
+            for cn, customer_account_id, customer_id, customer_name in credit_note_rows
         ],
     }

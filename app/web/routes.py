@@ -45,10 +45,9 @@ logger = logging.getLogger(__name__)
 # =============================================================================
 # MODULE AUTO-DISCOVERY
 # =============================================================================
-# Discover modules with MODULE_CONFIG exports (new modular system)
-# This runs at import time to register all properly configured modules
-_discovered_count = ModuleRegistry.discover_modules()
-logger.info(f"Auto-discovered {_discovered_count} modules")
+# Note: Module discovery is deferred to avoid circular imports during startup.
+# ModuleRegistry.discover_modules() is called lazily when needed (e.g., by get_base_context)
+# or explicitly at app startup via the lifespan handler.
 
 # =============================================================================
 # WEB ROUTER
@@ -60,136 +59,240 @@ templates = get_template_env()
 
 
 @web_router.get("/", response_class=HTMLResponse)
-async def dashboard(
+async def launcher(
     request: Request,
     response: Response,
     user: SessionUser,
     csrf_token: CSRFToken,
     db: DB,
 ):
-    """Dashboard / home page."""
+    """Launcher page - module grid with favorites and badges."""
     from datetime import datetime
-    from app.models.invoice import Invoice, InvoiceStatus
-    from app.models.unified_ticket import UnifiedTicket
-    from app.models.lead import Lead
-    from app.models.payment import Payment
+    from app.services.launcher import LauncherService
+    from app.web.context import get_module_registry
 
     context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = "Dashboard"
-    now = datetime.utcnow()
-    context["now"] = now
+    # NOTE: Do NOT include navigation - clean launcher UI
+    context["page_title"] = "Launcher"
+    context["now"] = datetime.utcnow()
 
-    # Build dashboard stats using services
-    try:
-        stats = _build_dashboard_stats(db)
-    except Exception:
-        logger.exception("dashboard_stats_failed")
-        stats = []
-    context["stats"] = stats
+    # Get launcher service for favorites
+    launcher_service = LauncherService(db, user)
+    favorites = launcher_service.get_user_favorites()
+    context["favorites"] = favorites
 
-    # Fetch recent activities (mix of invoices, tickets)
-    activities = []
-    currency_symbol = get_currency_symbol(settings.base_currency)
+    # Get modules from registry, filtered by user permissions
+    all_modules = get_module_registry(user)
 
-    # Recent invoices
-    try:
-        recent_invoices = db.query(Invoice).order_by(
-            Invoice.created_at.desc()
-        ).limit(3).all()
-        for inv in recent_invoices:
-            # Get customer name from contact or customer relationship
-            cust_name = None
-            if inv.customer_account and inv.customer_account.party:
-                cust_name = inv.customer_account.party.name
-            activities.append({
-                "user_name": cust_name or "Customer",
-                "user_initials": (cust_name or "C")[:2].upper(),
-                "color_from": "from-emerald-100",
-                "color_to": "to-emerald-200",
-                "text_color": "text-emerald-600",
-                "action": "was invoiced",
-                "description": f"Invoice {inv.invoice_number} for {currency_symbol}{inv.total_amount:,.2f}" if inv.total_amount else f"Invoice {inv.invoice_number}",
-                "timestamp": inv.created_at,
-                "badge": inv.status.value.replace("_", " ").title() if inv.status else None,
-                "badge_color": "bg-emerald-100 text-emerald-600" if inv.status == InvoiceStatus.PAID else "bg-amber-100 text-amber-600",
+    group_aliases = {
+        "analytics": "Admin",
+        "system": "Admin",
+    }
+
+    group_themes = {
+        "customer": "customer",
+        "finance": "finance",
+        "procurement": "procurement",
+        "facility": "facility",
+        "operations": "operations",
+        "isp": "isp",
+        "people": "people",
+        "marketing": "marketing",
+        "analytics": "analytics",
+        "system": "system",
+        "admin": "system",
+    }
+    fallback_themes = ["teal", "lime", "rose", "purple"]
+
+    def resolve_theme(module: dict, index: int) -> str:
+        group = (module.get("group") or "").lower()
+        for key, theme in group_themes.items():
+            if key in group:
+                return theme
+        return fallback_themes[index % len(fallback_themes)]
+
+    theme_by_id = {}
+    for idx, module in enumerate(all_modules):
+        raw_group = module.get("group", "Other")
+        mapped_group = group_aliases.get(raw_group.lower(), raw_group)
+        themed_module = {**module, "group": mapped_group}
+        theme_by_id[module.get("id")] = resolve_theme(themed_module, idx)
+
+    # Mark favorites on all modules
+    modules = []
+    for module in all_modules:
+        raw_group = module.get("group", "Other")
+        mapped_group = group_aliases.get(raw_group.lower(), raw_group)
+        modules.append({
+            **module,
+            "group": mapped_group,
+            "is_favorite": module["id"] in favorites,
+            "icon_theme": theme_by_id.get(module.get("id")),
+        })
+
+    # Group modules by domain
+    DOMAIN_ORDER = [
+        "Customer", "Finance", "Procurement", "Facility",
+        "Operations", "ISP", "People", "Marketing", "Admin"
+    ]
+
+    domain_groups = {}
+    for module in modules:
+        group = module.get("group", "Other")
+        if group not in domain_groups:
+            domain_groups[group] = []
+        domain_groups[group].append(module)
+
+    # Sort domains by defined order
+    sorted_domains = []
+    for domain in DOMAIN_ORDER:
+        if domain in domain_groups:
+            sorted_domains.append({
+                "name": domain,
+                "modules": domain_groups[domain]
             })
-    except Exception:
-        logger.exception("dashboard_recent_invoices_failed")
+    # Add any remaining domains not in order
+    for domain, mods in domain_groups.items():
+        if domain not in DOMAIN_ORDER:
+            sorted_domains.append({"name": domain, "modules": mods})
 
-    # Recent tickets
-    try:
-        recent_tickets = db.query(UnifiedTicket).order_by(
-            UnifiedTicket.created_at.desc()
-        ).limit(3).all()
-        for ticket in recent_tickets:
-            activities.append({
-                "user_name": ticket.contact_name or "Customer",
-                "user_initials": (ticket.contact_name or "C")[:2].upper(),
-                "color_from": "from-amber-100",
-                "color_to": "to-amber-200",
-                "text_color": "text-amber-600",
-                "action": "opened a ticket",
-                "description": f"#{ticket.ticket_number}: {ticket.subject[:50]}..." if len(ticket.subject or "") > 50 else f"#{ticket.ticket_number}: {ticket.subject}",
-                "timestamp": ticket.created_at,
-                "badge": ticket.priority.value.title() if ticket.priority else None,
-                "badge_color": "bg-red-100 text-red-600" if ticket.priority and ticket.priority.value in ("urgent", "critical") else "bg-gray-100 text-gray-600",
-            })
-    except Exception:
-        logger.exception("dashboard_recent_tickets_failed")
+    context["domains"] = sorted_domains
+    context["modules"] = modules
 
-    # Recent leads
-    try:
-        recent_leads = db.query(Lead).order_by(
-            Lead.created_at.desc()
-        ).limit(3).all()
-        for lead in recent_leads:
-            lead_name = lead.name or lead.email or "New Lead"
-            activities.append({
-                "user_name": lead_name,
-                "user_initials": lead_name[:2].upper(),
-                "color_from": "from-blue-100",
-                "color_to": "to-blue-200",
-                "text_color": "text-blue-600",
-                "action": "became a lead",
-                "description": f"{lead.email or ''} - {lead.phone or ''}".strip(" -"),
-                "timestamp": lead.created_at,
-                "badge": lead.status.value.replace("_", " ").title() if lead.status else "New",
-                "badge_color": "bg-blue-100 text-blue-600",
-            })
-    except Exception:
-        logger.exception("dashboard_recent_leads_failed")
+    # Get favorite modules for top section (maintain order)
+    favorite_modules = []
+    for fav_id in favorites:
+        for module in all_modules:
+            if module["id"] == fav_id:
+                raw_group = module.get("group", "Other")
+                mapped_group = group_aliases.get(raw_group.lower(), raw_group)
+                favorite_modules.append({
+                    **module,
+                    "group": mapped_group,
+                    "is_favorite": True,
+                    "icon_theme": theme_by_id.get(module.get("id")),
+                })
+                break
+    context["favorite_modules"] = favorite_modules
 
-    # Recent payments
-    try:
-        recent_payments = db.query(Payment).order_by(
-            Payment.created_at.desc()
-        ).limit(3).all()
-        for payment in recent_payments:
-            payer_name = None
-            if payment.customer_account and payment.customer_account.party:
-                payer_name = payment.customer_account.party.name
-            activities.append({
-                "user_name": payer_name or "Customer",
-                "user_initials": (payer_name or "P")[:2].upper(),
-                "color_from": "from-green-100",
-                "color_to": "to-green-200",
-                "text_color": "text-green-600",
-                "action": "made a payment",
-                "description": f"{currency_symbol}{payment.amount:,.2f}" if payment.amount else "Payment received",
-                "timestamp": payment.created_at,
-                "badge": payment.status.value.title() if payment.status else None,
-                "badge_color": "bg-green-100 text-green-600",
-            })
-    except Exception:
-        logger.exception("dashboard_recent_payments_failed")
-
-    # Sort by timestamp and take top 6
-    activities.sort(key=lambda x: x["timestamp"] or datetime.min, reverse=True)
-    context["activities"] = activities[:6]
-
-    template = templates.get_template("pages/dashboard.html")
+    template = templates.get_template("pages/launcher.html")
     return HTMLResponse(template.render(context))
+
+
+# =============================================================================
+# LAUNCHER FAVORITES API
+# =============================================================================
+
+
+@web_router.post("/launcher/favorites/{module_id}", response_class=HTMLResponse)
+async def add_favorite(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    module_id: str,
+):
+    """Add module to favorites (HTMX endpoint)."""
+    from app.services.launcher import LauncherService
+    from app.core.security import is_htmx_request
+
+    launcher_service = LauncherService(db, user)
+    launcher_service.add_favorite(module_id)
+
+    if is_htmx_request(request):
+        # Return updated star button (now filled/active)
+        return HTMLResponse(f'''
+            <button
+                class="absolute top-3 right-3 p-1.5 rounded-lg text-amber-400 hover:text-amber-400 hover:bg-amber-50 transition-colors z-10"
+                hx-delete="/launcher/favorites/{module_id}"
+                hx-swap="outerHTML"
+                @click.prevent.stop
+                aria-label="Remove from favorites"
+                data-testid="favorite-btn-{module_id}"
+            >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.93 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z"/>
+                </svg>
+            </button>
+        ''')
+
+    # Full page redirect for non-HTMX
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/", status_code=303)
+
+
+@web_router.delete("/launcher/favorites/{module_id}", response_class=HTMLResponse)
+async def remove_favorite(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    module_id: str,
+):
+    """Remove module from favorites (HTMX endpoint)."""
+    from app.services.launcher import LauncherService
+    from app.core.security import is_htmx_request
+
+    launcher_service = LauncherService(db, user)
+    launcher_service.remove_favorite(module_id)
+
+    if is_htmx_request(request):
+        # Return updated star button (now outline/inactive)
+        return HTMLResponse(f'''
+            <button
+                class="absolute top-3 right-3 p-1.5 rounded-lg text-gray-300 hover:text-amber-400 hover:bg-amber-50 transition-colors z-10"
+                hx-post="/launcher/favorites/{module_id}"
+                hx-swap="outerHTML"
+                @click.prevent.stop
+                aria-label="Add to favorites"
+                data-testid="favorite-btn-{module_id}"
+            >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.93 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z"/>
+                </svg>
+            </button>
+        ''')
+
+    # Full page redirect for non-HTMX
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/", status_code=303)
+
+
+@web_router.get("/launcher/badge/{module_id}", response_class=HTMLResponse)
+async def module_badge(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    db: DB,
+    module_id: str,
+):
+    """Get module badge/stats (HTMX endpoint for lazy loading)."""
+    from app.services.launcher import LauncherService
+
+    launcher_service = LauncherService(db, user)
+    badge = launcher_service.get_module_badge(module_id)
+
+    if not badge:
+        return HTMLResponse("")
+
+    color_classes = {
+        "amber": "bg-amber-100 text-amber-700",
+        "red": "bg-red-100 text-red-700",
+        "blue": "bg-blue-100 text-blue-700",
+        "green": "bg-green-100 text-green-700",
+    }
+
+    classes = color_classes.get(badge.color, "bg-gray-100 text-gray-700")
+
+    html = f'''
+    <span class="absolute -top-1 -right-1 inline-flex items-center justify-center
+                px-2 py-0.5 text-xs font-bold rounded-full {classes}"
+          data-testid="badge-{module_id}">
+        {badge.count}
+    </span>
+    '''
+
+    return HTMLResponse(html)
 
 
 def _build_dashboard_stats(db):
@@ -835,6 +938,9 @@ from app.modules.analytics.routes import router as analytics_router
 # CRM module (contacts and CRM workflows)
 from app.modules.crm import router as crm_router
 
+# Finance module (analytics and reporting)
+from app.modules.finance import router as finance_router
+
 # Settings module (includes workflow tasks redirect)
 from app.modules.settings.routes import router as settings_router
 
@@ -880,6 +986,7 @@ web_router.include_router(operations_router)
 web_router.include_router(network_router)
 web_router.include_router(analytics_router)
 web_router.include_router(crm_router)
+web_router.include_router(finance_router)
 web_router.include_router(settings_router)
 
 # Support module with all sub-routers
@@ -931,6 +1038,9 @@ web_router.include_router(vehicles_router)
 # AUTO-DISCOVERED MODULE ROUTERS
 # =============================================================================
 # Include routers from modules that have MODULE_CONFIG (new modular system)
+# Trigger discovery now that all imports are done (avoid circular import issues)
 # These are in addition to the manual imports above - FastAPI handles duplicates
+_discovered_count = ModuleRegistry.discover_modules()
+logger.info(f"Auto-discovered {_discovered_count} modules")
 for _router in ModuleRegistry.get_all_routers():
     web_router.include_router(_router)

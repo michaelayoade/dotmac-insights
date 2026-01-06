@@ -113,6 +113,8 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
             # Amounts
             total_amount = float(inv_data.get("total", inv_data.get("amount_total", 0)) or 0)
             amount_paid = float(inv_data.get("payment_amount", inv_data.get("amount_paid", 0)) or 0)
+            balance_value = inv_data.get("balance", inv_data.get("outstanding_amount", inv_data.get("outstanding")))
+            balance = float(balance_value) if balance_value is not None else 0.0
 
             # Get invoice number (proforma may not have this)
             invoice_number = inv_data.get("number", inv_data.get("invoice_number", f"PRO-{splynx_id}"))
@@ -123,7 +125,7 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                 existing.total_amount = total_amount
                 existing.amount = total_amount
                 existing.amount_paid = amount_paid
-                existing.balance = total_amount - amount_paid
+                existing.balance = balance
                 existing.status = status
                 existing.company = existing.company or "Dotmac Technologies"
                 existing.last_synced_at = datetime.now(timezone.utc)
@@ -143,7 +145,7 @@ async def sync_invoices(sync_client, client: httpx.AsyncClient, full_sync: bool)
                     total_amount=total_amount,
                     amount=total_amount,
                     amount_paid=amount_paid,
-                    balance=total_amount - amount_paid,
+                    balance=balance,
                     status=status,
                     company="Dotmac Technologies",
                     invoice_date=datetime.now(timezone.utc),

@@ -1,7 +1,7 @@
 """Recruitment models for ERPNext HR Module sync."""
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index
+from sqlalchemy import String, Text, ForeignKey, Enum, Index, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from decimal import Decimal
@@ -12,6 +12,7 @@ from app.database import Base
 if TYPE_CHECKING:
     from app.models.hr import Department, Designation
     from app.models.auth import User
+    from app.models.party import Party
 
 
 # ============= ENUMS =============
@@ -66,6 +67,12 @@ class JobOpening(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     job_title: Mapped[str] = mapped_column(String(500), nullable=False, index=True)
 
@@ -148,6 +155,13 @@ class JobApplicant(Base):
     # Organization
     company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Audit fields
     created_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
     updated_by_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -158,6 +172,8 @@ class JobApplicant(Base):
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<JobApplicant {self.applicant_name} ({self.status.value})>"
@@ -171,6 +187,12 @@ class JobOffer(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Applicant reference
     job_applicant: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -215,6 +237,7 @@ class JobOffer(Base):
     terms: Mapped[List["JobOfferTerm"]] = relationship(
         back_populates="job_offer", cascade="all, delete-orphan"
     )
+    party: Mapped[Optional["Party"]] = relationship()
 
     def __repr__(self) -> str:
         return f"<JobOffer {self.applicant_name} ({self.status.value})>"
@@ -254,6 +277,12 @@ class Interview(Base):
     __tablename__ = "interviews"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Applicant reference
     job_applicant_id: Mapped[int] = mapped_column(
@@ -301,6 +330,8 @@ class Interview(Base):
     __table_args__ = (
         Index("ix_interviews_applicant_date", "job_applicant_id", "scheduled_date"),
     )
+
+    party: Mapped[Optional["Party"]] = relationship()
 
     def __repr__(self) -> str:
         return f"<Interview applicant={self.job_applicant_id} on {self.scheduled_date}>"

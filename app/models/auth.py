@@ -13,7 +13,7 @@ This module defines the database models for:
 
 from __future__ import annotations
 
-from sqlalchemy import String, Boolean, ForeignKey, Text, UniqueConstraint, Index, CheckConstraint
+from sqlalchemy import String, Boolean, ForeignKey, Text, UniqueConstraint, Index, CheckConstraint, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
@@ -23,6 +23,8 @@ from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
     from app.models.contact_list import ContactList
+    from app.models.party import Party
+    from app.models.user_preference import UserPreference
 
 
 class User(Base):
@@ -44,6 +46,14 @@ class User(Base):
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     picture: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
+    # Identity link
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     is_superuser: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -54,6 +64,7 @@ class User(Base):
     last_login_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
     # Relationships
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
     roles: Mapped[List["UserRole"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -82,6 +93,12 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="[UserSession.user_id]"
+    )
+    # User preferences (one-to-one)
+    preference: Mapped[Optional["UserPreference"]] = relationship(
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:

@@ -8,6 +8,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.accounting import PurchaseInvoice, Supplier
+from app.models.party import Party, PartyRole, PartyType, SupplierAccount
 from app.services.types import PaginationParams, PaginatedResult
 from app.services.errors import NotFoundError, ValidationError, ConflictError
 
@@ -19,6 +20,96 @@ class SupplierService:
 
     def __init__(self, db: Session):
         self.db = db
+
+    def _get_or_create_party_for_supplier(
+        self,
+        *,
+        supplier_name: Optional[str],
+        email: Optional[str],
+        phone: Optional[str],
+        party_id: Optional[int],
+    ) -> Party:
+        party = None
+        if party_id:
+            party = self.db.get(Party, party_id)
+
+        email_norm = email.strip().lower() if email else None
+        if not party and email_norm:
+            party = self.db.query(Party).filter(Party.primary_email == email_norm).first()
+
+        if not party:
+            party = Party(
+                type=PartyType.ORGANIZATION.value,
+                name=supplier_name or None,
+                emails=[],
+                phones=[],
+            )
+            self.db.add(party)
+            self.db.flush()
+
+        if email_norm:
+            emails = list(party.emails or [])
+            if not any((e.get("address") or "").lower() == email_norm for e in emails):
+                emails.append(
+                    {
+                        "address": email_norm,
+                        "label": "primary",
+                        "is_primary": len(emails) == 0,
+                        "verified": False,
+                    }
+                )
+                party.emails = emails
+
+        if phone:
+            phones = list(party.phones or [])
+            if not any((p.get("number") or "") == phone for p in phones):
+                phones.append(
+                    {
+                        "number": phone,
+                        "label": "primary",
+                        "is_primary": len(phones) == 0,
+                        "can_sms": False,
+                        "can_whatsapp": False,
+                    }
+                )
+                party.phones = phones
+
+        if not party.name and supplier_name:
+            party.name = supplier_name
+
+        has_supplier_role = (
+            self.db.query(PartyRole)
+            .filter(PartyRole.party_id == party.id, PartyRole.role == "supplier", PartyRole.until.is_(None))
+            .first()
+        )
+        if not has_supplier_role:
+            self.db.add(PartyRole(party_id=party.id, role="supplier"))
+
+        return party
+
+    def _ensure_supplier_account(
+        self,
+        *,
+        party_id: int,
+        supplier_id: int,
+    ) -> SupplierAccount:
+        account = (
+            self.db.query(SupplierAccount)
+            .filter(SupplierAccount.party_id == party_id)
+            .first()
+        )
+        if not account:
+            account = SupplierAccount(
+                party_id=party_id,
+                account_number=f"SUP-{supplier_id}",
+                status="active",
+                supplier_id=supplier_id,
+                external_ids={},
+            )
+            self.db.add(account)
+        else:
+            account.supplier_id = supplier_id
+        return account
 
     def list_suppliers(
         self,
@@ -102,6 +193,14 @@ class SupplierService:
         )
         self.db.add(supplier)
         self.db.flush()
+        party = self._get_or_create_party_for_supplier(
+            supplier_name=supplier.supplier_name,
+            email=supplier.email_id,
+            phone=supplier.mobile_no,
+            party_id=supplier.party_id,
+        )
+        supplier.party_id = party.id
+        self._ensure_supplier_account(party_id=party.id, supplier_id=supplier.id)
         return supplier
 
     def update_supplier(self, supplier_id: int, data: SupplierUpdateData) -> Supplier:
@@ -129,6 +228,15 @@ class SupplierService:
             value = getattr(data, field_name, None)
             if value is not None:
                 setattr(supplier, field_name, value)
+
+        party = self._get_or_create_party_for_supplier(
+            supplier_name=supplier.supplier_name,
+            email=supplier.email_id,
+            phone=supplier.mobile_no,
+            party_id=supplier.party_id,
+        )
+        supplier.party_id = party.id
+        self._ensure_supplier_account(party_id=party.id, supplier_id=supplier.id)
 
         self.db.flush()
         return supplier

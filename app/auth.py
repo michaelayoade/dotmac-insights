@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.models.auth import User, ServiceToken, TokenDenylist
+from app.models.party import Party, PartyExternalId, PartyType
 from app.middleware.metrics import increment_contacts_auth_failure
 from app.feature_flags import feature_flags
 from app.services.activity_logger import ActivityLogger
@@ -560,6 +561,9 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
             last_login_at=datetime.utcnow(),
         )
         db.add(user)
+        db.flush()
+
+        _ensure_party_for_user(user, claims, db)
         db.commit()
         db.refresh(user)
 
@@ -593,9 +597,67 @@ async def get_or_create_user(claims: JWTClaims, db: Session) -> User:
         if claims.picture:
             user.picture = claims.picture
         user.last_login_at = datetime.utcnow()
+        _ensure_party_for_user(user, claims, db)
         db.commit()
 
     return user
+
+
+def _ensure_party_for_user(user: User, claims: JWTClaims, db: Session) -> None:
+    """Ensure auth user is linked to a Party + auth external ID."""
+    external_id = claims.sub
+    mapping = (
+        db.query(PartyExternalId)
+        .filter(PartyExternalId.system == "auth", PartyExternalId.external_id == external_id)
+        .first()
+    )
+
+    if user.party_id:
+        if not mapping:
+            db.add(
+                PartyExternalId(
+                    party_id=user.party_id,
+                    system="auth",
+                    external_id=external_id,
+                    external_key_type="user_id",
+                    is_primary=True,
+                )
+            )
+        return
+
+    party = None
+    if mapping:
+        party = db.query(Party).get(mapping.party_id)
+
+    if not party:
+        display_name = claims.name or user.name or user.email
+        party = Party(
+            type=PartyType.PERSON.value,
+            name=display_name,
+            primary_email=user.email,
+        )
+        if user.email:
+            party.emails = [
+                {
+                    "address": user.email,
+                    "label": "primary",
+                    "is_primary": True,
+                    "verified": False,
+                }
+            ]
+        db.add(party)
+        db.flush()
+        db.add(
+            PartyExternalId(
+                party_id=party.id,
+                system="auth",
+                external_id=external_id,
+                external_key_type="user_id",
+                is_primary=True,
+            )
+        )
+
+    user.party_id = party.id
 
 
 # ============================================================================

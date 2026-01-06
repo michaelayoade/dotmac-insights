@@ -6,6 +6,18 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Data Insights</h1>
         <p class="mt-1.5 text-gray-500 font-body">Data quality scorecard and anomaly detection</p>
     </div>
+    <div class="flex items-center gap-3">
+        <a href="/api/v1/analytics/exports/insights?format=csv"
+           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-surface-50">
+            {% include "components/icons/receipt.html" %}
+            CSV
+        </a>
+        <a href="/api/v1/analytics/exports/insights?format=pdf"
+           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-surface-50">
+            {% include "components/icons/file-text.html" %}
+            PDF
+        </a>
+    </div>
 </div>
 {% endblock %}
 
@@ -124,5 +136,46 @@
     </div>
     {% endif %}
 </div>
+{% endif %}
+
+<!-- Data Availability -->
+{% if availability %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Source Coverage</h3>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {% for source, data in availability.data_by_source.items() %}
+        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50">
+            <div class="text-sm font-semibold text-gray-900 mb-2 capitalize">{{ source }}</div>
+            <div class="space-y-2 text-sm">
+                {% for key, value in data.items() %}
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-600 capitalize">{{ key | replace("_", " ") }}</span>
+                    <span class="font-medium text-gray-900">{{ value }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% if availability.missing_critical_data %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Missing Critical Data</h3>
+    <div class="space-y-3">
+        {% for item in availability.missing_critical_data %}
+        <div class="p-4 rounded-xl border {{ 'border-red-200 bg-red-50' if item.impact == 'critical' else 'border-yellow-200 bg-yellow-50' if item.impact == 'high' else 'border-gray-200 bg-gray-50' }}">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">{{ item.entity | capitalize }} · {{ item.field | replace("_", " ") }}</div>
+                    <div class="text-sm text-gray-600 mt-1">{{ item.description }}</div>
+                </div>
+                <div class="text-sm font-semibold text-gray-900">{{ item.count }}</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% endif %}
 {% endblock %}

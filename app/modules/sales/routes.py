@@ -25,14 +25,24 @@ from app.web.context import (
     build_pagination_context,
 )
 from app.templates.environment import get_template_env
-from app.models.sales import QuotationStatus, SalesOrderStatus
+from decimal import Decimal
+from sqlalchemy.orm import joinedload
+from app.models.sales import QuotationStatus, SalesOrderStatus, SalesPerson, ERPNextLead, Quotation, SalesOrder
+from app.models.party import CustomerAccount
+from app.models.tax import TaxCode
 from app.core.security import is_htmx_request, set_flash, validate_csrf
 from app.services.sales import QuotationService, SalesOrderService
-from app.services.sales.quotation_types import QuotationFilters, QuotationCreateData, QuotationUpdateData
+from app.services.sales.quotation_types import (
+    QuotationFilters,
+    QuotationCreateData,
+    QuotationUpdateData,
+    QuotationLineItemData,
+)
 from app.services.sales.order_types import (
     SalesOrderFilters,
     SalesOrderCreateData,
     SalesOrderUpdateData,
+    SalesOrderLineItemData,
 )
 from app.services.types import PaginationParams
 from app.services.errors import NotFoundError, ValidationError
@@ -62,6 +72,24 @@ def _form_str(form: dict, key: str, default: str = "") -> str:
         return default
     return str(value).strip()
 
+def _form_int(form: dict, key: str, default: Optional[int] = None) -> Optional[int]:
+    value = form.get(key)
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+def _form_decimal(form: dict, key: str, default: Decimal = Decimal("0")) -> Decimal:
+    value = form.get(key, "")
+    if value is None or value == "":
+        return default
+    try:
+        return Decimal(str(value))
+    except (TypeError, ValueError):
+        return default
+
 def _form_date(value: str) -> Optional[datetime.date]:
     if not value:
         return None
@@ -69,6 +97,227 @@ def _form_date(value: str) -> Optional[datetime.date]:
         return datetime.strptime(value, "%Y-%m-%d").date()
     except ValueError:
         return None
+
+def _extract_party_address(addresses: list[dict]) -> dict:
+    if not addresses:
+        return {}
+    first = addresses[0]
+    if not isinstance(first, dict):
+        return {}
+    return {
+        "address_line1": first.get("address_line1") or first.get("line1") or first.get("street_1") or first.get("address"),
+        "address_line2": first.get("address_line2") or first.get("line2") or first.get("street_2"),
+        "city": first.get("city"),
+        "state": first.get("state"),
+        "postal_code": first.get("postal_code") or first.get("zip") or first.get("zip_code"),
+        "country": first.get("country"),
+        "gps_lat": first.get("gps_lat"),
+        "gps_lng": first.get("gps_lng"),
+    }
+
+
+def _format_party_address(addresses: list[dict]) -> str:
+    address = _extract_party_address(addresses)
+    if not address:
+        return ""
+    parts = [
+        address.get("address_line1"),
+        address.get("address_line2"),
+        address.get("city"),
+        address.get("state"),
+        address.get("postal_code"),
+        address.get("country"),
+    ]
+    return ", ".join([part for part in parts if part])
+
+
+def _get_customer_accounts(db: DB) -> list[dict]:
+    company = get_company_context(allow_null=True) or ""
+    accounts = (
+        db.query(CustomerAccount)
+        .options(joinedload(CustomerAccount.party))
+        .order_by(CustomerAccount.id.desc())
+        .limit(200)
+        .all()
+    )
+    options = []
+    for account in accounts:
+        party = account.party
+        party_name = ""
+        contact_email = ""
+        contact_phone = ""
+        address = ""
+        addr_struct = {}
+        if party:
+            party_name = party.name or party.legal_name or party.trading_name or ""
+            contact_email = party.primary_email or ""
+            contact_phone = party.primary_phone or ""
+            if party.addresses:
+                addr_struct = _extract_party_address(party.addresses)
+                address = _format_party_address(party.addresses)
+        options.append(
+            {
+                "id": account.id,
+                "name": party_name or f"Account {account.id}",
+                "contact_name": party_name,
+                "contact_email": contact_email,
+                "contact_phone": contact_phone,
+                "billing_address": address,
+                "shipping_address": address,
+                "billing_address_line1": addr_struct.get("address_line1", ""),
+                "billing_address_line2": addr_struct.get("address_line2", ""),
+                "billing_city": addr_struct.get("city", ""),
+                "billing_state": addr_struct.get("state", ""),
+                "billing_postal_code": addr_struct.get("postal_code", ""),
+                "billing_country": addr_struct.get("country", ""),
+                "billing_gps_lat": addr_struct.get("gps_lat", ""),
+                "billing_gps_lng": addr_struct.get("gps_lng", ""),
+                "shipping_address_line1": addr_struct.get("address_line1", ""),
+                "shipping_address_line2": addr_struct.get("address_line2", ""),
+                "shipping_city": addr_struct.get("city", ""),
+                "shipping_state": addr_struct.get("state", ""),
+                "shipping_postal_code": addr_struct.get("postal_code", ""),
+                "shipping_country": addr_struct.get("country", ""),
+                "shipping_gps_lat": addr_struct.get("gps_lat", ""),
+                "shipping_gps_lng": addr_struct.get("gps_lng", ""),
+                "currency": account.currency or "NGN",
+                "company": company,
+            }
+        )
+    return options
+
+def _get_sales_people(db: DB) -> list[SalesPerson]:
+    return db.query(SalesPerson).filter(SalesPerson.enabled == True).order_by(SalesPerson.sales_person_name).all()
+
+def _get_tax_codes(db: DB) -> list[TaxCode]:
+    return db.query(TaxCode).filter(TaxCode.is_active == True).order_by(TaxCode.code).all()
+
+def _get_recent_quotations(db: DB) -> list[dict]:
+    quotes = (
+        db.query(Quotation)
+        .options(joinedload(Quotation.items))
+        .filter(Quotation.is_deleted == False)
+        .order_by(Quotation.id.desc())
+        .limit(200)
+        .all()
+    )
+    results = []
+    for quote in quotes:
+        items = []
+        for item in quote.items or []:
+            items.append(
+                {
+                    "name": item.item_name or item.item_code or "Item",
+                    "qty": float(item.qty or 0),
+                    "rate": float(item.rate or 0),
+                    "tax_code_id": item.tax_code_id,
+                }
+            )
+        results.append(
+            {
+                "id": quote.id,
+                "erpnext_id": quote.erpnext_id,
+                "customer_name": quote.customer_name,
+                "party_name": quote.party_name,
+                "customer_account_id": quote.customer_account_id,
+                "contact_name": quote.contact_name,
+                "contact_email": quote.contact_email,
+                "contact_phone": quote.contact_phone,
+                "billing_address": quote.billing_address,
+                "shipping_address": quote.shipping_address,
+                "billing_address_line1": quote.billing_address_line1,
+                "billing_address_line2": quote.billing_address_line2,
+                "billing_city": quote.billing_city,
+                "billing_state": quote.billing_state,
+                "billing_postal_code": quote.billing_postal_code,
+                "billing_country": quote.billing_country,
+                "billing_gps_lat": quote.billing_gps_lat,
+                "billing_gps_lng": quote.billing_gps_lng,
+                "shipping_address_line1": quote.shipping_address_line1,
+                "shipping_address_line2": quote.shipping_address_line2,
+                "shipping_city": quote.shipping_city,
+                "shipping_state": quote.shipping_state,
+                "shipping_postal_code": quote.shipping_postal_code,
+                "shipping_country": quote.shipping_country,
+                "shipping_gps_lat": quote.shipping_gps_lat,
+                "shipping_gps_lng": quote.shipping_gps_lng,
+                "company": quote.company,
+                "currency": quote.currency,
+                "items": items,
+            }
+        )
+    return results
+
+def _get_recent_leads(db: DB) -> list[ERPNextLead]:
+    return db.query(ERPNextLead).order_by(ERPNextLead.id.desc()).limit(200).all()
+
+def _parse_line_items(form: dict, tax_codes: dict[int, TaxCode]) -> list[SalesOrderLineItemData]:
+    indices = []
+    for key in form.keys():
+        if key.startswith("line_item_name_"):
+            try:
+                indices.append(int(key.rsplit("_", 1)[-1]))
+            except ValueError:
+                continue
+    indices = sorted(set(indices))
+
+    items: list[SalesOrderLineItemData] = []
+    for idx in indices:
+        name = _form_str(form, f"line_item_name_{idx}")
+        qty = _form_decimal(form, f"line_item_qty_{idx}", Decimal("1")) or Decimal("1")
+        rate = _form_decimal(form, f"line_item_rate_{idx}", Decimal("0")) or Decimal("0")
+        tax_code_id = _form_int(form, f"line_item_tax_{idx}")
+        if not name and rate == Decimal("0"):
+            continue
+
+        tax_rate = Decimal("0")
+        if tax_code_id and tax_code_id in tax_codes:
+            tax_rate = Decimal(str(tax_codes[tax_code_id].rate or 0))
+
+        items.append(SalesOrderLineItemData(
+            item_code=name,
+            item_name=name,
+            qty=qty,
+            rate=rate,
+            tax_code_id=tax_code_id,
+            tax_rate=tax_rate,
+        ))
+
+    return items
+
+def _parse_quote_line_items(form: dict, tax_codes: dict[int, TaxCode]) -> list[QuotationLineItemData]:
+    indices = []
+    for key in form.keys():
+        if key.startswith("line_item_name_"):
+            try:
+                indices.append(int(key.rsplit("_", 1)[-1]))
+            except ValueError:
+                continue
+    indices = sorted(set(indices))
+
+    items: list[QuotationLineItemData] = []
+    for idx in indices:
+        name = _form_str(form, f"line_item_name_{idx}")
+        qty = _form_decimal(form, f"line_item_qty_{idx}", Decimal("1")) or Decimal("1")
+        rate = _form_decimal(form, f"line_item_rate_{idx}", Decimal("0")) or Decimal("0")
+        tax_code_id = _form_int(form, f"line_item_tax_{idx}")
+        if not name and rate == Decimal("0"):
+            continue
+
+        tax_rate = Decimal("0")
+        if tax_code_id and tax_code_id in tax_codes:
+            tax_rate = Decimal(str(tax_codes[tax_code_id].rate or 0))
+
+        items.append(QuotationLineItemData(
+            item_code=name,
+            item_name=name,
+            qty=qty,
+            rate=rate,
+            tax_code_id=tax_code_id,
+            tax_rate=tax_rate,
+        ))
+
+    return items
 
 
 @router.get("/quotations", response_class=HTMLResponse, dependencies=[RequireSalesRead])
@@ -172,8 +421,28 @@ async def quotation_new(
     context["is_edit"] = False
     context["form_data"] = {
         "quotation_to": "Customer",
-        "party_name": "",
         "customer_name": "",
+        "customer_account_id": "",
+        "lead_id": "",
+        "contact_name": "",
+        "contact_email": "",
+        "contact_phone": "",
+        "billing_address_line1": "",
+        "billing_address_line2": "",
+        "billing_city": "",
+        "billing_state": "",
+        "billing_postal_code": "",
+        "billing_country": "",
+        "billing_gps_lat": "",
+        "billing_gps_lng": "",
+        "shipping_address_line1": "",
+        "shipping_address_line2": "",
+        "shipping_city": "",
+        "shipping_state": "",
+        "shipping_postal_code": "",
+        "shipping_country": "",
+        "shipping_gps_lat": "",
+        "shipping_gps_lng": "",
         "company": "",
         "currency": "NGN",
         "transaction_date": "",
@@ -181,7 +450,14 @@ async def quotation_new(
         "order_type": "",
         "source": "",
         "campaign": "",
+        "status": QuotationStatus.DRAFT.value,
+        "sales_partner_id": "",
     }
+    context["status_options"] = get_quotation_status_options()
+    context["customer_accounts"] = _get_customer_accounts(db)
+    context["leads"] = _get_recent_leads(db)
+    context["sales_people"] = _get_sales_people(db)
+    context["tax_codes"] = _get_tax_codes(db)
     context["errors"] = {}
 
     template = templates.get_template("modules/sales/templates/quotations/pages/form.html")
@@ -201,8 +477,29 @@ async def quotation_create(
     form = await request.form()
 
     quotation_to = _form_str(form, "quotation_to", "Customer")
-    party_name = _form_str(form, "party_name")
-    customer_name = _form_str(form, "customer_name")
+    customer_name = _form_str(form, "customer_name") or _form_str(form, "party_name")
+    party_name = customer_name
+    customer_account_id = _form_int(form, "customer_account_id")
+    lead_id = _form_int(form, "lead_id")
+    contact_name = _form_str(form, "contact_name")
+    contact_email = _form_str(form, "contact_email")
+    contact_phone = _form_str(form, "contact_phone")
+    billing_address_line1 = _form_str(form, "billing_address_line1")
+    billing_address_line2 = _form_str(form, "billing_address_line2")
+    billing_city = _form_str(form, "billing_city")
+    billing_state = _form_str(form, "billing_state")
+    billing_postal_code = _form_str(form, "billing_postal_code")
+    billing_country = _form_str(form, "billing_country")
+    billing_gps_lat = _form_decimal(form, "billing_gps_lat")
+    billing_gps_lng = _form_decimal(form, "billing_gps_lng")
+    shipping_address_line1 = _form_str(form, "shipping_address_line1")
+    shipping_address_line2 = _form_str(form, "shipping_address_line2")
+    shipping_city = _form_str(form, "shipping_city")
+    shipping_state = _form_str(form, "shipping_state")
+    shipping_postal_code = _form_str(form, "shipping_postal_code")
+    shipping_country = _form_str(form, "shipping_country")
+    shipping_gps_lat = _form_decimal(form, "shipping_gps_lat")
+    shipping_gps_lng = _form_decimal(form, "shipping_gps_lng")
     company = _form_str(form, "company") or get_company_context(allow_null=True)
     currency = _form_str(form, "currency", "NGN") or "NGN"
     transaction_date = _form_date(_form_str(form, "transaction_date"))
@@ -210,10 +507,19 @@ async def quotation_create(
     order_type = _form_str(form, "order_type")
     source = _form_str(form, "source")
     campaign = _form_str(form, "campaign")
+    status = _form_str(form, "status", QuotationStatus.DRAFT.value)
+    sales_partner_id = _form_int(form, "sales_partner_id")
+
+    tax_codes = {tc.id: tc for tc in _get_tax_codes(db)}
+    items = _parse_quote_line_items(form, tax_codes)
+    if not items:
+        items = None
 
     errors: dict[str, str] = {}
-    if not party_name:
-        errors["party_name"] = "Customer or lead name is required"
+    if not party_name and not customer_account_id and not lead_id:
+        errors["customer_name"] = "Customer or lead name is required"
+    if not items:
+        errors["items"] = "At least one line item is required"
     if not company:
         errors["general"] = "Company is required to create a quotation."
 
@@ -229,8 +535,28 @@ async def quotation_create(
         context["is_edit"] = False
         context["form_data"] = {
             "quotation_to": quotation_to,
-            "party_name": party_name,
             "customer_name": customer_name,
+            "customer_account_id": str(customer_account_id) if customer_account_id else "",
+            "lead_id": str(lead_id) if lead_id else "",
+            "contact_name": contact_name,
+            "contact_email": contact_email,
+            "contact_phone": contact_phone,
+            "billing_address_line1": billing_address_line1,
+            "billing_address_line2": billing_address_line2,
+            "billing_city": billing_city,
+            "billing_state": billing_state,
+            "billing_postal_code": billing_postal_code,
+            "billing_country": billing_country,
+            "billing_gps_lat": str(billing_gps_lat or ""),
+            "billing_gps_lng": str(billing_gps_lng or ""),
+            "shipping_address_line1": shipping_address_line1,
+            "shipping_address_line2": shipping_address_line2,
+            "shipping_city": shipping_city,
+            "shipping_state": shipping_state,
+            "shipping_postal_code": shipping_postal_code,
+            "shipping_country": shipping_country,
+            "shipping_gps_lat": str(shipping_gps_lat or ""),
+            "shipping_gps_lng": str(shipping_gps_lng or ""),
             "company": company or "",
             "currency": currency,
             "transaction_date": _form_str(form, "transaction_date"),
@@ -238,7 +564,14 @@ async def quotation_create(
             "order_type": order_type,
             "source": source,
             "campaign": campaign,
+            "status": status,
+            "sales_partner_id": str(sales_partner_id) if sales_partner_id else "",
         }
+        context["status_options"] = get_quotation_status_options()
+        context["customer_accounts"] = _get_customer_accounts(db)
+        context["leads"] = _get_recent_leads(db)
+        context["sales_people"] = _get_sales_people(db)
+        context["tax_codes"] = list(tax_codes.values())
         context["errors"] = errors
         template = templates.get_template("modules/sales/templates/quotations/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
@@ -247,6 +580,27 @@ async def quotation_create(
         party_name=party_name,
         quotation_to=quotation_to,
         customer_name=customer_name or None,
+        customer_account_id=customer_account_id,
+        lead_id=lead_id,
+        contact_name=contact_name or None,
+        contact_email=contact_email or None,
+        contact_phone=contact_phone or None,
+        billing_address_line1=billing_address_line1 or None,
+        billing_address_line2=billing_address_line2 or None,
+        billing_city=billing_city or None,
+        billing_state=billing_state or None,
+        billing_postal_code=billing_postal_code or None,
+        billing_country=billing_country or None,
+        billing_gps_lat=billing_gps_lat if billing_gps_lat else None,
+        billing_gps_lng=billing_gps_lng if billing_gps_lng else None,
+        shipping_address_line1=shipping_address_line1 or None,
+        shipping_address_line2=shipping_address_line2 or None,
+        shipping_city=shipping_city or None,
+        shipping_state=shipping_state or None,
+        shipping_postal_code=shipping_postal_code or None,
+        shipping_country=shipping_country or None,
+        shipping_gps_lat=shipping_gps_lat if shipping_gps_lat else None,
+        shipping_gps_lng=shipping_gps_lng if shipping_gps_lng else None,
         company=company,
         currency=currency,
         transaction_date=transaction_date,
@@ -254,6 +608,9 @@ async def quotation_create(
         order_type=order_type or None,
         source=source or None,
         campaign=campaign or None,
+        sales_partner_id=sales_partner_id,
+        items=items,
+        status=status,
     )
 
     service = QuotationService(db)
@@ -329,8 +686,28 @@ async def quotation_edit(
     context["quotation_id"] = quotation.id
     context["form_data"] = {
         "quotation_to": quotation.quotation_to or "Customer",
-        "party_name": quotation.party_name or "",
-        "customer_name": quotation.customer_name or "",
+        "customer_name": quotation.party_name or quotation.customer_name or "",
+        "customer_account_id": str(quotation.customer_account_id) if quotation.customer_account_id else "",
+        "lead_id": str(quotation.lead_id) if quotation.lead_id else "",
+        "contact_name": quotation.contact_name or "",
+        "contact_email": quotation.contact_email or "",
+        "contact_phone": quotation.contact_phone or "",
+        "billing_address_line1": quotation.billing_address_line1 or "",
+        "billing_address_line2": quotation.billing_address_line2 or "",
+        "billing_city": quotation.billing_city or "",
+        "billing_state": quotation.billing_state or "",
+        "billing_postal_code": quotation.billing_postal_code or "",
+        "billing_country": quotation.billing_country or "",
+        "billing_gps_lat": str(quotation.billing_gps_lat or ""),
+        "billing_gps_lng": str(quotation.billing_gps_lng or ""),
+        "shipping_address_line1": quotation.shipping_address_line1 or "",
+        "shipping_address_line2": quotation.shipping_address_line2 or "",
+        "shipping_city": quotation.shipping_city or "",
+        "shipping_state": quotation.shipping_state or "",
+        "shipping_postal_code": quotation.shipping_postal_code or "",
+        "shipping_country": quotation.shipping_country or "",
+        "shipping_gps_lat": str(quotation.shipping_gps_lat or ""),
+        "shipping_gps_lng": str(quotation.shipping_gps_lng or ""),
         "company": quotation.company or "",
         "currency": quotation.currency or "NGN",
         "transaction_date": quotation.transaction_date.isoformat() if quotation.transaction_date else "",
@@ -338,7 +715,14 @@ async def quotation_edit(
         "order_type": quotation.order_type or "",
         "source": quotation.source or "",
         "campaign": quotation.campaign or "",
+        "status": quotation.status.value if quotation.status else QuotationStatus.DRAFT.value,
+        "sales_partner_id": str(quotation.sales_partner_id) if quotation.sales_partner_id else "",
     }
+    context["status_options"] = get_quotation_status_options()
+    context["customer_accounts"] = _get_customer_accounts(db)
+    context["leads"] = _get_recent_leads(db)
+    context["sales_people"] = _get_sales_people(db)
+    context["tax_codes"] = _get_tax_codes(db)
     context["errors"] = {}
 
     template = templates.get_template("modules/sales/templates/quotations/pages/form.html")
@@ -359,8 +743,29 @@ async def quotation_update(
     form = await request.form()
 
     quotation_to = _form_str(form, "quotation_to", "Customer")
-    party_name = _form_str(form, "party_name")
-    customer_name = _form_str(form, "customer_name")
+    customer_name = _form_str(form, "customer_name") or _form_str(form, "party_name")
+    party_name = customer_name
+    customer_account_id = _form_int(form, "customer_account_id")
+    lead_id = _form_int(form, "lead_id")
+    contact_name = _form_str(form, "contact_name")
+    contact_email = _form_str(form, "contact_email")
+    contact_phone = _form_str(form, "contact_phone")
+    billing_address_line1 = _form_str(form, "billing_address_line1")
+    billing_address_line2 = _form_str(form, "billing_address_line2")
+    billing_city = _form_str(form, "billing_city")
+    billing_state = _form_str(form, "billing_state")
+    billing_postal_code = _form_str(form, "billing_postal_code")
+    billing_country = _form_str(form, "billing_country")
+    billing_gps_lat = _form_decimal(form, "billing_gps_lat")
+    billing_gps_lng = _form_decimal(form, "billing_gps_lng")
+    shipping_address_line1 = _form_str(form, "shipping_address_line1")
+    shipping_address_line2 = _form_str(form, "shipping_address_line2")
+    shipping_city = _form_str(form, "shipping_city")
+    shipping_state = _form_str(form, "shipping_state")
+    shipping_postal_code = _form_str(form, "shipping_postal_code")
+    shipping_country = _form_str(form, "shipping_country")
+    shipping_gps_lat = _form_decimal(form, "shipping_gps_lat")
+    shipping_gps_lng = _form_decimal(form, "shipping_gps_lng")
     company = _form_str(form, "company") or get_company_context(allow_null=True)
     currency = _form_str(form, "currency", "NGN") or "NGN"
     transaction_date = _form_date(_form_str(form, "transaction_date"))
@@ -368,10 +773,15 @@ async def quotation_update(
     order_type = _form_str(form, "order_type")
     source = _form_str(form, "source")
     campaign = _form_str(form, "campaign")
+    status = _form_str(form, "status", QuotationStatus.DRAFT.value)
+    sales_partner_id = _form_int(form, "sales_partner_id")
+
+    tax_codes = {tc.id: tc for tc in _get_tax_codes(db)}
+    items = _parse_quote_line_items(form, tax_codes)
 
     errors: dict[str, str] = {}
-    if not party_name:
-        errors["party_name"] = "Customer or lead name is required"
+    if not party_name and not customer_account_id and not lead_id:
+        errors["customer_name"] = "Customer or lead name is required"
     if not company:
         errors["general"] = "Company is required to update a quotation."
 
@@ -389,8 +799,28 @@ async def quotation_update(
         context["quotation_id"] = quotation_id
         context["form_data"] = {
             "quotation_to": quotation_to,
-            "party_name": party_name,
             "customer_name": customer_name,
+            "customer_account_id": str(customer_account_id) if customer_account_id else "",
+            "lead_id": str(lead_id) if lead_id else "",
+            "contact_name": contact_name,
+            "contact_email": contact_email,
+            "contact_phone": contact_phone,
+            "billing_address_line1": billing_address_line1,
+            "billing_address_line2": billing_address_line2,
+            "billing_city": billing_city,
+            "billing_state": billing_state,
+            "billing_postal_code": billing_postal_code,
+            "billing_country": billing_country,
+            "billing_gps_lat": str(billing_gps_lat or ""),
+            "billing_gps_lng": str(billing_gps_lng or ""),
+            "shipping_address_line1": shipping_address_line1,
+            "shipping_address_line2": shipping_address_line2,
+            "shipping_city": shipping_city,
+            "shipping_state": shipping_state,
+            "shipping_postal_code": shipping_postal_code,
+            "shipping_country": shipping_country,
+            "shipping_gps_lat": str(shipping_gps_lat or ""),
+            "shipping_gps_lng": str(shipping_gps_lng or ""),
             "company": company or "",
             "currency": currency,
             "transaction_date": _form_str(form, "transaction_date"),
@@ -398,7 +828,14 @@ async def quotation_update(
             "order_type": order_type,
             "source": source,
             "campaign": campaign,
+            "status": status,
+            "sales_partner_id": str(sales_partner_id) if sales_partner_id else "",
         }
+        context["status_options"] = get_quotation_status_options()
+        context["customer_accounts"] = _get_customer_accounts(db)
+        context["leads"] = _get_recent_leads(db)
+        context["sales_people"] = _get_sales_people(db)
+        context["tax_codes"] = list(tax_codes.values())
         context["errors"] = errors
         template = templates.get_template("modules/sales/templates/quotations/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
@@ -407,6 +844,27 @@ async def quotation_update(
         quotation_to=quotation_to,
         party_name=party_name,
         customer_name=customer_name or None,
+        customer_account_id=customer_account_id,
+        lead_id=lead_id,
+        contact_name=contact_name or None,
+        contact_email=contact_email or None,
+        contact_phone=contact_phone or None,
+        billing_address_line1=billing_address_line1 or None,
+        billing_address_line2=billing_address_line2 or None,
+        billing_city=billing_city or None,
+        billing_state=billing_state or None,
+        billing_postal_code=billing_postal_code or None,
+        billing_country=billing_country or None,
+        billing_gps_lat=billing_gps_lat if billing_gps_lat else None,
+        billing_gps_lng=billing_gps_lng if billing_gps_lng else None,
+        shipping_address_line1=shipping_address_line1 or None,
+        shipping_address_line2=shipping_address_line2 or None,
+        shipping_city=shipping_city or None,
+        shipping_state=shipping_state or None,
+        shipping_postal_code=shipping_postal_code or None,
+        shipping_country=shipping_country or None,
+        shipping_gps_lat=shipping_gps_lat if shipping_gps_lat else None,
+        shipping_gps_lng=shipping_gps_lng if shipping_gps_lng else None,
         company=company,
         currency=currency,
         transaction_date=transaction_date,
@@ -414,6 +872,9 @@ async def quotation_update(
         order_type=order_type or None,
         source=source or None,
         campaign=campaign or None,
+        sales_partner_id=sales_partner_id,
+        items=items,
+        status=status,
     )
 
     service = QuotationService(db)
@@ -483,6 +944,7 @@ async def orders_list(
     db: DB,
     q: Optional[str] = Query(None, description="Search query"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    customer_account_id: Optional[int] = Query(None, description="Filter by customer account"),
     page: int = Query(1, ge=1),
     per_page: int = Query(25, ge=10, le=100),
 ):
@@ -491,7 +953,15 @@ async def orders_list(
     service = SalesOrderService(db)
 
     # Build filters
-    filters = SalesOrderFilters(search=q, status=status) if q or status else None
+    filters = (
+        SalesOrderFilters(
+            search=q,
+            status=status,
+            customer_account_id=customer_account_id,
+        )
+        if q or status or customer_account_id
+        else None
+    )
 
     # Get paginated orders
     offset = (page - 1) * per_page
@@ -515,6 +985,7 @@ async def orders_list(
     context["orders"] = result.items
     context["search_query"] = q or ""
     context["current_status"] = status
+    context["current_customer_account_id"] = customer_account_id
     context["status_options"] = get_order_status_options()
     context["stats"] = stats
     context["pagination"] = build_pagination_context(page, per_page, result.total)
@@ -531,6 +1002,7 @@ async def orders_list(
         {"label": "Sales"},
         {"label": "Orders"},
     ])
+    context["customer_accounts"] = _get_customer_accounts(db)
 
     template = templates.get_template("modules/sales/templates/orders/pages/list.html")
     return HTMLResponse(template.render(context))
@@ -556,8 +1028,28 @@ async def order_new(
     ])
 
     context["form_data"] = {
-        "customer": "",
+        "customer_account_id": "",
         "customer_name": "",
+        "contact_name": "",
+        "contact_email": "",
+        "contact_phone": "",
+        "billing_address_line1": "",
+        "billing_address_line2": "",
+        "billing_city": "",
+        "billing_state": "",
+        "billing_postal_code": "",
+        "billing_country": "",
+        "billing_gps_lat": "",
+        "billing_gps_lng": "",
+        "shipping_address_line1": "",
+        "shipping_address_line2": "",
+        "shipping_city": "",
+        "shipping_state": "",
+        "shipping_postal_code": "",
+        "shipping_country": "",
+        "shipping_gps_lat": "",
+        "shipping_gps_lng": "",
+        "quotation_id": "",
         "company": "",
         "currency": "NGN",
         "transaction_date": "",
@@ -565,7 +1057,14 @@ async def order_new(
         "order_type": "",
         "source": "",
         "campaign": "",
+        "sales_partner_id": "",
+        "status": SalesOrderStatus.DRAFT.value,
     }
+    context["status_options"] = get_order_status_options()
+    context["customer_accounts"] = _get_customer_accounts(db)
+    context["quotations"] = _get_recent_quotations(db)
+    context["sales_people"] = _get_sales_people(db)
+    context["tax_codes"] = _get_tax_codes(db)
     context["errors"] = {}
 
     template = templates.get_template("modules/sales/templates/orders/pages/form.html")
@@ -584,8 +1083,14 @@ async def order_create(
     await validate_csrf(request)
     form = await request.form()
 
-    customer = _form_str(form, "customer")
     customer_name = _form_str(form, "customer_name")
+    customer_account_id = _form_int(form, "customer_account_id")
+    quotation_id = _form_int(form, "quotation_id")
+    contact_name = _form_str(form, "contact_name")
+    contact_email = _form_str(form, "contact_email")
+    contact_phone = _form_str(form, "contact_phone")
+    billing_address = _form_str(form, "billing_address")
+    shipping_address = _form_str(form, "shipping_address")
     company = _form_str(form, "company") or get_company_context(allow_null=True)
     currency = _form_str(form, "currency", "NGN") or "NGN"
     transaction_date = _form_date(_form_str(form, "transaction_date"))
@@ -593,10 +1098,19 @@ async def order_create(
     order_type = _form_str(form, "order_type")
     source = _form_str(form, "source")
     campaign = _form_str(form, "campaign")
+    status = _form_str(form, "status", SalesOrderStatus.DRAFT.value)
+    sales_partner_id = _form_int(form, "sales_partner_id")
+
+    tax_codes = {tc.id: tc for tc in _get_tax_codes(db)}
+    items = _parse_line_items(form, tax_codes)
+    if not items:
+        items = None
 
     errors: dict[str, str] = {}
-    if not customer:
+    if not customer_account_id and not customer_name and not quotation_id:
         errors["customer"] = "Customer is required"
+    if not items and not quotation_id:
+        errors["items"] = "At least one line item is required"
     if not company:
         errors["general"] = "Company is required to create a sales order."
 
@@ -610,8 +1124,28 @@ async def order_create(
             {"label": "New"},
         ])
         context["form_data"] = {
-            "customer": customer,
             "customer_name": customer_name,
+            "customer_account_id": str(customer_account_id) if customer_account_id else "",
+            "quotation_id": str(quotation_id) if quotation_id else "",
+            "contact_name": contact_name,
+            "contact_email": contact_email,
+            "contact_phone": contact_phone,
+            "billing_address_line1": billing_address_line1,
+            "billing_address_line2": billing_address_line2,
+            "billing_city": billing_city,
+            "billing_state": billing_state,
+            "billing_postal_code": billing_postal_code,
+            "billing_country": billing_country,
+            "billing_gps_lat": str(billing_gps_lat or ""),
+            "billing_gps_lng": str(billing_gps_lng or ""),
+            "shipping_address_line1": shipping_address_line1,
+            "shipping_address_line2": shipping_address_line2,
+            "shipping_city": shipping_city,
+            "shipping_state": shipping_state,
+            "shipping_postal_code": shipping_postal_code,
+            "shipping_country": shipping_country,
+            "shipping_gps_lat": str(shipping_gps_lat or ""),
+            "shipping_gps_lng": str(shipping_gps_lng or ""),
             "company": company,
             "currency": currency,
             "transaction_date": _form_str(form, "transaction_date"),
@@ -619,14 +1153,41 @@ async def order_create(
             "order_type": order_type,
             "source": source,
             "campaign": campaign,
+            "sales_partner_id": str(sales_partner_id) if sales_partner_id else "",
+            "status": status,
         }
+        context["status_options"] = get_order_status_options()
+        context["customer_accounts"] = _get_customer_accounts(db)
+        context["quotations"] = _get_recent_quotations(db)
+        context["sales_people"] = _get_sales_people(db)
+        context["tax_codes"] = list(tax_codes.values())
         context["errors"] = errors
         template = templates.get_template("modules/sales/templates/orders/pages/form.html")
         return HTMLResponse(template.render(context), status_code=422)
 
     data = SalesOrderCreateData(
-        customer=customer,
         customer_name=customer_name or None,
+        customer_account_id=customer_account_id,
+        contact_name=contact_name or None,
+        contact_email=contact_email or None,
+        contact_phone=contact_phone or None,
+        billing_address_line1=billing_address_line1 or None,
+        billing_address_line2=billing_address_line2 or None,
+        billing_city=billing_city or None,
+        billing_state=billing_state or None,
+        billing_postal_code=billing_postal_code or None,
+        billing_country=billing_country or None,
+        billing_gps_lat=billing_gps_lat if billing_gps_lat else None,
+        billing_gps_lng=billing_gps_lng if billing_gps_lng else None,
+        shipping_address_line1=shipping_address_line1 or None,
+        shipping_address_line2=shipping_address_line2 or None,
+        shipping_city=shipping_city or None,
+        shipping_state=shipping_state or None,
+        shipping_postal_code=shipping_postal_code or None,
+        shipping_country=shipping_country or None,
+        shipping_gps_lat=shipping_gps_lat if shipping_gps_lat else None,
+        shipping_gps_lng=shipping_gps_lng if shipping_gps_lng else None,
+        quotation_id=quotation_id,
         company=company or None,
         currency=currency,
         transaction_date=transaction_date,
@@ -634,6 +1195,9 @@ async def order_create(
         order_type=order_type or None,
         source=source or None,
         campaign=campaign or None,
+        sales_partner_id=sales_partner_id,
+        items=items,
+        status=status,
     )
 
     service = SalesOrderService(db)
@@ -676,8 +1240,28 @@ async def order_edit(
         {"label": "Edit"},
     ])
     context["form_data"] = {
-        "customer": order.customer or "",
         "customer_name": order.customer_name or "",
+        "customer_account_id": str(order.customer_account_id) if order.customer_account_id else "",
+        "quotation_id": str(order.quotation_id) if order.quotation_id else "",
+        "contact_name": order.contact_name or "",
+        "contact_email": order.contact_email or "",
+        "contact_phone": order.contact_phone or "",
+        "billing_address_line1": order.billing_address_line1 or "",
+        "billing_address_line2": order.billing_address_line2 or "",
+        "billing_city": order.billing_city or "",
+        "billing_state": order.billing_state or "",
+        "billing_postal_code": order.billing_postal_code or "",
+        "billing_country": order.billing_country or "",
+        "billing_gps_lat": str(order.billing_gps_lat) if order.billing_gps_lat else "",
+        "billing_gps_lng": str(order.billing_gps_lng) if order.billing_gps_lng else "",
+        "shipping_address_line1": order.shipping_address_line1 or "",
+        "shipping_address_line2": order.shipping_address_line2 or "",
+        "shipping_city": order.shipping_city or "",
+        "shipping_state": order.shipping_state or "",
+        "shipping_postal_code": order.shipping_postal_code or "",
+        "shipping_country": order.shipping_country or "",
+        "shipping_gps_lat": str(order.shipping_gps_lat) if order.shipping_gps_lat else "",
+        "shipping_gps_lng": str(order.shipping_gps_lng) if order.shipping_gps_lng else "",
         "company": order.company or "",
         "currency": order.currency or "NGN",
         "transaction_date": order.transaction_date.isoformat() if order.transaction_date else "",
@@ -685,7 +1269,14 @@ async def order_edit(
         "order_type": order.order_type or "",
         "source": order.source or "",
         "campaign": order.campaign or "",
+        "sales_partner_id": str(order.sales_partner_id) if order.sales_partner_id else "",
+        "status": order.status.value if order.status else SalesOrderStatus.DRAFT.value,
     }
+    context["status_options"] = get_order_status_options()
+    context["customer_accounts"] = _get_customer_accounts(db)
+    context["quotations"] = _get_recent_quotations(db)
+    context["sales_people"] = _get_sales_people(db)
+    context["tax_codes"] = _get_tax_codes(db)
     context["errors"] = {}
     context["order"] = order
 
@@ -707,17 +1298,39 @@ async def order_update(
     form = await request.form()
 
     customer_name = _form_str(form, "customer_name")
+    customer_account_id = _form_int(form, "customer_account_id")
+    quotation_id = _form_int(form, "quotation_id")
+    contact_name = _form_str(form, "contact_name")
+    contact_email = _form_str(form, "contact_email")
+    contact_phone = _form_str(form, "contact_phone")
+    billing_address = _form_str(form, "billing_address")
+    shipping_address = _form_str(form, "shipping_address")
     delivery_date = _form_date(_form_str(form, "delivery_date"))
     order_type = _form_str(form, "order_type")
     source = _form_str(form, "source")
     campaign = _form_str(form, "campaign")
+    status = _form_str(form, "status", SalesOrderStatus.DRAFT.value)
+    sales_partner_id = _form_int(form, "sales_partner_id")
+
+    tax_codes = {tc.id: tc for tc in _get_tax_codes(db)}
+    items = _parse_line_items(form, tax_codes)
 
     data = SalesOrderUpdateData(
         customer_name=customer_name or None,
+        customer_account_id=customer_account_id,
+        contact_name=contact_name or None,
+        contact_email=contact_email or None,
+        contact_phone=contact_phone or None,
+        billing_address=billing_address or None,
+        shipping_address=shipping_address or None,
         delivery_date=delivery_date,
         order_type=order_type or None,
+        sales_partner_id=sales_partner_id,
         source=source or None,
         campaign=campaign or None,
+        quotation_id=quotation_id,
+        status=status,
+        items=items,
     )
 
     service = SalesOrderService(db)
@@ -744,8 +1357,28 @@ async def order_update(
             {"label": "Edit"},
         ])
         context["form_data"] = {
-            "customer": order.customer or "",
             "customer_name": customer_name,
+            "customer_account_id": str(customer_account_id) if customer_account_id else "",
+            "quotation_id": str(quotation_id) if quotation_id else "",
+            "contact_name": contact_name,
+            "contact_email": contact_email,
+            "contact_phone": contact_phone,
+            "billing_address_line1": billing_address_line1,
+            "billing_address_line2": billing_address_line2,
+            "billing_city": billing_city,
+            "billing_state": billing_state,
+            "billing_postal_code": billing_postal_code,
+            "billing_country": billing_country,
+            "billing_gps_lat": str(billing_gps_lat or ""),
+            "billing_gps_lng": str(billing_gps_lng or ""),
+            "shipping_address_line1": shipping_address_line1,
+            "shipping_address_line2": shipping_address_line2,
+            "shipping_city": shipping_city,
+            "shipping_state": shipping_state,
+            "shipping_postal_code": shipping_postal_code,
+            "shipping_country": shipping_country,
+            "shipping_gps_lat": str(shipping_gps_lat or ""),
+            "shipping_gps_lng": str(shipping_gps_lng or ""),
             "company": order.company or "",
             "currency": order.currency or "NGN",
             "transaction_date": order.transaction_date.isoformat() if order.transaction_date else "",
@@ -753,7 +1386,14 @@ async def order_update(
             "order_type": order_type,
             "source": source,
             "campaign": campaign,
+            "sales_partner_id": str(sales_partner_id) if sales_partner_id else "",
+            "status": status,
         }
+        context["status_options"] = get_order_status_options()
+        context["customer_accounts"] = _get_customer_accounts(db)
+        context["quotations"] = _get_recent_quotations(db)
+        context["sales_people"] = _get_sales_people(db)
+        context["tax_codes"] = list(tax_codes.values())
         context["errors"] = {"general": str(exc)}
         context["order"] = order
 

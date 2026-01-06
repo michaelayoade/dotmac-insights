@@ -136,7 +136,7 @@ async def projects_list(
         sort_by=sort,
         sort_dir=dir,
     )
-    pagination = PaginationParams(page=page, limit=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     result = service.list_projects(filters, pagination)
 
@@ -611,7 +611,7 @@ async def tasks_list(
         priority=priority_enum,
         project_id=project_id,
     )
-    pagination = PaginationParams(page=page, limit=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     result = task_service.list_tasks(filters, pagination)
 
@@ -771,7 +771,7 @@ async def milestones_list(
         sort_by="planned_end_date",
         sort_dir="asc",
     )
-    pagination = PaginationParams(page=page, limit=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     result = milestone_service.list_milestones(filters, pagination)
     milestones = result.items

@@ -14,6 +14,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models.employee import Employee
+from app.models.party import Party, PartyType
 from app.models.hr_recruitment import (
     Interview,
     InterviewResult,
@@ -126,6 +127,65 @@ class RecruitmentService:
         settings_service = HRSettingsService(self.db, self.principal)
         self._settings_cache[cache_key] = settings_service.get_settings(company)
         return self._settings_cache[cache_key]
+
+    def _get_or_create_party_for_applicant(
+        self,
+        applicant: JobApplicant,
+        *,
+        name: Optional[str],
+        email: Optional[str],
+        phone: Optional[str],
+    ) -> Party:
+        party = None
+        if applicant.party_id:
+            party = self.db.get(Party, applicant.party_id)
+
+        email_norm = email.strip().lower() if email else None
+        if not party and email_norm:
+            party = self.db.query(Party).filter(Party.primary_email == email_norm).first()
+
+        if not party:
+            party = Party(
+                type=PartyType.PERSON.value,
+                name=name or None,
+                emails=[],
+                phones=[],
+            )
+            self.db.add(party)
+            self.db.flush()
+
+        if email_norm:
+            emails = list(party.emails or [])
+            if not any((e.get("address") or "").lower() == email_norm for e in emails):
+                emails.append(
+                    {
+                        "address": email_norm,
+                        "label": "primary",
+                        "is_primary": len(emails) == 0,
+                        "verified": False,
+                    }
+                )
+                party.emails = emails
+
+        if phone:
+            phones = list(party.phones or [])
+            if not any((p.get("number") or "") == phone for p in phones):
+                phones.append(
+                    {
+                        "number": phone,
+                        "label": "primary",
+                        "is_primary": len(phones) == 0,
+                        "can_sms": False,
+                        "can_whatsapp": False,
+                    }
+                )
+                party.phones = phones
+
+        if not party.name and name:
+            party.name = name
+
+        applicant.party_id = party.id
+        return party
 
     # ==========================================================================
     # Job Openings
@@ -328,6 +388,12 @@ class RecruitmentService:
             applicant.created_by_id = self.principal.user_id
 
         self.db.add(applicant)
+        self._get_or_create_party_for_applicant(
+            applicant,
+            name=applicant.applicant_name,
+            email=applicant.email_id,
+            phone=applicant.phone_number,
+        )
         self.db.flush()
         return applicant
 
@@ -357,6 +423,12 @@ class RecruitmentService:
         if self.principal and self.principal.user_id:
             applicant.updated_by_id = self.principal.user_id
 
+        self._get_or_create_party_for_applicant(
+            applicant,
+            name=applicant.applicant_name,
+            email=applicant.email_id,
+            phone=applicant.phone_number,
+        )
         self.db.flush()
         return applicant
 
@@ -463,6 +535,8 @@ class RecruitmentService:
             notes=data.notes,
             status=InterviewStatus.SCHEDULED,
         )
+        if applicant.party_id:
+            interview.party_id = applicant.party_id
 
         if self.principal and self.principal.user_id:
             interview.created_by_id = self.principal.user_id
@@ -614,6 +688,12 @@ class RecruitmentService:
         """Create a new job offer."""
         # Verify applicant exists
         applicant = self.get_applicant(data.job_applicant_id)
+        self._get_or_create_party_for_applicant(
+            applicant,
+            name=data.applicant_name or applicant.applicant_name,
+            email=data.applicant_email or applicant.email_id,
+            phone=applicant.phone_number,
+        )
 
         offer = JobOffer(
             job_applicant_id=data.job_applicant_id,
@@ -627,6 +707,7 @@ class RecruitmentService:
             company=data.company,
             expiry_date=data.expiry_date,
             status=JobOfferStatus.PENDING,
+            party_id=applicant.party_id,
         )
 
         if self.principal and self.principal.user_id:

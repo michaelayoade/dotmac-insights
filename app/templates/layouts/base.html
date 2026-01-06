@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="{{ product_name }} - Unified Business Management Platform">
     <title>{% block title %}{{ page_title | default("Dashboard") }}{% endblock %} | {{ product_name }}</title>
+    <script>
+        (function () {
+            const stored = localStorage.getItem('theme');
+            const prefersNight = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = stored || (prefersNight ? 'night' : 'day');
+            document.documentElement.dataset.theme = theme;
+            document.documentElement.style.colorScheme = theme === 'night' ? 'dark' : 'light';
+        })();
+    </script>
 
     <!-- Fonts: DM Sans (display) + Source Sans 3 (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -78,12 +87,243 @@
             color: #b91c1c;
             border: 1px solid #fecaca;
         }
+
+        :root,
+        :root[data-theme="day"] {
+            --theme-bg: #f6f2ed;
+            --theme-surface: #ffffff;
+            --theme-surface-2: #fbf7f2;
+            --theme-surface-3: #f1e9e2;
+            --theme-border: #e3dbd2;
+            --theme-text: #1f2a33;
+            --theme-text-muted: #58656f;
+            --theme-text-subtle: #768391;
+            --theme-primary: #0d7377;
+            --theme-primary-strong: #0a5f62;
+            --theme-accent: #f2a65d;
+            --theme-ring: rgba(13, 115, 119, 0.35);
+            --theme-card-shadow: 0 12px 30px rgba(31, 42, 51, 0.14);
+        }
+
+        :root[data-theme="night"] {
+            --theme-bg: #0e1317;
+            --theme-surface: #161c21;
+            --theme-surface-2: #1b232a;
+            --theme-surface-3: #11171c;
+            --theme-border: #28313a;
+            --theme-text: #e6edf3;
+            --theme-text-muted: #bac6d1;
+            --theme-text-subtle: #93a3b3;
+            --theme-primary: #4fd1c5;
+            --theme-primary-strong: #2bb7a8;
+            --theme-accent: #f2c66d;
+            --theme-ring: rgba(79, 209, 197, 0.35);
+            --theme-card-shadow: 0 18px 40px rgba(5, 8, 12, 0.55);
+        }
+
+        html, body {
+            background: var(--theme-bg);
+            color: var(--theme-text);
+        }
+
+        .theme-bg { background: var(--theme-bg); color: var(--theme-text); }
+        .theme-surface { background: var(--theme-surface); color: var(--theme-text); }
+        .theme-surface-2 { background: var(--theme-surface-2); }
+        .theme-border { border-color: var(--theme-border); }
+        .theme-text { color: var(--theme-text); }
+        .theme-muted { color: var(--theme-text-muted); }
+        .theme-surface-glass { background: color-mix(in srgb, var(--theme-surface) 88%, transparent); }
+        .theme-surface-muted { background: color-mix(in srgb, var(--theme-surface) 70%, transparent); }
+
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--theme-border);
+            background: var(--theme-surface-2);
+            color: var(--theme-text-muted);
+            font-size: 0.75rem;
+            line-height: 1rem;
+            transition: transform 150ms ease, background 150ms ease, color 150ms ease, border-color 150ms ease;
+        }
+
+        .theme-toggle:hover {
+            color: var(--theme-text);
+            transform: translateY(-1px);
+        }
+
+        .theme-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 150ms ease, transform 150ms ease;
+        }
+
+        .theme-icon-night { opacity: 0; transform: translateY(2px) scale(0.9); }
+        :root[data-theme="night"] .theme-icon-night { opacity: 1; transform: translateY(0) scale(1); }
+        :root[data-theme="night"] .theme-icon-day { opacity: 0; transform: translateY(-2px) scale(0.9); }
+
+        :root[data-theme="night"] .bg-white { background-color: var(--theme-surface); }
+        :root[data-theme="night"] .bg-gray-50 { background-color: var(--theme-surface-2); }
+        :root[data-theme="night"] .bg-gray-100 { background-color: var(--theme-surface-3); }
+        :root[data-theme="night"] .bg-surface-50,
+        :root[data-theme="night"] .bg-surface-100 { background-color: var(--theme-bg); }
+        :root[data-theme="night"] .bg-surface-200 { background-color: var(--theme-surface-2); }
+        :root[data-theme="night"] .bg-surface-300 { background-color: var(--theme-surface-3); }
+
+        :root[data-theme="night"] .text-gray-900,
+        :root[data-theme="night"] .text-gray-800 { color: var(--theme-text); }
+        :root[data-theme="night"] .text-gray-700,
+        :root[data-theme="night"] .text-gray-600 { color: var(--theme-text-muted); }
+        :root[data-theme="night"] .text-gray-500,
+        :root[data-theme="night"] .text-gray-400 { color: var(--theme-text-subtle); }
+
+        :root[data-theme="night"] .border-gray-200,
+        :root[data-theme="night"] .border-gray-100,
+        :root[data-theme="night"] .border-surface-200,
+        :root[data-theme="night"] .border-surface-300 { border-color: var(--theme-border); }
+
+        :root[data-theme="night"] .shadow-sm,
+        :root[data-theme="night"] .shadow,
+        :root[data-theme="night"] .shadow-md,
+        :root[data-theme="night"] .shadow-lg,
+        :root[data-theme="night"] .shadow-warm-md,
+        :root[data-theme="night"] .shadow-warm-lg {
+            box-shadow: var(--theme-card-shadow);
+        }
+
+        :root[data-theme="night"] input,
+        :root[data-theme="night"] select,
+        :root[data-theme="night"] textarea {
+            background-color: var(--theme-surface-2);
+            border-color: var(--theme-border);
+            color: var(--theme-text);
+        }
+
+        :root[data-theme="night"] input::placeholder,
+        :root[data-theme="night"] textarea::placeholder {
+            color: var(--theme-text-subtle);
+        }
+
+        input:focus, select:focus, textarea:focus {
+            --tw-ring-color: var(--theme-ring);
+        }
+
+        .btn-primary {
+            background: linear-gradient(90deg, var(--theme-primary), var(--theme-primary-strong));
+        }
+
+        .btn-secondary {
+            background: var(--theme-surface);
+            color: var(--theme-text-muted);
+            border: 1px solid var(--theme-border);
+        }
+
+        .theme-hover:hover {
+            background: var(--theme-surface-2);
+        }
+
+        .theme-launcher {
+            background:
+                radial-gradient(1200px 600px at 10% -10%, rgba(13, 115, 119, 0.12), transparent 60%),
+                radial-gradient(900px 500px at 95% 0%, rgba(242, 166, 93, 0.18), transparent 55%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(246, 242, 237, 0.95));
+        }
+
+        :root[data-theme="night"] .theme-launcher {
+            background:
+                radial-gradient(1200px 600px at 10% -10%, rgba(79, 209, 197, 0.16), transparent 60%),
+                radial-gradient(900px 500px at 95% 0%, rgba(242, 198, 109, 0.18), transparent 55%),
+                linear-gradient(180deg, rgba(14, 19, 23, 0.98), rgba(10, 14, 18, 0.95));
+        }
+
+        .module-icon {
+            background: var(--module-icon-bg, var(--theme-surface-3));
+            color: var(--module-icon-fg, var(--theme-text));
+        }
+
+        .module-icon-hover:hover .module-icon,
+        .module-icon-hover:focus-visible .module-icon {
+            background: var(--module-icon-bg-hover, var(--module-icon-bg, var(--theme-surface-3)));
+            color: var(--module-icon-fg-hover, var(--module-icon-fg, var(--theme-text)));
+        }
+
+        .module-icon-label {
+            color: var(--module-label-fg, var(--theme-text));
+        }
+
+        .module-icon-hover:hover .module-icon-label,
+        .module-icon-hover:focus-visible .module-icon-label {
+            color: var(--module-icon-fg-hover, var(--module-icon-fg, var(--theme-text)));
+        }
+
+        .module-icon--customer { --module-icon-bg: #fde7cf; --module-icon-fg: #a35d14; }
+        .module-icon--finance { --module-icon-bg: #dff6ea; --module-icon-fg: #166b4e; }
+        .module-icon--procurement { --module-icon-bg: #ffe2c4; --module-icon-fg: #9a4b10; }
+        .module-icon--facility { --module-icon-bg: #ede9e2; --module-icon-fg: #6c5a48; }
+        .module-icon--operations { --module-icon-bg: #dff1ff; --module-icon-fg: #1b5f8a; }
+        .module-icon--isp { --module-icon-bg: #dcf7fb; --module-icon-fg: #1a6d7a; }
+        .module-icon--people { --module-icon-bg: #ece5ff; --module-icon-fg: #5a34a8; }
+        .module-icon--marketing { --module-icon-bg: #ffe3ed; --module-icon-fg: #9a2f56; }
+        .module-icon--analytics { --module-icon-bg: #e2e7ff; --module-icon-fg: #2f3f99; }
+        .module-icon--system { --module-icon-bg: #e4e9ef; --module-icon-fg: #3e4a57; }
+        .module-icon--teal { --module-icon-bg: #d7f6f2; --module-icon-fg: #0f6b60; }
+        .module-icon--lime { --module-icon-bg: #edf7c9; --module-icon-fg: #5b6f12; }
+        .module-icon--rose { --module-icon-bg: #ffe1e8; --module-icon-fg: #9f1f3f; }
+        .module-icon--purple { --module-icon-bg: #efe2ff; --module-icon-fg: #5b2aa4; }
+
+        .module-icon--customer { --module-icon-bg-hover: #f7d9b4; --module-icon-fg-hover: #8a4d10; }
+        .module-icon--finance { --module-icon-bg-hover: #c7eddc; --module-icon-fg-hover: #12563f; }
+        .module-icon--procurement { --module-icon-bg-hover: #f8cfa8; --module-icon-fg-hover: #7d3f0f; }
+        .module-icon--facility { --module-icon-bg-hover: #e0d6cc; --module-icon-fg-hover: #5a4b3d; }
+        .module-icon--operations { --module-icon-bg-hover: #c8e6ff; --module-icon-fg-hover: #154c70; }
+        .module-icon--isp { --module-icon-bg-hover: #c5eef4; --module-icon-fg-hover: #145662; }
+        .module-icon--people { --module-icon-bg-hover: #d9ccff; --module-icon-fg-hover: #4c2c92; }
+        .module-icon--marketing { --module-icon-bg-hover: #ffc8da; --module-icon-fg-hover: #7e2345; }
+        .module-icon--analytics { --module-icon-bg-hover: #c8d3ff; --module-icon-fg-hover: #24347f; }
+        .module-icon--system { --module-icon-bg-hover: #d4dbe3; --module-icon-fg-hover: #333e49; }
+        .module-icon--teal { --module-icon-bg-hover: #bfeae4; --module-icon-fg-hover: #0b524a; }
+        .module-icon--lime { --module-icon-bg-hover: #dfeeb0; --module-icon-fg-hover: #4c5d10; }
+        .module-icon--rose { --module-icon-bg-hover: #fbc1d0; --module-icon-fg-hover: #7f1833; }
+        .module-icon--purple { --module-icon-bg-hover: #e0ccff; --module-icon-fg-hover: #4a228a; }
+
+        :root[data-theme="night"] .module-icon--customer { --module-icon-bg: #3a2b1c; --module-icon-fg: #f7c58a; }
+        :root[data-theme="night"] .module-icon--finance { --module-icon-bg: #1c3228; --module-icon-fg: #7fe3b6; }
+        :root[data-theme="night"] .module-icon--procurement { --module-icon-bg: #3b2718; --module-icon-fg: #f6b374; }
+        :root[data-theme="night"] .module-icon--facility { --module-icon-bg: #2b2621; --module-icon-fg: #d9c6b3; }
+        :root[data-theme="night"] .module-icon--operations { --module-icon-bg: #1c2a35; --module-icon-fg: #89c6e8; }
+        :root[data-theme="night"] .module-icon--isp { --module-icon-bg: #1c2f33; --module-icon-fg: #7dd7e3; }
+        :root[data-theme="night"] .module-icon--people { --module-icon-bg: #2c243a; --module-icon-fg: #c3a6ff; }
+        :root[data-theme="night"] .module-icon--marketing { --module-icon-bg: #3b2029; --module-icon-fg: #f49ab6; }
+        :root[data-theme="night"] .module-icon--analytics { --module-icon-bg: #23283b; --module-icon-fg: #aab5ff; }
+        :root[data-theme="night"] .module-icon--system { --module-icon-bg: #252b33; --module-icon-fg: #b3c0ce; }
+        :root[data-theme="night"] .module-icon--teal { --module-icon-bg: #17312f; --module-icon-fg: #7de0d6; }
+        :root[data-theme="night"] .module-icon--lime { --module-icon-bg: #2b3318; --module-icon-fg: #c7de6b; }
+        :root[data-theme="night"] .module-icon--rose { --module-icon-bg: #3a1d24; --module-icon-fg: #f4a0b4; }
+        :root[data-theme="night"] .module-icon--purple { --module-icon-bg: #2b2038; --module-icon-fg: #c7a3ff; }
+
+        :root[data-theme="night"] .module-icon--customer { --module-icon-bg-hover: #4a3522; --module-icon-fg-hover: #ffd39c; }
+        :root[data-theme="night"] .module-icon--finance { --module-icon-bg-hover: #244437; --module-icon-fg-hover: #9af0c6; }
+        :root[data-theme="night"] .module-icon--procurement { --module-icon-bg-hover: #4b2f1c; --module-icon-fg-hover: #ffc58a; }
+        :root[data-theme="night"] .module-icon--facility { --module-icon-bg-hover: #34302a; --module-icon-fg-hover: #e7d6c6; }
+        :root[data-theme="night"] .module-icon--operations { --module-icon-bg-hover: #233444; --module-icon-fg-hover: #a5d4ef; }
+        :root[data-theme="night"] .module-icon--isp { --module-icon-bg-hover: #23373c; --module-icon-fg-hover: #9ae4ee; }
+        :root[data-theme="night"] .module-icon--people { --module-icon-bg-hover: #3a2f4b; --module-icon-fg-hover: #d8c2ff; }
+        :root[data-theme="night"] .module-icon--marketing { --module-icon-bg-hover: #4a2731; --module-icon-fg-hover: #ffb5cd; }
+        :root[data-theme="night"] .module-icon--analytics { --module-icon-bg-hover: #2b3149; --module-icon-fg-hover: #c1c9ff; }
+        :root[data-theme="night"] .module-icon--system { --module-icon-bg-hover: #2f3640; --module-icon-fg-hover: #c9d5e1; }
+        :root[data-theme="night"] .module-icon--teal { --module-icon-bg-hover: #1b3f3c; --module-icon-fg-hover: #9beee5; }
+        :root[data-theme="night"] .module-icon--lime { --module-icon-bg-hover: #36411f; --module-icon-fg-hover: #d8f081; }
+        :root[data-theme="night"] .module-icon--rose { --module-icon-bg-hover: #47222b; --module-icon-fg-hover: #ffb2c4; }
+        :root[data-theme="night"] .module-icon--purple { --module-icon-bg-hover: #352544; --module-icon-fg-hover: #dec0ff; }
     </style>
 
     {% block head %}{% endblock %}
 </head>
 <body
-    class="h-full bg-surface-100 font-body antialiased"
+    class="h-full theme-bg font-body antialiased"
     hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'
     x-data="{ sidebarOpen: false }"
     data-product-name="{{ product_name }}"
@@ -247,6 +487,32 @@
     <!-- UI components (must load before Alpine) -->
     <script src="/static/js/ui.js"></script>
     <script src="/static/js/table-actions.js"></script>
+    <script>
+        (function () {
+            function applyTheme(nextTheme) {
+                document.documentElement.dataset.theme = nextTheme;
+                document.documentElement.style.colorScheme = nextTheme === 'night' ? 'dark' : 'light';
+                localStorage.setItem('theme', nextTheme);
+            }
+
+            function toggleTheme() {
+                const current = document.documentElement.dataset.theme || 'day';
+                applyTheme(current === 'night' ? 'day' : 'night');
+            }
+
+            function initThemeToggles() {
+                document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+                    button.addEventListener('click', toggleTheme);
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initThemeToggles);
+            } else {
+                initThemeToggles();
+            }
+        })();
+    </script>
 
     <!-- Alpine.js -->
     <script defer src="/static/js/vendor/alpine.min.js"></script>

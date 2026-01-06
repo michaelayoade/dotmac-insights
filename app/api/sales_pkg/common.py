@@ -15,7 +15,7 @@ from typing import Dict, Any, Optional, List, Iterable, cast
 from datetime import datetime, timedelta, timezone, date
 from decimal import Decimal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from app.database import get_db
 from app.models.invoice import Invoice, InvoiceStatus, InvoiceSource
 from app.models.payment import Payment, PaymentStatus, PaymentMethod, PaymentSource
@@ -286,9 +286,87 @@ class PaymentUpdateRequest(BaseModel):
         return value.upper() if value else value
 
 
+class SalesOrderLineItemRequest(BaseModel):
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    description: Optional[str] = None
+    qty: Decimal = Decimal("1")
+    rate: Decimal = Decimal("0")
+    discount_percentage: Decimal = Decimal("0")
+    discount_amount: Decimal = Decimal("0")
+    uom: Optional[str] = None
+    warehouse: Optional[str] = None
+    tax_code_id: Optional[int] = None
+    tax_rate: Decimal = Decimal("0")
+    tax_amount: Decimal = Decimal("0")
+    is_tax_inclusive: bool = False
+
+    @field_validator(
+        "qty",
+        "rate",
+        "discount_percentage",
+        "discount_amount",
+        "tax_rate",
+        "tax_amount",
+        mode="before",
+    )
+    def _to_decimal(cls, value):
+        return Decimal(str(value)) if value is not None else Decimal("0")
+
+
+class QuotationLineItemRequest(BaseModel):
+    item_code: Optional[str] = None
+    item_name: Optional[str] = None
+    description: Optional[str] = None
+    qty: Decimal = Decimal("1")
+    rate: Decimal = Decimal("0")
+    discount_percentage: Decimal = Decimal("0")
+    discount_amount: Decimal = Decimal("0")
+    uom: Optional[str] = None
+    warehouse: Optional[str] = None
+    tax_code_id: Optional[int] = None
+    tax_rate: Decimal = Decimal("0")
+    tax_amount: Decimal = Decimal("0")
+    is_tax_inclusive: bool = False
+
+    @field_validator(
+        "qty",
+        "rate",
+        "discount_percentage",
+        "discount_amount",
+        "tax_rate",
+        "tax_amount",
+        mode="before",
+    )
+    def _to_decimal(cls, value):
+        return Decimal(str(value)) if value is not None else Decimal("0")
+
+
 class SalesOrderRequest(BaseModel):
     customer_account_id: Optional[int] = None
+    quotation_id: Optional[int] = None
     customer_name: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    billing_address: Optional[str] = None
+    billing_address_line1: Optional[str] = None
+    billing_address_line2: Optional[str] = None
+    billing_city: Optional[str] = None
+    billing_state: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    billing_country: Optional[str] = None
+    billing_gps_lat: Optional[Decimal] = None
+    billing_gps_lng: Optional[Decimal] = None
+    shipping_address: Optional[str] = None
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+    shipping_gps_lat: Optional[Decimal] = None
+    shipping_gps_lng: Optional[Decimal] = None
     order_type: Optional[str] = None
     company: Optional[str] = None
     currency: str = "NGN"
@@ -306,9 +384,11 @@ class SalesOrderRequest(BaseModel):
     delivery_status: Optional[str] = None
     status: Optional[str] = SalesOrderStatus.DRAFT.value
     sales_partner: Optional[str] = None
+    sales_partner_id: Optional[int] = None
     territory: Optional[str] = None
     source: Optional[str] = None
     campaign: Optional[str] = None
+    items: Optional[List["SalesOrderLineItemRequest"]] = None
 
     @field_validator(
         "total_qty",
@@ -331,7 +411,29 @@ class SalesOrderRequest(BaseModel):
 
 class SalesOrderUpdateRequest(BaseModel):
     customer_account_id: Optional[int] = None
+    quotation_id: Optional[int] = None
     customer_name: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    billing_address: Optional[str] = None
+    billing_address_line1: Optional[str] = None
+    billing_address_line2: Optional[str] = None
+    billing_city: Optional[str] = None
+    billing_state: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    billing_country: Optional[str] = None
+    billing_gps_lat: Optional[Decimal] = None
+    billing_gps_lng: Optional[Decimal] = None
+    shipping_address: Optional[str] = None
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+    shipping_gps_lat: Optional[Decimal] = None
+    shipping_gps_lng: Optional[Decimal] = None
     order_type: Optional[str] = None
     company: Optional[str] = None
     currency: Optional[str] = None
@@ -349,9 +451,11 @@ class SalesOrderUpdateRequest(BaseModel):
     delivery_status: Optional[str] = None
     status: Optional[str] = None
     sales_partner: Optional[str] = None
+    sales_partner_id: Optional[int] = None
     territory: Optional[str] = None
     source: Optional[str] = None
     campaign: Optional[str] = None
+    items: Optional[List["SalesOrderLineItemRequest"]] = None
 
     @field_validator(
         "total_qty",
@@ -374,8 +478,31 @@ class SalesOrderUpdateRequest(BaseModel):
 
 class QuotationRequest(BaseModel):
     quotation_to: Optional[str] = None
-    party_name: Optional[str] = None
+    party_name: Optional[str] = Field(default=None, json_schema_extra={"deprecated": True})
     customer_name: Optional[str] = None
+    customer_account_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    billing_address: Optional[str] = None
+    billing_address_line1: Optional[str] = None
+    billing_address_line2: Optional[str] = None
+    billing_city: Optional[str] = None
+    billing_state: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    billing_country: Optional[str] = None
+    billing_gps_lat: Optional[Decimal] = None
+    billing_gps_lng: Optional[Decimal] = None
+    shipping_address: Optional[str] = None
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+    shipping_gps_lat: Optional[Decimal] = None
+    shipping_gps_lng: Optional[Decimal] = None
     order_type: Optional[str] = None
     company: Optional[str] = None
     currency: str = "NGN"
@@ -389,10 +516,12 @@ class QuotationRequest(BaseModel):
     total_taxes_and_charges: Decimal = Decimal("0")
     status: Optional[str] = QuotationStatus.DRAFT.value
     sales_partner: Optional[str] = None
+    sales_partner_id: Optional[int] = None
     territory: Optional[str] = None
     source: Optional[str] = None
     campaign: Optional[str] = None
     order_lost_reason: Optional[str] = None
+    items: Optional[List["QuotationLineItemRequest"]] = None
 
     @field_validator(
         "total_qty",
@@ -410,11 +539,42 @@ class QuotationRequest(BaseModel):
     def _upper_currency(cls, value: str) -> str:
         return value.upper()
 
+    @model_validator(mode="after")
+    def _sync_customer_name(self):
+        if not self.customer_name and self.party_name:
+            self.customer_name = self.party_name
+        if not self.party_name and self.customer_name:
+            self.party_name = self.customer_name
+        return self
+
 
 class QuotationUpdateRequest(BaseModel):
     quotation_to: Optional[str] = None
-    party_name: Optional[str] = None
+    party_name: Optional[str] = Field(default=None, json_schema_extra={"deprecated": True})
     customer_name: Optional[str] = None
+    customer_account_id: Optional[int] = None
+    lead_id: Optional[int] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    billing_address: Optional[str] = None
+    billing_address_line1: Optional[str] = None
+    billing_address_line2: Optional[str] = None
+    billing_city: Optional[str] = None
+    billing_state: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    billing_country: Optional[str] = None
+    billing_gps_lat: Optional[Decimal] = None
+    billing_gps_lng: Optional[Decimal] = None
+    shipping_address: Optional[str] = None
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+    shipping_gps_lat: Optional[Decimal] = None
+    shipping_gps_lng: Optional[Decimal] = None
     order_type: Optional[str] = None
     company: Optional[str] = None
     currency: Optional[str] = None
@@ -428,10 +588,12 @@ class QuotationUpdateRequest(BaseModel):
     total_taxes_and_charges: Optional[Decimal] = None
     status: Optional[str] = None
     sales_partner: Optional[str] = None
+    sales_partner_id: Optional[int] = None
     territory: Optional[str] = None
     source: Optional[str] = None
     campaign: Optional[str] = None
     order_lost_reason: Optional[str] = None
+    items: Optional[List["QuotationLineItemRequest"]] = None
 
     @field_validator(
         "total_qty",
@@ -448,6 +610,14 @@ class QuotationUpdateRequest(BaseModel):
     @field_validator("currency")
     def _upper_currency(cls, value: Optional[str]) -> Optional[str]:
         return value.upper() if value else value
+
+    @model_validator(mode="after")
+    def _sync_customer_name(self):
+        if not self.customer_name and self.party_name:
+            self.customer_name = self.party_name
+        if not self.party_name and self.customer_name:
+            self.party_name = self.customer_name
+        return self
 
 
 class CustomerGroupRequest(BaseModel):
@@ -563,7 +733,7 @@ class CreditNoteUpdateRequest(BaseModel):
 
 
 class CustomerAccountRequest(BaseModel):
-    """Customer account (Party-based) request payload."""
+    """Customer account request payload."""
     account_number: Optional[str] = None
     billing_email: Optional[str] = None
     billing_type: Optional[str] = None
@@ -571,8 +741,17 @@ class CustomerAccountRequest(BaseModel):
     currency: Optional[str] = "NGN"
     status: Optional[str] = "active"
     tier: Optional[str] = "standard"
-    party_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    party_id: Optional[int] = Field(default=None, json_schema_extra={"deprecated": True})
     customer_type: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _sync_customer_id(self):
+        if self.customer_id is None and self.party_id is not None:
+            self.customer_id = self.party_id
+        if self.party_id is None and self.customer_id is not None:
+            self.party_id = self.customer_id
+        return self
 
 
 class CustomerAccountUpdateRequest(BaseModel):
@@ -583,8 +762,17 @@ class CustomerAccountUpdateRequest(BaseModel):
     currency: Optional[str] = None
     status: Optional[str] = None
     tier: Optional[str] = None
-    party_id: Optional[int] = None
+    customer_id: Optional[int] = None
+    party_id: Optional[int] = Field(default=None, json_schema_extra={"deprecated": True})
     customer_type: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _sync_customer_id(self):
+        if self.customer_id is None and self.party_id is not None:
+            self.customer_id = self.party_id
+        if self.party_id is None and self.customer_id is not None:
+            self.party_id = self.customer_id
+        return self
 
 
 def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
@@ -593,27 +781,27 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
     items = db.query(InvoiceLine).filter(InvoiceLine.invoice_id == invoice.id).all()
 
     customer_account = None
-    party_id = None
-    party_name = None
+    customer_id = None
+    customer_name = None
     if invoice.customer_account and invoice.customer_account.party:
         party = invoice.customer_account.party
-        party_id = party.id
-        party_name = party.name
-        if not party_name:
-            party_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
-        if not party_name:
-            party_name = party.legal_name or party.trading_name
+        customer_id = party.id
+        customer_name = party.name
+        if not customer_name:
+            customer_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+        if not customer_name:
+            customer_name = party.legal_name or party.trading_name
         customer_account = {
             "id": invoice.customer_account.id,
-            "party_id": party.id,
-            "name": party_name,
+            "customer_id": party.id,
+            "customer_name": customer_name,
         }
 
     return {
         "id": invoice.id,
         "customer_account_id": invoice.customer_account_id,
-        "party_id": party_id,
-        "party_name": party_name,
+        "customer_id": customer_id,
+        "customer_name": customer_name,
         "invoice_number": invoice.invoice_number,
         "description": invoice.description,
         "amount": float(invoice.amount),
@@ -675,23 +863,23 @@ def _serialize_invoice(invoice: Invoice, db: Session) -> Dict[str, Any]:
 
 
 def _serialize_payment(payment: Payment) -> Dict[str, Any]:
-    party_id = None
-    party_name = None
+    customer_id = None
+    customer_name = None
     if payment.customer_account and payment.customer_account.party:
         party = payment.customer_account.party
-        party_id = party.id
-        party_name = party.name
-        if not party_name:
-            party_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
-        if not party_name:
-            party_name = party.legal_name or party.trading_name
+        customer_id = party.id
+        customer_name = party.name
+        if not customer_name:
+            customer_name = f"{party.first_name or ''} {party.last_name or ''}".strip()
+        if not customer_name:
+            customer_name = party.legal_name or party.trading_name
 
     return {
         "id": payment.id,
         "receipt_number": payment.receipt_number,
         "customer_account_id": payment.customer_account_id,
-        "party_id": party_id,
-        "party_name": party_name,
+        "customer_id": customer_id,
+        "customer_name": customer_name,
         "invoice_id": payment.invoice_id,
         "amount": float(payment.amount),
         "currency": payment.currency,
@@ -726,6 +914,10 @@ def _serialize_sales_order(order: SalesOrder) -> Dict[str, Any]:
                 "discount_amount": float(it.discount_amount or 0),
                 "amount": float(it.amount or 0),
                 "net_amount": float(it.net_amount or 0),
+                "tax_code_id": it.tax_code_id,
+                "tax_rate": float(it.tax_rate or 0),
+                "tax_amount": float(it.tax_amount or 0),
+                "is_tax_inclusive": bool(it.is_tax_inclusive),
                 "delivered_qty": float(it.delivered_qty or 0),
                 "billed_amt": float(it.billed_amt or 0),
                 "warehouse": it.warehouse,
@@ -739,7 +931,30 @@ def _serialize_sales_order(order: SalesOrder) -> Dict[str, Any]:
         "id": order.id,
         "erpnext_id": order.erpnext_id,
         "customer_account_id": order.customer_account_id,
+        "customer_id": order.party_id,
+        "quotation_id": order.quotation_id,
         "customer_name": order.customer_name,
+        "contact_name": order.contact_name,
+        "contact_email": order.contact_email,
+        "contact_phone": order.contact_phone,
+        "billing_address": order.billing_address,
+        "billing_address_line1": order.billing_address_line1,
+        "billing_address_line2": order.billing_address_line2,
+        "billing_city": order.billing_city,
+        "billing_state": order.billing_state,
+        "billing_postal_code": order.billing_postal_code,
+        "billing_country": order.billing_country,
+        "billing_gps_lat": float(order.billing_gps_lat) if order.billing_gps_lat is not None else None,
+        "billing_gps_lng": float(order.billing_gps_lng) if order.billing_gps_lng is not None else None,
+        "shipping_address": order.shipping_address,
+        "shipping_address_line1": order.shipping_address_line1,
+        "shipping_address_line2": order.shipping_address_line2,
+        "shipping_city": order.shipping_city,
+        "shipping_state": order.shipping_state,
+        "shipping_postal_code": order.shipping_postal_code,
+        "shipping_country": order.shipping_country,
+        "shipping_gps_lat": float(order.shipping_gps_lat) if order.shipping_gps_lat is not None else None,
+        "shipping_gps_lng": float(order.shipping_gps_lng) if order.shipping_gps_lng is not None else None,
         "order_type": order.order_type,
         "company": order.company,
         "currency": order.currency,
@@ -757,6 +972,7 @@ def _serialize_sales_order(order: SalesOrder) -> Dict[str, Any]:
         "delivery_status": order.delivery_status,
         "status": order.status.value if order.status else None,
         "sales_partner": order.sales_partner,
+        "sales_partner_id": order.sales_partner_id,
         "territory": order.territory,
         "source": order.source,
         "campaign": order.campaign,
@@ -785,6 +1001,10 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
                 "discount_amount": float(it.discount_amount or 0),
                 "amount": float(it.amount or 0),
                 "net_amount": float(it.net_amount or 0),
+                "tax_code_id": it.tax_code_id,
+                "tax_rate": float(it.tax_rate or 0),
+                "tax_amount": float(it.tax_amount or 0),
+                "is_tax_inclusive": bool(it.is_tax_inclusive),
                 "idx": it.idx,
             }
             for it in quote.items
@@ -794,8 +1014,30 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
         "id": quote.id,
         "erpnext_id": quote.erpnext_id,
         "quotation_to": quote.quotation_to,
-        "party_name": quote.party_name,
-        "customer_name": quote.customer_name,
+        "customer_name": quote.customer_name or quote.party_name,
+        "customer_account_id": quote.customer_account_id,
+        "lead_id": quote.lead_id,
+        "contact_name": quote.contact_name,
+        "contact_email": quote.contact_email,
+        "contact_phone": quote.contact_phone,
+        "billing_address": quote.billing_address,
+        "billing_address_line1": quote.billing_address_line1,
+        "billing_address_line2": quote.billing_address_line2,
+        "billing_city": quote.billing_city,
+        "billing_state": quote.billing_state,
+        "billing_postal_code": quote.billing_postal_code,
+        "billing_country": quote.billing_country,
+        "billing_gps_lat": float(quote.billing_gps_lat) if quote.billing_gps_lat is not None else None,
+        "billing_gps_lng": float(quote.billing_gps_lng) if quote.billing_gps_lng is not None else None,
+        "shipping_address": quote.shipping_address,
+        "shipping_address_line1": quote.shipping_address_line1,
+        "shipping_address_line2": quote.shipping_address_line2,
+        "shipping_city": quote.shipping_city,
+        "shipping_state": quote.shipping_state,
+        "shipping_postal_code": quote.shipping_postal_code,
+        "shipping_country": quote.shipping_country,
+        "shipping_gps_lat": float(quote.shipping_gps_lat) if quote.shipping_gps_lat is not None else None,
+        "shipping_gps_lng": float(quote.shipping_gps_lng) if quote.shipping_gps_lng is not None else None,
         "order_type": quote.order_type,
         "company": quote.company,
         "currency": quote.currency,
@@ -809,6 +1051,7 @@ def _serialize_quotation(quote: Quotation) -> Dict[str, Any]:
         "total_taxes_and_charges": float(quote.total_taxes_and_charges or 0),
         "status": quote.status.value if quote.status else None,
         "sales_partner": quote.sales_partner,
+        "sales_partner_id": quote.sales_partner_id,
         "territory": quote.territory,
         "source": quote.source,
         "campaign": quote.campaign,

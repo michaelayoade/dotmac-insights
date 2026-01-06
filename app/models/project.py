@@ -12,6 +12,7 @@ from app.utils.datetime_utils import utc_now
 
 if TYPE_CHECKING:
     from app.models.party import CustomerAccount
+    from app.models.party import Party
     from app.models.employee import Employee
     from app.models.expense import Expense
     from app.models.ticket import Ticket
@@ -189,6 +190,12 @@ class ProjectUser(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     user: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -200,6 +207,7 @@ class ProjectUser(Base):
 
     # Relationship
     project: Mapped["Project"] = relationship(back_populates="users")
+    party: Mapped[Optional["Party"]] = relationship()
 
 
 class Milestone(SoftDeleteMixin, Base):

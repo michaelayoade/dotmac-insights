@@ -6,6 +6,18 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">HR Analytics</h1>
         <p class="mt-1.5 text-gray-500 font-body">Leave, attendance, payroll, and recruitment insights</p>
     </div>
+    <div class="flex items-center gap-3">
+        <a href="/api/v1/analytics/exports/hr?format=csv"
+           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-surface-50">
+            {% include "components/icons/receipt.html" %}
+            CSV
+        </a>
+        <a href="/api/v1/analytics/exports/hr?format=pdf"
+           class="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-surface-50">
+            {% include "components/icons/file-text.html" %}
+            PDF
+        </a>
+    </div>
 </div>
 {% endblock %}
 
@@ -96,6 +108,78 @@
         <div class="text-center p-4 rounded-xl bg-emerald-50">
             <div class="text-2xl font-bold text-emerald-700">{{ "{:.1f}%".format(recruitment.accepted_rate | default(0)) }}</div>
             <div class="text-sm text-emerald-600 mt-1">Acceptance Rate</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if workforce %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Workforce Snapshot</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="text-center p-4 rounded-xl bg-blue-50">
+            <div class="text-2xl font-bold text-blue-700">{{ workforce.total_headcount | default(0) }}</div>
+            <div class="text-sm text-blue-600 mt-1">Total Headcount</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-green-50">
+            <div class="text-2xl font-bold text-green-700">{{ workforce.active_employees | default(0) }}</div>
+            <div class="text-sm text-green-600 mt-1">Active Employees</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-yellow-50">
+            <div class="text-2xl font-bold text-yellow-700">{{ workforce.on_leave | default(0) }}</div>
+            <div class="text-sm text-yellow-600 mt-1">On Leave</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-red-50">
+            <div class="text-2xl font-bold text-red-700">{{ workforce.terminated | default(0) }}</div>
+            <div class="text-sm text-red-600 mt-1">Terminated</div>
+        </div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50">
+            <div class="text-sm font-semibold text-gray-900 mb-3">Headcount by Department</div>
+            <div class="space-y-2">
+                {% for row in workforce.headcount_by_department %}
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">{{ row.department_name }}</span>
+                    <span class="font-medium text-gray-900">{{ row.total_employees }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="rounded-xl border border-gray-100 p-4 bg-gray-50">
+            <div class="text-sm font-semibold text-gray-900 mb-3">Headcount by Designation</div>
+            <div class="space-y-2">
+                {% for row in workforce.headcount_by_designation %}
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">{{ row.designation_name }}</span>
+                    <span class="font-medium text-gray-900">{{ row.employee_count }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if turnover %}
+<div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-6 mt-8">
+    <h3 class="font-semibold text-gray-900 mb-4">Turnover Summary</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="text-center p-4 rounded-xl bg-orange-50">
+            <div class="text-2xl font-bold text-orange-700">{{ turnover.total_separations | default(0) }}</div>
+            <div class="text-sm text-orange-600 mt-1">Separations</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-emerald-50">
+            <div class="text-2xl font-bold text-emerald-700">{{ "{:.1f}%".format(turnover.turnover_rate | default(0)) }}</div>
+            <div class="text-sm text-emerald-600 mt-1">Turnover Rate</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-blue-50">
+            <div class="text-2xl font-bold text-blue-700">{{ turnover.voluntary_separations | default(0) }}</div>
+            <div class="text-sm text-blue-600 mt-1">Voluntary</div>
+        </div>
+        <div class="text-center p-4 rounded-xl bg-red-50">
+            <div class="text-2xl font-bold text-red-700">{{ turnover.involuntary_separations | default(0) }}</div>
+            <div class="text-sm text-red-600 mt-1">Involuntary</div>
         </div>
     </div>
 </div>

@@ -23,8 +23,9 @@ from app.models.project import (
     ProjectActivityType,
 )
 from app.models.task import Task, TaskStatus
-from app.models.party import CustomerAccount
+from app.models.party import CustomerAccount, Party
 from app.models.employee import Employee
+from app.models.hr import ERPNextUser
 from app.models.auth import User
 from app.services.types import PaginatedResult, PaginationParams
 from app.services.activity_logger import ActivityLogger
@@ -722,6 +723,26 @@ class ProjectService:
         idx: int,
     ) -> ProjectUser:
         """Internal method to add a team member."""
+        party_id = None
+        if user.email:
+            email_norm = user.email.strip().lower()
+            party = self.db.query(Party).filter(Party.primary_email == email_norm).first()
+            if party:
+                party_id = party.id
+        if not party_id and user.user:
+            erpnext_user = self.db.query(ERPNextUser).filter(
+                or_(
+                    ERPNextUser.erpnext_id == user.user,
+                    ERPNextUser.email == user.user,
+                )
+            ).first()
+            if erpnext_user:
+                party_id = erpnext_user.party_id
+                if not party_id and erpnext_user.employee_id:
+                    employee = self.db.get(Employee, erpnext_user.employee_id)
+                    if employee and employee.party_id:
+                        party_id = employee.party_id
+
         project_user = ProjectUser(
             project_id=project_id,
             user=user.user,
@@ -731,6 +752,7 @@ class ProjectService:
             view_attachments=user.view_attachments,
             welcome_email_sent=user.welcome_email_sent,
             idx=user.idx if user.idx else idx,
+            party_id=party_id,
         )
         self.db.add(project_user)
         self.db.flush()

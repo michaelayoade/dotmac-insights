@@ -58,6 +58,7 @@
 
             getLabel(type) {
                 const labels = {
+                    party: 'Parties',
                     contact: 'Contacts',
                     customer: 'Customers',
                     ticket: 'Tickets',
@@ -81,6 +82,7 @@
             getIconClass(item) {
                 const type = item?.type;
                 const classes = {
+                    party: 'bg-primary-50 text-primary-600',
                     contact: 'bg-primary-50 text-primary-600',
                     customer: 'bg-blue-50 text-blue-600',
                     ticket: 'bg-amber-50 text-amber-600',
@@ -99,6 +101,7 @@
                     return this.getModuleIcon(item?.icon);
                 }
                 const icons = {
+                    party: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A4 4 0 018 16h8a4 4 0 012.879 1.804M8 10a4 4 0 108 0 4 4 0 00-8 0z"/></svg>',
                     contact: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
                     customer: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>',
                     ticket: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
@@ -204,7 +207,32 @@
         };
     }
 
+    function initGlobalSearchShortcuts() {
+        function shouldIgnore(event) {
+            const target = event.target;
+            if (!target) return false;
+            const tag = target.tagName;
+            return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (shouldIgnore(event)) return;
+
+            const isSlash = event.key === '/';
+            const isCmdK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
+            if (!isSlash && !isCmdK) return;
+
+            const input = document.querySelector('[data-global-search-input]');
+            if (!input) return;
+
+            event.preventDefault();
+            input.focus();
+            input.select();
+        });
+    }
+
     window.globalSearch = globalSearch;
+    initGlobalSearchShortcuts();
 
     window.showToast = function(message, type = 'success') {
         window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } }));

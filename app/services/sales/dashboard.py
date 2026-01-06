@@ -754,13 +754,14 @@ class SalesDashboardService:
             List of CustomerRevenue.
         """
         query = (
-            self.db.query(
-                SalesOrder.customer,
-                SalesOrder.customer_name,
-                func.count(SalesOrder.id).label("order_count"),
-                func.sum(SalesOrder.grand_total).label("revenue"),
-                func.max(SalesOrder.transaction_date).label("last_order"),
-            )
+                self.db.query(
+                    SalesOrder.party_id,
+                    SalesOrder.customer,
+                    SalesOrder.customer_name,
+                    func.count(SalesOrder.id).label("order_count"),
+                    func.sum(SalesOrder.grand_total).label("revenue"),
+                    func.max(SalesOrder.transaction_date).label("last_order"),
+                )
             .filter(
                 SalesOrder.status.in_([
                     SalesOrderStatus.COMPLETED,
@@ -768,7 +769,7 @@ class SalesDashboardService:
                     SalesOrderStatus.TO_BILL,
                 ])
             )
-            .group_by(SalesOrder.customer, SalesOrder.customer_name)
+            .group_by(SalesOrder.party_id, SalesOrder.customer, SalesOrder.customer_name)
             .order_by(func.sum(SalesOrder.grand_total).desc())
         )
 
@@ -791,7 +792,7 @@ class SalesDashboardService:
 
             customers.append(CustomerRevenue(
                 rank=i,
-                party_id=0,  # No party_id in SalesOrder, uses customer string
+                party_id=r.party_id or 0,
                 party_name=r.customer_name or r.customer or "",
                 order_count=order_count,
                 revenue=revenue,

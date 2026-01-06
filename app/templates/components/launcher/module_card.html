@@ -1,0 +1,48 @@
+{# Module card component for launcher grid #}
+<a href="{{ module.href }}"
+   class="group module-icon-hover relative bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 p-4 w-36 flex flex-col items-center
+          hover:shadow-warm-md hover:ring-primary-200 hover:-translate-y-0.5
+          transition-all duration-200 text-center"
+   data-testid="module-card-{{ module.id }}">
+
+    <!-- Badge placeholder (HTMX lazy-loaded) -->
+    <div id="badge-{{ module.id }}"
+         class="absolute -top-2 -right-2"
+         hx-get="/launcher/badge/{{ module.id }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+    </div>
+
+    <!-- Favorite button -->
+    <button class="absolute top-2 left-2 p-1 rounded-lg
+                   {% if module.is_favorite %}text-amber-400{% else %}text-gray-300 opacity-0 group-hover:opacity-100{% endif %}
+                   hover:text-amber-400 hover:bg-amber-50 transition-all z-10"
+            {% if module.is_favorite %}
+            hx-delete="/launcher/favorites/{{ module.id }}"
+            {% else %}
+            hx-post="/launcher/favorites/{{ module.id }}"
+            {% endif %}
+            hx-swap="outerHTML"
+            hx-target="this"
+            @click.prevent.stop
+            aria-label="{% if module.is_favorite %}Remove from favorites{% else %}Add to favorites{% endif %}"
+            data-testid="favorite-btn-{{ module.id }}">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.176 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.93 8.72c-.783-.57-.38-1.81.588-1.81h3.462a1 1 0 00.95-.69l1.07-3.292z"/>
+        </svg>
+    </button>
+
+    <!-- Icon -->
+    <div class="w-10 h-10 mx-auto rounded-xl shadow-sm module-icon
+                flex items-center justify-center mb-3 transition-colors
+                module-icon--{{ module.icon_theme | default('teal') }}
+                ">
+        {% set icon_name = module.icon | default('folder') %}
+        {% include "components/icons/" ~ icon_name ~ ".html" ignore missing %}
+    </div>
+
+    <!-- Label -->
+    <h3 class="text-sm font-semibold module-icon-label transition-colors">
+        {{ module.label | default(module.name) }}
+    </h3>
+</a>

@@ -73,7 +73,7 @@ async def subscribers_list(
         party_type=party_type,
         has_active_subscription=has_active_subscription,
     )
-    pagination = PaginationParams(page=page, per_page=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     # Get subscribers with pagination
     result = svc.list_subscribers(filters=filters, pagination=pagination)

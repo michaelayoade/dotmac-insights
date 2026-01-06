@@ -1167,8 +1167,13 @@ def allocate_bank_transaction(
                 raise HTTPException(status_code=404, detail=f"Invoice {alloc.document_id} not found")
 
             # Update invoice paid amount
+            prior_balance = (
+                invoice.balance
+                if invoice.balance is not None
+                else (invoice.total_amount - (invoice.amount_paid or Decimal("0")))
+            )
             invoice.amount_paid = (invoice.amount_paid or Decimal("0")) + Decimal(str(alloc.allocated_amount))
-            invoice.balance = invoice.total_amount - invoice.amount_paid
+            invoice.balance = prior_balance - Decimal(str(alloc.allocated_amount))
 
             allocated_results.append({
                 "document_type": alloc.document_type,

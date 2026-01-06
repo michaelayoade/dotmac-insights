@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.sales import SalesOrder, SalesOrderStatus
+from app.models.sales import SalesOrder, SalesOrderStatus, Quotation
+from app.models.party import CustomerAccount, Party
+from app.utils.normalizers import normalize_phone
 from app.models.document_lines import SalesOrderItem
 from app.services.base import paginate, scoped_query
 from app.services.errors import NotFoundError, ValidationError
@@ -79,11 +81,16 @@ class SalesOrderService:
         if filters:
             if filters.search:
                 like = f"%{filters.search}%"
+                query = query.outerjoin(Party, SalesOrder.party_id == Party.id)
                 query = query.filter(
                     or_(
                         SalesOrder.customer.ilike(like),
                         SalesOrder.customer_name.ilike(like),
                         SalesOrder.erpnext_id.ilike(like),
+                        Party.name.ilike(like),
+                        Party.legal_name.ilike(like),
+                        Party.trading_name.ilike(like),
+                        Party.primary_email.ilike(like),
                     )
                 )
 
@@ -99,6 +106,9 @@ class SalesOrderService:
 
             if filters.customer_account_id:
                 query = query.filter(SalesOrder.customer_account_id == filters.customer_account_id)
+
+            if filters.party_id:
+                query = query.filter(SalesOrder.party_id == filters.party_id)
 
             if filters.sales_partner_id:
                 query = query.filter(SalesOrder.sales_partner_id == filters.sales_partner_id)
@@ -175,10 +185,142 @@ class SalesOrderService:
         Returns:
             The created SalesOrder (not yet committed).
         """
+        quote: Optional[Quotation] = None
+        if data.quotation_id:
+            quote = self.db.query(Quotation).filter(Quotation.id == data.quotation_id).first()
+            if not quote:
+                raise ValidationError(f"Quotation {data.quotation_id} not found")
+
+        customer_account_id = data.customer_account_id or (quote.customer_account_id if quote else None)
+        contact_name = data.contact_name or (quote.contact_name if quote else None)
+        contact_email = data.contact_email or (quote.contact_email if quote else None)
+        contact_phone = data.contact_phone or (quote.contact_phone if quote else None)
+        billing_address = data.billing_address or (quote.billing_address if quote else None)
+        shipping_address = data.shipping_address or (quote.shipping_address if quote else None)
+        billing_address_line1 = data.billing_address_line1 or (quote.billing_address_line1 if quote else None)
+        billing_address_line2 = data.billing_address_line2 or (quote.billing_address_line2 if quote else None)
+        billing_city = data.billing_city or (quote.billing_city if quote else None)
+        billing_state = data.billing_state or (quote.billing_state if quote else None)
+        billing_postal_code = data.billing_postal_code or (quote.billing_postal_code if quote else None)
+        billing_country = data.billing_country or (quote.billing_country if quote else None)
+        billing_gps_lat = data.billing_gps_lat or (quote.billing_gps_lat if quote else None)
+        billing_gps_lng = data.billing_gps_lng or (quote.billing_gps_lng if quote else None)
+        shipping_address_line1 = data.shipping_address_line1 or (quote.shipping_address_line1 if quote else None)
+        shipping_address_line2 = data.shipping_address_line2 or (quote.shipping_address_line2 if quote else None)
+        shipping_city = data.shipping_city or (quote.shipping_city if quote else None)
+        shipping_state = data.shipping_state or (quote.shipping_state if quote else None)
+        shipping_postal_code = data.shipping_postal_code or (quote.shipping_postal_code if quote else None)
+        shipping_country = data.shipping_country or (quote.shipping_country if quote else None)
+        shipping_gps_lat = data.shipping_gps_lat or (quote.shipping_gps_lat if quote else None)
+        shipping_gps_lng = data.shipping_gps_lng or (quote.shipping_gps_lng if quote else None)
+        order_party_id = None
+
+        customer = data.customer
+        customer_name = data.customer_name
+        if customer_account_id:
+            account = (
+                self.db.query(CustomerAccount)
+                .join(Party, CustomerAccount.party_id == Party.id)
+                .filter(CustomerAccount.id == customer_account_id)
+                .first()
+            )
+            if account and account.party:
+                party_name = account.party.name or account.party.legal_name or account.party.trading_name
+                order_party_id = account.party.id
+                customer_name = customer_name or party_name
+                customer = customer or party_name
+                contact_name = contact_name or party_name
+                contact_email = contact_email or account.party.primary_email
+                contact_phone = contact_phone or account.party.primary_phone
+                if account.party.addresses:
+                    address = account.party.addresses[0] if isinstance(account.party.addresses[0], dict) else {}
+                    billing_address_line1 = billing_address_line1 or address.get("address_line1") or address.get("line1") or address.get("street_1") or address.get("address")
+                    billing_address_line2 = billing_address_line2 or address.get("address_line2") or address.get("line2") or address.get("street_2")
+                    billing_city = billing_city or address.get("city")
+                    billing_state = billing_state or address.get("state")
+                    billing_postal_code = billing_postal_code or address.get("postal_code") or address.get("zip") or address.get("zip_code")
+                    billing_country = billing_country or address.get("country")
+                    billing_gps_lat = billing_gps_lat or address.get("gps_lat")
+                    billing_gps_lng = billing_gps_lng or address.get("gps_lng")
+                    shipping_address_line1 = shipping_address_line1 or billing_address_line1
+                    shipping_address_line2 = shipping_address_line2 or billing_address_line2
+                    shipping_city = shipping_city or billing_city
+                    shipping_state = shipping_state or billing_state
+                    shipping_postal_code = shipping_postal_code or billing_postal_code
+                    shipping_country = shipping_country or billing_country
+                    shipping_gps_lat = shipping_gps_lat or billing_gps_lat
+                    shipping_gps_lng = shipping_gps_lng or billing_gps_lng
+
+        if quote:
+            customer = customer or quote.party_name or quote.customer_name
+            customer_name = customer_name or quote.customer_name or quote.party_name
+            if quote.party_id:
+                order_party_id = quote.party_id
+
+        if not customer and not customer_name:
+            raise ValidationError("Customer is required to create a sales order")
+        customer = customer or customer_name
+
+        phone_country = billing_country or shipping_country or "NG"
+        if contact_phone:
+            normalized = normalize_phone(contact_phone, country=phone_country)
+            if not normalized.is_valid:
+                raise ValidationError(normalized.error or "Invalid phone number")
+            contact_phone = normalized.normalized
+
+        if not billing_address and billing_address_line1:
+            billing_address = self._compose_address(
+                billing_address_line1,
+                billing_address_line2,
+                billing_city,
+                billing_state,
+                billing_postal_code,
+                billing_country,
+            )
+        if not shipping_address and shipping_address_line1:
+            shipping_address = self._compose_address(
+                shipping_address_line1,
+                shipping_address_line2,
+                shipping_city,
+                shipping_state,
+                shipping_postal_code,
+                shipping_country,
+            )
+
+        status = SalesOrderStatus.DRAFT
+        if data.status:
+            try:
+                status = SalesOrderStatus(data.status.lower())
+            except ValueError:
+                raise ValidationError(f"Invalid order status: {data.status}")
+
         order = SalesOrder(
-            customer=data.customer,
-            customer_name=data.customer_name or data.customer,
-            customer_account_id=data.customer_account_id,
+            customer=customer,
+            customer_name=customer_name or customer,
+            customer_account_id=customer_account_id,
+            party_id=order_party_id,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            contact_phone=contact_phone,
+            billing_address=billing_address,
+            shipping_address=shipping_address,
+            billing_address_line1=billing_address_line1,
+            billing_address_line2=billing_address_line2,
+            billing_city=billing_city,
+            billing_state=billing_state,
+            billing_postal_code=billing_postal_code,
+            billing_country=billing_country,
+            billing_gps_lat=billing_gps_lat,
+            billing_gps_lng=billing_gps_lng,
+            shipping_address_line1=shipping_address_line1,
+            shipping_address_line2=shipping_address_line2,
+            shipping_city=shipping_city,
+            shipping_state=shipping_state,
+            shipping_postal_code=shipping_postal_code,
+            shipping_country=shipping_country,
+            shipping_gps_lat=shipping_gps_lat,
+            shipping_gps_lng=shipping_gps_lng,
+            quotation_id=data.quotation_id,
             company=data.company,
             currency=data.currency,
             transaction_date=data.transaction_date or date.today(),
@@ -188,15 +330,36 @@ class SalesOrderService:
             territory_id=data.territory_id,
             source=data.source,
             campaign=data.campaign,
-            status=SalesOrderStatus.DRAFT,
+            status=status,
         )
 
         self.db.add(order)
         self.db.flush()
 
         # Add line items
-        for item_data in data.items:
-            self.add_line_item(order.id, item_data)
+        if data.items:
+            for item_data in data.items:
+                self.add_line_item(order.id, item_data)
+        elif quote and quote.items:
+            for q_item in quote.items:
+                self.add_line_item(
+                    order.id,
+                    SalesOrderLineItemData(
+                        item_code=q_item.item_code or (q_item.item_name or ""),
+                        item_name=q_item.item_name or q_item.item_code or "Item",
+                        qty=q_item.qty,
+                        rate=q_item.rate,
+                        discount_percentage=q_item.discount_percentage,
+                        discount_amount=q_item.discount_amount,
+                        description=q_item.description,
+                        uom=q_item.uom,
+                        warehouse=q_item.warehouse,
+                        tax_code_id=q_item.tax_code_id,
+                        tax_rate=q_item.tax_rate,
+                        tax_amount=q_item.tax_amount,
+                        is_tax_inclusive=q_item.is_tax_inclusive,
+                    ),
+                )
 
         self._recalculate_totals(order)
         return order
@@ -222,13 +385,66 @@ class SalesOrderService:
 
         # Update simple fields
         update_fields = [
-            "customer_name", "delivery_date", "order_type",
-            "sales_partner_id", "territory_id", "source", "campaign",
+            "customer_name", "customer_account_id", "contact_name", "contact_email", "contact_phone",
+            "billing_address", "shipping_address", "delivery_date", "order_type",
+            "sales_partner_id", "territory_id", "source", "campaign", "quotation_id",
+            "billing_address_line1", "billing_address_line2", "billing_city", "billing_state",
+            "billing_postal_code", "billing_country", "billing_gps_lat", "billing_gps_lng",
+            "shipping_address_line1", "shipping_address_line2", "shipping_city", "shipping_state",
+            "shipping_postal_code", "shipping_country", "shipping_gps_lat", "shipping_gps_lng",
         ]
         for field_name in update_fields:
             value = getattr(data, field_name, None)
             if value is not None:
                 setattr(order, field_name, value)
+
+        if data.customer_account_id is not None:
+            account = (
+                self.db.query(CustomerAccount)
+                .filter(CustomerAccount.id == data.customer_account_id)
+                .first()
+            )
+            order.party_id = account.party_id if account else None
+
+        if data.status:
+            try:
+                order.status = SalesOrderStatus(data.status.lower())
+            except ValueError:
+                raise ValidationError(f"Invalid order status: {data.status}")
+
+        if data.contact_phone is not None:
+            phone_country = order.billing_country or order.shipping_country or "NG"
+            if data.contact_phone:
+                normalized = normalize_phone(data.contact_phone, country=phone_country)
+                if not normalized.is_valid:
+                    raise ValidationError(normalized.error or "Invalid phone number")
+                order.contact_phone = normalized.normalized
+            else:
+                order.contact_phone = None
+
+        if data.billing_address_line1 and not data.billing_address:
+            order.billing_address = self._compose_address(
+                order.billing_address_line1,
+                order.billing_address_line2,
+                order.billing_city,
+                order.billing_state,
+                order.billing_postal_code,
+                order.billing_country,
+            )
+        if data.shipping_address_line1 and not data.shipping_address:
+            order.shipping_address = self._compose_address(
+                order.shipping_address_line1,
+                order.shipping_address_line2,
+                order.shipping_city,
+                order.shipping_state,
+                order.shipping_postal_code,
+                order.shipping_country,
+            )
+
+        if data.items is not None:
+            self.db.query(SalesOrderItem).filter(SalesOrderItem.sales_order_id == order.id).delete()
+            for item_data in data.items:
+                self.add_line_item(order.id, item_data)
 
         return order
 
@@ -304,6 +520,9 @@ class SalesOrderService:
             amount = amount * (1 - data.discount_percentage / 100)
         elif data.discount_amount:
             amount = amount - data.discount_amount
+        tax_amount = data.tax_amount
+        if data.tax_rate and not data.tax_amount:
+            tax_amount = amount * (data.tax_rate / 100)
 
         item = SalesOrderItem(
             sales_order_id=order_id,
@@ -316,6 +535,11 @@ class SalesOrderService:
             discount_percentage=data.discount_percentage,
             discount_amount=data.discount_amount,
             amount=amount,
+            net_amount=amount,
+            tax_code_id=data.tax_code_id,
+            tax_rate=data.tax_rate,
+            tax_amount=tax_amount,
+            is_tax_inclusive=data.is_tax_inclusive,
             warehouse=data.warehouse,
             delivery_date=data.delivery_date,
         )
@@ -360,6 +584,14 @@ class SalesOrderService:
             item.description = data.description
         if data.delivery_date is not None:
             item.delivery_date = data.delivery_date
+        if data.tax_code_id is not None:
+            item.tax_code_id = data.tax_code_id
+        if data.tax_rate is not None:
+            item.tax_rate = data.tax_rate
+        if data.tax_amount is not None:
+            item.tax_amount = data.tax_amount
+        if data.is_tax_inclusive is not None:
+            item.is_tax_inclusive = data.is_tax_inclusive
 
         # Recalculate amount
         amount = item.qty * item.rate
@@ -368,6 +600,9 @@ class SalesOrderService:
         elif item.discount_amount:
             amount = amount - item.discount_amount
         item.amount = amount
+        item.net_amount = amount
+        if item.tax_rate and not item.tax_amount:
+            item.tax_amount = amount * (item.tax_rate / 100)
 
         self._recalculate_totals(order)
         return item
@@ -651,6 +886,8 @@ class SalesOrderService:
                 base_query = base_query.filter(SalesOrder.transaction_date >= filters.date_from)
             if filters.date_to:
                 base_query = base_query.filter(SalesOrder.transaction_date <= filters.date_to)
+            if filters.party_id:
+                base_query = base_query.filter(SalesOrder.party_id == filters.party_id)
             if filters.company:
                 base_query = base_query.filter(SalesOrder.company == filters.company)
 
@@ -729,11 +966,25 @@ class SalesOrderService:
 
         total_qty = sum(item.qty for item in items)
         total = sum(item.amount for item in items)
+        total_taxes = sum((item.tax_amount or Decimal("0")) for item in items)
         order.total_qty = total_qty
         order.total = total
         order.net_total = total
-        order.grand_total = total + order.total_taxes_and_charges
+        order.total_taxes_and_charges = total_taxes
+        order.grand_total = total + total_taxes
         order.rounded_total = round(order.grand_total, 0)
+
+    @staticmethod
+    def _compose_address(
+        line1: Optional[str],
+        line2: Optional[str],
+        city: Optional[str],
+        state: Optional[str],
+        postal_code: Optional[str],
+        country: Optional[str],
+    ) -> str:
+        parts = [line1, line2, city, state, postal_code, country]
+        return ", ".join([part for part in parts if part])
 
     def _update_fulfillment_status(self, order: SalesOrder) -> None:
         """Update order status based on fulfillment percentages."""

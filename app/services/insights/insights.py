@@ -887,7 +887,10 @@ class InsightsService:
             }
 
             days_overdue = func.date_part("day", func.current_date() - cast(Invoice.due_date, Date))
-            invoice_balance = func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.amount_paid, 0)
+            invoice_balance = func.coalesce(
+                Invoice.balance,
+                func.coalesce(Invoice.total_amount, 0) - func.coalesce(Invoice.amount_paid, 0),
+            )
             aging_bucket = case(
                 (days_overdue <= 0, "current"),
                 (days_overdue <= 30, "1_30_days"),
@@ -902,7 +905,9 @@ class InsightsService:
                 func.sum(invoice_balance).label("amount")
             ).filter(
                 Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.OVERDUE, InvoiceStatus.PARTIALLY_PAID]),
-                Invoice.due_date.isnot(None)
+                Invoice.due_date.isnot(None),
+                Invoice.is_deleted == False,
+                invoice_balance > 0,
             ).group_by(
                 aging_bucket
             ).all()

@@ -86,6 +86,9 @@ class ModuleConfig:
         """Check if user has access to this module."""
         if not self.scopes:
             return True
+        # Superuser has access to all
+        if "*" in user_scopes:
+            return True
         return any(scope in user_scopes for scope in self.scopes)
 
     def to_dict(self) -> Dict[str, Any]:

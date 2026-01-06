@@ -112,7 +112,7 @@
                             hx-get="/sales/orders/table"
                             hx-trigger="input changed delay:300ms, search"
                             hx-target="#orders-table-container"
-                            hx-include="[name='status']"
+                            hx-include="[name='status'], [name='customer_account_id']"
                             hx-push-url="true"
                             data-testid="orders-search"
                         />
@@ -126,13 +126,31 @@
                     hx-get="/sales/orders/table"
                     hx-trigger="change"
                     hx-target="#orders-table-container"
-                    hx-include="[name='q']"
+                    hx-include="[name='q'], [name='customer_account_id']"
                     hx-push-url="true"
                     data-testid="orders-status-filter"
                 >
                     <option value="">All Status</option>
                     {% for opt in status_options %}
                     <option value="{{ opt.value }}" {% if current_status == opt.value %}selected{% endif %}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+
+                {# Customer Filter #}
+                <select
+                    name="customer_account_id"
+                    class="px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 font-body bg-white"
+                    hx-get="/sales/orders/table"
+                    hx-trigger="change"
+                    hx-target="#orders-table-container"
+                    hx-include="[name='q'], [name='status']"
+                    hx-push-url="true"
+                >
+                    <option value="">All Customers</option>
+                    {% for account in customer_accounts %}
+                    <option value="{{ account.id }}" {% if current_customer_account_id == account.id %}selected{% endif %}>
+                        {{ account.party.name or account.party.trading_name or account.party.legal_name or ('Account ' ~ account.id) }}
+                    </option>
                     {% endfor %}
                 </select>
             </div>

@@ -129,6 +129,7 @@ class ReceivablesService:
                 InvoiceStatus.OVERDUE,
                 InvoiceStatus.PARTIALLY_PAID,
             ]),
+            Invoice.is_deleted == False,
         )
 
         if filters.customer_account_id:
@@ -164,7 +165,7 @@ class ReceivablesService:
                 continue  # Skip invoices with no date
 
             days_overdue = (cutoff - due).days if cutoff > due else 0
-            outstanding = Decimal(str(inv.total_amount)) - Decimal(str(inv.amount_paid or 0))
+            outstanding = Decimal(str(inv.balance or (inv.total_amount - (inv.amount_paid or 0))))
 
             if outstanding <= 0:
                 continue
@@ -238,14 +239,16 @@ class ReceivablesService:
 
         # Total outstanding
         inv_query = self.db.query(
-            func.sum(Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0)).label("outstanding"),
+            func.sum(func.coalesce(Invoice.balance, Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0))).label("outstanding"),
             func.count(Invoice.id).label("invoice_count"),
         ).filter(
             Invoice.status.in_([
                 InvoiceStatus.PENDING,
                 InvoiceStatus.OVERDUE,
                 InvoiceStatus.PARTIALLY_PAID,
-            ])
+            ]),
+            Invoice.is_deleted == False,
+            func.coalesce(Invoice.balance, Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0)) > 0,
         )
         if currency:
             inv_query = inv_query.filter(Invoice.currency == currency)
@@ -260,7 +263,7 @@ class ReceivablesService:
                 Party.id.label("party_id"),
                 Party.name.label("party_name"),
                 Invoice.customer_account_id.label("customer_account_id"),
-                func.sum(Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0)).label("outstanding"),
+                func.sum(func.coalesce(Invoice.balance, Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0))).label("outstanding"),
             )
             .join(CustomerAccount, CustomerAccount.id == Invoice.customer_account_id)
             .join(Party, Party.id == CustomerAccount.party_id)
@@ -271,6 +274,8 @@ class ReceivablesService:
                     InvoiceStatus.PARTIALLY_PAID,
                 ]),
                 Invoice.customer_account_id.isnot(None),
+                Invoice.is_deleted == False,
+                func.coalesce(Invoice.balance, Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0)) > 0,
             )
         )
         if currency:
@@ -279,7 +284,7 @@ class ReceivablesService:
         inv_by_party = (
             inv_by_party_query
             .group_by(Party.id, Party.name, Invoice.customer_account_id)
-            .order_by(func.sum(Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0)).desc())
+            .order_by(func.sum(func.coalesce(Invoice.balance, Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0))).desc())
             .limit(top_n)
             .all()
         )
@@ -524,6 +529,7 @@ class ReceivablesService:
 
         pending_base = self.db.query(Invoice).filter(
             Invoice.status.in_(pending_statuses),
+            Invoice.is_deleted == False,
         )
         if filters.currency:
             pending_base = pending_base.filter(Invoice.currency == filters.currency)
@@ -547,18 +553,23 @@ class ReceivablesService:
         now = datetime.utcnow()
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-        total_count = self.db.query(func.count(Invoice.id)).scalar() or 0
+        total_count = self.db.query(func.count(Invoice.id)).filter(
+            Invoice.is_deleted == False,
+        ).scalar() or 0
 
         outstanding = self.db.query(func.sum(Invoice.balance)).filter(
-            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID])
+            Invoice.status.in_([InvoiceStatus.PENDING, InvoiceStatus.PARTIALLY_PAID]),
+            Invoice.is_deleted == False,
         ).scalar() or Decimal("0")
 
         overdue = self.db.query(func.sum(Invoice.balance)).filter(
-            Invoice.status == InvoiceStatus.OVERDUE
+            Invoice.status == InvoiceStatus.OVERDUE,
+            Invoice.is_deleted == False,
         ).scalar() or Decimal("0")
 
         paid_this_month = self.db.query(func.sum(Invoice.amount_paid)).filter(
-            Invoice.paid_date >= month_start
+            Invoice.paid_date >= month_start,
+            Invoice.is_deleted == False,
         ).scalar() or Decimal("0")
 
         return {
@@ -580,6 +591,7 @@ class ReceivablesService:
                         InvoiceStatus.OVERDUE,
                     ]
                 ),
+                Invoice.is_deleted == False,
                 Invoice.balance > 0,
             )
             .order_by(Invoice.due_date)
@@ -602,6 +614,7 @@ class ReceivablesService:
                         InvoiceStatus.OVERDUE,
                     ]
                 ),
+                Invoice.is_deleted == False,
                 Invoice.balance > 0,
             )
             .order_by(Invoice.due_date)

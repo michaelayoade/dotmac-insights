@@ -94,7 +94,6 @@ from .parties import router as parties_router
 from .opportunities import router as opportunities_router
 from .activities import router as activities_router
 from .pipeline import router as pipeline_router
-from .sales import router as sales_router
 from .config import router as config_router
 from .leads import router as leads_router
 from .campaigns import router as campaigns_router
@@ -125,8 +124,6 @@ router.include_router(campaigns_router)
 # Dashboard
 router.include_router(dashboard_router)
 
-# Sales documents sub-module (orders, quotations)
-router.include_router(sales_router)
 
 # Configuration sub-module (territories, sales-persons, customer-groups)
 router.include_router(config_router)

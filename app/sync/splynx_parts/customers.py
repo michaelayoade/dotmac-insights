@@ -6,6 +6,7 @@ import bcrypt
 
 from app.models.party import (
     CustomerAccount,
+    CustomerAccountReseller,
     Party,
     PartyExternalId,
     PartyRole,
@@ -267,6 +268,12 @@ async def sync_customers(sync_client, client, full_sync: bool):
             .all()
         )
         party_by_ext = {p.external_id: p.party_id for p in party_ext_ids}
+        partner_ext_ids = (
+            sync_client.db.query(PartyExternalId)
+            .filter(PartyExternalId.system == "splynx_partner")
+            .all()
+        )
+        partner_by_ext = {p.external_id: p.party_id for p in partner_ext_ids}
         party_email_index = {
             (p.primary_email or "").lower(): p
             for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
@@ -479,6 +486,49 @@ async def sync_customers(sync_client, client, full_sync: bool):
                 account.status = account_status
                 if not account.billing_email:
                     account.billing_email = cust_data.get("billing_email") or cust_data.get("email")
+
+            sync_client.db.flush()
+
+            partner_id = cust_data.get("partner_id")
+            if partner_id:
+                partner_key = str(partner_id)
+                reseller_party_id = partner_by_ext.get(partner_key)
+                if not reseller_party_id:
+                    reseller_party = Party(
+                        type=PartyType.ORGANIZATION.value,
+                        name=f"Splynx Partner {partner_key}",
+                    )
+                    sync_client.db.add(reseller_party)
+                    sync_client.db.flush()
+                    sync_client.db.add(
+                        PartyExternalId(
+                            party_id=reseller_party.id,
+                            system="splynx_partner",
+                            external_id=partner_key,
+                            external_key_type="partner_id",
+                            is_primary=True,
+                        )
+                    )
+                    sync_client.db.add(PartyRole(party_id=reseller_party.id, role="reseller"))
+                    partner_by_ext[partner_key] = reseller_party.id
+                    reseller_party_id = reseller_party.id
+
+                existing_reseller = (
+                    sync_client.db.query(CustomerAccountReseller)
+                    .filter(
+                        CustomerAccountReseller.account_id == account.id,
+                        CustomerAccountReseller.reseller_party_id == reseller_party_id,
+                        CustomerAccountReseller.until.is_(None),
+                    )
+                    .first()
+                )
+                if not existing_reseller:
+                    sync_client.db.add(
+                        CustomerAccountReseller(
+                            account_id=account.id,
+                            reseller_party_id=reseller_party_id,
+                        )
+                    )
 
             # Normalize address for party payloads
             addr = _normalize_customer_address(cust_data, latitude, longitude)

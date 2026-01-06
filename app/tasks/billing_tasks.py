@@ -842,8 +842,13 @@ def _update_invoice_paid(db, invoice_id: int, amount: float) -> None:
 
     invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if invoice:
+        prior_balance = (
+            invoice.balance
+            if invoice.balance is not None
+            else (invoice.total_amount - (invoice.amount_paid or Decimal("0")))
+        )
         invoice.amount_paid += Decimal(str(amount))
-        invoice.balance = invoice.total_amount - invoice.amount_paid
+        invoice.balance = prior_balance - Decimal(str(amount))
 
         if invoice.amount_paid >= invoice.total_amount:
             invoice.status = InvoiceStatus.PAID

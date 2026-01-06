@@ -39,6 +39,11 @@ def get_base_context(
     module_registry = get_module_registry(user)
     active_module = resolve_active_module(request.url.path, module_registry)
 
+    # Get navigation for active module (used by module layout)
+    module_navigation = []
+    if active_module:
+        module_navigation = get_module_navigation(user, active_module["id"])
+
     return {
         # Request info
         "request": request,
@@ -72,6 +77,7 @@ def get_base_context(
         "module_registry": module_registry,
         "active_module": active_module,
         "active_module_id": active_module["id"] if active_module else None,
+        "module_navigation": module_navigation,
     }
 
 
@@ -231,6 +237,10 @@ def get_module_registry(user: Optional[Principal]) -> List[Dict[str, Any]]:
         return []
 
     user_scopes = list(user.scopes) if user.scopes else []
+    # Superuser gets access to all modules
+    if user.is_superuser and "*" not in user_scopes:
+        user_scopes.append("*")
+
     seen_ids = set()
     visible = []
 
@@ -298,6 +308,11 @@ def get_navigation_context(user: Optional[Principal]) -> List[Dict[str, Any]]:
     if not modules:
         logger.warning("Navigation build found no registered modules")
 
+    group_aliases = {
+        "analytics": "Admin",
+        "system": "Admin",
+    }
+
     # Group sections by module group
     groups: Dict[str, List[Dict[str, Any]]] = {}
 
@@ -305,7 +320,7 @@ def get_navigation_context(user: Optional[Principal]) -> List[Dict[str, Any]]:
         ModuleRegistry.get_all(),
         key=lambda m: (m.config.group, m.config.order, m.config.name),
     ):
-        group_name = module.config.group
+        group_name = group_aliases.get(module.config.group.lower(), module.config.group)
 
         for section in sorted(module.navigation, key=lambda s: s.order):
             if not allow_all and section.scope and not user.has_scope(section.scope):
@@ -354,3 +369,63 @@ def get_navigation_context(user: Optional[Principal]) -> List[Dict[str, Any]]:
             allow_all,
         )
     return result
+
+
+def get_module_navigation(user: Optional[Principal], module_id: str) -> List[Dict[str, Any]]:
+    """Get navigation sections for a specific module only.
+
+    Used by module pages to show only their own routes in the sidebar.
+
+    Returns:
+        List of navigation sections for the specified module
+    """
+    from app.web.modules import ModuleRegistry
+
+    if not user:
+        return []
+
+    user_scopes = list(user.scopes) if user.scopes else []
+    allow_all = user.is_superuser or "*" in user_scopes or not user_scopes
+
+    ModuleRegistry.discover_modules()
+    modules = ModuleRegistry.get_all()
+
+    # Find the specific module
+    target_module = None
+    for module in modules:
+        if module.id == module_id:
+            target_module = module
+            break
+
+    if not target_module:
+        return []
+
+    # Build navigation for just this module
+    sections = []
+    for section in sorted(target_module.navigation, key=lambda s: s.order):
+        if not allow_all and section.scope and not user.has_scope(section.scope):
+            continue
+
+        filtered_links = []
+        for link in section.links:
+            if not allow_all and link.scope and not user.has_scope(link.scope):
+                continue
+            filtered_links.append({
+                "label": link.label,
+                "href": link.href,
+                "icon": link.icon,
+                "badge": link.badge,
+            })
+
+        if not filtered_links:
+            continue
+
+        sections.append({
+            "section": section.section,
+            "href": section.href,
+            "icon": section.icon,
+            "module": target_module.id,
+            "links": filtered_links,
+        })
+
+    return sections

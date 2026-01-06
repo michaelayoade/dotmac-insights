@@ -1,0 +1,107 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <div class="min-w-0">
+        <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Collections Analytics</h1>
+        <p class="mt-1.5 text-gray-500 font-body">Payment methods, timing & daily collection totals</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    {% if error %}
+    <div class="rounded-xl bg-amber-50 border border-amber-200 p-4">
+        <p class="text-sm text-amber-700">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if collections %}
+    <!-- Payment Timing -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Payment Timing</h2>
+        </div>
+        <div class="p-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="text-center p-4 rounded-xl bg-green-50">
+                    <p class="text-sm font-medium text-green-700">Early</p>
+                    <p class="text-2xl font-bold text-green-900 mt-1">{{ collections.payment_timing.early }}</p>
+                    <p class="text-xs text-green-600">&gt;3 days before due</p>
+                </div>
+                <div class="text-center p-4 rounded-xl bg-blue-50">
+                    <p class="text-sm font-medium text-blue-700">On Time</p>
+                    <p class="text-2xl font-bold text-blue-900 mt-1">{{ collections.payment_timing.on_time }}</p>
+                    <p class="text-xs text-blue-600">Within 3 days of due</p>
+                </div>
+                <div class="text-center p-4 rounded-xl bg-red-50">
+                    <p class="text-sm font-medium text-red-700">Late</p>
+                    <p class="text-2xl font-bold text-red-900 mt-1">{{ collections.payment_timing.late }}</p>
+                    <p class="text-xs text-red-600">After due date</p>
+                </div>
+                <div class="text-center p-4 rounded-xl bg-gray-50">
+                    <p class="text-sm font-medium text-gray-700">Total</p>
+                    <p class="text-2xl font-bold text-gray-900 mt-1">{{ collections.payment_timing.total }}</p>
+                    <p class="text-xs text-gray-600">Payments analyzed</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Methods -->
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Payment Methods</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Count</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for method in collections.by_method %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ method.method | title }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ method.count }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">₦{{ "{:,.0f}".format(method.total) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Daily Totals -->
+    {% if collections.daily_totals %}
+    <div class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Daily Collections</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for day in collections.daily_totals %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ day.date }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">₦{{ "{:,.0f}".format(day.total) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

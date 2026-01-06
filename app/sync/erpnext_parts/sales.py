@@ -21,6 +21,7 @@ from app.models.party import (
     PartyRole,
     PartyType,
 )
+from app.models.employee import Employee
 from app.models.sales import (
     CustomerGroup,
     ERPNextLead,
@@ -373,9 +374,15 @@ async def sync_sales_persons(
             "Sales Person",
             fields=["*"],
         )
+        employees_by_erpnext_id = {
+            e.erpnext_id: e
+            for e in sync_client.db.query(Employee).filter(Employee.erpnext_id.isnot(None)).all()
+        }
 
         for person_data in persons:
             erpnext_id = person_data.get("name")
+            employee_erpnext_id = person_data.get("employee")
+            employee = employees_by_erpnext_id.get(employee_erpnext_id)
             existing = sync_client.db.query(SalesPerson).filter(
                 SalesPerson.erpnext_id == erpnext_id
             ).first()
@@ -386,6 +393,8 @@ async def sync_sales_persons(
                 existing.is_group = person_data.get("is_group", 0) == 1
                 existing.employee = person_data.get("employee")
                 existing.department = person_data.get("department")
+                existing.employee_id = employee.id if employee else None
+                existing.party_id = employee.party_id if employee else None
                 existing.enabled = person_data.get("enabled", 1) == 1
                 existing.commission_rate = Decimal(str(person_data.get("commission_rate", 0) or 0))
                 existing.lft = person_data.get("lft")
@@ -400,6 +409,8 @@ async def sync_sales_persons(
                     is_group=person_data.get("is_group", 0) == 1,
                     employee=person_data.get("employee"),
                     department=person_data.get("department"),
+                    employee_id=employee.id if employee else None,
+                    party_id=employee.party_id if employee else None,
                     enabled=person_data.get("enabled", 1) == 1,
                     commission_rate=Decimal(str(person_data.get("commission_rate", 0) or 0)),
                     lft=person_data.get("lft"),
@@ -432,6 +443,20 @@ async def sync_erpnext_leads(
             fields=["*"],
         )
 
+        party_exts = (
+            sync_client.db.query(PartyExternalId)
+            .filter(
+                PartyExternalId.system == "erpnext",
+                PartyExternalId.external_key_type == "lead_id",
+            )
+            .all()
+        )
+        party_by_ext = {p.external_id: p.party_id for p in party_exts}
+        party_email_index = {
+            (p.primary_email or "").lower(): p
+            for p in sync_client.db.query(Party).filter(Party.primary_email.isnot(None)).all()
+        }
+
         batch_size = 500
         for i, lead_data in enumerate(leads, 1):
             erpnext_id = lead_data.get("name")
@@ -454,6 +479,83 @@ async def sync_erpnext_leads(
             }
             status = status_map.get(status_str, ERPNextLeadStatus.LEAD)
 
+            # Link or create party for this lead
+            party = None
+            if existing and existing.party_id:
+                party = sync_client.db.query(Party).get(existing.party_id)
+
+            if not party and erpnext_id:
+                party_id = party_by_ext.get(str(erpnext_id))
+                if party_id:
+                    party = sync_client.db.query(Party).get(party_id)
+
+            email = (lead_data.get("email_id") or "").strip().lower()
+            if not party and email:
+                party = party_email_index.get(email)
+
+            if not party:
+                company_name = lead_data.get("company_name") or None
+                party_type = PartyType.ORGANIZATION.value if company_name else PartyType.PERSON.value
+                party = Party(
+                    type=party_type,
+                    name=company_name or lead_data.get("lead_name") or None,
+                    emails=[],
+                    phones=[],
+                )
+                sync_client.db.add(party)
+                sync_client.db.flush()
+
+            if email:
+                emails = list(party.emails or [])
+                if not any((e.get("address") or "").lower() == email for e in emails):
+                    emails.append(
+                        {
+                            "address": email,
+                            "label": "primary",
+                            "is_primary": len(emails) == 0,
+                            "verified": False,
+                        }
+                    )
+                    party.emails = emails
+                    party_email_index[email] = party
+
+            phone = lead_data.get("phone") or lead_data.get("mobile_no")
+            if phone:
+                phones = list(party.phones or [])
+                if not any((p.get("number") or "") == phone for p in phones):
+                    phones.append(
+                        {
+                            "number": phone,
+                            "label": "primary",
+                            "is_primary": len(phones) == 0,
+                            "can_sms": False,
+                            "can_whatsapp": False,
+                        }
+                    )
+                    party.phones = phones
+
+            if not party.name:
+                party.name = lead_data.get("company_name") or lead_data.get("lead_name") or party.name
+
+            if erpnext_id and str(erpnext_id) not in party_by_ext:
+                sync_client.db.add(
+                    PartyExternalId(
+                        party_id=party.id,
+                        system="erpnext",
+                        external_id=str(erpnext_id),
+                        external_key_type="lead_id",
+                    )
+                )
+                party_by_ext[str(erpnext_id)] = party.id
+
+            has_lead_role = (
+                sync_client.db.query(PartyRole)
+                .filter(PartyRole.party_id == party.id, PartyRole.role == "lead", PartyRole.until.is_(None))
+                .first()
+            )
+            if not has_lead_role:
+                sync_client.db.add(PartyRole(party_id=party.id, role="lead"))
+
             if existing:
                 existing.lead_name = lead_data.get("lead_name", "")
                 existing.company_name = lead_data.get("company_name")
@@ -473,6 +575,7 @@ async def sync_erpnext_leads(
                 existing.country = lead_data.get("country")
                 existing.notes = lead_data.get("notes")
                 existing.converted = lead_data.get("converted", 0) == 1 or status == ERPNextLeadStatus.CONVERTED
+                existing.party_id = party.id
                 existing.last_synced_at = datetime.now(timezone.utc)
                 sync_client.increment_updated()
             else:
@@ -496,6 +599,7 @@ async def sync_erpnext_leads(
                     country=lead_data.get("country"),
                     notes=lead_data.get("notes"),
                     converted=lead_data.get("converted", 0) == 1 or status == ERPNextLeadStatus.CONVERTED,
+                    party_id=party.id,
                 )
                 sync_client.db.add(lead)
                 sync_client.increment_created()
@@ -654,7 +758,7 @@ async def sync_sales_orders(
 
         # Pre-fetch customer accounts by erpnext_id for FK linking
         accounts_by_erpnext_id = {
-            pe.external_id: ca.id
+            pe.external_id: (ca.id, ca.party_id)
             for pe, ca in (
                 sync_client.db.query(PartyExternalId, CustomerAccount)
                 .join(CustomerAccount, CustomerAccount.party_id == PartyExternalId.party_id)
@@ -689,16 +793,18 @@ async def sync_sales_orders(
 
             # Link to customer account
             erpnext_customer = order_data.get("customer")
-            customer_account_id = (
-                accounts_by_erpnext_id.get(str(erpnext_customer))
-                if erpnext_customer
-                else None
-            )
+            customer_account_id = None
+            party_id = None
+            if erpnext_customer:
+                account_tuple = accounts_by_erpnext_id.get(str(erpnext_customer))
+                if account_tuple:
+                    customer_account_id, party_id = account_tuple
 
             if existing:
                 existing.customer = erpnext_customer
                 existing.customer_name = order_data.get("customer_name")
                 existing.customer_account_id = customer_account_id
+                existing.party_id = party_id
                 existing.order_type = order_data.get("order_type")
                 existing.company = order_data.get("company")
                 existing.currency = order_data.get("currency", "NGN")
@@ -739,6 +845,7 @@ async def sync_sales_orders(
                     customer=erpnext_customer,
                     customer_name=order_data.get("customer_name"),
                     customer_account_id=customer_account_id,
+                    party_id=party_id,
                     order_type=order_data.get("order_type"),
                     company=order_data.get("company"),
                     currency=order_data.get("currency", "NGN"),

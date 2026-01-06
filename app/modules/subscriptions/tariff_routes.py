@@ -81,7 +81,7 @@ async def tariffs_list(
         tariff_type=tariff_type,
         enabled_only=enabled_only,
         search=q,
-        pagination=PaginationParams(page=page, per_page=per_page),
+        pagination=PaginationParams(offset=(page - 1) * per_page, limit=per_page),
     )
 
     # Get subscription counts per tariff

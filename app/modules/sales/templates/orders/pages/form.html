@@ -28,23 +28,99 @@
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="sm:col-span-2">
-                    <label for="customer" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    <label for="customer_account_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
                         Customer <span class="text-red-500">*</span>
                     </label>
-                    <input
-                        type="text"
-                        name="customer"
-                        id="customer"
-                        {% if not is_edit %}required{% endif %}
-                        value="{{ form_data.customer if form_data else '' }}"
-                        placeholder="Customer name or code"
-                        class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.customer else '' }}"
-                        {% if is_edit %}disabled{% endif %}
+                    <select
+                        name="customer_account_id"
+                        id="customer_account_id"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.customer else '' }}"
                         data-testid="sales-order-customer"
                     >
+                        <option value="">Select customer</option>
+                        {% for account in customer_accounts %}
+                        <option
+                            value="{{ account.id }}"
+                            data-contact-name="{{ account.contact_name }}"
+                            data-contact-email="{{ account.contact_email }}"
+                            data-contact-phone="{{ account.contact_phone }}"
+                            data-billing-address="{{ account.billing_address }}"
+                            data-shipping-address="{{ account.shipping_address }}"
+                            data-billing-address-line1="{{ account.billing_address_line1 }}"
+                            data-billing-address-line2="{{ account.billing_address_line2 }}"
+                            data-billing-city="{{ account.billing_city }}"
+                            data-billing-state="{{ account.billing_state }}"
+                            data-billing-postal-code="{{ account.billing_postal_code }}"
+                            data-billing-country="{{ account.billing_country }}"
+                            data-billing-gps-lat="{{ account.billing_gps_lat }}"
+                            data-billing-gps-lng="{{ account.billing_gps_lng }}"
+                            data-shipping-address-line1="{{ account.shipping_address_line1 }}"
+                            data-shipping-address-line2="{{ account.shipping_address_line2 }}"
+                            data-shipping-city="{{ account.shipping_city }}"
+                            data-shipping-state="{{ account.shipping_state }}"
+                            data-shipping-postal-code="{{ account.shipping_postal_code }}"
+                            data-shipping-country="{{ account.shipping_country }}"
+                            data-shipping-gps-lat="{{ account.shipping_gps_lat }}"
+                            data-shipping-gps-lng="{{ account.shipping_gps_lng }}"
+                            data-currency="{{ account.currency }}"
+                            data-company="{{ account.company }}"
+                            {{ 'selected' if form_data.customer_account_id == account.id|string else '' }}
+                        >
+                            {{ account.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
                     {% if errors.customer %}
                     <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.customer }}</p>
                     {% endif %}
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="quotation_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Linked Quotation
+                    </label>
+                    <select
+                        name="quotation_id"
+                        id="quotation_id"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-quotation"
+                    >
+                        <option value="">No linked quotation</option>
+                        {% for quotation in quotations %}
+                        <option
+                            value="{{ quotation.id }}"
+                            data-customer-account-id="{{ quotation.customer_account_id or '' }}"
+                            data-customer-name="{{ quotation.customer_name or quotation.party_name or '' }}"
+                            data-contact-name="{{ quotation.contact_name or '' }}"
+                            data-contact-email="{{ quotation.contact_email or '' }}"
+                            data-contact-phone="{{ quotation.contact_phone or '' }}"
+                            data-billing-address="{{ quotation.billing_address or '' }}"
+                            data-shipping-address="{{ quotation.shipping_address or '' }}"
+                            data-billing-address-line1="{{ quotation.billing_address_line1 or '' }}"
+                            data-billing-address-line2="{{ quotation.billing_address_line2 or '' }}"
+                            data-billing-city="{{ quotation.billing_city or '' }}"
+                            data-billing-state="{{ quotation.billing_state or '' }}"
+                            data-billing-postal-code="{{ quotation.billing_postal_code or '' }}"
+                            data-billing-country="{{ quotation.billing_country or '' }}"
+                            data-billing-gps-lat="{{ quotation.billing_gps_lat or '' }}"
+                            data-billing-gps-lng="{{ quotation.billing_gps_lng or '' }}"
+                            data-shipping-address-line1="{{ quotation.shipping_address_line1 or '' }}"
+                            data-shipping-address-line2="{{ quotation.shipping_address_line2 or '' }}"
+                            data-shipping-city="{{ quotation.shipping_city or '' }}"
+                            data-shipping-state="{{ quotation.shipping_state or '' }}"
+                            data-shipping-postal-code="{{ quotation.shipping_postal_code or '' }}"
+                            data-shipping-country="{{ quotation.shipping_country or '' }}"
+                            data-shipping-gps-lat="{{ quotation.shipping_gps_lat or '' }}"
+                            data-shipping-gps-lng="{{ quotation.shipping_gps_lng or '' }}"
+                            data-company="{{ quotation.company or '' }}"
+                            data-currency="{{ quotation.currency or '' }}"
+                            data-items='{{ quotation.items | tojson | e }}'
+                            {{ 'selected' if form_data.quotation_id == quotation.id|string else '' }}
+                        >
+                            {{ quotation.erpnext_id or ('QTN-' ~ quotation.id) }} - {{ quotation.customer_name or quotation.party_name or 'Unknown' }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <div class="sm:col-span-2">
@@ -60,6 +136,43 @@
                         class="block w-full px-4 py-2.5 text-gray-900 placeholder-gray-400 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
                         data-testid="sales-order-customer-name"
                     >
+                </div>
+
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Status
+                    </label>
+                    <select
+                        name="status"
+                        id="status"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-status"
+                    >
+                        {% for option in status_options %}
+                        <option value="{{ option.value }}" {{ 'selected' if form_data.status == option.value else '' }}>
+                            {{ option.label }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="sales_partner_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Sales Agent
+                    </label>
+                    <select
+                        name="sales_partner_id"
+                        id="sales_partner_id"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-sales-agent"
+                    >
+                        <option value="">Unassigned</option>
+                        {% for person in sales_people %}
+                        <option value="{{ person.id }}" {{ 'selected' if form_data.sales_partner_id == person.id|string else '' }}>
+                            {{ person.sales_person_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <div>
@@ -168,6 +281,367 @@
                     >
                 </div>
             </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <h3 class="text-sm font-semibold text-gray-900">Contact Info</h3>
+                </div>
+                <div>
+                    <label for="contact_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Contact Name
+                    </label>
+                    <input
+                        type="text"
+                        name="contact_name"
+                        id="contact_name"
+                        value="{{ form_data.contact_name if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-contact-name"
+                    >
+                </div>
+                <div>
+                    <label for="contact_phone" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Contact Phone
+                    </label>
+                    <input
+                        type="text"
+                        name="contact_phone"
+                        id="contact_phone"
+                        value="{{ form_data.contact_phone if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-contact-phone"
+                    >
+                </div>
+                <div class="sm:col-span-2">
+                    <label for="contact_email" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Contact Email
+                    </label>
+                    <input
+                        type="email"
+                        name="contact_email"
+                        id="contact_email"
+                        value="{{ form_data.contact_email if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                        data-testid="sales-order-contact-email"
+                    >
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <h3 class="text-sm font-semibold text-gray-900">Address Info</h3>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="inline-flex items-center gap-2 text-sm text-gray-600 font-body">
+                        <input
+                            type="checkbox"
+                            id="billing_same_as_shipping"
+                            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        >
+                        Billing and shipping address are the same
+                    </label>
+                </div>
+                <div class="sm:col-span-2">
+                    <p class="text-xs text-gray-500 font-body">Billing Address</p>
+                </div>
+                <div>
+                    <label for="billing_address_line1" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Address Line 1
+                    </label>
+                    <input
+                        type="text"
+                        name="billing_address_line1"
+                        id="billing_address_line1"
+                        value="{{ form_data.billing_address_line1 if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_address_line2" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Address Line 2
+                    </label>
+                    <input
+                        type="text"
+                        name="billing_address_line2"
+                        id="billing_address_line2"
+                        value="{{ form_data.billing_address_line2 if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_city" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        City
+                    </label>
+                    <input
+                        type="text"
+                        name="billing_city"
+                        id="billing_city"
+                        value="{{ form_data.billing_city if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_state" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        State
+                    </label>
+                    <input
+                        type="text"
+                        name="billing_state"
+                        id="billing_state"
+                        value="{{ form_data.billing_state if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_postal_code" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Postal Code
+                    </label>
+                    <input
+                        type="text"
+                        name="billing_postal_code"
+                        id="billing_postal_code"
+                        value="{{ form_data.billing_postal_code if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_country" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Country
+                    </label>
+                    <input
+                        type="text"
+                        name="billing_country"
+                        id="billing_country"
+                        value="{{ form_data.billing_country if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_gps_lat" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        GPS Latitude
+                    </label>
+                    <input
+                        type="number"
+                        name="billing_gps_lat"
+                        id="billing_gps_lat"
+                        value="{{ form_data.billing_gps_lat if form_data else '' }}"
+                        step="0.000001"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="billing_gps_lng" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        GPS Longitude
+                    </label>
+                    <input
+                        type="number"
+                        name="billing_gps_lng"
+                        id="billing_gps_lng"
+                        value="{{ form_data.billing_gps_lng if form_data else '' }}"
+                        step="0.000001"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div class="sm:col-span-2 mt-2">
+                    <p class="text-xs text-gray-500 font-body">Shipping Address</p>
+                </div>
+                <div>
+                    <label for="shipping_address_line1" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Address Line 1
+                    </label>
+                    <input
+                        type="text"
+                        name="shipping_address_line1"
+                        id="shipping_address_line1"
+                        value="{{ form_data.shipping_address_line1 if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_address_line2" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Address Line 2
+                    </label>
+                    <input
+                        type="text"
+                        name="shipping_address_line2"
+                        id="shipping_address_line2"
+                        value="{{ form_data.shipping_address_line2 if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_city" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        City
+                    </label>
+                    <input
+                        type="text"
+                        name="shipping_city"
+                        id="shipping_city"
+                        value="{{ form_data.shipping_city if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_state" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        State
+                    </label>
+                    <input
+                        type="text"
+                        name="shipping_state"
+                        id="shipping_state"
+                        value="{{ form_data.shipping_state if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_postal_code" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Postal Code
+                    </label>
+                    <input
+                        type="text"
+                        name="shipping_postal_code"
+                        id="shipping_postal_code"
+                        value="{{ form_data.shipping_postal_code if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_country" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Country
+                    </label>
+                    <input
+                        type="text"
+                        name="shipping_country"
+                        id="shipping_country"
+                        value="{{ form_data.shipping_country if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_gps_lat" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        GPS Latitude
+                    </label>
+                    <input
+                        type="number"
+                        name="shipping_gps_lat"
+                        id="shipping_gps_lat"
+                        value="{{ form_data.shipping_gps_lat if form_data else '' }}"
+                        step="0.000001"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+                <div>
+                    <label for="shipping_gps_lng" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        GPS Longitude
+                    </label>
+                    <input
+                        type="number"
+                        name="shipping_gps_lng"
+                        id="shipping_gps_lng"
+                        value="{{ form_data.shipping_gps_lng if form_data else '' }}"
+                        step="0.000001"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-gray-100 p-5">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold text-gray-900">Line Items</h2>
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors"
+                        data-testid="add-line"
+                        onclick="addOrderLineItem()"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        Add line
+                    </button>
+                </div>
+                {% if errors.items %}
+                <p class="mb-3 text-sm text-red-600 font-body">{{ errors.items }}</p>
+                {% endif %}
+                <div class="overflow-x-auto" id="line-items" data-testid="line-items">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-surface-50">
+                            <tr>
+                                <th class="py-3 pl-4 pr-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Item</th>
+                                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Qty</th>
+                                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Rate</th>
+                                <th class="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 font-body">Tax</th>
+                            </tr>
+                        </thead>
+                        <tbody id="order-line-items-body" class="divide-y divide-gray-100">
+                            <tr class="line-item">
+                                <td class="py-3 pl-4 pr-3">
+                                    <input
+                                        type="text"
+                                        name="line_item_name_0"
+                                        class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                                    >
+                                </td>
+                                <td class="px-3 py-3">
+                                    <input
+                                        type="number"
+                                        name="line_item_qty_0"
+                                        value="1"
+                                        min="1"
+                                        step="1"
+                                        class="block w-24 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                                    >
+                                </td>
+                                <td class="px-3 py-3">
+                                    <input
+                                        type="number"
+                                        name="line_item_rate_0"
+                                        value=""
+                                        min="0"
+                                        step="0.01"
+                                        class="block w-32 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                                    >
+                                </td>
+                                <td class="px-3 py-3">
+                                    <select
+                                        name="line_item_tax_0"
+                                        class="block w-40 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                                    >
+                                        <option value="">No tax</option>
+                                        {% for tc in tax_codes %}
+                                        <option value="{{ tc.id }}" data-rate="{{ tc.rate }}">{{ tc.code }} ({{ tc.rate }}%)</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4 flex flex-col items-end gap-1 text-sm">
+                    <div class="flex w-full max-w-xs justify-between text-gray-600">
+                        <span>Subtotal</span>
+                        <span class="flex items-center gap-1 font-mono font-semibold text-gray-900">
+                            <span data-testid="subtotal">0.00</span>
+                            <span class="text-xs text-gray-500" data-testid="order-form-currency">{{ form_data.currency or 'NGN' }}</span>
+                        </span>
+                    </div>
+                    <div class="flex w-full max-w-xs justify-between text-gray-600">
+                        <span>Tax</span>
+                        <span class="flex items-center gap-1 font-mono font-semibold text-gray-900">
+                            <span data-testid="tax-total">0.00</span>
+                            <span class="text-xs text-gray-500" data-testid="order-form-currency">{{ form_data.currency or 'NGN' }}</span>
+                        </span>
+                    </div>
+                    <div class="flex w-full max-w-xs justify-between text-gray-700">
+                        <span>Total</span>
+                        <span class="flex items-center gap-1 font-mono font-bold text-gray-900">
+                            <span data-testid="grand-total">0.00</span>
+                            <span class="text-xs text-gray-500" data-testid="order-form-currency">{{ form_data.currency or 'NGN' }}</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/60 flex items-center justify-end gap-3">
@@ -187,4 +661,402 @@
         </div>
     </form>
 </div>
+
+<script>
+function parseOrderNumber(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function updateOrderTotals() {
+    const rows = document.querySelectorAll('#order-line-items-body tr');
+    let subtotal = 0;
+    let taxTotal = 0;
+    rows.forEach((row) => {
+        const qtyInput = row.querySelector('input[name^="line_item_qty_"]');
+        const rateInput = row.querySelector('input[name^="line_item_rate_"]');
+        const taxSelect = row.querySelector('select[name^="line_item_tax_"]');
+        const quantity = parseOrderNumber(qtyInput?.value || '0');
+        const rate = parseOrderNumber(rateInput?.value || '0');
+        const lineAmount = quantity * rate;
+        subtotal += lineAmount;
+        if (taxSelect) {
+            const selected = taxSelect.options[taxSelect.selectedIndex];
+            const rateValue = parseOrderNumber(selected?.dataset?.rate || '0');
+            taxTotal += lineAmount * (rateValue / 100);
+        }
+    });
+
+    const subtotalEl = document.querySelector('[data-testid="subtotal"]');
+    const taxEl = document.querySelector('[data-testid="tax-total"]');
+    const totalEl = document.querySelector('[data-testid="grand-total"]');
+    if (subtotalEl) {
+        subtotalEl.textContent = subtotal.toFixed(2);
+    }
+    if (taxEl) {
+        taxEl.textContent = taxTotal.toFixed(2);
+    }
+    if (totalEl) {
+        totalEl.textContent = (subtotal + taxTotal).toFixed(2);
+    }
+}
+
+function addOrderLineItem() {
+    const tbody = document.getElementById('order-line-items-body');
+    if (!tbody) {
+        return;
+    }
+    const index = tbody.querySelectorAll('tr').length;
+    const taxOptions = `{% for tc in tax_codes %}<option value="{{ tc.id }}" data-rate="{{ tc.rate }}">{{ tc.code }} ({{ tc.rate }}%)</option>{% endfor %}`;
+    const row = document.createElement('tr');
+    row.className = 'line-item';
+    row.innerHTML = `
+        <td class="py-3 pl-4 pr-3">
+            <input
+                type="text"
+                name="line_item_name_${index}"
+                class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            >
+        </td>
+        <td class="px-3 py-3">
+            <input
+                type="number"
+                name="line_item_qty_${index}"
+                value="1"
+                min="1"
+                step="1"
+                class="block w-24 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            >
+        </td>
+        <td class="px-3 py-3">
+            <input
+                type="number"
+                name="line_item_rate_${index}"
+                value=""
+                min="0"
+                step="0.01"
+                class="block w-32 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            >
+        </td>
+        <td class="px-3 py-3">
+            <select
+                name="line_item_tax_${index}"
+                class="block w-40 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+            >
+                <option value="">No tax</option>
+                ${taxOptions}
+            </select>
+        </td>
+    `;
+    tbody.appendChild(row);
+    updateOrderTotals();
+}
+
+const orderLineItemsBody = document.getElementById('order-line-items-body');
+const customerSelect = document.getElementById('customer_account_id');
+const quotationSelect = document.getElementById('quotation_id');
+const contactNameInput = document.getElementById('contact_name');
+const contactEmailInput = document.getElementById('contact_email');
+const contactPhoneInput = document.getElementById('contact_phone');
+const billingAddressLine1Input = document.getElementById('billing_address_line1');
+const billingAddressLine2Input = document.getElementById('billing_address_line2');
+const billingCityInput = document.getElementById('billing_city');
+const billingStateInput = document.getElementById('billing_state');
+const billingPostalInput = document.getElementById('billing_postal_code');
+const billingCountryInput = document.getElementById('billing_country');
+const billingGpsLatInput = document.getElementById('billing_gps_lat');
+const billingGpsLngInput = document.getElementById('billing_gps_lng');
+const shippingAddressLine1Input = document.getElementById('shipping_address_line1');
+const shippingAddressLine2Input = document.getElementById('shipping_address_line2');
+const shippingCityInput = document.getElementById('shipping_city');
+const shippingStateInput = document.getElementById('shipping_state');
+const shippingPostalInput = document.getElementById('shipping_postal_code');
+const shippingCountryInput = document.getElementById('shipping_country');
+const shippingGpsLatInput = document.getElementById('shipping_gps_lat');
+const shippingGpsLngInput = document.getElementById('shipping_gps_lng');
+const billingSameAsShippingInput = document.getElementById('billing_same_as_shipping');
+const companyInput = document.getElementById('company');
+const currencyInput = document.getElementById('currency');
+
+function applyCustomerDefaults() {
+    if (!customerSelect) {
+        return;
+    }
+    const selected = customerSelect.options[customerSelect.selectedIndex];
+    if (!selected || !selected.value) {
+        return;
+    }
+    if (contactNameInput) {
+        contactNameInput.value = selected.dataset.contactName || '';
+    }
+    if (contactEmailInput) {
+        contactEmailInput.value = selected.dataset.contactEmail || '';
+    }
+    if (contactPhoneInput) {
+        contactPhoneInput.value = selected.dataset.contactPhone || '';
+    }
+    if (billingAddressLine1Input) {
+        billingAddressLine1Input.value = selected.dataset.billingAddressLine1 || '';
+    }
+    if (billingAddressLine2Input) {
+        billingAddressLine2Input.value = selected.dataset.billingAddressLine2 || '';
+    }
+    if (billingCityInput) {
+        billingCityInput.value = selected.dataset.billingCity || '';
+    }
+    if (billingStateInput) {
+        billingStateInput.value = selected.dataset.billingState || '';
+    }
+    if (billingPostalInput) {
+        billingPostalInput.value = selected.dataset.billingPostalCode || '';
+    }
+    if (billingCountryInput) {
+        billingCountryInput.value = selected.dataset.billingCountry || '';
+    }
+    if (billingGpsLatInput) {
+        billingGpsLatInput.value = selected.dataset.billingGpsLat || '';
+    }
+    if (billingGpsLngInput) {
+        billingGpsLngInput.value = selected.dataset.billingGpsLng || '';
+    }
+    if (shippingAddressLine1Input) {
+        shippingAddressLine1Input.value = selected.dataset.shippingAddressLine1 || '';
+    }
+    if (shippingAddressLine2Input) {
+        shippingAddressLine2Input.value = selected.dataset.shippingAddressLine2 || '';
+    }
+    if (shippingCityInput) {
+        shippingCityInput.value = selected.dataset.shippingCity || '';
+    }
+    if (shippingStateInput) {
+        shippingStateInput.value = selected.dataset.shippingState || '';
+    }
+    if (shippingPostalInput) {
+        shippingPostalInput.value = selected.dataset.shippingPostalCode || '';
+    }
+    if (shippingCountryInput) {
+        shippingCountryInput.value = selected.dataset.shippingCountry || '';
+    }
+    if (shippingGpsLatInput) {
+        shippingGpsLatInput.value = selected.dataset.shippingGpsLat || '';
+    }
+    if (shippingGpsLngInput) {
+        shippingGpsLngInput.value = selected.dataset.shippingGpsLng || '';
+    }
+    if (companyInput) {
+        companyInput.value = selected.dataset.company || companyInput.value;
+    }
+    if (currencyInput) {
+        currencyInput.value = selected.dataset.currency || currencyInput.value;
+    }
+    copyBillingToShipping();
+}
+
+let quotationAppliedOnce = false;
+function applyQuotationDefaults() {
+    if (!quotationSelect) {
+        return;
+    }
+    const selected = quotationSelect.options[quotationSelect.selectedIndex];
+    if (!selected || !selected.value) {
+        return;
+    }
+    if (quotationAppliedOnce) {
+        const proceed = window.confirm("Apply linked quotation details and overwrite current fields and line items?");
+        if (!proceed) {
+            return;
+        }
+    }
+    quotationAppliedOnce = true;
+    const customerAccountId = selected.dataset.customerAccountId || '';
+    if (customerSelect && customerAccountId) {
+        customerSelect.value = customerAccountId;
+    }
+    if (contactNameInput) {
+        contactNameInput.value = selected.dataset.contactName || '';
+    }
+    if (contactEmailInput) {
+        contactEmailInput.value = selected.dataset.contactEmail || '';
+    }
+    if (contactPhoneInput) {
+        contactPhoneInput.value = selected.dataset.contactPhone || '';
+    }
+    if (billingAddressLine1Input) {
+        billingAddressLine1Input.value = selected.dataset.billingAddressLine1 || '';
+    }
+    if (billingAddressLine2Input) {
+        billingAddressLine2Input.value = selected.dataset.billingAddressLine2 || '';
+    }
+    if (billingCityInput) {
+        billingCityInput.value = selected.dataset.billingCity || '';
+    }
+    if (billingStateInput) {
+        billingStateInput.value = selected.dataset.billingState || '';
+    }
+    if (billingPostalInput) {
+        billingPostalInput.value = selected.dataset.billingPostalCode || '';
+    }
+    if (billingCountryInput) {
+        billingCountryInput.value = selected.dataset.billingCountry || '';
+    }
+    if (billingGpsLatInput) {
+        billingGpsLatInput.value = selected.dataset.billingGpsLat || '';
+    }
+    if (billingGpsLngInput) {
+        billingGpsLngInput.value = selected.dataset.billingGpsLng || '';
+    }
+    if (shippingAddressLine1Input) {
+        shippingAddressLine1Input.value = selected.dataset.shippingAddressLine1 || '';
+    }
+    if (shippingAddressLine2Input) {
+        shippingAddressLine2Input.value = selected.dataset.shippingAddressLine2 || '';
+    }
+    if (shippingCityInput) {
+        shippingCityInput.value = selected.dataset.shippingCity || '';
+    }
+    if (shippingStateInput) {
+        shippingStateInput.value = selected.dataset.shippingState || '';
+    }
+    if (shippingPostalInput) {
+        shippingPostalInput.value = selected.dataset.shippingPostalCode || '';
+    }
+    if (shippingCountryInput) {
+        shippingCountryInput.value = selected.dataset.shippingCountry || '';
+    }
+    if (shippingGpsLatInput) {
+        shippingGpsLatInput.value = selected.dataset.shippingGpsLat || '';
+    }
+    if (shippingGpsLngInput) {
+        shippingGpsLngInput.value = selected.dataset.shippingGpsLng || '';
+    }
+    if (companyInput) {
+        companyInput.value = selected.dataset.company || companyInput.value;
+    }
+    if (currencyInput) {
+        currencyInput.value = selected.dataset.currency || currencyInput.value;
+    }
+    copyBillingToShipping();
+
+    const items = selected.dataset.items ? JSON.parse(selected.dataset.items) : [];
+    if (orderLineItemsBody && Array.isArray(items) && items.length) {
+        orderLineItemsBody.innerHTML = '';
+        items.forEach((item, index) => {
+            const row = document.createElement('tr');
+            row.className = 'line-item';
+            row.innerHTML = `
+                <td class="py-3 pl-4 pr-3">
+                    <input
+                        type="text"
+                        name="line_item_name_${index}"
+                        value="${item.name || ''}"
+                        class="block w-full rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                    >
+                </td>
+                <td class="px-3 py-3">
+                    <input
+                        type="number"
+                        name="line_item_qty_${index}"
+                        value="${item.qty || 1}"
+                        min="1"
+                        step="1"
+                        class="block w-24 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                    >
+                </td>
+                <td class="px-3 py-3">
+                    <input
+                        type="number"
+                        name="line_item_rate_${index}"
+                        value="${item.rate || 0}"
+                        min="0"
+                        step="0.01"
+                        class="block w-32 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                    >
+                </td>
+                <td class="px-3 py-3">
+                    <select
+                        name="line_item_tax_${index}"
+                        class="block w-40 rounded-lg border-0 py-2 px-3 text-sm text-gray-900 ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500"
+                    >
+                        <option value="">No tax</option>
+                        {% for tc in tax_codes %}
+                        <option value="{{ tc.id }}" data-rate="{{ tc.rate }}" ${String(item.tax_code_id || '') === '{{ tc.id }}' ? 'selected' : ''}>{{ tc.code }} ({{ tc.rate }}%)</option>
+                        {% endfor %}
+                    </select>
+                </td>
+            `;
+            orderLineItemsBody.appendChild(row);
+        });
+    }
+
+    updateOrderTotals();
+}
+
+function copyBillingToShipping() {
+    if (!billingSameAsShippingInput?.checked) {
+        return;
+    }
+    if (shippingAddressLine1Input) {
+        shippingAddressLine1Input.value = billingAddressLine1Input?.value || '';
+    }
+    if (shippingAddressLine2Input) {
+        shippingAddressLine2Input.value = billingAddressLine2Input?.value || '';
+    }
+    if (shippingCityInput) {
+        shippingCityInput.value = billingCityInput?.value || '';
+    }
+    if (shippingStateInput) {
+        shippingStateInput.value = billingStateInput?.value || '';
+    }
+    if (shippingPostalInput) {
+        shippingPostalInput.value = billingPostalInput?.value || '';
+    }
+    if (shippingCountryInput) {
+        shippingCountryInput.value = billingCountryInput?.value || '';
+    }
+    if (shippingGpsLatInput) {
+        shippingGpsLatInput.value = billingGpsLatInput?.value || '';
+    }
+    if (shippingGpsLngInput) {
+        shippingGpsLngInput.value = billingGpsLngInput?.value || '';
+    }
+}
+
+if (orderLineItemsBody) {
+    orderLineItemsBody.addEventListener('input', (event) => {
+        const target = event.target;
+        if (
+            target instanceof HTMLInputElement ||
+            target instanceof HTMLSelectElement
+        ) {
+            updateOrderTotals();
+        }
+    });
+}
+if (customerSelect) {
+    customerSelect.addEventListener('change', applyCustomerDefaults);
+    applyCustomerDefaults();
+}
+if (quotationSelect) {
+    quotationSelect.addEventListener('change', applyQuotationDefaults);
+    applyQuotationDefaults();
+}
+if (billingSameAsShippingInput) {
+    billingSameAsShippingInput.addEventListener('change', copyBillingToShipping);
+    [
+        billingAddressLine1Input,
+        billingAddressLine2Input,
+        billingCityInput,
+        billingStateInput,
+        billingPostalInput,
+        billingCountryInput,
+        billingGpsLatInput,
+        billingGpsLngInput,
+    ].forEach((input) => {
+        if (input) {
+            input.addEventListener('input', copyBillingToShipping);
+        }
+    });
+}
+updateOrderTotals();
+</script>
 {% endblock %}

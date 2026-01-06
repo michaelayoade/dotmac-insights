@@ -119,6 +119,7 @@ from app.models.auth import (
     UserSession,
     RBACAuditLog,
 )
+from app.models.user_preference import UserPreference
 from app.models.sync_cursor import SyncCursor, FailedSyncRecord
 from app.models.sync_schedule import SyncSchedule
 from app.models.gateway_transaction import (
@@ -570,6 +571,8 @@ __all__ = [
     "UserPermission",
     "UserSession",
     "RBACAuditLog",
+    # User preferences
+    "UserPreference",
     # Sync infrastructure
     "SyncCursor",
     "FailedSyncRecord",

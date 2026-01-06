@@ -140,7 +140,7 @@ async def payment_subscriptions_list(
         provider=provider,
         party_id=party_id,
     )
-    pagination = PaginationParams(page=page, per_page=per_page)
+    pagination = PaginationParams(offset=(page - 1) * per_page, limit=per_page)
 
     # Get payment subscriptions using service
     result = svc.list_payment_subscriptions(

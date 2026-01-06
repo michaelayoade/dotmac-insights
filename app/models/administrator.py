@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, BigInteger, ForeignKey
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
 
@@ -23,6 +24,10 @@ class Administrator(Base):
     role_name = Column(String(100), nullable=True)  # super-administrator, etc.
     router_access = Column(String(50), nullable=True)  # full, none, etc.
     partner_id = Column(Integer, nullable=True)
+
+    # Party link
+    party_id = Column(BigInteger, ForeignKey("parties.id", ondelete="SET NULL"), nullable=True, index=True)
+    party = relationship("Party", backref="splynx_administrators")
 
     # Activity tracking
     last_ip = Column(String(50), nullable=True)

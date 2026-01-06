@@ -164,13 +164,11 @@ class SubscriptionWebService:
         if filters is None:
             filters = SubscriptionFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._subscription_svc.list_subscriptions(
             filters=filters,
             pagination=pagination,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
         )
 
     def get_subscription(self, subscription_id: int) -> Subscription:
@@ -475,7 +473,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = UsageFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._usage_svc.list_usage(filters, pagination)
 
@@ -545,7 +543,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = SessionFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._session_svc.list_active_sessions(filters, pagination)
 
@@ -604,7 +602,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = ProvisioningLogFilters(subscription_id=subscription_id)
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._provisioning_svc.list_logs(filters, pagination)
 
@@ -722,7 +720,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = PaymentSubscriptionFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._payment_svc.list_payment_subscriptions(filters, pagination)
 
@@ -789,7 +787,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = ServiceTransactionFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._transaction_svc.list_transactions(filters, pagination)
 
@@ -885,7 +883,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = NASConfigFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._radius_settings_svc.list_nas_configs(filters, pagination)
 
@@ -902,7 +900,7 @@ class SubscriptionWebService:
         if filters is None:
             filters = AttributeMappingFilters()
         if pagination is None:
-            pagination = PaginationParams(page=1, per_page=25)
+            pagination = PaginationParams(offset=0, limit=25)
 
         return self._radius_settings_svc.list_attribute_mappings(filters, pagination)
 

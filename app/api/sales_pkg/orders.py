@@ -12,21 +12,26 @@ from decimal import Decimal
 from app.database import get_db
 from app.auth import Require
 from app.cache import cached, CACHE_TTL
+from app.utils.normalizers import normalize_phone
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.payment import Payment, PaymentStatus
 from app.models.credit_note import CreditNote
-from app.models.party import CustomerAccount
+from app.models.party import CustomerAccount, Party
 from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.sales import (
     ERPNextLead, SalesOrder, Quotation, CustomerGroup,
     Territory, SalesPerson
 )
+from app.models.document_lines import SalesOrderItem, QuotationItem
+from app.models.tax import TaxCode
 from app.api.sales_pkg.common import (
     Principal,
     SalesOrderRequest,
     SalesOrderUpdateRequest,
+    SalesOrderLineItemRequest,
     QuotationRequest,
     QuotationUpdateRequest,
+    QuotationLineItemRequest,
     SalesOrderStatus,
     QuotationStatus,
     _parse_date_only,
@@ -41,12 +46,149 @@ from app.api.sales_pkg.common import (
 router = APIRouter()
 
 
+def _resolve_tax_rate(db: Session, tax_code_id: Optional[int], tax_rate: Decimal) -> Decimal:
+    if tax_code_id and (tax_rate is None or tax_rate == Decimal("0")):
+        code = db.query(TaxCode).filter(TaxCode.id == tax_code_id).first()
+        if code:
+            return Decimal(str(code.rate or 0))
+    return tax_rate or Decimal("0")
+
+
+def _compute_line_amount(qty: Decimal, rate: Decimal, discount_percentage: Decimal, discount_amount: Decimal) -> Decimal:
+    amount = qty * rate
+    if discount_percentage:
+        amount = amount * (Decimal("1") - (discount_percentage / Decimal("100")))
+    elif discount_amount:
+        amount = amount - discount_amount
+    return amount
+
+
+def _compose_address(
+    line1: Optional[str],
+    line2: Optional[str],
+    city: Optional[str],
+    state: Optional[str],
+    postal_code: Optional[str],
+    country: Optional[str],
+) -> Optional[str]:
+    parts = [line1, line2, city, state, postal_code, country]
+    cleaned = [part for part in parts if part]
+    return ", ".join(cleaned) if cleaned else None
+
+
+def _extract_party_address(addresses: Optional[list]) -> dict:
+    if not addresses:
+        return {}
+    for address in addresses:
+        if isinstance(address, dict) and (address.get("address_line1") or address.get("address")):
+            return address
+    return addresses[0] if isinstance(addresses[0], dict) else {}
+
+
+def _normalize_contact_phone(phone: Optional[str], country: Optional[str]) -> Optional[str]:
+    if not phone:
+        return phone
+    normalized = normalize_phone(phone, country=country or "NG")
+    return normalized.normalized or phone
+
+
+def _build_sales_order_items(
+    db: Session,
+    order_id: int,
+    items_payload: List[SalesOrderLineItemRequest],
+) -> Dict[str, Decimal]:
+    totals = {
+        "total_qty": Decimal("0"),
+        "total": Decimal("0"),
+        "tax_total": Decimal("0"),
+    }
+    for item in items_payload:
+        qty = item.qty or Decimal("0")
+        rate = item.rate or Decimal("0")
+        discount_percentage = item.discount_percentage or Decimal("0")
+        discount_amount = item.discount_amount or Decimal("0")
+        tax_rate = _resolve_tax_rate(db, item.tax_code_id, item.tax_rate)
+        amount = _compute_line_amount(qty, rate, discount_percentage, discount_amount)
+        tax_amount = item.tax_amount or (amount * (tax_rate / Decimal("100")) if tax_rate else Decimal("0"))
+        so_item = SalesOrderItem(
+            sales_order_id=order_id,
+            item_code=item.item_code,
+            item_name=item.item_name or item.description,
+            description=item.description,
+            qty=qty,
+            rate=rate,
+            discount_percentage=discount_percentage,
+            discount_amount=discount_amount,
+            amount=amount,
+            net_amount=amount,
+            uom=item.uom,
+            warehouse=item.warehouse,
+            tax_code_id=item.tax_code_id,
+            tax_rate=tax_rate,
+            tax_amount=tax_amount,
+            is_tax_inclusive=item.is_tax_inclusive,
+        )
+        db.add(so_item)
+        totals["total_qty"] += qty
+        totals["total"] += amount
+        totals["tax_total"] += tax_amount
+
+    return totals
+
+
+def _build_quotation_items(
+    db: Session,
+    quotation_id: int,
+    items_payload: List[QuotationLineItemRequest],
+) -> Dict[str, Decimal]:
+    totals = {
+        "total_qty": Decimal("0"),
+        "total": Decimal("0"),
+        "tax_total": Decimal("0"),
+    }
+    for item in items_payload:
+        qty = item.qty or Decimal("0")
+        rate = item.rate or Decimal("0")
+        discount_percentage = item.discount_percentage or Decimal("0")
+        discount_amount = item.discount_amount or Decimal("0")
+        tax_rate = _resolve_tax_rate(db, item.tax_code_id, item.tax_rate)
+        amount = _compute_line_amount(qty, rate, discount_percentage, discount_amount)
+        tax_amount = item.tax_amount or (amount * (tax_rate / Decimal("100")) if tax_rate else Decimal("0"))
+        quote_item = QuotationItem(
+            quotation_id=quotation_id,
+            item_code=item.item_code,
+            item_name=item.item_name or item.description,
+            description=item.description,
+            qty=qty,
+            rate=rate,
+            discount_percentage=discount_percentage,
+            discount_amount=discount_amount,
+            amount=amount,
+            net_amount=amount,
+            uom=item.uom,
+            warehouse=item.warehouse,
+            tax_code_id=item.tax_code_id,
+            tax_rate=tax_rate,
+            tax_amount=tax_amount,
+            is_tax_inclusive=item.is_tax_inclusive,
+        )
+        db.add(quote_item)
+        totals["total_qty"] += qty
+        totals["total"] += amount
+        totals["tax_total"] += tax_amount
+
+    return totals
+
+
 # ==================== READ ENDPOINTS ====================
 
 @router.get("/orders", dependencies=[Depends(Require("explorer:read"))])
 async def list_sales_orders(
     status: Optional[str] = None,
     customer_account_id: Optional[int] = None,
+    customer_id: Optional[int] = None,
+    party_id: Optional[int] = Query(None, include_in_schema=False),
+    search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -58,8 +200,23 @@ async def list_sales_orders(
         status_enum = _parse_sales_order_status(status)
         if status_enum:
             query = query.filter(SalesOrder.status == status_enum)
+    if search:
+        like = f"%{search}%"
+        query = query.outerjoin(Party, SalesOrder.party_id == Party.id).filter(
+            or_(
+                SalesOrder.customer.ilike(like),
+                SalesOrder.customer_name.ilike(like),
+                SalesOrder.erpnext_id.ilike(like),
+                Party.name.ilike(like),
+                Party.legal_name.ilike(like),
+                Party.trading_name.ilike(like),
+                Party.primary_email.ilike(like),
+            )
+        )
     if customer_account_id:
         query = query.filter(SalesOrder.customer_account_id == customer_account_id)
+    if customer_id or party_id:
+        query = query.filter(SalesOrder.party_id == (customer_id or party_id))
 
     total = query.count()
     orders = query.order_by(SalesOrder.id.desc()).offset(offset).limit(limit).all()
@@ -89,6 +246,7 @@ async def get_sales_order(
 async def list_quotations(
     status: Optional[str] = None,
     customer_name: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -100,6 +258,19 @@ async def list_quotations(
         status_enum = _parse_quotation_status(status)
         if status_enum:
             query = query.filter(Quotation.status == status_enum)
+    if search:
+        like = f"%{search}%"
+        query = query.outerjoin(Party, Quotation.party_id == Party.id).filter(
+            or_(
+                Quotation.party_name.ilike(like),
+                Quotation.customer_name.ilike(like),
+                Quotation.erpnext_id.ilike(like),
+                Party.name.ilike(like),
+                Party.legal_name.ilike(like),
+                Party.trading_name.ilike(like),
+                Party.primary_email.ilike(like),
+            )
+        )
     if customer_name:
         query = query.filter(Quotation.customer_name.ilike(f"%{customer_name}%"))
 
@@ -135,6 +306,12 @@ async def create_sales_order(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """Create a sales order locally."""
+    quote = None
+    if payload.quotation_id:
+        quote = db.query(Quotation).filter(Quotation.id == payload.quotation_id, Quotation.is_deleted == False).first()
+        if not quote:
+            raise HTTPException(status_code=404, detail="Linked quotation not found")
+
     if payload.customer_account_id:
         if not db.query(CustomerAccount.id).filter(CustomerAccount.id == payload.customer_account_id).first():
             raise HTTPException(
@@ -142,10 +319,131 @@ async def create_sales_order(
                 detail=f"Customer account {payload.customer_account_id} not found",
             )
 
+    party_id = None
+    if payload.customer_account_id:
+        party_id = (
+            db.query(CustomerAccount.party_id)
+            .filter(CustomerAccount.id == payload.customer_account_id)
+            .scalar()
+        )
+    elif quote and quote.party_id:
+        party_id = quote.party_id
+
+    billing_address_line1 = payload.billing_address_line1 or (quote.billing_address_line1 if quote else None)
+    billing_address_line2 = payload.billing_address_line2 or (quote.billing_address_line2 if quote else None)
+    billing_city = payload.billing_city or (quote.billing_city if quote else None)
+    billing_state = payload.billing_state or (quote.billing_state if quote else None)
+    billing_postal_code = payload.billing_postal_code or (quote.billing_postal_code if quote else None)
+    billing_country = payload.billing_country or (quote.billing_country if quote else None)
+    billing_gps_lat = payload.billing_gps_lat if payload.billing_gps_lat is not None else (
+        quote.billing_gps_lat if quote else None
+    )
+    billing_gps_lng = payload.billing_gps_lng if payload.billing_gps_lng is not None else (
+        quote.billing_gps_lng if quote else None
+    )
+    shipping_address_line1 = payload.shipping_address_line1 or (quote.shipping_address_line1 if quote else None)
+    shipping_address_line2 = payload.shipping_address_line2 or (quote.shipping_address_line2 if quote else None)
+    shipping_city = payload.shipping_city or (quote.shipping_city if quote else None)
+    shipping_state = payload.shipping_state or (quote.shipping_state if quote else None)
+    shipping_postal_code = payload.shipping_postal_code or (quote.shipping_postal_code if quote else None)
+    shipping_country = payload.shipping_country or (quote.shipping_country if quote else None)
+    shipping_gps_lat = payload.shipping_gps_lat if payload.shipping_gps_lat is not None else (
+        quote.shipping_gps_lat if quote else None
+    )
+    shipping_gps_lng = payload.shipping_gps_lng if payload.shipping_gps_lng is not None else (
+        quote.shipping_gps_lng if quote else None
+    )
+    billing_address = payload.billing_address or (quote.billing_address if quote else None)
+    shipping_address = payload.shipping_address or (quote.shipping_address if quote else None)
+
+    if payload.customer_account_id and party_id:
+        party = db.query(Party).filter(Party.id == party_id).first()
+        if party and party.addresses:
+            addr = _extract_party_address(party.addresses)
+            if not billing_address_line1:
+                billing_address_line1 = addr.get("address_line1") or addr.get("address")
+            if not billing_address_line2:
+                billing_address_line2 = addr.get("address_line2")
+            if not billing_city:
+                billing_city = addr.get("city")
+            if not billing_state:
+                billing_state = addr.get("state")
+            if not billing_postal_code:
+                billing_postal_code = addr.get("postal_code")
+            if not billing_country:
+                billing_country = addr.get("country")
+            if billing_gps_lat is None:
+                billing_gps_lat = addr.get("gps_lat")
+            if billing_gps_lng is None:
+                billing_gps_lng = addr.get("gps_lng")
+            if not shipping_address_line1:
+                shipping_address_line1 = addr.get("address_line1") or addr.get("address")
+            if not shipping_address_line2:
+                shipping_address_line2 = addr.get("address_line2")
+            if not shipping_city:
+                shipping_city = addr.get("city")
+            if not shipping_state:
+                shipping_state = addr.get("state")
+            if not shipping_postal_code:
+                shipping_postal_code = addr.get("postal_code")
+            if not shipping_country:
+                shipping_country = addr.get("country")
+            if shipping_gps_lat is None:
+                shipping_gps_lat = addr.get("gps_lat")
+            if shipping_gps_lng is None:
+                shipping_gps_lng = addr.get("gps_lng")
+
+    if not billing_address:
+        billing_address = _compose_address(
+            billing_address_line1,
+            billing_address_line2,
+            billing_city,
+            billing_state,
+            billing_postal_code,
+            billing_country,
+        )
+    if not shipping_address:
+        shipping_address = _compose_address(
+            shipping_address_line1,
+            shipping_address_line2,
+            shipping_city,
+            shipping_state,
+            shipping_postal_code,
+            shipping_country,
+        )
+
+    contact_phone = payload.contact_phone or (quote.contact_phone if quote else None)
+    if contact_phone:
+        phone_country = billing_country or shipping_country
+        contact_phone = _normalize_contact_phone(contact_phone, phone_country)
+
     order = SalesOrder(
         erpnext_id=None,
-        customer_account_id=payload.customer_account_id,
-        customer_name=payload.customer_name,
+        customer_account_id=payload.customer_account_id or (quote.customer_account_id if quote else None),
+        party_id=party_id,
+        quotation_id=payload.quotation_id,
+        customer_name=payload.customer_name or (quote.customer_name if quote else None),
+        contact_name=payload.contact_name or (quote.contact_name if quote else None),
+        contact_email=payload.contact_email or (quote.contact_email if quote else None),
+        contact_phone=contact_phone,
+        billing_address=billing_address,
+        billing_address_line1=billing_address_line1,
+        billing_address_line2=billing_address_line2,
+        billing_city=billing_city,
+        billing_state=billing_state,
+        billing_postal_code=billing_postal_code,
+        billing_country=billing_country,
+        billing_gps_lat=billing_gps_lat,
+        billing_gps_lng=billing_gps_lng,
+        shipping_address=shipping_address,
+        shipping_address_line1=shipping_address_line1,
+        shipping_address_line2=shipping_address_line2,
+        shipping_city=shipping_city,
+        shipping_state=shipping_state,
+        shipping_postal_code=shipping_postal_code,
+        shipping_country=shipping_country,
+        shipping_gps_lat=shipping_gps_lat,
+        shipping_gps_lng=shipping_gps_lng,
         order_type=payload.order_type,
         company=payload.company or get_company_context(allow_null=True),
         currency=payload.currency,
@@ -163,11 +461,58 @@ async def create_sales_order(
         delivery_status=payload.delivery_status,
         status=_parse_sales_order_status(payload.status) or SalesOrderStatus.DRAFT,
         sales_partner=payload.sales_partner,
+        sales_partner_id=payload.sales_partner_id,
         territory=payload.territory,
         source=payload.source or "local",
         campaign=payload.campaign,
     )
     db.add(order)
+    db.flush()
+
+    if payload.items:
+        totals = _build_sales_order_items(db, order.id, payload.items)
+        order.total_qty = totals["total_qty"]
+        order.total = totals["total"]
+        order.net_total = totals["total"]
+        order.total_taxes_and_charges = totals["tax_total"]
+        order.grand_total = totals["total"] + totals["tax_total"]
+        order.rounded_total = round(order.grand_total or 0, 0)
+    elif quote and quote.items:
+        totals = {
+            "total_qty": Decimal("0"),
+            "total": Decimal("0"),
+            "tax_total": Decimal("0"),
+        }
+        for q_item in quote.items:
+            so_item = SalesOrderItem(
+                sales_order_id=order.id,
+                item_code=q_item.item_code,
+                item_name=q_item.item_name,
+                description=q_item.description,
+                qty=q_item.qty,
+                rate=q_item.rate,
+                discount_percentage=q_item.discount_percentage,
+                discount_amount=q_item.discount_amount,
+                amount=q_item.amount,
+                net_amount=q_item.net_amount,
+                uom=q_item.uom,
+                warehouse=q_item.warehouse,
+                tax_code_id=q_item.tax_code_id,
+                tax_rate=q_item.tax_rate,
+                tax_amount=q_item.tax_amount,
+                is_tax_inclusive=q_item.is_tax_inclusive,
+            )
+            db.add(so_item)
+            totals["total_qty"] += Decimal(str(q_item.qty or 0))
+            totals["total"] += Decimal(str(q_item.amount or 0))
+            totals["tax_total"] += Decimal(str(q_item.tax_amount or 0))
+        order.total_qty = totals["total_qty"]
+        order.total = totals["total"]
+        order.net_total = totals["total"]
+        order.total_taxes_and_charges = totals["tax_total"]
+        order.grand_total = totals["total"] + totals["tax_total"]
+        order.rounded_total = round(order.grand_total or 0, 0)
+
     db.commit()
     db.refresh(order)
     return _serialize_sales_order(order)
@@ -196,8 +541,58 @@ async def update_sales_order(
                 detail=f"Customer account {payload.customer_account_id} not found",
             )
         order.customer_account_id = payload.customer_account_id
+        if payload.customer_account_id:
+            order.party_id = (
+                db.query(CustomerAccount.party_id)
+                .filter(CustomerAccount.id == payload.customer_account_id)
+                .scalar()
+            )
+        else:
+            order.party_id = None
+    if payload.quotation_id is not None:
+        order.quotation_id = payload.quotation_id
     if payload.customer_name is not None:
         order.customer_name = payload.customer_name
+    if payload.contact_name is not None:
+        order.contact_name = payload.contact_name
+    if payload.contact_email is not None:
+        order.contact_email = payload.contact_email
+    if payload.billing_address is not None:
+        order.billing_address = payload.billing_address
+    if payload.billing_address_line1 is not None:
+        order.billing_address_line1 = payload.billing_address_line1
+    if payload.billing_address_line2 is not None:
+        order.billing_address_line2 = payload.billing_address_line2
+    if payload.billing_city is not None:
+        order.billing_city = payload.billing_city
+    if payload.billing_state is not None:
+        order.billing_state = payload.billing_state
+    if payload.billing_postal_code is not None:
+        order.billing_postal_code = payload.billing_postal_code
+    if payload.billing_country is not None:
+        order.billing_country = payload.billing_country
+    if payload.billing_gps_lat is not None:
+        order.billing_gps_lat = payload.billing_gps_lat
+    if payload.billing_gps_lng is not None:
+        order.billing_gps_lng = payload.billing_gps_lng
+    if payload.shipping_address is not None:
+        order.shipping_address = payload.shipping_address
+    if payload.shipping_address_line1 is not None:
+        order.shipping_address_line1 = payload.shipping_address_line1
+    if payload.shipping_address_line2 is not None:
+        order.shipping_address_line2 = payload.shipping_address_line2
+    if payload.shipping_city is not None:
+        order.shipping_city = payload.shipping_city
+    if payload.shipping_state is not None:
+        order.shipping_state = payload.shipping_state
+    if payload.shipping_postal_code is not None:
+        order.shipping_postal_code = payload.shipping_postal_code
+    if payload.shipping_country is not None:
+        order.shipping_country = payload.shipping_country
+    if payload.shipping_gps_lat is not None:
+        order.shipping_gps_lat = payload.shipping_gps_lat
+    if payload.shipping_gps_lng is not None:
+        order.shipping_gps_lng = payload.shipping_gps_lng
     if payload.order_type is not None:
         order.order_type = payload.order_type
     if payload.company is not None:
@@ -232,12 +627,62 @@ async def update_sales_order(
         order.status = _parse_sales_order_status(payload.status) or order.status
     if payload.sales_partner is not None:
         order.sales_partner = payload.sales_partner
+    if payload.sales_partner_id is not None:
+        order.sales_partner_id = payload.sales_partner_id
     if payload.territory is not None:
         order.territory = payload.territory
     if payload.source is not None:
         order.source = payload.source
     if payload.campaign is not None:
         order.campaign = payload.campaign
+
+    if payload.contact_phone is not None:
+        phone_country = order.billing_country or order.shipping_country
+        order.contact_phone = _normalize_contact_phone(payload.contact_phone, phone_country)
+
+    if payload.billing_address is None and (
+        payload.billing_address_line1 is not None
+        or payload.billing_address_line2 is not None
+        or payload.billing_city is not None
+        or payload.billing_state is not None
+        or payload.billing_postal_code is not None
+        or payload.billing_country is not None
+    ):
+        order.billing_address = _compose_address(
+            order.billing_address_line1,
+            order.billing_address_line2,
+            order.billing_city,
+            order.billing_state,
+            order.billing_postal_code,
+            order.billing_country,
+        )
+
+    if payload.shipping_address is None and (
+        payload.shipping_address_line1 is not None
+        or payload.shipping_address_line2 is not None
+        or payload.shipping_city is not None
+        or payload.shipping_state is not None
+        or payload.shipping_postal_code is not None
+        or payload.shipping_country is not None
+    ):
+        order.shipping_address = _compose_address(
+            order.shipping_address_line1,
+            order.shipping_address_line2,
+            order.shipping_city,
+            order.shipping_state,
+            order.shipping_postal_code,
+            order.shipping_country,
+        )
+
+    if payload.items is not None:
+        db.query(SalesOrderItem).filter(SalesOrderItem.sales_order_id == order.id).delete()
+        totals = _build_sales_order_items(db, order.id, payload.items)
+        order.total_qty = totals["total_qty"]
+        order.total = totals["total"]
+        order.net_total = totals["total"]
+        order.total_taxes_and_charges = totals["tax_total"]
+        order.grand_total = totals["total"] + totals["tax_total"]
+        order.rounded_total = round(order.grand_total or 0, 0)
 
     db.commit()
     db.refresh(order)
@@ -266,11 +711,140 @@ async def create_quotation(
     principal: Principal = Depends(get_current_principal),
 ) -> Dict[str, Any]:
     """Create a quotation locally."""
+    party_name = payload.customer_name or payload.party_name
+    customer_name = payload.customer_name or payload.party_name
+    contact_name = payload.contact_name
+    contact_email = payload.contact_email
+    contact_phone = payload.contact_phone
+    billing_address = payload.billing_address
+    shipping_address = payload.shipping_address
+    billing_address_line1 = payload.billing_address_line1
+    billing_address_line2 = payload.billing_address_line2
+    billing_city = payload.billing_city
+    billing_state = payload.billing_state
+    billing_postal_code = payload.billing_postal_code
+    billing_country = payload.billing_country
+    billing_gps_lat = payload.billing_gps_lat
+    billing_gps_lng = payload.billing_gps_lng
+    shipping_address_line1 = payload.shipping_address_line1
+    shipping_address_line2 = payload.shipping_address_line2
+    shipping_city = payload.shipping_city
+    shipping_state = payload.shipping_state
+    shipping_postal_code = payload.shipping_postal_code
+    shipping_country = payload.shipping_country
+    shipping_gps_lat = payload.shipping_gps_lat
+    shipping_gps_lng = payload.shipping_gps_lng
+    party_id = None
+
+    if payload.customer_account_id:
+        account = db.query(CustomerAccount).filter(CustomerAccount.id == payload.customer_account_id).first()
+        if not account:
+            raise HTTPException(status_code=400, detail="Customer account not found")
+        if account.party:
+            party = account.party
+            party_name = party_name or party.name or party.legal_name or party.trading_name
+            customer_name = customer_name or party_name
+            contact_name = contact_name or party_name
+            contact_email = contact_email or party.primary_email
+            contact_phone = contact_phone or party.primary_phone
+            party_id = party.id
+            if party.addresses:
+                addr = _extract_party_address(party.addresses)
+                if not billing_address_line1:
+                    billing_address_line1 = addr.get("address_line1") or addr.get("address")
+                if not billing_address_line2:
+                    billing_address_line2 = addr.get("address_line2")
+                if not billing_city:
+                    billing_city = addr.get("city")
+                if not billing_state:
+                    billing_state = addr.get("state")
+                if not billing_postal_code:
+                    billing_postal_code = addr.get("postal_code")
+                if not billing_country:
+                    billing_country = addr.get("country")
+                if billing_gps_lat is None:
+                    billing_gps_lat = addr.get("gps_lat")
+                if billing_gps_lng is None:
+                    billing_gps_lng = addr.get("gps_lng")
+                if not shipping_address_line1:
+                    shipping_address_line1 = addr.get("address_line1") or addr.get("address")
+                if not shipping_address_line2:
+                    shipping_address_line2 = addr.get("address_line2")
+                if not shipping_city:
+                    shipping_city = addr.get("city")
+                if not shipping_state:
+                    shipping_state = addr.get("state")
+                if not shipping_postal_code:
+                    shipping_postal_code = addr.get("postal_code")
+                if not shipping_country:
+                    shipping_country = addr.get("country")
+                if shipping_gps_lat is None:
+                    shipping_gps_lat = addr.get("gps_lat")
+                if shipping_gps_lng is None:
+                    shipping_gps_lng = addr.get("gps_lng")
+
+    if payload.lead_id:
+        lead = db.query(ERPNextLead).filter(ERPNextLead.id == payload.lead_id).first()
+        if lead:
+            party_name = party_name or lead.lead_name
+            customer_name = customer_name or lead.lead_name
+            contact_name = contact_name or lead.lead_name
+            contact_email = contact_email or lead.email_id
+            contact_phone = contact_phone or lead.phone or lead.mobile_no
+
+    if not party_name:
+        raise HTTPException(status_code=400, detail="Customer or lead name is required")
+
+    if not billing_address:
+        billing_address = _compose_address(
+            billing_address_line1,
+            billing_address_line2,
+            billing_city,
+            billing_state,
+            billing_postal_code,
+            billing_country,
+        )
+    if not shipping_address:
+        shipping_address = _compose_address(
+            shipping_address_line1,
+            shipping_address_line2,
+            shipping_city,
+            shipping_state,
+            shipping_postal_code,
+            shipping_country,
+        )
+    if contact_phone:
+        phone_country = billing_country or shipping_country
+        contact_phone = _normalize_contact_phone(contact_phone, phone_country)
+
     quote = Quotation(
         erpnext_id=None,
         quotation_to=payload.quotation_to,
-        party_name=payload.party_name,
-        customer_name=payload.customer_name,
+        party_name=party_name,
+        customer_name=customer_name,
+        customer_account_id=payload.customer_account_id,
+        lead_id=payload.lead_id,
+        contact_name=contact_name,
+        contact_email=contact_email,
+        contact_phone=contact_phone,
+        billing_address=billing_address,
+        billing_address_line1=billing_address_line1,
+        billing_address_line2=billing_address_line2,
+        billing_city=billing_city,
+        billing_state=billing_state,
+        billing_postal_code=billing_postal_code,
+        billing_country=billing_country,
+        billing_gps_lat=billing_gps_lat,
+        billing_gps_lng=billing_gps_lng,
+        shipping_address=shipping_address,
+        shipping_address_line1=shipping_address_line1,
+        shipping_address_line2=shipping_address_line2,
+        shipping_city=shipping_city,
+        shipping_state=shipping_state,
+        shipping_postal_code=shipping_postal_code,
+        shipping_country=shipping_country,
+        shipping_gps_lat=shipping_gps_lat,
+        shipping_gps_lng=shipping_gps_lng,
         order_type=payload.order_type,
         company=payload.company or get_company_context(allow_null=True),
         currency=payload.currency,
@@ -290,10 +864,20 @@ async def create_quotation(
         order_lost_reason=payload.order_lost_reason,
         origin_system="local",
         write_back_status="pending",
+        party_id=party_id,
         created_by_id=principal.id,
         updated_by_id=principal.id,
     )
     db.add(quote)
+    db.flush()
+    if payload.items:
+        totals = _build_quotation_items(db, quote.id, payload.items)
+        quote.total_qty = totals["total_qty"]
+        quote.total = totals["total"]
+        quote.net_total = totals["total"]
+        quote.total_taxes_and_charges = totals["tax_total"]
+        quote.grand_total = totals["total"] + totals["tax_total"]
+        quote.rounded_total = round(quote.grand_total or 0, 0)
     db.commit()
     db.refresh(quote)
     return _serialize_quotation(quote)
@@ -315,8 +899,56 @@ async def update_quotation(
         quote.quotation_to = payload.quotation_to
     if payload.party_name is not None:
         quote.party_name = payload.party_name
+        if payload.customer_name is None:
+            quote.customer_name = payload.party_name
     if payload.customer_name is not None:
         quote.customer_name = payload.customer_name
+        if payload.party_name is None:
+            quote.party_name = payload.customer_name
+    if payload.customer_account_id is not None:
+        quote.customer_account_id = payload.customer_account_id
+    if payload.lead_id is not None:
+        quote.lead_id = payload.lead_id
+    if payload.contact_name is not None:
+        quote.contact_name = payload.contact_name
+    if payload.contact_email is not None:
+        quote.contact_email = payload.contact_email
+    if payload.billing_address is not None:
+        quote.billing_address = payload.billing_address
+    if payload.billing_address_line1 is not None:
+        quote.billing_address_line1 = payload.billing_address_line1
+    if payload.billing_address_line2 is not None:
+        quote.billing_address_line2 = payload.billing_address_line2
+    if payload.billing_city is not None:
+        quote.billing_city = payload.billing_city
+    if payload.billing_state is not None:
+        quote.billing_state = payload.billing_state
+    if payload.billing_postal_code is not None:
+        quote.billing_postal_code = payload.billing_postal_code
+    if payload.billing_country is not None:
+        quote.billing_country = payload.billing_country
+    if payload.billing_gps_lat is not None:
+        quote.billing_gps_lat = payload.billing_gps_lat
+    if payload.billing_gps_lng is not None:
+        quote.billing_gps_lng = payload.billing_gps_lng
+    if payload.shipping_address is not None:
+        quote.shipping_address = payload.shipping_address
+    if payload.shipping_address_line1 is not None:
+        quote.shipping_address_line1 = payload.shipping_address_line1
+    if payload.shipping_address_line2 is not None:
+        quote.shipping_address_line2 = payload.shipping_address_line2
+    if payload.shipping_city is not None:
+        quote.shipping_city = payload.shipping_city
+    if payload.shipping_state is not None:
+        quote.shipping_state = payload.shipping_state
+    if payload.shipping_postal_code is not None:
+        quote.shipping_postal_code = payload.shipping_postal_code
+    if payload.shipping_country is not None:
+        quote.shipping_country = payload.shipping_country
+    if payload.shipping_gps_lat is not None:
+        quote.shipping_gps_lat = payload.shipping_gps_lat
+    if payload.shipping_gps_lng is not None:
+        quote.shipping_gps_lng = payload.shipping_gps_lng
     if payload.order_type is not None:
         quote.order_type = payload.order_type
     if payload.company is not None:
@@ -343,6 +975,8 @@ async def update_quotation(
         quote.status = _parse_quotation_status(payload.status) or quote.status
     if payload.sales_partner is not None:
         quote.sales_partner = payload.sales_partner
+    if payload.sales_partner_id is not None:
+        quote.sales_partner_id = payload.sales_partner_id
     if payload.territory is not None:
         quote.territory = payload.territory
     if payload.source is not None:
@@ -351,6 +985,54 @@ async def update_quotation(
         quote.campaign = payload.campaign
     if payload.order_lost_reason is not None:
         quote.order_lost_reason = payload.order_lost_reason
+
+    if payload.contact_phone is not None:
+        phone_country = quote.billing_country or quote.shipping_country
+        quote.contact_phone = _normalize_contact_phone(payload.contact_phone, phone_country)
+
+    if payload.billing_address is None and (
+        payload.billing_address_line1 is not None
+        or payload.billing_address_line2 is not None
+        or payload.billing_city is not None
+        or payload.billing_state is not None
+        or payload.billing_postal_code is not None
+        or payload.billing_country is not None
+    ):
+        quote.billing_address = _compose_address(
+            quote.billing_address_line1,
+            quote.billing_address_line2,
+            quote.billing_city,
+            quote.billing_state,
+            quote.billing_postal_code,
+            quote.billing_country,
+        )
+
+    if payload.shipping_address is None and (
+        payload.shipping_address_line1 is not None
+        or payload.shipping_address_line2 is not None
+        or payload.shipping_city is not None
+        or payload.shipping_state is not None
+        or payload.shipping_postal_code is not None
+        or payload.shipping_country is not None
+    ):
+        quote.shipping_address = _compose_address(
+            quote.shipping_address_line1,
+            quote.shipping_address_line2,
+            quote.shipping_city,
+            quote.shipping_state,
+            quote.shipping_postal_code,
+            quote.shipping_country,
+        )
+
+    if payload.items is not None:
+        db.query(QuotationItem).filter(QuotationItem.quotation_id == quote.id).delete()
+        totals = _build_quotation_items(db, quote.id, payload.items)
+        quote.total_qty = totals["total_qty"]
+        quote.total = totals["total"]
+        quote.net_total = totals["total"]
+        quote.total_taxes_and_charges = totals["tax_total"]
+        quote.grand_total = totals["total"] + totals["tax_total"]
+        quote.rounded_total = round(quote.grand_total or 0, 0)
 
     if hasattr(quote, "updated_by_id"):
         setattr(quote, "updated_by_id", principal.id)

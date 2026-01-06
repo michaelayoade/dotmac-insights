@@ -19,20 +19,20 @@ from app.web.module_types import ModuleConfig
 
 MODULE_CONFIG = ModuleConfig(
     id="analytics",
-    name="Analytics",
+    name="Business Intelligence",
     description="Business intelligence and reporting dashboards",
     icon="activity",
     prefix="/analytics",
-    group="Operations",
+    group="Analytics",
     order=80,
     scopes=["analytics:read"],
-    enabled=False,
+    enabled=True,
     prefixes=["/analytics"],
 )
 
 NAVIGATION = [
     {
-        "section": "Analytics",
+        "section": "Business Intelligence",
         "module": "analytics",
         "href": "/analytics",
         "icon": "activity",

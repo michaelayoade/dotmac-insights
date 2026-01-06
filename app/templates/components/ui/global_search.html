@@ -1,0 +1,67 @@
+<div class="relative" x-data="globalSearch()" @keydown.escape.window="close()" @click.outside="close()">
+    <div class="relative">
+        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5">
+            <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+        </div>
+        <input
+            type="search"
+            class="w-72 rounded-xl border theme-border theme-surface-2 pl-8 pr-16 py-2 text-sm leading-5 text-gray-700 placeholder:text-gray-400 focus:outline-none focus:ring-2"
+            placeholder="Search everything..."
+            data-global-search-input
+            x-model="query"
+            @input.debounce.300ms="search()"
+            @focus="open = true; if (query.length >= 2) search()"
+            @keydown.arrow-down.prevent="focusNext()"
+            @keydown.arrow-up.prevent="focusPrev()"
+            @keydown.enter.prevent="selectFocused()"
+            data-testid="global-search-input"
+        >
+        <div class="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1 text-[11px] uppercase tracking-wide text-gray-400">
+            <span class="hidden md:inline">/</span>
+            <span class="hidden lg:inline">⌘K</span>
+        </div>
+    </div>
+
+    <div
+        x-cloak
+        x-show="open"
+        class="absolute left-0 right-0 mt-2 overflow-hidden rounded-xl border theme-border theme-surface shadow-warm-lg z-30"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0 translate-y-1"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 translate-y-1"
+    >
+        <div class="px-3 py-2 text-xs uppercase tracking-wide text-gray-400" x-show="loading">
+            Searching...
+        </div>
+
+        <template x-if="!loading && totalItems === 0">
+            <div class="px-3 py-3 text-sm text-gray-500">No matches yet.</div>
+        </template>
+
+        <template x-for="(group, groupIndex) in groupedResults" :key="group.type">
+            <div class="border-t border-gray-100">
+                <div class="px-3 pt-3 pb-2 text-xs font-semibold uppercase tracking-wide text-gray-400" x-text="group.label"></div>
+                <template x-for="(item, itemIndex) in group.items" :key="item.id">
+                    <a
+                        :href="item.url"
+                        class="flex items-center gap-3 px-3 py-2 text-sm text-gray-700 theme-hover transition-colors"
+                        :class="{'theme-surface-2': focusedIndex === getGlobalIndex(groupIndex, itemIndex)}"
+                        @mousemove="focusedIndex = getGlobalIndex(groupIndex, itemIndex)"
+                    >
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center text-gray-600" :class="getIconClass(item)" x-html="getIcon(item)"></div>
+                        <div class="min-w-0">
+                            <div class="font-medium text-gray-900 truncate" x-text="item.title"></div>
+                            <div class="text-xs text-gray-500 truncate" x-text="item.subtitle"></div>
+                        </div>
+                        <div class="ml-auto text-[11px] uppercase tracking-wide text-gray-400" x-text="item.status ? item.status.replace('_', ' ') : ''"></div>
+                    </a>
+                </template>
+            </div>
+        </template>
+    </div>
+</div>

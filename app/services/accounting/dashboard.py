@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.api.accounting.helpers import ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES
 from app.models.accounting import (
     Account,
     AccountType,
@@ -26,6 +25,7 @@ from app.models.accounting import (
 )
 from app.models.invoice import Invoice, InvoiceStatus
 
+from .account_utils import ASSET_ACCOUNT_TYPES, LIABILITY_ACCOUNT_TYPES
 from .dashboard_types import (
     ActivityCounts,
     BalanceSummary,

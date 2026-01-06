@@ -8,6 +8,7 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.employee import Employee
+    from app.models.party import Party
 
 
 # ============= DEPARTMENT =============
@@ -137,6 +138,11 @@ class ERPNextUser(Base):
 
     # Link to employee
     employee_id: Mapped[Optional[int]] = mapped_column(ForeignKey("employees.id"), nullable=True, index=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     # Sync metadata
     last_synced_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
@@ -145,6 +151,7 @@ class ERPNextUser(Base):
 
     # Relationships
     employee: Mapped[Optional["Employee"]] = relationship()
+    party: Mapped[Optional["Party"]] = relationship(foreign_keys=[party_id])
 
     def __repr__(self) -> str:
         return f"<ERPNextUser {self.email}>"

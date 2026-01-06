@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+</head>
+<body>
+    <h1>{{ title }}</h1>
+    <div class="meta">Generated at {{ generated_at }}</div>
+
+    {% for section in sections %}
+    <div class="section">
+        <h2>{{ section.title }}</h2>
+        {% if section.columns and section.rows %}
+        <table>
+            <thead>
+                <tr>
+                    {% for col in section.columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in section.rows %}
+                <tr>
+                    {% if row is mapping %}
+                        {% for col in section.columns %}
+                        <td>{{ row[col] }}</td>
+                        {% endfor %}
+                    {% else %}
+                        {% for cell in row %}
+                        <td>{{ cell }}</td>
+                        {% endfor %}
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="meta">No data available.</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</body>
+</html>

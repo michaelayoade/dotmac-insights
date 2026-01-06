@@ -116,7 +116,7 @@
                 <div>
                     <p class="text-sm font-medium text-primary-700 font-body">Balance Due</p>
                     <p class="mt-2 text-3xl font-display font-bold invoice-balance {{ 'text-red-700' if invoice.balance and invoice.balance > 0 else 'text-gray-500' }}" data-testid="balance">
-                        {{ invoice.balance | currency if invoice.balance else (invoice.total_amount - invoice.amount_paid) | currency }}
+                        {{ (invoice.balance if invoice.balance is not none else (invoice.total_amount - invoice.amount_paid)) | currency }}
                     </p>
                 </div>
             </div>

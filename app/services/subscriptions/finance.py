@@ -310,6 +310,10 @@ class SubscriptionFinanceService:
                     InvoiceStatus.OVERDUE,
                 ]),
                 Invoice.is_deleted == False,
+                func.coalesce(
+                    Invoice.balance,
+                    Invoice.total_amount - func.coalesce(Invoice.amount_paid, 0),
+                ) > 0,
             )
             .order_by(Invoice.due_date.asc())
             .all()
@@ -367,7 +371,9 @@ class SubscriptionFinanceService:
                 if remaining <= 0:
                     break
 
-                invoice_balance = invoice.total_amount - (invoice.amount_paid or Decimal("0"))
+                invoice_balance = invoice.balance or (
+                    invoice.total_amount - (invoice.amount_paid or Decimal("0"))
+                )
                 allocation_amount = min(remaining, invoice_balance)
 
                 if allocation_amount > 0:
@@ -556,7 +562,10 @@ class SubscriptionFinanceService:
         total_invoiced = sum(inv.total_amount for inv in invoices)
         total_paid = sum(inv.amount_paid or Decimal("0") for inv in invoices)
         total_tax = sum(inv.tax_amount or Decimal("0") for inv in invoices)
-        outstanding = total_invoiced - total_paid
+        outstanding = sum(
+            (inv.balance or (inv.total_amount - (inv.amount_paid or Decimal("0"))))
+            for inv in invoices
+        )
 
         # Calculate lifetime value
         active_days = 0
@@ -658,7 +667,7 @@ class SubscriptionFinanceService:
         }
 
         for inv in invoices:
-            balance = inv.total_amount - (inv.amount_paid or Decimal("0"))
+            balance = inv.balance or Decimal("0")
             total_outstanding += balance
 
             due = inv.due_date.date() if isinstance(

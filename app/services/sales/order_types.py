@@ -30,6 +30,7 @@ class SalesOrderFilters:
     status: Optional[str] = None  # draft, to_deliver_and_bill, to_bill, to_deliver, completed, cancelled, closed, on_hold
     customer: Optional[str] = None
     customer_account_id: Optional[int] = None
+    party_id: Optional[int] = None
     sales_partner_id: Optional[int] = None
     territory_id: Optional[int] = None
     min_value: Optional[Decimal] = None
@@ -59,15 +60,40 @@ class SalesOrderLineItemData:
     uom: Optional[str] = None
     warehouse: Optional[str] = None
     delivery_date: Optional[date] = None
+    tax_code_id: Optional[int] = None
+    tax_rate: Decimal = Decimal("0")
+    tax_amount: Decimal = Decimal("0")
+    is_tax_inclusive: bool = False
 
 
 @dataclass
 class SalesOrderCreateData:
     """Data for creating a sales order."""
 
-    customer: str
+    customer: Optional[str] = None
     customer_name: Optional[str] = None
     customer_account_id: Optional[int] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    billing_address: Optional[str] = None
+    shipping_address: Optional[str] = None
+    billing_address_line1: Optional[str] = None
+    billing_address_line2: Optional[str] = None
+    billing_city: Optional[str] = None
+    billing_state: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    billing_country: Optional[str] = None
+    billing_gps_lat: Optional[Decimal] = None
+    billing_gps_lng: Optional[Decimal] = None
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+    shipping_gps_lat: Optional[Decimal] = None
+    shipping_gps_lng: Optional[Decimal] = None
     company: Optional[str] = None
     currency: str = "NGN"
     transaction_date: Optional[date] = None
@@ -79,6 +105,7 @@ class SalesOrderCreateData:
     campaign: Optional[str] = None
     items: List[SalesOrderLineItemData] = field(default_factory=list)
     quotation_id: Optional[int] = None  # Source quotation if converted
+    status: Optional[str] = None
 
 
 @dataclass
@@ -86,12 +113,37 @@ class SalesOrderUpdateData:
     """Data for updating a sales order (all fields optional)."""
 
     customer_name: Optional[str] = None
+    customer_account_id: Optional[int] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    billing_address: Optional[str] = None
+    shipping_address: Optional[str] = None
+    billing_address_line1: Optional[str] = None
+    billing_address_line2: Optional[str] = None
+    billing_city: Optional[str] = None
+    billing_state: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    billing_country: Optional[str] = None
+    billing_gps_lat: Optional[Decimal] = None
+    billing_gps_lng: Optional[Decimal] = None
+    shipping_address_line1: Optional[str] = None
+    shipping_address_line2: Optional[str] = None
+    shipping_city: Optional[str] = None
+    shipping_state: Optional[str] = None
+    shipping_postal_code: Optional[str] = None
+    shipping_country: Optional[str] = None
+    shipping_gps_lat: Optional[Decimal] = None
+    shipping_gps_lng: Optional[Decimal] = None
     delivery_date: Optional[date] = None
     order_type: Optional[str] = None
     sales_partner_id: Optional[int] = None
     territory_id: Optional[int] = None
     source: Optional[str] = None
     campaign: Optional[str] = None
+    quotation_id: Optional[int] = None
+    status: Optional[str] = None
+    items: Optional[List[SalesOrderLineItemData]] = None
 
 
 @dataclass
@@ -104,6 +156,10 @@ class SalesOrderLineItemUpdateData:
     discount_amount: Optional[Decimal] = None
     description: Optional[str] = None
     delivery_date: Optional[date] = None
+    tax_code_id: Optional[int] = None
+    tax_rate: Optional[Decimal] = None
+    tax_amount: Optional[Decimal] = None
+    is_tax_inclusive: Optional[bool] = None
 
 
 @dataclass

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey, Index, text
+from sqlalchemy import String, Text, Enum, Date, Numeric, ForeignKey, Index, text, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from app.utils.datetime_utils import utc_now
@@ -14,6 +14,7 @@ from app.models.document_lines import BillLine
 if TYPE_CHECKING:
     from app.models.bank_transaction_split import BankTransactionSplit
     from app.models.party import SupplierAccount
+    from app.models.party import Party
 
 
 # ============= SUPPLIER =============
@@ -24,6 +25,12 @@ class Supplier(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    party_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger,
+        ForeignKey("parties.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     supplier_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     supplier_group: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)  # ERPNext value
@@ -62,6 +69,7 @@ class Supplier(Base):
     updated_at: Mapped[datetime] = mapped_column(default=utc_now, onupdate=utc_now)
 
     # Relationships
+    party: Mapped[Optional["Party"]] = relationship()
     supplier_group_rel: Mapped[Optional["SupplierGroup"]] = relationship(
         "SupplierGroup",
         foreign_keys=[supplier_group_id],
