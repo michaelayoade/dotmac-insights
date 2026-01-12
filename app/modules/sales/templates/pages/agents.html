@@ -15,8 +15,19 @@
         <h1 class="text-2xl sm:text-3xl font-display font-bold text-gray-900 tracking-tight" data-testid="page-title">Sales Agents</h1>
         <p class="mt-1.5 text-gray-500 font-body">Performance leaderboard by sales person</p>
     </div>
-    <!-- Filters -->
+    <!-- Actions / Filters -->
     <div class="flex flex-wrap items-center gap-3">
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all shadow-sm"
+            data-testid="sales-agents-add-agent"
+            onclick="openSalesAgentModal()"
+        >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add agent
+        </button>
         <select
             name="territory"
             class="rounded-xl border-0 py-2.5 pl-4 pr-10 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-200 focus:ring-2 focus:ring-inset focus:ring-primary-500 sm:text-sm"
@@ -85,6 +96,8 @@
                         <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Revenue</th>
                         <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Avg Order</th>
                         <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Commission</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
                     </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-100">
@@ -136,6 +149,21 @@
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-right">
                             {{ agent.commission_rate }}
                         </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            <span class="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium {{ 'bg-emerald-50 text-emerald-700' if agent.is_active else 'bg-gray-100 text-gray-600' }}">
+                                {{ 'Active' if agent.is_active else 'Inactive' }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            <button
+                                type="button"
+                                class="text-xs font-medium text-primary-600 hover:text-primary-700"
+                                onclick="toggleAgentStatus({{ agent.id }}, {{ 'false' if agent.is_active else 'true' }})"
+                                data-testid="agent-toggle-{{ agent.id }}"
+                            >
+                                {{ 'Deactivate' if agent.is_active else 'Activate' }}
+                            </button>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -153,4 +181,189 @@
         {% endif %}
     </div>
 </div>
+
+<div
+    id="sales-agent-modal"
+    class="hidden fixed inset-0 z-40 flex items-center justify-center bg-gray-900/40 p-4"
+    role="dialog"
+    aria-modal="true"
+>
+    <div class="w-full max-w-md rounded-2xl bg-white shadow-warm-xl">
+        <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+            <h3 class="text-sm font-semibold text-gray-900">Add sales agent</h3>
+            <button
+                type="button"
+                class="text-gray-400 hover:text-gray-600"
+                onclick="closeSalesAgentModal()"
+                aria-label="Close"
+            >
+                <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4.28 3.22a.75.75 0 00-1.06 1.06L6.94 8l-3.72 3.72a.75.75 0 101.06 1.06L8 9.06l3.72 3.72a.75.75 0 101.06-1.06L9.06 8l3.72-3.72a.75.75 0 00-1.06-1.06L8 6.94 4.28 3.22z"/>
+                </svg>
+            </button>
+        </div>
+        <form class="px-5 py-4 space-y-4" onsubmit="submitSalesAgentForm(event)">
+            <div>
+                <label for="sales-agent-name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Agent name
+                </label>
+                <input
+                    type="text"
+                    id="sales-agent-name"
+                    class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    placeholder="Full name"
+                    required
+                >
+            </div>
+            <div>
+                <label for="sales-agent-department" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Department
+                </label>
+                <input
+                    type="text"
+                    id="sales-agent-department"
+                    class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    placeholder="Sales"
+                >
+            </div>
+            <div>
+                <label for="sales-agent-commission" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                    Commission rate (%)
+                </label>
+                <input
+                    type="number"
+                    id="sales-agent-commission"
+                    min="0"
+                    step="0.1"
+                    class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    placeholder="0"
+                >
+            </div>
+            <p id="sales-agent-error" class="hidden text-sm text-red-600 font-body"></p>
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button
+                    type="button"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-all"
+                    onclick="closeSalesAgentModal()"
+                >
+                    Cancel
+                </button>
+                <button
+                    type="submit"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all shadow-sm"
+                >
+                    Create agent
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const salesAgentModal = document.getElementById('sales-agent-modal');
+const salesAgentNameInput = document.getElementById('sales-agent-name');
+const salesAgentDepartmentInput = document.getElementById('sales-agent-department');
+const salesAgentCommissionInput = document.getElementById('sales-agent-commission');
+const salesAgentError = document.getElementById('sales-agent-error');
+
+function openSalesAgentModal() {
+    if (!salesAgentModal) {
+        return;
+    }
+    salesAgentModal.classList.remove('hidden');
+    if (salesAgentNameInput) {
+        salesAgentNameInput.focus();
+    }
+}
+
+function closeSalesAgentModal() {
+    if (!salesAgentModal) {
+        return;
+    }
+    salesAgentModal.classList.add('hidden');
+    if (salesAgentNameInput) {
+        salesAgentNameInput.value = '';
+    }
+    if (salesAgentDepartmentInput) {
+        salesAgentDepartmentInput.value = '';
+    }
+    if (salesAgentCommissionInput) {
+        salesAgentCommissionInput.value = '';
+    }
+    if (salesAgentError) {
+        salesAgentError.textContent = '';
+        salesAgentError.classList.add('hidden');
+    }
+}
+
+async function submitSalesAgentForm(event) {
+    event.preventDefault();
+    if (!salesAgentNameInput) {
+        return;
+    }
+    const name = salesAgentNameInput.value.trim();
+    if (!name) {
+        if (salesAgentError) {
+            salesAgentError.textContent = 'Agent name is required.';
+            salesAgentError.classList.remove('hidden');
+        }
+        return;
+    }
+    const payload = {
+        sales_person_name: name,
+        department: salesAgentDepartmentInput?.value.trim() || null,
+        commission_rate: Number.parseFloat(salesAgentCommissionInput?.value || '0') || 0,
+        is_group: false,
+        enabled: true,
+    };
+    try {
+        const response = await fetch('/api/v1/sales/sales-persons', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            const message = data.detail || 'Unable to create sales agent.';
+            if (salesAgentError) {
+                salesAgentError.textContent = message;
+                salesAgentError.classList.remove('hidden');
+            }
+            return;
+        }
+        closeSalesAgentModal();
+        window.location.reload();
+    } catch (error) {
+        if (salesAgentError) {
+            salesAgentError.textContent = 'Unable to create sales agent.';
+            salesAgentError.classList.remove('hidden');
+        }
+    }
+}
+
+async function toggleAgentStatus(agentId, enabled) {
+    try {
+        const response = await fetch(`/api/v1/sales/sales-persons/${agentId}`, {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ enabled }),
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            const message = data.detail || 'Unable to update agent status.';
+            window.alert(message);
+            return;
+        }
+        window.location.reload();
+    } catch (error) {
+        window.alert('Unable to update agent status.');
+    }
+}
+</script>
 {% endblock %}

@@ -66,6 +66,7 @@ class HRDashboardSummary:
 class DepartmentStat:
     """Employee count by department."""
 
+    id: int
     name: str
     count: int
 

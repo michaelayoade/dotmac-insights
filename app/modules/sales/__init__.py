@@ -252,7 +252,7 @@ async def sales_agents(
 
     # Get sales persons with their order stats
     agents_data = []
-    sales_persons = db.query(SalesPerson).filter(SalesPerson.enabled == True).all()
+    sales_persons = db.query(SalesPerson).all()
 
     for sp in sales_persons:
         # Build query for orders by this sales person
@@ -270,18 +270,17 @@ async def sales_agents(
         total_revenue = sum(o.grand_total or Decimal("0") for o in orders)
         avg_order_value = total_revenue / order_count if order_count > 0 else Decimal("0")
 
-        # Only include agents with activity
-        if order_count > 0:
-            agents_data.append({
-                "id": sp.id,
-                "name": sp.sales_person_name,
-                "department": sp.department or "—",
-                "orders": order_count,
-                "revenue": total_revenue,
-                "revenue_formatted": f"₦{total_revenue:,.0f}",
-                "avg_order": f"₦{avg_order_value:,.0f}",
-                "commission_rate": f"{sp.commission_rate:.1f}%",
-            })
+        agents_data.append({
+            "id": sp.id,
+            "name": sp.sales_person_name,
+            "department": sp.department or "—",
+            "orders": order_count,
+            "revenue": total_revenue,
+            "revenue_formatted": f"₦{total_revenue:,.0f}",
+            "avg_order": f"₦{avg_order_value:,.0f}",
+            "commission_rate": f"{sp.commission_rate:.1f}%",
+            "is_active": sp.enabled is not False,
+        })
 
     # Sort by revenue descending and assign ranks
     agents_data.sort(key=lambda x: x["revenue"], reverse=True)
@@ -289,7 +288,7 @@ async def sales_agents(
         agent["rank"] = i
 
     context["agents"] = agents_data
-    context["total_agents"] = len(agents_data)
+    context["total_agents"] = sum(1 for sp in sales_persons if sp.enabled is not False)
     context["total_revenue"] = f"₦{sum(a['revenue'] for a in agents_data):,.0f}"
     context["total_orders"] = sum(a["orders"] for a in agents_data)
 

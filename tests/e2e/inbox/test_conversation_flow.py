@@ -158,7 +158,7 @@ class TestConversationResolutionFlow:
         conv_id = conv.id
 
         # Verify initial state
-        resp = client.get(f"/api/inbox/conversations/{conv_id}")
+        resp = client.get(f"/api/v1/inbox/conversations/{conv_id}")
         assert_http_ok(resp, "Get conversation")
         conversation = get_json(resp)
         assert conversation["status"] == "open"
@@ -166,7 +166,7 @@ class TestConversationResolutionFlow:
         assert conversation["assigned_agent_id"] is None
 
         # 2. Assign to agent
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/assign", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/assign", json={
             "agent_id": test_agent.id,
         })
         assert_http_ok(resp, "Assign to agent")
@@ -175,13 +175,13 @@ class TestConversationResolutionFlow:
         assert conversation["assigned_at"] is not None
 
         # 3. Agent marks conversation as read
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/mark-read")
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/mark-read")
         assert_http_ok(resp, "Mark as read")
         result = get_json(resp)
         assert result["success"] is True
 
         # 4. Agent sends reply
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/messages", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/messages", json={
             "body": "Hello Jane! Thank you for reaching out. I'd be happy to help with your billing question. Could you please provide more details about invoice #1234?",
             "is_private": False,
         })
@@ -190,12 +190,12 @@ class TestConversationResolutionFlow:
         assert message["direction"] == "outbound"
 
         # Verify first response time was tracked
-        resp = client.get(f"/api/inbox/conversations/{conv_id}")
+        resp = client.get(f"/api/v1/inbox/conversations/{conv_id}")
         conversation = get_json(resp)
         assert conversation["first_response_at"] is not None
 
         # 5. Simulate customer response (add internal note about it)
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/messages", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/messages", json={
             "body": "Customer replied: The invoice shows a charge I don't recognize.",
             "is_private": True,  # Private note
         })
@@ -204,14 +204,14 @@ class TestConversationResolutionFlow:
         assert note["message_type"] == "private_note"
 
         # 6. Agent sends final response
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/messages", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/messages", json={
             "body": "I've reviewed your account and found that charge was for the premium upgrade you requested on the 15th. I've attached the order confirmation for your records. Is there anything else I can help with?",
             "is_private": False,
         })
         assert_http_ok(resp, "Send final response")
 
         # 7. Resolve conversation
-        resp = client.patch(f"/api/inbox/conversations/{conv_id}", json={
+        resp = client.patch(f"/api/v1/inbox/conversations/{conv_id}", json={
             "status": "resolved",
         })
         assert_http_ok(resp, "Resolve conversation")
@@ -252,20 +252,20 @@ class TestConversationToTicketFlow:
         conv_id = conv.id
 
         # 2. Assign to agent
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/assign", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/assign", json={
             "agent_id": test_agent.id,
         })
         assert_http_ok(resp)
 
         # 3. Agent acknowledges and prepares to escalate
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/messages", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/messages", json={
             "body": "I understand you're experiencing network issues affecting your office. Let me create a support ticket for this so our technical team can investigate.",
             "is_private": False,
         })
         assert_http_ok(resp)
 
         # 4. Create ticket from conversation
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/create-ticket", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/create-ticket", json={
             "subject": "Network Outage - Office Connectivity Down",
             "priority": "high",
             "category": "network",
@@ -278,7 +278,7 @@ class TestConversationToTicketFlow:
         assert result["ticket_id"] is not None
 
         # 5. Verify conversation is linked to ticket
-        resp = client.get(f"/api/inbox/conversations/{conv_id}")
+        resp = client.get(f"/api/v1/inbox/conversations/{conv_id}")
         conversation = get_json(resp)
         assert conversation["ticket_id"] == result["ticket_id"]
 
@@ -313,14 +313,14 @@ class TestConversationToLeadFlow:
         conv_id = conv.id
 
         # 2. Update conversation with sales context
-        resp = client.patch(f"/api/inbox/conversations/{conv_id}", json={
+        resp = client.patch(f"/api/v1/inbox/conversations/{conv_id}", json={
             "tags": ["sales", "enterprise", "pricing"],
             "priority": "high",
         })
         assert_http_ok(resp)
 
         # 3. Create lead from conversation
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/create-lead", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/create-lead", json={
             "lead_name": "Corporate Buyer",
             "company_name": "Enterprise Corp",
             "source": "inbox",
@@ -333,7 +333,7 @@ class TestConversationToLeadFlow:
         assert result["lead_id"] is not None
 
         # 4. Verify conversation is linked to lead
-        resp = client.get(f"/api/inbox/conversations/{conv_id}")
+        resp = client.get(f"/api/v1/inbox/conversations/{conv_id}")
         conversation = get_json(resp)
         assert conversation["lead_id"] == result["lead_id"]
 
@@ -365,12 +365,12 @@ class TestConversationSnoozeFlow:
         conv_id = conv.id
 
         # Assign and respond
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/assign", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/assign", json={
             "agent_id": test_agent.id,
         })
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/messages", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/messages", json={
             "body": "I'd be happy to help. Could you please verify your account email?",
             "is_private": False,
         })
@@ -378,7 +378,7 @@ class TestConversationSnoozeFlow:
 
         # Snooze for 24 hours
         snooze_until = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
-        resp = client.patch(f"/api/inbox/conversations/{conv_id}", json={
+        resp = client.patch(f"/api/v1/inbox/conversations/{conv_id}", json={
             "status": "snoozed",
             "snoozed_until": snooze_until,
         })
@@ -418,7 +418,7 @@ class TestTeamAssignmentFlow:
         conv_id = conv.id
 
         # 1. Assign to team
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/assign", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/assign", json={
             "team_id": test_team.id,
         })
         assert_http_ok(resp, "Assign to team")
@@ -427,7 +427,7 @@ class TestTeamAssignmentFlow:
         assert conversation["assigned_agent_id"] is None
 
         # 2. Agent picks up from team queue
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/assign", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/assign", json={
             "agent_id": test_agent.id,
         })
         assert_http_ok(resp, "Agent picks up")
@@ -463,13 +463,13 @@ class TestConversationFilteringFlow:
             subject="Already Assigned",
             initial_message="This one is taken",
         )
-        resp = client.post(f"/api/inbox/conversations/{assigned_conv.id}/assign", json={
+        resp = client.post(f"/api/v1/inbox/conversations/{assigned_conv.id}/assign", json={
             "agent_id": test_agent.id,
         })
         assert_http_ok(resp)
 
         # Filter for unassigned
-        resp = client.get("/api/inbox/conversations?unassigned=true")
+        resp = client.get("/api/v1/inbox/conversations?unassigned=true")
         assert_http_ok(resp)
         data = get_json(resp)
 
@@ -496,7 +496,7 @@ class TestConversationFilteringFlow:
                 subject=f"VIP Customer {i}",
                 initial_message=f"Important inquiry {i}",
             )
-            resp = client.patch(f"/api/inbox/conversations/{conv.id}", json={
+            resp = client.patch(f"/api/v1/inbox/conversations/{conv.id}", json={
                 "is_starred": True,
             })
             assert_http_ok(resp)
@@ -509,7 +509,7 @@ class TestConversationFilteringFlow:
         )
 
         # Filter for starred
-        resp = client.get("/api/inbox/conversations?is_starred=true")
+        resp = client.get("/api/v1/inbox/conversations?is_starred=true")
         assert_http_ok(resp)
         data = get_json(resp)
 
@@ -539,18 +539,18 @@ class TestConversationArchiveFlow:
         conv_id = conv.id
 
         # Resolve the conversation
-        resp = client.patch(f"/api/inbox/conversations/{conv_id}", json={
+        resp = client.patch(f"/api/v1/inbox/conversations/{conv_id}", json={
             "status": "resolved",
         })
         assert_http_ok(resp)
 
         # Archive the conversation
-        resp = client.post(f"/api/inbox/conversations/{conv_id}/archive")
+        resp = client.post(f"/api/v1/inbox/conversations/{conv_id}/archive")
         assert_http_ok(resp, "Archive conversation")
         result = get_json(resp)
         assert result["success"] is True
 
         # Verify archived (closed) status
-        resp = client.get(f"/api/inbox/conversations/{conv_id}")
+        resp = client.get(f"/api/v1/inbox/conversations/{conv_id}")
         conversation = get_json(resp)
         assert conversation["status"] == "closed"

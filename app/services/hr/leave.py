@@ -122,7 +122,10 @@ class LeaveService:
         Returns:
             List of LeaveType objects.
         """
-        stmt = select(LeaveType).order_by(LeaveType.leave_type_name.asc())
+        stmt = select(LeaveType)
+        if not include_inactive:
+            stmt = stmt.where(LeaveType.is_active == True)
+        stmt = stmt.order_by(LeaveType.leave_type_name.asc())
         return list(self.db.scalars(stmt).all())
 
     def get_leave_type(self, leave_type_id: int) -> LeaveType:
@@ -165,6 +168,7 @@ class LeaveService:
 
         leave_type = LeaveType(
             leave_type_name=data.leave_type_name,
+            is_active=data.is_active,
             max_leaves_allowed=data.max_leaves_allowed,
             max_continuous_days_allowed=data.max_continuous_days_allowed,
             is_carry_forward=data.is_carry_forward,
@@ -203,6 +207,8 @@ class LeaveService:
                     f"Leave type '{data.leave_type_name}' already exists"
                 )
             leave_type.leave_type_name = data.leave_type_name
+        if data.is_active is not None:
+            leave_type.is_active = data.is_active
 
         if data.max_leaves_allowed is not None:
             leave_type.max_leaves_allowed = data.max_leaves_allowed
@@ -565,11 +571,6 @@ class LeaveService:
     ) -> LeaveApplication:
         """Update an existing leave application."""
         application = self.get_application(application_id)
-
-        if application.status != LeaveApplicationStatus.OPEN:
-            raise LeaveStatusTransitionError(
-                application.status.value, "updated",
-            )
 
         if data.from_date is not None:
             application.from_date = data.from_date

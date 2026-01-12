@@ -69,7 +69,13 @@
                         {{ lead.created_at.strftime('%b %d, %Y') if lead.created_at else '-' }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <a href="/crm/leads/{{ lead.party_id }}" class="text-blue-600 hover:text-blue-900">View</a>
+                        <div class="inline-flex items-center gap-3">
+                            <a href="/crm/leads/{{ lead.party_id }}" class="text-blue-600 hover:text-blue-900" onclick="event.stopPropagation();">View</a>
+                            <form method="POST" action="/crm/leads/{{ lead.party_id }}/delete" onsubmit="event.stopPropagation(); return confirm('Delete {{ lead.display_name or lead.name }}? This will mark the lead as inactive.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <button type="submit" class="text-red-600 hover:text-red-700">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}

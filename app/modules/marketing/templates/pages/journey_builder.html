@@ -8,7 +8,10 @@
     </div>
     <div class="flex flex-wrap gap-3">
         <button class="px-4 py-2.5 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50">Preview</button>
-        <button class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Publish Journey</button>
+        <form method="post" action="/marketing/journeys/{{ journey.id }}/publish">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 font-medium">Publish Journey</button>
+        </form>
     </div>
 </div>
 {% endblock %}

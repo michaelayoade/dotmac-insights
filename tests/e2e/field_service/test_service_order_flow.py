@@ -98,7 +98,7 @@ class TestServiceOrderCompleteFlow:
         create_payload = {
             "order_type": "installation",
             "priority": "high",
-            "customer_id": test_customer.id,
+            "customer_account_id": test_customer.id,
             "service_address": "123 Installation Street, Lagos",
             "city": "Lagos",
             "state": "Lagos",
@@ -113,7 +113,7 @@ class TestServiceOrderCompleteFlow:
             "is_billable": True,
         }
 
-        resp = client.post("/api/field-service/orders", json=create_payload)
+        resp = client.post("/api/v1/field-service/orders", json=create_payload)
         assert_http_ok(resp, "Create service order")
         order = get_json(resp)
 
@@ -123,7 +123,7 @@ class TestServiceOrderCompleteFlow:
         assert order["priority"] == "high"
 
         # 2. Schedule the order
-        resp = client.post(f"/api/field-service/orders/{order_id}/schedule", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/schedule", json={
             "notes": "Scheduled for morning installation"
         })
         assert_http_ok(resp, "Schedule order")
@@ -131,7 +131,7 @@ class TestServiceOrderCompleteFlow:
         assert order["status"] == "scheduled"
 
         # 3. Dispatch to technician
-        resp = client.post(f"/api/field-service/orders/{order_id}/dispatch", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/dispatch", json={
             "technician_id": test_technician.id,
             "notes": "Assigned to primary technician",
             "notify_customer": False,
@@ -142,7 +142,7 @@ class TestServiceOrderCompleteFlow:
         assert order["assigned_technician_id"] == test_technician.id
 
         # 4. Technician marks en route
-        resp = client.post(f"/api/field-service/orders/{order_id}/en-route", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/en-route", json={
             "latitude": "6.5244",
             "longitude": "3.3792",
             "notes": "Leaving office now"
@@ -152,7 +152,7 @@ class TestServiceOrderCompleteFlow:
         assert order["status"] == "en_route"
 
         # 5. Technician arrives on site
-        resp = client.post(f"/api/field-service/orders/{order_id}/arrive", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/arrive", json={
             "latitude": "6.4500",
             "longitude": "3.4000",
             "notes": "Arrived at customer location"
@@ -162,7 +162,7 @@ class TestServiceOrderCompleteFlow:
         assert order["status"] == "on_site"
 
         # 6. Technician starts work
-        resp = client.post(f"/api/field-service/orders/{order_id}/start", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/start", json={
             "notes": "Beginning installation work"
         })
         assert_http_ok(resp, "Start work")
@@ -176,7 +176,7 @@ class TestServiceOrderCompleteFlow:
         if order.get("checklist_items"):
             for item in order["checklist_items"]:
                 resp = client.patch(
-                    f"/api/field-service/orders/{order_id}/checklist/{item['id']}",
+                    f"/api/v1/field-service/orders/{order_id}/checklist/{item['id']}",
                     json={
                         "is_completed": True,
                         "notes": "Completed successfully",
@@ -185,7 +185,7 @@ class TestServiceOrderCompleteFlow:
                 assert_http_ok(resp, f"Update checklist item {item['id']}")
 
         # 8. Add inventory items used
-        resp = client.post(f"/api/field-service/orders/{order_id}/items", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/items", json={
             "item_name": "Fiber Router Model X",
             "quantity": "1",
             "unit": "pcs",
@@ -194,7 +194,7 @@ class TestServiceOrderCompleteFlow:
         assert_http_ok(resp, "Add inventory item")
 
         # 9. Complete the order
-        resp = client.post(f"/api/field-service/orders/{order_id}/complete", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/complete", json={
             "notes": "Installation completed successfully. Customer trained on usage."
         })
         assert_http_ok(resp, "Complete order")
@@ -203,7 +203,7 @@ class TestServiceOrderCompleteFlow:
         assert order["resolution_notes"] is not None
 
         # 10. Capture customer signature
-        resp = client.post(f"/api/field-service/orders/{order_id}/signature", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/signature", json={
             "signature_data": "base64encodedSignatureData==",
             "signer_name": "John Customer",
             "rating": 5,
@@ -215,7 +215,7 @@ class TestServiceOrderCompleteFlow:
         assert signature["rating"] == 5
 
         # Verify final state
-        resp = client.get(f"/api/field-service/orders/{order_id}")
+        resp = client.get(f"/api/v1/field-service/orders/{order_id}")
         final_order = get_json(resp)
         assert final_order["status"] == "completed"
         assert final_order["customer_rating"] == 5
@@ -244,22 +244,22 @@ class TestServiceOrderRescheduleFlow:
         # Create and schedule order
         create_payload = {
             "order_type": "maintenance",
-            "customer_id": test_customer.id,
+            "customer_account_id": test_customer.id,
             "service_address": "456 Maintenance Ave",
             "scheduled_date": date.today().isoformat(),
             "title": "Routine Maintenance",
         }
-        resp = client.post("/api/field-service/orders", json=create_payload)
+        resp = client.post("/api/v1/field-service/orders", json=create_payload)
         order = get_json(resp)
         order_id = order["id"]
 
         # Schedule it
-        resp = client.post(f"/api/field-service/orders/{order_id}/schedule", json={})
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/schedule", json={})
         assert_http_ok(resp, "Schedule order")
 
         # Reschedule to next week
         new_date = date.today() + timedelta(days=7)
-        resp = client.post(f"/api/field-service/orders/{order_id}/reschedule", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/reschedule", json={
             "scheduled_date": new_date.isoformat(),
             "scheduled_start_time": "14:00:00",
             "reason": "Customer requested different date",
@@ -289,27 +289,27 @@ class TestServiceOrderCancellationFlow:
         # Create and schedule order
         create_payload = {
             "order_type": "repair",
-            "customer_id": test_customer.id,
+            "customer_account_id": test_customer.id,
             "service_address": "789 Cancel Street",
             "scheduled_date": date.today().isoformat(),
             "title": "Repair Work",
         }
-        resp = client.post("/api/field-service/orders", json=create_payload)
+        resp = client.post("/api/v1/field-service/orders", json=create_payload)
         order = get_json(resp)
         order_id = order["id"]
 
         # Schedule it
-        resp = client.post(f"/api/field-service/orders/{order_id}/schedule", json={})
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/schedule", json={})
         assert_http_ok(resp, "Schedule order")
 
         # Cancel the order
-        resp = client.delete(f"/api/field-service/orders/{order_id}")
+        resp = client.delete(f"/api/v1/field-service/orders/{order_id}")
         assert_http_ok(resp, "Cancel order")
         result = get_json(resp)
         assert "cancelled" in result["message"].lower()
 
         # Verify cancelled status
-        resp = client.get(f"/api/field-service/orders/{order_id}")
+        resp = client.get(f"/api/v1/field-service/orders/{order_id}")
         order = get_json(resp)
         assert order["status"] == "cancelled"
 
@@ -331,9 +331,9 @@ class TestBulkOperationsFlow:
         # Create multiple orders
         order_ids = []
         for i in range(3):
-            resp = client.post("/api/field-service/orders", json={
+            resp = client.post("/api/v1/field-service/orders", json={
                 "order_type": "maintenance",
-                "customer_id": test_customer.id,
+                "customer_account_id": test_customer.id,
                 "service_address": f"{i} Bulk Street",
                 "scheduled_date": date.today().isoformat(),
                 "title": f"Bulk Order {i}",
@@ -341,13 +341,13 @@ class TestBulkOperationsFlow:
             order = get_json(resp)
 
             # Schedule each order
-            resp = client.post(f"/api/field-service/orders/{order['id']}/schedule", json={})
+            resp = client.post(f"/api/v1/field-service/orders/{order['id']}/schedule", json={})
             assert_http_ok(resp)
             order_ids.append(order["id"])
 
         # Bulk reschedule
         new_date = date.today() + timedelta(days=14)
-        resp = client.post("/api/field-service/orders/bulk/reschedule", json={
+        resp = client.post("/api/v1/field-service/orders/bulk/reschedule", json={
             "order_ids": order_ids,
             "scheduled_date": new_date.isoformat(),
             "reason": "Weather delay - all outdoor work postponed",
@@ -361,7 +361,7 @@ class TestBulkOperationsFlow:
 
         # Verify all orders were rescheduled
         for order_id in order_ids:
-            resp = client.get(f"/api/field-service/orders/{order_id}")
+            resp = client.get(f"/api/v1/field-service/orders/{order_id}")
             order = get_json(resp)
             assert order["scheduled_date"] == new_date.isoformat()
 
@@ -387,10 +387,10 @@ class TestEmergencyServiceFlow:
         client = e2e_superuser_client
 
         # Create urgent order
-        resp = client.post("/api/field-service/orders", json={
+        resp = client.post("/api/v1/field-service/orders", json={
             "order_type": "repair",
             "priority": "urgent",
-            "customer_id": test_customer.id,
+            "customer_account_id": test_customer.id,
             "service_address": "Emergency Location",
             "scheduled_date": date.today().isoformat(),
             "title": "URGENT: Network Down",
@@ -401,13 +401,13 @@ class TestEmergencyServiceFlow:
         assert order["priority"] == "urgent"
 
         # Schedule immediately
-        resp = client.post(f"/api/field-service/orders/{order_id}/schedule", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/schedule", json={
             "notes": "URGENT - expedited scheduling"
         })
         assert_http_ok(resp)
 
         # Dispatch immediately
-        resp = client.post(f"/api/field-service/orders/{order_id}/dispatch", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/dispatch", json={
             "technician_id": test_technician.id,
             "notes": "URGENT dispatch - highest priority",
             "notify_customer": False,
@@ -415,22 +415,22 @@ class TestEmergencyServiceFlow:
         assert_http_ok(resp)
 
         # Simulate rapid response - directly to in progress
-        resp = client.post(f"/api/field-service/orders/{order_id}/en-route", json={})
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/en-route", json={})
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/field-service/orders/{order_id}/arrive", json={})
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/arrive", json={})
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/field-service/orders/{order_id}/start", json={})
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/start", json={})
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/field-service/orders/{order_id}/complete", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/complete", json={
             "notes": "Emergency resolved - replaced faulty equipment"
         })
         assert_http_ok(resp)
 
         # Verify completed urgent order
-        resp = client.get(f"/api/field-service/orders/{order_id}")
+        resp = client.get(f"/api/v1/field-service/orders/{order_id}")
         order = get_json(resp)
         assert order["status"] == "completed"
         assert order["priority"] == "urgent"
@@ -460,9 +460,9 @@ class TestMultiTechnicianFlow:
         )
 
         # Create and dispatch order to first technician
-        resp = client.post("/api/field-service/orders", json={
+        resp = client.post("/api/v1/field-service/orders", json={
             "order_type": "installation",
-            "customer_id": test_customer.id,
+            "customer_account_id": test_customer.id,
             "service_address": "Reassign Street",
             "scheduled_date": date.today().isoformat(),
             "title": "Order to Reassign",
@@ -471,11 +471,11 @@ class TestMultiTechnicianFlow:
         order_id = order["id"]
 
         # Schedule
-        resp = client.post(f"/api/field-service/orders/{order_id}/schedule", json={})
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/schedule", json={})
         assert_http_ok(resp)
 
         # Dispatch to first technician
-        resp = client.post(f"/api/field-service/orders/{order_id}/dispatch", json={
+        resp = client.post(f"/api/v1/field-service/orders/{order_id}/dispatch", json={
             "technician_id": test_technician.id,
             "notify_customer": False,
         })
@@ -484,7 +484,7 @@ class TestMultiTechnicianFlow:
         assert order["assigned_technician_id"] == test_technician.id
 
         # Reassign to second technician via update
-        resp = client.patch(f"/api/field-service/orders/{order_id}", json={
+        resp = client.patch(f"/api/v1/field-service/orders/{order_id}", json={
             "assigned_technician_id": tech2.id,
         })
         assert_http_ok(resp, "Reassign technician")

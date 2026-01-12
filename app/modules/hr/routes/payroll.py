@@ -9,6 +9,7 @@ Uses PayrollService for all business logic.
 """
 from decimal import Decimal
 from typing import Optional
+from datetime import date
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -22,7 +23,10 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.core.security import is_htmx_request
+from sqlalchemy.exc import SQLAlchemyError
 from app.services.hr.payroll import PayrollService
+from app.services.hr.employees import EmployeeService
+from app.services.hr.employee_types import EmployeeFilters
 from app.services.hr.payroll_types import (
     SalarySlipFilters,
     SalaryStructureFilters,
@@ -31,9 +35,10 @@ from app.services.hr.payroll_types import (
     SalaryStructureUpdateData,
     StructureEarningData,
     StructureDeductionData,
+    SalarySlipCreateData,
 )
 from app.services.types import PaginationParams
-from app.services.hr.errors import SalarySlipNotFoundError, SalaryStructureNotFoundError
+from app.services.hr.errors import SalarySlipNotFoundError, SalaryStructureNotFoundError, EmployeeNotFoundError
 from app.models.hr_payroll import SalaryComponentType
 
 RequireHRRead = Depends(require_scope("hr:read"))
@@ -60,10 +65,13 @@ async def payroll_list(
 
     filters = SalarySlipFilters()
     pagination = PaginationParams(offset=offset, limit=per_page)
-    result = service.list_salary_slips(filters, pagination)
+    try:
+        result = service.list_salary_slips(filters, pagination)
+    except SQLAlchemyError:
+        result = None
 
     # Apply search filter post-query if needed (service handles employee_id filter)
-    slips = result.items
+    slips = result.items if result else []
     if q:
         q_lower = q.lower()
         slips = [
@@ -73,7 +81,7 @@ async def payroll_list(
         ]
         total = len(slips)
     else:
-        total = result.total
+        total = result.total if result else 0
 
     context = get_base_context(request, response, user, csrf_token)
     context["slips"] = slips
@@ -107,6 +115,162 @@ async def payroll_table(
     per_page: int = Query(25, ge=10, le=100),
 ):
     return await payroll_list(request, response, user, csrf_token, db, q, page, per_page)
+
+
+@router.get("/new", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def salary_slip_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    """New salary slip form."""
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Salary Slip"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "HR", "href": "/hr/employees"},
+        {"label": "Payroll", "href": "/hr/payroll"},
+        {"label": "New Slip"},
+    ])
+    context["employees"] = get_employee_options(db)
+    context["form_data"] = {
+        "employee_id": "",
+        "posting_date": "",
+        "start_date": "",
+        "end_date": "",
+        "gross_pay": "",
+        "total_deduction": "",
+        "net_pay": "",
+        "currency": "NGN",
+        "company": "",
+        "bank_name": "",
+        "bank_account_no": "",
+    }
+    context["errors"] = {}
+    template = templates.get_template("modules/hr/templates/payroll/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def salary_slip_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    _: CSRFProtect,
+):
+    """Create a new salary slip."""
+    form = await request.form()
+    employee_id = _form_str(form.get("employee_id"))
+    posting_date = _form_date(form.get("posting_date"))
+    start_date = _form_date(form.get("start_date"))
+    end_date = _form_date(form.get("end_date"))
+    gross_pay = _form_decimal(form.get("gross_pay"))
+    total_deduction = _form_decimal(form.get("total_deduction"))
+    net_pay = _form_decimal(form.get("net_pay"))
+    currency = _form_str(form.get("currency")) or "NGN"
+    company = _form_str(form.get("company"))
+    bank_name = _form_str(form.get("bank_name"))
+    bank_account_no = _form_str(form.get("bank_account_no"))
+
+    errors: dict[str, str] = {}
+    if not employee_id or not employee_id.isdigit():
+        errors["employee_id"] = "Employee is required."
+    if not posting_date:
+        errors["posting_date"] = "Posting date is required."
+    if not start_date:
+        errors["start_date"] = "Start date is required."
+    if not end_date:
+        errors["end_date"] = "End date is required."
+    if start_date and end_date and end_date < start_date:
+        errors["end_date"] = "End date must be after start date."
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Salary Slip"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Payroll", "href": "/hr/payroll"},
+            {"label": "New Slip"},
+        ])
+        context["employees"] = get_employee_options(db)
+        context["form_data"] = {
+            "employee_id": employee_id or "",
+            "posting_date": form.get("posting_date") or "",
+            "start_date": form.get("start_date") or "",
+            "end_date": form.get("end_date") or "",
+            "gross_pay": form.get("gross_pay") or "",
+            "total_deduction": form.get("total_deduction") or "",
+            "net_pay": form.get("net_pay") or "",
+            "currency": currency,
+            "company": company or "",
+            "bank_name": bank_name or "",
+            "bank_account_no": bank_account_no or "",
+        }
+        context["errors"] = errors
+        template = templates.get_template("modules/hr/templates/payroll/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    employee_service = EmployeeService(db)
+    try:
+        employee = employee_service.get_employee(int(employee_id))
+    except EmployeeNotFoundError:
+        errors["employee_id"] = "Employee not found."
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Salary Slip"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Payroll", "href": "/hr/payroll"},
+            {"label": "New Slip"},
+        ])
+        context["employees"] = get_employee_options(db)
+        context["form_data"] = {
+            "employee_id": employee_id or "",
+            "posting_date": form.get("posting_date") or "",
+            "start_date": form.get("start_date") or "",
+            "end_date": form.get("end_date") or "",
+            "gross_pay": form.get("gross_pay") or "",
+            "total_deduction": form.get("total_deduction") or "",
+            "net_pay": form.get("net_pay") or "",
+            "currency": currency,
+            "company": company or "",
+            "bank_name": bank_name or "",
+            "bank_account_no": bank_account_no or "",
+        }
+        context["errors"] = errors
+        template = templates.get_template("modules/hr/templates/payroll/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+    employee_code = employee.employee_number or employee.name
+
+    service = PayrollService(db, user)
+    data = SalarySlipCreateData(
+        employee_id=employee.id,
+        employee=employee_code,
+        employee_name=employee.name,
+        department=employee.department,
+        designation=employee.designation,
+        posting_date=posting_date,
+        start_date=start_date,
+        end_date=end_date,
+        company=company,
+        currency=currency,
+        gross_pay=gross_pay,
+        total_deduction=total_deduction,
+        net_pay=net_pay,
+        bank_name=bank_name,
+        bank_account_no=bank_account_no,
+    )
+    slip = service.create_salary_slip(data)
+    db.commit()
+    db.refresh(slip)
+    return RedirectResponse(url="/hr/payroll", status_code=303)
 
 
 @router.get("/structures", response_class=HTMLResponse, dependencies=[RequireHRRead])
@@ -181,6 +345,26 @@ def _form_decimal(value: Optional[str]) -> Decimal:
         return Decimal(value.strip())
     except Exception:
         return Decimal("0")
+
+
+def _form_date(value: Optional[str]) -> Optional[date]:
+    if not value or not value.strip():
+        return None
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError:
+        return None
+
+
+def get_employee_options(db: DB):
+    """Get employees using EmployeeService."""
+    service = EmployeeService(db)
+    result = service.list_employees(
+        filters=EmployeeFilters(),
+        pagination=PaginationParams(offset=0, limit=500),
+    )
+    employees = sorted(result.items, key=lambda e: e.name or "")
+    return employees
 
 
 def _parse_structure_components(
@@ -568,7 +752,7 @@ async def payroll_runs_list(
     return HTMLResponse(template.render(context))
 
 
-@router.get("/{slip_id}", response_class=HTMLResponse, dependencies=[RequireHRRead])
+@router.get("/{slip_id:int}", response_class=HTMLResponse, dependencies=[RequireHRRead])
 async def salary_slip_detail(
     request: Request,
     response: Response,

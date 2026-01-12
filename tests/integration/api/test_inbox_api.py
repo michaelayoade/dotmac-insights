@@ -10,7 +10,8 @@ from datetime import datetime, timezone, timedelta
 from app.models.omni import (
     OmniChannel, OmniConversation, OmniMessage, OmniParticipant
 )
-from app.models.agent import Agent, Team
+from app.models.agent import Team
+from app.models.party import Party, PartyRole, RefPartyRoleType
 from app.models.ticket import Ticket
 
 
@@ -37,16 +38,34 @@ def sample_channel(integration_db):
 @pytest.fixture
 def sample_agent(integration_db):
     """Create a test agent."""
-    agent = Agent(
-        email="agent@test.com",
-        display_name="Test Agent",
-        is_active=True,
-        max_concurrent_chats=10,
-        current_chat_count=0,
+    role_type = (
+        integration_db.query(RefPartyRoleType)
+        .filter(RefPartyRoleType.code == "support_agent")
+        .first()
+    )
+    if not role_type:
+        role_type = RefPartyRoleType(
+            code="support_agent",
+            label="Support Agent",
+            category="support",
+        )
+        integration_db.add(role_type)
+        integration_db.commit()
+
+    agent = Party(
+        type="person",
+        status="active",
+        name="Test Agent",
+        primary_email="agent@test.com",
+        emails=[{"address": "agent@test.com", "label": "primary", "is_primary": True}],
     )
     integration_db.add(agent)
     integration_db.commit()
     integration_db.refresh(agent)
+
+    agent_role = PartyRole(party_id=agent.id, role="support_agent", status="active")
+    integration_db.add(agent_role)
+    integration_db.commit()
     return agent
 
 
@@ -89,7 +108,7 @@ def create_test_conversation(integration_db, sample_channel):
             priority=priority,
             contact_name=contact_name,
             contact_email=contact_email,
-            assigned_agent_id=assigned_agent_id,
+            assigned_party_id=assigned_agent_id,
             assigned_team_id=assigned_team_id,
             is_starred=is_starred,
             tags=tags,
@@ -318,7 +337,7 @@ class TestConversationGet:
         """Cannot get conversation without support:read scope."""
         conv = create_test_conversation()
 
-        client = auth_client(["contacts:read"])  # Wrong scope
+        client = auth_client(["crm:read"])  # Wrong scope
         resp = client.get(f"/api/inbox/conversations/{conv.id}")
 
         assert resp.status_code == 403

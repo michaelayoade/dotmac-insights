@@ -9,6 +9,22 @@
             <span class="inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-medium {{ status_styles.get(application.status.value, 'bg-gray-100 text-gray-600') }}" data-testid="leave-status" data-status="{{ application.status.value }}">{{ application.status.value | title }}</span>
         </div>
     </div>
+    <div class="flex flex-wrap items-center gap-2">
+        <a
+            href="/hr/leave/{{ application.id }}/edit"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50"
+            data-testid="edit-leave"
+        >Edit</a>
+        <button
+            type="button"
+            class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 hover:border-red-300"
+            hx-delete="/hr/leave/{{ application.id }}"
+            hx-confirm="Are you sure you want to delete this leave application?"
+            data-delete-id="leave-{{ application.id }}"
+            data-item-name="{{ application.employee_name or application.employee }}"
+            data-testid="delete-leave"
+        >Delete</button>
+    </div>
     {% if application.status.value == 'open' %}
     <div class="flex items-center gap-2">
         <button

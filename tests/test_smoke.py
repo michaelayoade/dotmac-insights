@@ -46,8 +46,8 @@ class TestAppBoot:
     def test_cli_imports(self):
         """Test that CLI can import all models."""
         # Simulate CLI import
-        from app.models import Customer, Employee, Invoice, Department, SalesPerson
-        assert Customer is not None
+        from app.models import CustomerAccount, Employee, Invoice, Department, SalesPerson
+        assert CustomerAccount is not None
         assert Employee is not None
         assert Invoice is not None
         assert Department is not None

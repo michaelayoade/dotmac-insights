@@ -262,8 +262,6 @@ def scenario_ap_workflow(db: Session) -> dict:
 
     Returns dict with all entities.
     """
-    from app.models.unified_contact import UnifiedContact, ContactType
-
     # Create supplier
     supplier = create_unified_contact(
         db,

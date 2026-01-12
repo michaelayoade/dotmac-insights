@@ -149,7 +149,7 @@
                     <option value="">All Customers</option>
                     {% for account in customer_accounts %}
                     <option value="{{ account.id }}" {% if current_customer_account_id == account.id %}selected{% endif %}>
-                        {{ account.party.name or account.party.trading_name or account.party.legal_name or ('Account ' ~ account.id) }}
+                        {{ account.name or ('Account ' ~ account.id) }}
                     </option>
                     {% endfor %}
                 </select>

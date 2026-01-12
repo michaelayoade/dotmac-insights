@@ -6,16 +6,25 @@ All routes delegate to services in app/services/marketing.
 from __future__ import annotations
 
 from datetime import date, datetime, time, timezone
+from decimal import Decimal, InvalidOperation
 
-from fastapi import APIRouter, Request, Response, Depends
+from fastapi import APIRouter, Request, Response, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.web.dependencies import SessionUser, CSRFToken, DB, require_scope, csrf_protect
 from app.web.context import get_base_context, get_navigation_context
 from app.templates.environment import get_template_env
-from app.services.errors import ValidationError
+from app.services.errors import ValidationError, NotFoundError
 from app.core.security import set_flash
-from app.models.marketing import SocialPostStatus, SocialPlatform
+from app.models.marketing import (
+    SocialPostStatus,
+    SocialPlatform,
+    MarketingCampaign,
+    MarketingCampaignStatus,
+    MarketingCampaignType,
+    JourneyStatus,
+    JourneyTemplate,
+)
 from app.services.secrets_service import get_secrets
 
 from app.services.marketing import (
@@ -82,6 +91,16 @@ def _form_str(form: dict, key: str) -> str:
     return str(value).strip()
 
 
+def _form_int(form: dict, key: str) -> int | None:
+    value = _form_str(form, key)
+    if not value:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _parse_date(value: str) -> date | None:
     if not value:
         return None
@@ -96,6 +115,24 @@ def _parse_time(value: str) -> time | None:
         return None
     try:
         return time.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _parse_decimal(value: str) -> Decimal | None:
+    if not value:
+        return None
+    try:
+        return Decimal(value)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _parse_enum(value: str, enum_cls):
+    if not value:
+        return None
+    try:
+        return enum_cls(value)
     except ValueError:
         return None
 
@@ -168,6 +205,108 @@ async def marketing_campaigns(
     return HTMLResponse(template.render(context))
 
 
+@protected_router.get("/campaigns/new", response_class=HTMLResponse, dependencies=[RequireMarketingWrite])
+async def marketing_campaign_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Campaign"
+    context["campaign_type_options"] = [
+        {"value": t.value, "label": t.value.replace("_", " ").title()}
+        for t in MarketingCampaignType
+    ]
+    context["status_options"] = [
+        {"value": s.value, "label": s.value.replace("_", " ").title()}
+        for s in MarketingCampaignStatus
+    ]
+    context["form_data"] = {}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/marketing/templates/pages/campaign_form.html")
+    return HTMLResponse(template.render(context))
+
+
+@protected_router.post(
+    "/campaigns",
+    response_class=HTMLResponse,
+    dependencies=[RequireMarketingWrite, Depends(csrf_protect)],
+)
+async def marketing_campaign_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    form = await request.form()
+    name = _form_str(form, "name")
+    description = _form_str(form, "description") or None
+    campaign_type = _parse_enum(_form_str(form, "campaign_type"), MarketingCampaignType)
+    status = _parse_enum(_form_str(form, "status"), MarketingCampaignStatus)
+    budget = _parse_decimal(_form_str(form, "budget")) or Decimal("0")
+    currency = _form_str(form, "currency") or "NGN"
+    start_date = _parse_date(_form_str(form, "starts_at"))
+    end_date = _parse_date(_form_str(form, "ends_at"))
+
+    errors = {}
+    if not name:
+        errors["name"] = "Campaign name is required."
+    if campaign_type is None:
+        errors["campaign_type"] = "Campaign type is required."
+    if status is None:
+        errors["status"] = "Status is required."
+    if start_date and end_date and end_date < start_date:
+        errors["ends_at"] = "End date must be on or after start date."
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Campaign"
+        context["campaign_type_options"] = [
+            {"value": t.value, "label": t.value.replace("_", " ").title()}
+            for t in MarketingCampaignType
+        ]
+        context["status_options"] = [
+            {"value": s.value, "label": s.value.replace("_", " ").title()}
+            for s in MarketingCampaignStatus
+        ]
+        context["form_data"] = dict(form)
+        context["errors"] = errors
+        template = templates.get_template("modules/marketing/templates/pages/campaign_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    starts_at = datetime.combine(start_date, time.min, tzinfo=timezone.utc) if start_date else None
+    ends_at = datetime.combine(end_date, time.min, tzinfo=timezone.utc) if end_date else None
+
+    campaign_service = get_campaign_service(db)
+    try:
+        campaign_service.create_campaign(
+            {
+                "name": name,
+                "description": description,
+                "campaign_type": campaign_type,
+                "status": status,
+                "budget": budget,
+                "currency": currency,
+                "starts_at": starts_at,
+                "ends_at": ends_at,
+            }
+        )
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url="/marketing/campaigns/new", status_code=303)
+
+    set_flash(response, "Campaign created.", "success")
+    return RedirectResponse(url="/marketing/campaigns", status_code=303)
+
+
 # =============================================================================
 # Journeys
 # =============================================================================
@@ -190,6 +329,99 @@ async def marketing_journeys(
 
     template = templates.get_template("modules/marketing/templates/pages/journey_list.html")
     return HTMLResponse(template.render(context))
+
+
+@protected_router.get("/journeys/new", response_class=HTMLResponse, dependencies=[RequireMarketingWrite])
+async def marketing_journey_new(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "New Journey"
+    context["status_options"] = [
+        {"value": s.value, "label": s.value.replace("_", " ").title()}
+        for s in JourneyStatus
+    ]
+    context["templates"] = (
+        db.query(JourneyTemplate).order_by(JourneyTemplate.name.asc()).all()
+    )
+    context["campaigns"] = (
+        db.query(MarketingCampaign).order_by(MarketingCampaign.name.asc()).all()
+    )
+    context["form_data"] = {}
+    context["errors"] = {}
+
+    template = templates.get_template("modules/marketing/templates/pages/journey_form.html")
+    return HTMLResponse(template.render(context))
+
+
+@protected_router.post(
+    "/journeys",
+    response_class=HTMLResponse,
+    dependencies=[RequireMarketingWrite, Depends(csrf_protect)],
+)
+async def marketing_journey_create(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+):
+    form = await request.form()
+    name = _form_str(form, "name")
+    status = _parse_enum(_form_str(form, "status"), JourneyStatus)
+    template_id = _form_int(form, "template_id")
+    campaign_id = _form_int(form, "campaign_id")
+    entry_trigger = _form_str(form, "entry_trigger") or None
+
+    errors = {}
+    if not name:
+        errors["name"] = "Journey name is required."
+    if status is None:
+        errors["status"] = "Status is required."
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "New Journey"
+        context["status_options"] = [
+            {"value": s.value, "label": s.value.replace("_", " ").title()}
+            for s in JourneyStatus
+        ]
+        context["templates"] = (
+            db.query(JourneyTemplate).order_by(JourneyTemplate.name.asc()).all()
+        )
+        context["campaigns"] = (
+            db.query(MarketingCampaign).order_by(MarketingCampaign.name.asc()).all()
+        )
+        context["form_data"] = dict(form)
+        context["errors"] = errors
+        template = templates.get_template("modules/marketing/templates/pages/journey_form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    journey_service = get_journey_service(db)
+    try:
+        journey = journey_service.create_journey(
+            {
+                "name": name,
+                "template_id": template_id,
+                "campaign_id": campaign_id,
+                "status": status,
+                "entry_trigger": entry_trigger,
+            }
+        )
+        db.commit()
+    except ValidationError as exc:
+        db.rollback()
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url="/marketing/journeys/new", status_code=303)
+
+    set_flash(response, "Journey created.", "success")
+    return RedirectResponse(url=f"/marketing/journeys/{journey.id}/builder", status_code=303)
 
 
 @protected_router.get("/journeys/templates", response_class=HTMLResponse)
@@ -226,11 +458,40 @@ async def marketing_journey_builder(
 
     journey_service = get_journey_service(db)
     context["steps"] = journey_service.get_journey_steps(journey_id)
-    context["journey"] = {}
+    try:
+        context["journey"] = journey_service.get_journey(journey_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Journey not found")
     context["analytics"] = {}
 
     template = templates.get_template("modules/marketing/templates/pages/journey_builder.html")
     return HTMLResponse(template.render(context))
+
+
+@protected_router.post(
+    "/journeys/{journey_id}/publish",
+    response_class=HTMLResponse,
+    dependencies=[RequireMarketingWrite, Depends(csrf_protect)],
+)
+async def marketing_journey_publish(
+    request: Request,
+    response: Response,
+    db: DB,
+    journey_id: int,
+):
+    journey_service = get_journey_service(db)
+    try:
+        journey_service.update_journey(journey_id, {"status": JourneyStatus.ACTIVE})
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Journey not found")
+    except ValidationError as exc:
+        db.rollback()
+        set_flash(response, str(exc), "error")
+        return RedirectResponse(url=f"/marketing/journeys/{journey_id}/builder", status_code=303)
+
+    set_flash(response, "Journey published.", "success")
+    return RedirectResponse(url=f"/marketing/journeys/{journey_id}/builder", status_code=303)
 
 
 # =============================================================================

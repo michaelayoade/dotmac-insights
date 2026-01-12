@@ -9,7 +9,7 @@ import pytest
 from decimal import Decimal
 from datetime import date
 from app.database import SessionLocal, Base, engine
-from app.models.tax_config import TaxRegion, GenericGenericTaxCategory, TaxRate, GenericTaxCategoryType, TaxFilingFrequency
+from app.models.tax_config import TaxRegion, GenericTaxCategory, TaxRate, GenericTaxCategoryType, TaxFilingFrequency
 from app.models.payroll_config import (
     PayrollRegion,
     DeductionRule,

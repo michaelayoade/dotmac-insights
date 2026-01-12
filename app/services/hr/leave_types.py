@@ -52,6 +52,7 @@ class LeaveTypeCreateData:
     """Data for creating a leave type."""
 
     leave_type_name: str
+    is_active: bool = True
     max_leaves_allowed: int = 0
     max_continuous_days_allowed: Optional[int] = None
     is_carry_forward: bool = False
@@ -70,6 +71,7 @@ class LeaveTypeUpdateData:
     """Data for updating a leave type (all fields optional)."""
 
     leave_type_name: Optional[str] = None
+    is_active: Optional[bool] = None
     max_leaves_allowed: Optional[int] = None
     max_continuous_days_allowed: Optional[int] = None
     is_carry_forward: Optional[bool] = None

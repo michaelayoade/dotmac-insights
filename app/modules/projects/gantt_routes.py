@@ -31,7 +31,7 @@ from ._deps import (
 )
 import json
 
-router = APIRouter(prefix="/projects", tags=["projects-gantt"])
+router = APIRouter(tags=["projects-gantt"])  # Prefix added in __init__.py
 
 
 # =============================================================================

@@ -1024,11 +1024,14 @@ web_router.include_router(payments_router)
 
 # Legacy operations sub-modules (for backwards compatibility)
 web_router.include_router(inventory_router)
-web_router.include_router(projects_router)
-web_router.include_router(projects_dashboard_router)
-web_router.include_router(projects_tasks_router)
-web_router.include_router(projects_milestones_router)
-web_router.include_router(projects_gantt_router)
+# NOTE: projects_router has /{project_id} which would catch /dashboard, /tasks, etc.
+# So specific routers must be included BEFORE projects_router.
+# These routers have no prefix, so we add /projects here.
+web_router.include_router(projects_dashboard_router, prefix="/projects")
+web_router.include_router(projects_tasks_router, prefix="/projects")
+web_router.include_router(projects_milestones_router, prefix="/projects")
+web_router.include_router(projects_gantt_router, prefix="/projects")
+web_router.include_router(projects_router)  # Already has prefix="/projects", must be last
 web_router.include_router(field_service_router)
 web_router.include_router(field_service_calendar_router)
 web_router.include_router(assets_router)

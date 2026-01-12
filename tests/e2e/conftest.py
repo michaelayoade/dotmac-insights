@@ -115,8 +115,11 @@ def e2e_db(e2e_engine):
         autocommit=False,
         autoflush=False,
         bind=connection,
+        expire_on_commit=False,
+        join_transaction_mode="create_savepoint",
     )
     db = TestSessionLocal()
+    db.info["sessionmaker"] = TestSessionLocal
 
     yield db
 
@@ -133,11 +136,14 @@ def e2e_client(e2e_db):
 
     Uses the same database session as e2e_db for state verification.
     """
+    sessionmaker_factory = e2e_db.info["sessionmaker"]
+
     def override_get_db():
+        request_db = sessionmaker_factory()
         try:
-            yield e2e_db
+            yield request_db
         finally:
-            pass  # Don't close - handled by e2e_db fixture
+            request_db.close()
 
     # Use direct override assignment for cleaner fixture chain
     fastapi_app.dependency_overrides[get_db] = override_get_db
@@ -201,7 +207,7 @@ def e2e_scoped_client(e2e_db, e2e_client):
 
     Usage:
         def test_limited_access(e2e_scoped_client):
-            client = e2e_scoped_client(["contacts:read", "contacts:write"])
+            client = e2e_scoped_client(["crm:read", "crm:write"])
             # Test with limited permissions
     """
     def _make_client(scopes: list[str], is_superuser: bool = False):

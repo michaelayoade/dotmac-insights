@@ -32,7 +32,7 @@ class TestProjectCreation:
 
         payload = {
             "project_name": "E2E Test Project",
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "project_manager_id": manager.id,
             "status": "open",
             "priority": "high",
@@ -41,7 +41,7 @@ class TestProjectCreation:
             "estimated_costing": 5000000,
         }
 
-        response = e2e_superuser_client.post("/api/projects/projects", json=payload)
+        response = e2e_superuser_client.post("/api/v1/projects/projects", json=payload)
         assert_http_ok(response, "Create project")
 
         data = get_json(response)
@@ -54,7 +54,7 @@ class TestProjectCreation:
         create_project(e2e_db, customer_id=customer.id, project_name="List Test 1")
         create_project(e2e_db, customer_id=customer.id, project_name="List Test 2")
 
-        response = e2e_superuser_client.get("/api/projects/projects")
+        response = e2e_superuser_client.get("/api/v1/projects/projects")
         assert_http_ok(response, "List projects")
 
         data = get_json(response)
@@ -67,7 +67,7 @@ class TestProjectCreation:
         create_project(e2e_db, customer_id=customer.id, status="open")
         create_project(e2e_db, customer_id=customer.id, status="completed")
 
-        response = e2e_superuser_client.get("/api/projects/projects", params={"status": "open"})
+        response = e2e_superuser_client.get("/api/v1/projects/projects", params={"status": "open"})
         assert_http_ok(response, "Filter by status")
 
         data = get_json(response)
@@ -78,7 +78,7 @@ class TestProjectCreation:
         """Test getting project details."""
         project = create_project(e2e_db, project_name="Detail Test Project")
 
-        response = e2e_superuser_client.get(f"/api/projects/projects/{project.id}")
+        response = e2e_superuser_client.get(f"/api/v1/projects/projects/{project.id}")
         assert_http_ok(response, "Get project")
 
         data = get_json(response)
@@ -101,7 +101,7 @@ class TestProjectTasks:
             "exp_end_date": (date.today() + timedelta(days=7)).isoformat(),
         }
 
-        response = e2e_superuser_client.post("/api/projects/tasks", json=payload)
+        response = e2e_superuser_client.post("/api/v1/projects/tasks", json=payload)
         assert_http_ok(response, "Create task")
 
         data = get_json(response)
@@ -117,7 +117,7 @@ class TestProjectTasks:
         create_task(e2e_db, project.id, subject="Task 2")
 
         response = e2e_superuser_client.get(
-            "/api/projects/tasks",
+            "/api/v1/projects/tasks",
             params={"project_id": project.id},
         )
         assert_http_ok(response, "List tasks")
@@ -134,7 +134,7 @@ class TestProjectTasks:
         task = create_task(e2e_db, project.id, status="open")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/tasks/{task.id}",
+            f"/api/v1/projects/tasks/{task.id}",
             json={"status": "working"},
         )
         assert_http_ok(response, "Update task status")
@@ -150,7 +150,7 @@ class TestProjectTasks:
         task = create_task(e2e_db, project.id, status="working")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/tasks/{task.id}",
+            f"/api/v1/projects/tasks/{task.id}",
             json={"status": "completed"},
         )
         assert_http_ok(response, "Complete task")
@@ -167,7 +167,7 @@ class TestProjectTasks:
         task = create_task(e2e_db, project.id)
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/tasks/{task.id}",
+            f"/api/v1/projects/tasks/{task.id}",
             json={"assigned_to_id": employee.id},
         )
         assert_http_ok(response, "Assign task")
@@ -190,7 +190,7 @@ class TestProjectMilestones:
             "status": "planned",
         }
 
-        response = e2e_superuser_client.post("/api/projects/milestones", json=payload)
+        response = e2e_superuser_client.post("/api/v1/projects/milestones", json=payload)
         # May return 200, 201 or 404 if endpoint doesn't exist
         assert response.status_code in [200, 201, 404], f"Create milestone: {response.text}"
 
@@ -199,7 +199,7 @@ class TestProjectMilestones:
         project = create_project(e2e_db, project_name="Milestone List Project")
 
         response = e2e_superuser_client.get(
-            "/api/projects/milestones",
+            "/api/v1/projects/milestones",
             params={"project_id": project.id},
         )
         # Endpoint may not exist
@@ -214,7 +214,7 @@ class TestProjectProgress:
         project = create_project(e2e_db, project_name="Progress Test Project")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project.id}",
+            f"/api/v1/projects/projects/{project.id}",
             json={"percent_complete": 50},
         )
         assert_http_ok(response, "Update progress")
@@ -236,7 +236,7 @@ class TestProjectProgress:
         task4 = create_task(e2e_db, project.id, status="open")
 
         # Get project - progress should reflect task completion
-        response = e2e_superuser_client.get(f"/api/projects/projects/{project.id}")
+        response = e2e_superuser_client.get(f"/api/v1/projects/projects/{project.id}")
         data = get_json(response)
 
         # 2/4 tasks complete = 50% (if auto-calculated)
@@ -252,7 +252,7 @@ class TestProjectStatus:
         project = create_project(e2e_db, status="open")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project.id}",
+            f"/api/v1/projects/projects/{project.id}",
             json={"status": "on_hold"},
         )
         assert_http_ok(response, "Put on hold")
@@ -265,7 +265,7 @@ class TestProjectStatus:
         project = create_project(e2e_db, status="open")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project.id}",
+            f"/api/v1/projects/projects/{project.id}",
             json={"status": "completed"},
         )
         assert_http_ok(response, "Complete project")
@@ -278,7 +278,7 @@ class TestProjectStatus:
         project = create_project(e2e_db, status="open")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project.id}",
+            f"/api/v1/projects/projects/{project.id}",
             json={"status": "cancelled"},
         )
         assert_http_ok(response, "Cancel project")
@@ -295,7 +295,7 @@ class TestProjectDashboard:
         create_project(e2e_db, status="open")
         create_project(e2e_db, status="completed")
 
-        response = e2e_superuser_client.get("/api/projects/dashboard")
+        response = e2e_superuser_client.get("/api/v1/projects/dashboard")
         assert_http_ok(response, "Get projects dashboard")
 
         data = get_json(response)
@@ -303,7 +303,7 @@ class TestProjectDashboard:
 
     def test_project_analytics(self, e2e_superuser_client, e2e_db):
         """Test project analytics endpoint."""
-        response = e2e_superuser_client.get("/api/projects/analytics/status-trend")
+        response = e2e_superuser_client.get("/api/v1/projects/analytics/status-trend")
         assert_http_ok(response, "Get project analytics")
 
 
@@ -328,7 +328,7 @@ class TestFullProjectLifecycle:
         # Step 1: Create project
         project_payload = {
             "project_name": "Full Lifecycle Project",
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "project_manager_id": manager.id,
             "status": "open",
             "priority": "high",
@@ -336,7 +336,7 @@ class TestFullProjectLifecycle:
             "expected_end_date": (date.today() + timedelta(days=60)).isoformat(),
             "estimated_costing": 2000000,
         }
-        project_resp = e2e_superuser_client.post("/api/projects/projects", json=project_payload)
+        project_resp = e2e_superuser_client.post("/api/v1/projects/projects", json=project_payload)
         assert_http_ok(project_resp, "Step 1: Create project")
         project = get_json(project_resp)
         project_id = project["id"]
@@ -349,14 +349,14 @@ class TestFullProjectLifecycle:
                 "subject": task_name,
                 "status": "open",
             }
-            task_resp = e2e_superuser_client.post("/api/projects/tasks", json=task_payload)
+            task_resp = e2e_superuser_client.post("/api/v1/projects/tasks", json=task_payload)
             assert_http_ok(task_resp, f"Step 2: Create task {task_name}")
             task_ids.append(get_json(task_resp)["id"])
 
         # Step 3: Assign tasks
         for task_id in task_ids:
             assign_resp = e2e_superuser_client.patch(
-                f"/api/projects/tasks/{task_id}",
+                f"/api/v1/projects/tasks/{task_id}",
                 json={"assigned_to_id": developer.id},
             )
             assert_http_ok(assign_resp, "Step 3: Assign task")
@@ -365,32 +365,32 @@ class TestFullProjectLifecycle:
         for task_id in task_ids:
             # Working
             e2e_superuser_client.patch(
-                f"/api/projects/tasks/{task_id}",
+                f"/api/v1/projects/tasks/{task_id}",
                 json={"status": "working"},
             )
             # Completed
             complete_resp = e2e_superuser_client.patch(
-                f"/api/projects/tasks/{task_id}",
+                f"/api/v1/projects/tasks/{task_id}",
                 json={"status": "completed"},
             )
             assert_http_ok(complete_resp, "Step 4/5: Complete task")
 
         # Step 6: Update project progress
         progress_resp = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project_id}",
+            f"/api/v1/projects/projects/{project_id}",
             json={"percent_complete": 100},
         )
         assert_http_ok(progress_resp, "Step 6: Update progress")
 
         # Step 7: Complete project
         complete_resp = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project_id}",
+            f"/api/v1/projects/projects/{project_id}",
             json={"status": "completed"},
         )
         assert_http_ok(complete_resp, "Step 7: Complete project")
 
         # Verify final state
-        final_resp = e2e_superuser_client.get(f"/api/projects/projects/{project_id}")
+        final_resp = e2e_superuser_client.get(f"/api/v1/projects/projects/{project_id}")
         final = get_json(final_resp)
         assert final["status"] == "completed"
         assert "percent_complete" in final, "Response missing 'percent_complete' field"
@@ -405,7 +405,7 @@ class TestProjectCosting:
         project = create_project(e2e_db, project_name="Cost Test Project")
 
         response = e2e_superuser_client.patch(
-            f"/api/projects/projects/{project.id}",
+            f"/api/v1/projects/projects/{project.id}",
             json={
                 "total_costing_amount": 1500000,
                 "total_expense_claim": 200000,
@@ -419,7 +419,7 @@ class TestProjectCosting:
 
         # Update revenue and costs
         e2e_superuser_client.patch(
-            f"/api/projects/projects/{project.id}",
+            f"/api/v1/projects/projects/{project.id}",
             json={
                 "total_sales_amount": 2000000,
                 "total_costing_amount": 1500000,
@@ -427,7 +427,7 @@ class TestProjectCosting:
         )
 
         # Get project and verify margin
-        response = e2e_superuser_client.get(f"/api/projects/projects/{project.id}")
+        response = e2e_superuser_client.get(f"/api/v1/projects/projects/{project.id}")
         data = get_json(response)
 
         # Gross margin = sales - costs = 500,000

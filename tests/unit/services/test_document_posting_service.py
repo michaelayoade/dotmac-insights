@@ -19,6 +19,7 @@ from app.services.document_posting import (
     DocumentPostingService,
     PostingError,
 )
+from app.models.accounting_ext import FiscalPeriodStatus
 
 # Import mock fixtures
 from tests.unit.conftest import (
@@ -76,12 +77,6 @@ class MockGLEntry:
     company: Optional[str] = "Default Company"
 
 
-class MockFiscalPeriodStatus(str, enum.Enum):
-    OPEN = "open"
-    CLOSED = "closed"
-    LOCKED = "locked"
-
-
 @dataclass
 class MockFiscalPeriod:
     """Mock Fiscal Period for testing."""
@@ -89,7 +84,7 @@ class MockFiscalPeriod:
     period_name: str = "January 2024"
     start_date: date = date(2024, 1, 1)
     end_date: date = date(2024, 1, 31)
-    status: MockFiscalPeriodStatus = MockFiscalPeriodStatus.OPEN
+    status: FiscalPeriodStatus = FiscalPeriodStatus.OPEN
 
 
 @dataclass
@@ -98,6 +93,7 @@ class MockCreditNote:
     id: int = 1
     credit_number: str = "CN-001"
     customer_id: int = 1
+    customer_account_id: Optional[int] = None
     amount: Decimal = Decimal("100.00")
     issue_date: Optional[datetime] = field(default_factory=lambda: datetime.now(timezone.utc))
     posting_date: Optional[datetime] = None
@@ -105,6 +101,10 @@ class MockCreditNote:
     docstatus: int = 0
     journal_entry_id: Optional[int] = None
     workflow_status: Optional[str] = None
+
+    def __post_init__(self):
+        if self.customer_account_id is None:
+            self.customer_account_id = self.customer_id
 
 
 @dataclass
@@ -170,7 +170,7 @@ def invoice_unpaid():
         amount=Decimal("1000.00"),  # Net
         tax_amount=Decimal("180.00"),  # 18% VAT
         amount_paid=Decimal("0.00"),
-        status=MockInvoiceStatus.UNPAID,
+        status=MockInvoiceStatus.PENDING,
         invoice_date=datetime(2024, 1, 15, tzinfo=timezone.utc),
         company="Default Company",
         docstatus=0,
@@ -273,7 +273,7 @@ def open_period():
         period_name="January 2024",
         start_date=date(2024, 1, 1),
         end_date=date(2024, 1, 31),
-        status=MockFiscalPeriodStatus.OPEN,
+        status=FiscalPeriodStatus.OPEN,
     )
 
 
@@ -285,7 +285,7 @@ def closed_period():
         period_name="December 2023",
         start_date=date(2023, 12, 1),
         end_date=date(2023, 12, 31),
-        status=MockFiscalPeriodStatus.CLOSED,
+        status=FiscalPeriodStatus.HARD_CLOSED,
     )
 
 
@@ -989,6 +989,7 @@ class TestEdgeCases:
             tax_amount=Decimal("0.00"),
             docstatus=0,
         )
+        zero_invoice.customer_account_id = zero_invoice.customer_id
 
         created_je = MockJournalEntry(id=1)
 
@@ -1018,6 +1019,7 @@ class TestEdgeCases:
             tax_amount=Decimal("152542372881.36"),
             docstatus=0,
         )
+        large_invoice.customer_account_id = large_invoice.customer_id
 
         created_je = MockJournalEntry(id=1)
 
@@ -1045,6 +1047,7 @@ class TestEdgeCases:
             company=None,
             docstatus=0,
         )
+        invoice.customer_account_id = invoice.customer_id
 
         created_je = MockJournalEntry(id=1)
 

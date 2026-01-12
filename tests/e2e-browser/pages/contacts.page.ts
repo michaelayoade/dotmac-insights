@@ -12,8 +12,8 @@ import { BasePage } from './base.page';
  */
 export class ContactsPage extends BasePage {
   // URL patterns
-  readonly listUrl = '/crm/contacts';
-  readonly createUrl = '/crm/contacts/new';
+  readonly listUrl = '/crm/parties';
+  readonly createUrl = '/crm/parties/new';
 
   // List page elements
   readonly contactsTable: Locator;

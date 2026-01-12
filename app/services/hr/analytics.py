@@ -192,6 +192,7 @@ class HRAnalyticsService:
 
         query = (
             self.db.query(
+                Department.id,
                 Department.department_name,
                 func.count(Employee.id).label("count"),
             )
@@ -214,7 +215,7 @@ class HRAnalyticsService:
             query = query.filter(Department.company.ilike(f"%{company}%"))
 
         return [
-            DepartmentStat(name=row[0], count=row[1] or 0)
+            DepartmentStat(id=row[0], name=row[1], count=row[2] or 0)
             for row in query.all()
         ]
 

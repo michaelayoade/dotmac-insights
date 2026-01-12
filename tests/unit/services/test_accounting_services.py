@@ -36,7 +36,7 @@ class MockPurchaseInvoiceStatus(str, enum.Enum):
 
 class MockInvoiceStatus(str, enum.Enum):
     DRAFT = "draft"
-    UNPAID = "unpaid"
+    PENDING = "pending"
     PARTIALLY_PAID = "partially_paid"
     PAID = "paid"
     CANCELLED = "cancelled"
@@ -110,7 +110,7 @@ class MockInvoice:
     total_amount: Decimal = Decimal("1000.00")
     amount_paid: Decimal = Decimal("0.00")
     balance: Optional[Decimal] = None
-    status: MockInvoiceStatus = MockInvoiceStatus.UNPAID
+    status: MockInvoiceStatus = MockInvoiceStatus.PENDING
     invoice_date: Optional[date] = None
     due_date: Optional[date] = None
     currency: str = "NGN"
@@ -631,6 +631,61 @@ class TestReceivablesServiceDateHandling:
 
         # Should result in skip (continue in loop)
         assert due is None
+
+
+class TestReceivablesServiceAging:
+    """Tests for ReceivablesService aging calculations."""
+
+    @pytest.mark.unit
+    @pytest.mark.accounting
+    def test_aging_report_skips_zero_balance(self, mock_db, mock_settings_service):
+        """Aging report should skip invoices with zero balance."""
+        from app.models.invoice import Invoice
+        from app.services.accounting.receivables import ReceivablesService
+
+        today = date.today()
+        inv_paid = MockInvoice(
+            id=1,
+            balance=Decimal("0"),
+            due_date=today - timedelta(days=10),
+        )
+        inv_open = MockInvoice(
+            id=2,
+            balance=Decimal("250"),
+            due_date=today - timedelta(days=5),
+        )
+        inv_paid.is_deleted = False
+        inv_open.is_deleted = False
+
+        mock_db.register_data(Invoice, [inv_paid, inv_open])
+        service = ReceivablesService(mock_db, mock_settings_service)
+        report = service.get_aging_report()
+
+        assert report.total_invoices == 1
+        assert report.buckets["1_30"].count == 1
+        assert report.total_receivable == Decimal("250")
+
+    @pytest.mark.unit
+    @pytest.mark.accounting
+    def test_aging_report_uses_invoice_date_when_due_missing(self, mock_db, mock_settings_service):
+        """Aging report should fall back to invoice_date when due_date is missing."""
+        from app.models.invoice import Invoice
+        from app.services.accounting.receivables import ReceivablesService
+
+        today = date.today()
+        inv = MockInvoice(
+            id=3,
+            balance=Decimal("100"),
+            invoice_date=today - timedelta(days=20),
+        )
+        inv.due_date = None
+        inv.is_deleted = False
+
+        mock_db.register_data(Invoice, [inv])
+        service = ReceivablesService(mock_db, mock_settings_service)
+        report = service.get_aging_report()
+
+        assert report.buckets["1_30"].count == 1
 
 
 # =============================================================================

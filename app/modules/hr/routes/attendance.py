@@ -8,7 +8,7 @@ Permission Requirements:
 - hr:write - Create, update attendance
 """
 from typing import Optional, Any
-from datetime import date
+from datetime import date, datetime, time
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -24,7 +24,11 @@ from app.templates.environment import get_template_env
 from app.models.hr_attendance import AttendanceStatus
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.services.hr.attendance import AttendanceService
-from app.services.hr.attendance_types import AttendanceFilters, AttendanceCreateData
+from app.services.hr.attendance_types import (
+    AttendanceFilters,
+    AttendanceCreateData,
+    AttendanceUpdateData,
+)
 from app.services.hr.employees import EmployeeService
 from app.services.types import PaginationParams
 from app.services.hr.errors import (
@@ -66,6 +70,26 @@ def _form_date(form: Any, key: str) -> Optional[date]:
         return None
     try:
         return date.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _form_time(form: Any, key: str) -> Optional[time]:
+    value = _form_str(form, key, "")
+    if not value:
+        return None
+    try:
+        return time.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _parse_status(value: str) -> Optional[AttendanceStatus]:
+    if not value:
+        return None
+    normalized = value.strip().lower().replace(" ", "_")
+    try:
+        return AttendanceStatus(normalized)
     except ValueError:
         return None
 
@@ -240,12 +264,13 @@ async def attendance_create(
     employee_id = _form_int(form, "employee_id")
     attendance_date_val = _form_date(form, "attendance_date")
     status_val = _form_str(form, "status")
+    status_enum = _parse_status(status_val)
 
     if employee_id is None:
         errors["employee_id"] = "Employee is required"
     if attendance_date_val is None:
         errors["attendance_date"] = "Date is required"
-    if not status_val:
+    if not status_enum:
         errors["status"] = "Status is required"
 
     if errors:
@@ -296,13 +321,21 @@ async def attendance_create(
 
     # Create attendance via service
     service = AttendanceService(db)
+    shift_id = _form_int(form, "shift_id")
+    shift_name = None
+    if shift_id:
+        try:
+            shift_name = service.get_shift_type(shift_id).shift_type_name
+        except Exception:
+            shift_name = None
+
     create_data = AttendanceCreateData(
         employee_id=employee_id,
         employee=employee.erpnext_id or str(employee.id),
         employee_name=employee.name,
         attendance_date=attendance_date_val,
-        status=AttendanceStatus(status_val),
-        shift=_form_str(form, "shift") or None,
+        status=status_enum,
+        shift=shift_name,
     )
 
     try:
@@ -351,6 +384,174 @@ async def attendance_create(
 
     set_flash(response, "Attendance recorded successfully.", "success")
     return RedirectResponse(url=f"/hr/attendance/{record.id}", status_code=303)
+
+
+@router.get("/{record_id}/edit", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def attendance_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    record_id: int,
+):
+    """Edit attendance record form."""
+    service = AttendanceService(db, user)
+    try:
+        record = service.get_attendance(record_id)
+    except AttendanceNotFoundError:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Edit Attendance"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "HR", "href": "/hr/employees"},
+        {"label": "Attendance", "href": "/hr/attendance"},
+        {"label": str(record.attendance_date), "href": f"/hr/attendance/{record.id}"},
+        {"label": "Edit"},
+    ])
+    context["record"] = record
+    context["status_options"] = get_status_options()
+    context["employee_options"] = get_employee_options(db)
+    context["shift_options"] = get_shift_options(db)
+    context["errors"] = {}
+    context["form_data"] = {}
+
+    template = templates.get_template("modules/hr/templates/attendance/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{record_id}", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def attendance_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    record_id: int,
+):
+    """Update an attendance record."""
+    form = await request.form()
+    service = AttendanceService(db, user)
+
+    try:
+        record = service.get_attendance(record_id)
+    except AttendanceNotFoundError:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+
+    errors = {}
+    status_val = _form_str(form, "status")
+    status_enum = _parse_status(status_val)
+    if not status_enum:
+        errors["status"] = "Status is required"
+
+    shift_id = _form_int(form, "shift_id")
+    shift_name = None
+    if shift_id:
+        try:
+            shift_name = service.get_shift_type(shift_id).shift_type_name
+        except Exception:
+            shift_name = None
+
+    in_time_val = _form_time(form, "in_time")
+    out_time_val = _form_time(form, "out_time")
+    attendance_date_val = record.attendance_date
+    in_time_dt = datetime.combine(attendance_date_val, in_time_val) if in_time_val else None
+    out_time_dt = datetime.combine(attendance_date_val, out_time_val) if out_time_val else None
+
+    late_entry = _form_str(form, "late_entry") == "on"
+    early_exit = _form_str(form, "early_exit") == "on"
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Attendance"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Attendance", "href": "/hr/attendance"},
+            {"label": str(record.attendance_date), "href": f"/hr/attendance/{record.id}"},
+            {"label": "Edit"},
+        ])
+        context["record"] = record
+        context["status_options"] = get_status_options()
+        context["employee_options"] = get_employee_options(db)
+        context["shift_options"] = get_shift_options(db)
+        context["errors"] = errors
+        context["form_data"] = dict(form)
+        template = templates.get_template("modules/hr/templates/attendance/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    service.update_attendance(
+        record_id,
+        AttendanceUpdateData(
+            status=status_enum,
+            shift=shift_name,
+            in_time=in_time_dt,
+            out_time=out_time_dt,
+            late_entry=late_entry,
+            early_exit=early_exit,
+        ),
+    )
+    db.commit()
+
+    set_flash(response, "Attendance record updated successfully.", "success")
+    return RedirectResponse(url=f"/hr/attendance/{record_id}", status_code=303)
+
+
+@router.get("/shifts", response_class=HTMLResponse, dependencies=[RequireHRRead])
+async def shifts_list(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    q: Optional[str] = Query(None),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(25, ge=10, le=100),
+):
+    """Shift types list page using AttendanceService."""
+    service = AttendanceService(db)
+    offset = (page - 1) * per_page
+
+    # Search requires post-filtering since service doesn't support text search
+    if q:
+        all_result = service.list_shift_types(
+            pagination=PaginationParams(offset=0, limit=10000),
+        )
+        q_lower = q.lower()
+        filtered = [
+            s for s in all_result.items
+            if s.shift_type_name and q_lower in s.shift_type_name.lower()
+        ]
+        total = len(filtered)
+        shifts = filtered[offset : offset + per_page]
+    else:
+        result = service.list_shift_types(
+            pagination=PaginationParams(offset=offset, limit=per_page),
+        )
+        shifts = result.items
+        total = result.total
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["shifts"] = shifts
+    context["search_query"] = q or ""
+    context["pagination"] = build_pagination_context(page, per_page, total)
+
+    if is_htmx_request(request):
+        template = templates.get_template("modules/hr/templates/attendance/partials/shifts_table.html")
+        return HTMLResponse(template.render(context))
+
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = "Shift Types"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "HR", "href": "/hr/employees"},
+        {"label": "Shift Types"},
+    ])
+
+    template = templates.get_template("modules/hr/templates/attendance/pages/shifts_list.html")
+    return HTMLResponse(template.render(context))
 
 
 @router.get("/{record_id}", response_class=HTMLResponse, dependencies=[RequireHRRead])
@@ -406,58 +607,3 @@ async def attendance_delete(
 
     set_flash(response, "Attendance record deleted.", "success")
     return RedirectResponse(url="/hr/attendance", status_code=303)
-
-
-# === Shift Types Routes ===
-@router.get("/shifts", response_class=HTMLResponse, dependencies=[RequireHRRead])
-async def shifts_list(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    q: Optional[str] = Query(None),
-    page: int = Query(1, ge=1),
-    per_page: int = Query(25, ge=10, le=100),
-):
-    """Shift types list page using AttendanceService."""
-    service = AttendanceService(db)
-    offset = (page - 1) * per_page
-
-    # Search requires post-filtering since service doesn't support text search
-    if q:
-        all_result = service.list_shift_types(
-            pagination=PaginationParams(offset=0, limit=10000),
-        )
-        q_lower = q.lower()
-        filtered = [
-            s for s in all_result.items
-            if s.shift_type_name and q_lower in s.shift_type_name.lower()
-        ]
-        total = len(filtered)
-        shifts = filtered[offset : offset + per_page]
-    else:
-        result = service.list_shift_types(
-            pagination=PaginationParams(offset=offset, limit=per_page),
-        )
-        shifts = result.items
-        total = result.total
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["shifts"] = shifts
-    context["search_query"] = q or ""
-    context["pagination"] = build_pagination_context(page, per_page, total)
-
-    if is_htmx_request(request):
-        template = templates.get_template("modules/hr/templates/attendance/partials/shifts_table.html")
-        return HTMLResponse(template.render(context))
-
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = "Shift Types"
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "HR", "href": "/hr/employees"},
-        {"label": "Shift Types"},
-    ])
-
-    template = templates.get_template("modules/hr/templates/attendance/pages/shifts_list.html")
-    return HTMLResponse(template.render(context))

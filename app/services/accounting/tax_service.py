@@ -29,7 +29,6 @@ from app.services.base import paginate
 from app.services.errors import NotFoundError, ValidationError
 from app.services.types import PaginatedResult, PaginationParams
 from app.services.validation.soft_validation_service import SoftValidationService
-from app.services.validation.soft_validation_service import SoftValidationService
 
 from .tax_types import (
     TaxCodeFilters,
@@ -398,6 +397,16 @@ class TaxService:
             NotFoundError: If period not found
         """
         period = self.get_filing_period(period_id)
+        if data.amount <= 0:
+            raise ValidationError("Payment amount must be greater than zero")
+        if period.status in [TaxFilingStatus.PAID, TaxFilingStatus.CLOSED]:
+            raise ValidationError(f"Cannot record payment for period in status {period.status.value}")
+
+        remaining = period.tax_amount - period.amount_paid
+        if remaining > 0 and data.amount > remaining:
+            raise ValidationError(
+                f"Payment exceeds outstanding balance ({remaining})"
+            )
 
         payment = TaxPayment(
             filing_period_id=period_id,
@@ -444,7 +453,9 @@ class TaxService:
                 )
             ).all()
 
-            total_outstanding = sum(p.outstanding_amount for p in open_periods)
+            total_outstanding = sum(
+                max(p.outstanding_amount, Decimal("0")) for p in open_periods
+            )
             overdue_count = sum(1 for p in open_periods if p.is_overdue)
 
             if open_periods or total_outstanding > 0:

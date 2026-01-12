@@ -124,6 +124,7 @@ async def support_dashboard(
             "response_overdue": 0,
             "resolution_overdue": 0,
             "status_distribution": {},
+            "priority_distribution": {},
         }
 
     try:
@@ -256,11 +257,11 @@ async def support_dashboard(
     # Format distributions for template
     status_distribution = [
         {"status": status, "count": count}
-        for status, count in basic_stats["status_distribution"].items()
+        for status, count in basic_stats.get("status_distribution", {}).items()
     ]
     priority_distribution = [
         {"priority": priority, "count": count}
-        for priority, count in basic_stats["priority_distribution"].items()
+        for priority, count in basic_stats.get("priority_distribution", {}).items()
     ]
 
     context = get_base_context(request, response, user, csrf_token)

@@ -175,6 +175,7 @@ async def pops_list(
 ):
     """POP list page with customer and router counts."""
     pop_service = get_pop_service(db)
+    dashboard_service = NetworkDashboardService(db)
 
     # Map status filter
     is_active = None

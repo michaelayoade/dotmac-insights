@@ -51,12 +51,18 @@ NAVIGATION = [
 # =============================================================================
 
 # Import sub-routers
-from .routes import router as projects_router
+from .routes import router as projects_router, tasks_router, milestones_router, dashboard_router
 from .gantt_routes import router as gantt_router
 
 # Create combined router
+# NOTE: Routers with specific paths (tasks, milestones, gantt, dashboard) must be
+# included BEFORE projects_router because it has /{project_id} which would catch them.
+# These routers have no prefix, so we add /projects here.
 router = APIRouter(tags=["projects"])
-router.include_router(projects_router)
-router.include_router(gantt_router)
+router.include_router(dashboard_router, prefix="/projects")
+router.include_router(tasks_router, prefix="/projects")
+router.include_router(milestones_router, prefix="/projects")
+router.include_router(gantt_router, prefix="/projects")
+router.include_router(projects_router)  # Already has prefix="/projects"
 
 __all__ = ["MODULE_CONFIG", "NAVIGATION", "router"]

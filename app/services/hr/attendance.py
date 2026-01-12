@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from datetime import date, datetime, time, timedelta
 
-from app.utils.datetime_utils import utc_now
 from decimal import Decimal
 from typing import TYPE_CHECKING, List, Optional, Set
 
@@ -97,6 +96,18 @@ class AttendanceService:
         settings_service = HRSettingsService(self.db, self.principal)
         self._settings_cache[cache_key] = settings_service.get_settings(company)
         return self._settings_cache[cache_key]
+
+    def _naive_now(self) -> datetime:
+        """Return local-time naive datetime."""
+        return datetime.now()
+
+    def _ensure_naive(self, value: Optional[datetime]) -> Optional[datetime]:
+        """Normalize any timezone-aware datetimes to naive local time."""
+        if value is None:
+            return None
+        if value.tzinfo is not None:
+            return value.replace(tzinfo=None)
+        return value
 
     # ==========================================================================
     # Shift Types
@@ -571,15 +582,15 @@ class AttendanceService:
 
         if data.status is not None:
             attendance.status = data.status
-            attendance.status_changed_at = utc_now()
+            attendance.status_changed_at = self._naive_now()
             if self.principal and self.principal.user_id:
                 attendance.status_changed_by_id = self.principal.user_id
         if data.shift is not None:
             attendance.shift = data.shift
         if data.in_time is not None:
-            attendance.in_time = data.in_time
+            attendance.in_time = self._ensure_naive(data.in_time)
         if data.out_time is not None:
-            attendance.out_time = data.out_time
+            attendance.out_time = self._ensure_naive(data.out_time)
         if data.working_hours is not None:
             attendance.working_hours = data.working_hours
         if data.late_entry is not None:
@@ -621,7 +632,7 @@ class AttendanceService:
         - geolocation_required: Whether location is mandatory
         """
         check_date = data.attendance_date or date.today()
-        check_time = data.in_time or utc_now()
+        check_time = self._ensure_naive(data.in_time) or self._naive_now()
 
         # Get employee info first (need company for settings)
         employee = self.db.get(Employee, employee_id)
@@ -716,7 +727,7 @@ class AttendanceService:
         - geolocation_required: Whether location is mandatory
         """
         check_date = data.attendance_date or date.today()
-        check_time = data.out_time or utc_now()
+        check_time = self._ensure_naive(data.out_time) or self._naive_now()
 
         # Must have checked in first
         attendance = self.get_attendance_by_employee_date(employee_id, check_date)
@@ -852,7 +863,7 @@ class AttendanceService:
             )
 
         request.status = AttendanceRequestStatus.APPROVED
-        request.status_changed_at = utc_now()
+        request.status_changed_at = self._naive_now()
         if self.principal and self.principal.user_id:
             request.status_changed_by_id = self.principal.user_id
             request.updated_by_id = self.principal.user_id
@@ -878,7 +889,7 @@ class AttendanceService:
             )
 
         request.status = AttendanceRequestStatus.REJECTED
-        request.status_changed_at = utc_now()
+        request.status_changed_at = self._naive_now()
         if self.principal and self.principal.user_id:
             request.status_changed_by_id = self.principal.user_id
             request.updated_by_id = self.principal.user_id
@@ -912,7 +923,7 @@ class AttendanceService:
 
             if existing:
                 existing.status = status
-                existing.status_changed_at = utc_now()
+                existing.status_changed_at = self._naive_now()
                 if self.principal and self.principal.user_id:
                     existing.status_changed_by_id = self.principal.user_id
                     existing.updated_by_id = self.principal.user_id

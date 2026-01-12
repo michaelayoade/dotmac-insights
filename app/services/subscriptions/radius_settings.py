@@ -532,6 +532,36 @@ class RADIUSSettingsService:
 
     def _to_settings_data(self, settings: RADIUSSettings) -> RADIUSSettingsData:
         """Convert model to DTO."""
+        default_auth_type = (
+            settings.default_auth_type.value
+            if settings.default_auth_type is not None
+            else AuthenticationType.PAP.value
+        )
+        password_encryption = (
+            settings.password_encryption.value
+            if settings.password_encryption is not None
+            else PasswordEncryption.CLEARTEXT.value
+        )
+        accounting_method = (
+            settings.accounting_method.value
+            if settings.accounting_method is not None
+            else AccountingMethod.RADIUS.value
+        )
+        session_limit_action = (
+            settings.session_limit_action.value
+            if settings.session_limit_action is not None
+            else SessionLimitAction.REJECT.value
+        )
+        bandwidth_unit = (
+            settings.bandwidth_unit.value
+            if settings.bandwidth_unit is not None
+            else BandwidthUnit.MBPS.value
+        )
+        default_nas_type = (
+            settings.default_nas_type.value
+            if settings.default_nas_type is not None
+            else NASType.MIKROTIK.value
+        )
         return RADIUSSettingsData(
             server=RADIUSServerConfig(
                 host=settings.radius_host,
@@ -550,8 +580,8 @@ class RADIUSSettingsService:
                 secondary_secret=settings.radius_secondary_secret,
             ),
             authentication=AuthenticationConfig(
-                default_auth_type=settings.default_auth_type.value,
-                password_encryption=settings.password_encryption.value,
+                default_auth_type=default_auth_type,
+                password_encryption=password_encryption,
                 mac_auth_enabled=settings.mac_auth_enabled,
                 mac_auth_password=settings.mac_auth_password,
                 mac_format=settings.mac_format,
@@ -559,7 +589,7 @@ class RADIUSSettingsService:
                 strip_realm=settings.strip_realm,
             ),
             accounting=AccountingConfig(
-                method=settings.accounting_method.value,
+                method=accounting_method,
                 interim_update_interval_seconds=settings.interim_update_interval_seconds,
                 acct_delay_time_enabled=settings.acct_delay_time_enabled,
                 track_sessions=settings.track_sessions,
@@ -570,7 +600,7 @@ class RADIUSSettingsService:
             ),
             session_limits=SessionLimitConfig(
                 max_sessions_per_user=settings.max_sessions_per_user,
-                session_limit_action=settings.session_limit_action.value,
+                session_limit_action=session_limit_action,
                 simultaneous_use_enabled=settings.simultaneous_use_enabled,
             ),
             coa=CoAConfig(
@@ -581,7 +611,7 @@ class RADIUSSettingsService:
                 retries=settings.coa_retries,
             ),
             bandwidth=BandwidthConfig(
-                unit=settings.bandwidth_unit.value,
+                unit=bandwidth_unit,
                 use_mikrotik_rate_limit=settings.use_mikrotik_rate_limit,
                 use_wispr_bandwidth=settings.use_wispr_bandwidth,
                 burst_enabled=settings.burst_enabled,
@@ -597,7 +627,7 @@ class RADIUSSettingsService:
                 static_ipv6_reply_attribute=settings.static_ipv6_reply_attribute,
             ),
             nas_defaults=NASDefaultsConfig(
-                default_nas_type=settings.default_nas_type.value,
+                default_nas_type=default_nas_type,
                 auto_add_nas=settings.auto_add_nas,
                 default_nas_secret=settings.default_nas_secret,
                 nas_require_secret=settings.nas_require_secret,

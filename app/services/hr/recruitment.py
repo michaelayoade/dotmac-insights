@@ -166,6 +166,8 @@ class RecruitmentService:
                     }
                 )
                 party.emails = emails
+            if not party.primary_email:
+                party.primary_email = email_norm
 
         if phone:
             phones = list(party.phones or [])
@@ -180,6 +182,8 @@ class RecruitmentService:
                     }
                 )
                 party.phones = phones
+            if not party.primary_phone:
+                party.primary_phone = phone
 
         if not party.name and name:
             party.name = name

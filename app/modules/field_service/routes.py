@@ -440,265 +440,6 @@ async def service_order_create(
         return HTMLResponse(template.render(context), status_code=422)
 
 
-@router.get("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceRead])
-async def service_order_detail(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    order_id: int,
-):
-    """Service order detail page."""
-    service = ServiceOrderService(db)
-
-    try:
-        order = service.get_order(order_id)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Service order not found")
-
-    lookup = FieldServiceLookupService(db)
-
-    customer = order.customer
-    technician = order.technician
-    team = order.team
-
-    related_project = (
-        lookup.get_project(order.project_id) if order.project_id else None
-    )
-    related_ticket = (
-        lookup.get_unified_ticket(order.ticket_id) if order.ticket_id else None
-    )
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = order.order_number
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "Operations"},
-        {"label": "Field Service", "href": "/field-service"},
-        {"label": order.order_number},
-    ])
-    context["order"] = order
-    context["customer"] = customer
-    context["technician"] = technician
-    context["team"] = team
-    context["related_project"] = related_project
-    context["related_ticket"] = related_ticket
-
-    template = templates.get_template("modules/field_service/templates/pages/detail.html")
-    return HTMLResponse(template.render(context))
-
-
-@router.get("/{order_id}/edit", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
-async def service_order_edit(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    order_id: int,
-):
-    """Service order edit form page."""
-    service = ServiceOrderService(db)
-
-    try:
-        order = service.get_order(order_id)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Service order not found")
-
-    lookup = FieldServiceLookupService(db)
-    customers, technicians, teams = _get_order_form_options(lookup)
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = f"Edit {order.order_number}"
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "Operations"},
-        {"label": "Field Service", "href": "/field-service"},
-        {"label": order.order_number, "href": f"/field-service/{order.id}"},
-        {"label": "Edit"},
-    ])
-    context["order"] = order
-    context["customers"] = customers
-    context["technicians"] = technicians
-    context["teams"] = teams
-    context["status_options"] = get_status_options()
-    context["priority_options"] = get_priority_options()
-    context["type_options"] = get_type_options()
-    context["errors"] = {}
-
-    template = templates.get_template("modules/field_service/templates/pages/form.html")
-    return HTMLResponse(template.render(context))
-
-
-@router.post("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
-async def service_order_update(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    csrf: CSRFProtect,
-    db: DB,
-    order_id: int,
-):
-    """Update a service order."""
-    service = ServiceOrderService(db)
-
-    try:
-        order = service.get_order(order_id)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Service order not found")
-
-    form = await request.form()
-
-    # Basic validation
-    errors = {}
-    title = _form_str(form, "title")
-    service_address = _form_str(form, "service_address")
-
-    if not title:
-        errors["title"] = "Title is required"
-    if not service_address:
-        errors["service_address"] = "Service address is required"
-
-    if errors:
-        lookup = FieldServiceLookupService(db)
-        customers, technicians, teams = _get_order_form_options(lookup)
-
-        context = get_base_context(request, response, user, csrf_token)
-        context["navigation"] = get_navigation_context(user)
-        context["page_title"] = f"Edit {order.order_number}"
-        context["breadcrumbs"] = build_breadcrumbs([
-            {"label": "Operations"},
-            {"label": "Field Service", "href": "/field-service"},
-            {"label": order.order_number, "href": f"/field-service/{order.id}"},
-            {"label": "Edit"},
-        ])
-        context["order"] = order
-        context["customers"] = customers
-        context["technicians"] = technicians
-        context["teams"] = teams
-        context["status_options"] = get_status_options()
-        context["priority_options"] = get_priority_options()
-        context["type_options"] = get_type_options()
-        context["errors"] = errors
-
-        template = templates.get_template("modules/field_service/templates/pages/form.html")
-        return HTMLResponse(template.render(context), status_code=422)
-
-    # Parse scheduled date
-    scheduled_date = None
-    scheduled_date_str = _form_str(form, "scheduled_date")
-    if scheduled_date_str:
-        try:
-            scheduled_date = datetime.strptime(scheduled_date_str, "%Y-%m-%d").date()
-        except ValueError:
-            pass
-
-    # Build update data
-    order_type = _form_enum(ServiceOrderType, form, "order_type", order.order_type)
-    priority = _form_enum(ServiceOrderPriority, form, "priority", order.priority)
-
-    data = ServiceOrderUpdateData(
-        title=title,
-        description=_form_str(form, "description") or None,
-        order_type=order_type.value,
-        priority=priority.value,
-        service_address=service_address,
-        city=_form_str(form, "city") or None,
-        state=_form_str(form, "state") or None,
-        postal_code=_form_str(form, "postal_code") or None,
-        scheduled_date=scheduled_date,
-        customer_contact_name=_form_str(form, "customer_contact_name") or None,
-        customer_contact_phone=_form_str(form, "customer_contact_phone") or None,
-        assigned_technician_id=_form_int(form, "assigned_technician_id"),
-        assigned_team_id=_form_int(form, "assigned_team_id"),
-    )
-
-    try:
-        order = service.update_order(order_id, data)
-        db.commit()
-        set_flash(response, f"Service order '{order.order_number}' updated successfully.", "success")
-        return RedirectResponse(url=f"/field-service/{order.id}", status_code=303)
-    except ValidationError as e:
-        errors["general"] = str(e)
-        lookup = FieldServiceLookupService(db)
-        customers, technicians, teams = _get_order_form_options(lookup)
-
-        context = get_base_context(request, response, user, csrf_token)
-        context["navigation"] = get_navigation_context(user)
-        context["page_title"] = f"Edit {order.order_number}"
-        context["breadcrumbs"] = build_breadcrumbs([
-            {"label": "Operations"},
-            {"label": "Field Service", "href": "/field-service"},
-            {"label": order.order_number, "href": f"/field-service/{order.id}"},
-            {"label": "Edit"},
-        ])
-        context["order"] = order
-        context["customers"] = customers
-        context["technicians"] = technicians
-        context["teams"] = teams
-        context["status_options"] = get_status_options()
-        context["priority_options"] = get_priority_options()
-        context["type_options"] = get_type_options()
-        context["errors"] = errors
-
-        template = templates.get_template("modules/field_service/templates/pages/form.html")
-        return HTMLResponse(template.render(context), status_code=422)
-
-
-@router.delete("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
-async def service_order_delete(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf: CSRFProtect,
-    db: DB,
-    order_id: int,
-):
-    """Delete a service order."""
-    service = ServiceOrderService(db)
-
-    try:
-        order = service.get_order(order_id)
-        order_number = order.order_number
-        service.cancel(order_id, "Deleted via web UI")
-        db.commit()
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Service order not found")
-
-    if is_htmx_request(request):
-        htmx_toast(response, f"Service order '{order_number}' deleted.", "success")
-        return HTMLResponse("", headers=dict(response.headers))
-
-    set_flash(response, f"Service order '{order_number}' deleted.", "success")
-    return RedirectResponse(url="/field-service", status_code=303)
-
-
-@router.get("/{order_id}/row", response_class=HTMLResponse, dependencies=[RequireFieldServiceRead])
-async def service_order_row(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    order_id: int,
-):
-    """Single service order row partial for HTMX updates."""
-    service = ServiceOrderService(db)
-
-    try:
-        order = service.get_order(order_id)
-    except NotFoundError:
-        return HTMLResponse("", status_code=404)
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["order"] = order
-
-    template = templates.get_template("modules/field_service/templates/partials/order_row.html")
-    return HTMLResponse(template.render(context))
-
-
 # =============================================================================
 # TEAMS MANAGEMENT
 # =============================================================================
@@ -1235,3 +976,266 @@ async def technician_remove_skill(
 
     set_flash(response, "Skill removed.", "success")
     return RedirectResponse(url=f"/field-service/technicians/{employee_id}", status_code=303)
+
+
+# =============================================================================
+# SERVICE ORDER DETAIL ROUTES (must be after /teams and /technicians)
+# =============================================================================
+
+@router.get("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceRead])
+async def service_order_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    order_id: int,
+):
+    """Service order detail page."""
+    service = ServiceOrderService(db)
+
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Service order not found")
+
+    lookup = FieldServiceLookupService(db)
+
+    customer = order.customer
+    technician = order.technician
+    team = order.team
+
+    related_project = (
+        lookup.get_project(order.project_id) if order.project_id else None
+    )
+    related_ticket = (
+        lookup.get_unified_ticket(order.ticket_id) if order.ticket_id else None
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = order.order_number
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Operations"},
+        {"label": "Field Service", "href": "/field-service"},
+        {"label": order.order_number},
+    ])
+    context["order"] = order
+    context["customer"] = customer
+    context["technician"] = technician
+    context["team"] = team
+    context["related_project"] = related_project
+    context["related_ticket"] = related_ticket
+
+    template = templates.get_template("modules/field_service/templates/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/{order_id}/edit", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
+async def service_order_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    order_id: int,
+):
+    """Service order edit form page."""
+    service = ServiceOrderService(db)
+
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Service order not found")
+
+    lookup = FieldServiceLookupService(db)
+    customers, technicians, teams = _get_order_form_options(lookup)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit {order.order_number}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Operations"},
+        {"label": "Field Service", "href": "/field-service"},
+        {"label": order.order_number, "href": f"/field-service/{order.id}"},
+        {"label": "Edit"},
+    ])
+    context["order"] = order
+    context["customers"] = customers
+    context["technicians"] = technicians
+    context["teams"] = teams
+    context["status_options"] = get_status_options()
+    context["priority_options"] = get_priority_options()
+    context["type_options"] = get_type_options()
+    context["errors"] = {}
+
+    template = templates.get_template("modules/field_service/templates/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
+async def service_order_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    order_id: int,
+):
+    """Update a service order."""
+    service = ServiceOrderService(db)
+
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Service order not found")
+
+    form = await request.form()
+
+    # Basic validation
+    errors = {}
+    title = _form_str(form, "title")
+    service_address = _form_str(form, "service_address")
+
+    if not title:
+        errors["title"] = "Title is required"
+    if not service_address:
+        errors["service_address"] = "Service address is required"
+
+    if errors:
+        lookup = FieldServiceLookupService(db)
+        customers, technicians, teams = _get_order_form_options(lookup)
+
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {order.order_number}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Field Service", "href": "/field-service"},
+            {"label": order.order_number, "href": f"/field-service/{order.id}"},
+            {"label": "Edit"},
+        ])
+        context["order"] = order
+        context["customers"] = customers
+        context["technicians"] = technicians
+        context["teams"] = teams
+        context["status_options"] = get_status_options()
+        context["priority_options"] = get_priority_options()
+        context["type_options"] = get_type_options()
+        context["errors"] = errors
+
+        template = templates.get_template("modules/field_service/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    # Parse scheduled date
+    scheduled_date = None
+    scheduled_date_str = _form_str(form, "scheduled_date")
+    if scheduled_date_str:
+        try:
+            scheduled_date = datetime.strptime(scheduled_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    # Build update data
+    order_type = _form_enum(ServiceOrderType, form, "order_type", order.order_type)
+    priority = _form_enum(ServiceOrderPriority, form, "priority", order.priority)
+
+    data = ServiceOrderUpdateData(
+        title=title,
+        description=_form_str(form, "description") or None,
+        order_type=order_type.value,
+        priority=priority.value,
+        service_address=service_address,
+        city=_form_str(form, "city") or None,
+        state=_form_str(form, "state") or None,
+        postal_code=_form_str(form, "postal_code") or None,
+        scheduled_date=scheduled_date,
+        customer_contact_name=_form_str(form, "customer_contact_name") or None,
+        customer_contact_phone=_form_str(form, "customer_contact_phone") or None,
+        assigned_technician_id=_form_int(form, "assigned_technician_id"),
+        assigned_team_id=_form_int(form, "assigned_team_id"),
+    )
+
+    try:
+        order = service.update_order(order_id, data)
+        db.commit()
+        set_flash(response, f"Service order '{order.order_number}' updated successfully.", "success")
+        return RedirectResponse(url=f"/field-service/{order.id}", status_code=303)
+    except ValidationError as e:
+        errors["general"] = str(e)
+        lookup = FieldServiceLookupService(db)
+        customers, technicians, teams = _get_order_form_options(lookup)
+
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {order.order_number}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Field Service", "href": "/field-service"},
+            {"label": order.order_number, "href": f"/field-service/{order.id}"},
+            {"label": "Edit"},
+        ])
+        context["order"] = order
+        context["customers"] = customers
+        context["technicians"] = technicians
+        context["teams"] = teams
+        context["status_options"] = get_status_options()
+        context["priority_options"] = get_priority_options()
+        context["type_options"] = get_type_options()
+        context["errors"] = errors
+
+        template = templates.get_template("modules/field_service/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+
+@router.delete("/{order_id}", response_class=HTMLResponse, dependencies=[RequireFieldServiceWrite])
+async def service_order_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    order_id: int,
+):
+    """Delete a service order."""
+    service = ServiceOrderService(db)
+
+    try:
+        order = service.get_order(order_id)
+        order_number = order.order_number
+        service.cancel(order_id, "Deleted via web UI")
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Service order not found")
+
+    if is_htmx_request(request):
+        htmx_toast(response, f"Service order '{order_number}' deleted.", "success")
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, f"Service order '{order_number}' deleted.", "success")
+    return RedirectResponse(url="/field-service", status_code=303)
+
+
+@router.get("/{order_id}/row", response_class=HTMLResponse, dependencies=[RequireFieldServiceRead])
+async def service_order_row(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    order_id: int,
+):
+    """Single service order row partial for HTMX updates."""
+    service = ServiceOrderService(db)
+
+    try:
+        order = service.get_order(order_id)
+    except NotFoundError:
+        return HTMLResponse("", status_code=404)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["order"] = order
+
+    template = templates.get_template("modules/field_service/templates/partials/order_row.html")
+    return HTMLResponse(template.render(context))

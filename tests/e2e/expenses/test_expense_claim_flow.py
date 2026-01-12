@@ -166,7 +166,7 @@ class TestExpenseClaimCompleteFlow:
             ],
         }
 
-        resp = client.post("/api/expenses/claims", json=create_payload)
+        resp = client.post("/api/v1/expenses/claims", json=create_payload)
         assert_http_ok(resp, "Create expense claim")
         claim = get_json(resp)
 
@@ -176,28 +176,28 @@ class TestExpenseClaimCompleteFlow:
         assert Decimal(str(claim["total_amount"])) == Decimal("145000.00")
 
         # 2. Verify claim details
-        resp = client.get(f"/api/expenses/claims/{claim_id}")
+        resp = client.get(f"/api/v1/expenses/claims/{claim_id}")
         assert_http_ok(resp)
         claim = get_json(resp)
         assert claim["employee_id"] == test_employee.id
         assert claim["funding_method"] == "out_of_pocket"
 
         # 3. Submit for approval
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp, "Submit for approval")
         claim = get_json(resp)
         assert claim["status"] == "pending_approval"
         assert claim["submitted_at"] is not None
 
         # 4. Approve the claim
-        resp = client.post(f"/api/expenses/claims/{claim_id}/approve")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/approve")
         assert_http_ok(resp, "Approve claim")
         claim = get_json(resp)
         assert claim["status"] == "approved"
         assert claim["approved_at"] is not None
 
         # 5. Post to GL (finance step)
-        resp = client.post(f"/api/expenses/claims/{claim_id}/post")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/post")
         assert_http_ok(resp, "Post to GL")
         claim = get_json(resp)
         assert claim["status"] == "posted"
@@ -205,7 +205,7 @@ class TestExpenseClaimCompleteFlow:
 
         # Verify journal entry was created
         if claim.get("journal_entry_id"):
-            resp = client.get(f"/api/accounting/journal-entries/{claim['journal_entry_id']}")
+            resp = client.get(f"/api/v1/accounting/journal-entries/{claim['journal_entry_id']}")
             assert_http_ok(resp)
             je = get_json(resp)
             assert je["status"] in ["draft", "posted"]
@@ -233,7 +233,7 @@ class TestExpenseClaimRejectionFlow:
         client = e2e_superuser_client
 
         # 1. Create expense claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Expensive Client Dinner",
             "claim_date": date.today().isoformat(),
@@ -254,11 +254,11 @@ class TestExpenseClaimRejectionFlow:
         claim_id = claim["id"]
 
         # 2. Submit for approval
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
 
         # 3. Reject with reason
-        resp = client.post(f"/api/expenses/claims/{claim_id}/reject", params={
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/reject", params={
             "reason": "Amount exceeds policy limit for meals. Please split into multiple claims or get pre-approval.",
         })
         assert_http_ok(resp, "Reject claim")
@@ -268,7 +268,7 @@ class TestExpenseClaimRejectionFlow:
         assert claim["rejection_reason"] is not None
 
         # 4. Verify employee can see rejection reason
-        resp = client.get(f"/api/expenses/claims/{claim_id}")
+        resp = client.get(f"/api/v1/expenses/claims/{claim_id}")
         claim = get_json(resp)
         assert "exceeds policy" in claim["rejection_reason"].lower()
 
@@ -295,7 +295,7 @@ class TestExpenseClaimReturnFlow:
         client = e2e_superuser_client
 
         # 1. Create and submit claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Office Supplies",
             "claim_date": date.today().isoformat(),
@@ -314,11 +314,11 @@ class TestExpenseClaimReturnFlow:
         claim = get_json(resp)
         claim_id = claim["id"]
 
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
 
         # 2. Return for edits
-        resp = client.post(f"/api/expenses/claims/{claim_id}/return", json={
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/return", json={
             "reason": "Please attach scanned copies of receipts for all items.",
         })
         assert_http_ok(resp, "Return claim")
@@ -326,19 +326,19 @@ class TestExpenseClaimReturnFlow:
         assert claim["status"] == "returned"
 
         # 3. Update claim (add note about receipts)
-        resp = client.patch(f"/api/expenses/claims/{claim_id}", json={
+        resp = client.patch(f"/api/v1/expenses/claims/{claim_id}", json={
             "notes": "Receipts attached to all expense lines.",
         })
         assert_http_ok(resp)
 
         # 4. Resubmit
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp, "Resubmit claim")
         claim = get_json(resp)
         assert claim["status"] == "pending_approval"
 
         # 5. Approve
-        resp = client.post(f"/api/expenses/claims/{claim_id}/approve")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/approve")
         assert_http_ok(resp)
         claim = get_json(resp)
         assert claim["status"] == "approved"
@@ -360,7 +360,7 @@ class TestExpenseClaimRecallFlow:
         client = e2e_superuser_client
 
         # Create and submit claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Conference Attendance",
             "claim_date": date.today().isoformat(),
@@ -379,24 +379,24 @@ class TestExpenseClaimRecallFlow:
         claim = get_json(resp)
         claim_id = claim["id"]
 
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
         assert get_json(resp)["status"] == "pending_approval"
 
         # Recall the claim
-        resp = client.post(f"/api/expenses/claims/{claim_id}/recall")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/recall")
         assert_http_ok(resp, "Recall claim")
         claim = get_json(resp)
         assert claim["status"] == "recalled"
 
         # Make corrections
-        resp = client.patch(f"/api/expenses/claims/{claim_id}", json={
+        resp = client.patch(f"/api/v1/expenses/claims/{claim_id}", json={
             "claim_title": "Conference Attendance - Updated",
         })
         assert_http_ok(resp)
 
         # Can resubmit after recall
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
         assert get_json(resp)["status"] == "pending_approval"
 
@@ -433,7 +433,7 @@ class TestCashAdvanceFlow:
             "expected_return_date": (date.today() + timedelta(days=10)).isoformat(),
         }
 
-        resp = client.post("/api/expenses/cash-advances", json=advance_payload)
+        resp = client.post("/api/v1/expenses/cash-advances", json=advance_payload)
         assert_http_ok(resp, "Create cash advance request")
         advance = get_json(resp)
 
@@ -442,19 +442,19 @@ class TestCashAdvanceFlow:
         assert Decimal(str(advance["amount"])) == Decimal("150000.00")
 
         # 2. Submit for approval
-        resp = client.post(f"/api/expenses/cash-advances/{advance_id}/submit")
+        resp = client.post(f"/api/v1/expenses/cash-advances/{advance_id}/submit")
         assert_http_ok(resp, "Submit advance")
         advance = get_json(resp)
         assert advance["status"] == "pending_approval"
 
         # 3. Approve cash advance
-        resp = client.post(f"/api/expenses/cash-advances/{advance_id}/approve")
+        resp = client.post(f"/api/v1/expenses/cash-advances/{advance_id}/approve")
         assert_http_ok(resp, "Approve advance")
         advance = get_json(resp)
         assert advance["status"] == "approved"
 
         # 4. Disburse funds
-        resp = client.post(f"/api/expenses/cash-advances/{advance_id}/disburse", json={
+        resp = client.post(f"/api/v1/expenses/cash-advances/{advance_id}/disburse", json={
             "disbursement_date": date.today().isoformat(),
             "disbursement_method": "bank_transfer",
             "reference": "TRF-12345",
@@ -465,7 +465,7 @@ class TestCashAdvanceFlow:
         assert advance["disbursed_at"] is not None
 
         # 5. Create expense claim linked to advance
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Port Harcourt Client Visit Expenses",
             "claim_date": date.today().isoformat(),
@@ -497,14 +497,14 @@ class TestCashAdvanceFlow:
         assert Decimal(str(claim["total_amount"])) == Decimal("140000.00")
 
         # 6. Submit and approve claim
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/expenses/claims/{claim_id}/approve")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/approve")
         assert_http_ok(resp)
 
         # 7. Settle the advance
-        resp = client.post(f"/api/expenses/cash-advances/{advance_id}/settle", json={
+        resp = client.post(f"/api/v1/expenses/cash-advances/{advance_id}/settle", json={
             "claim_ids": [claim_id],
         })
         assert_http_ok(resp, "Settle advance")
@@ -539,7 +539,7 @@ class TestCorporateCardFlow:
         # Skip card creation if not implemented, test the matching flow
 
         # 2. Create expense claim with corporate card funding
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Corporate Card Expenses - December",
             "claim_date": date.today().isoformat(),
@@ -570,10 +570,10 @@ class TestCorporateCardFlow:
         assert claim["funding_method"] == "corporate_card"
 
         # 3. Submit and approve
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/expenses/claims/{claim_id}/approve")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/approve")
         assert_http_ok(resp)
         claim = get_json(resp)
         assert claim["status"] == "approved"
@@ -601,7 +601,7 @@ class TestMultiLineApprovalFlow:
         client = e2e_superuser_client
 
         # 1. Create claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Mixed Expense Claim",
             "claim_date": date.today().isoformat(),
@@ -629,18 +629,18 @@ class TestMultiLineApprovalFlow:
         original_total = Decimal(str(claim["total_amount"]))
 
         # 2. Submit
-        resp = client.post(f"/api/expenses/claims/{claim_id}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/submit")
         assert_http_ok(resp)
 
         # 3. Get claim with lines for adjustment
-        resp = client.get(f"/api/expenses/claims/{claim_id}")
+        resp = client.get(f"/api/v1/expenses/claims/{claim_id}")
         claim = get_json(resp)
         lines = claim.get("lines", [])
 
         # 4. Adjust a line (if line-level API exists)
         if lines:
             line_id = lines[0]["id"]
-            resp = client.patch(f"/api/expenses/claims/{claim_id}/lines/{line_id}", json={
+            resp = client.patch(f"/api/v1/expenses/claims/{claim_id}/lines/{line_id}", json={
                 "approved_amount": "12000.00",
                 "adjustment_reason": "Reduced per policy meal limit",
             })
@@ -650,7 +650,7 @@ class TestMultiLineApprovalFlow:
                 assert Decimal(str(line["approved_amount"])) == Decimal("12000.00")
 
         # 5. Approve
-        resp = client.post(f"/api/expenses/claims/{claim_id}/approve")
+        resp = client.post(f"/api/v1/expenses/claims/{claim_id}/approve")
         assert_http_ok(resp)
 
 
@@ -671,7 +671,7 @@ class TestExpenseReportingFlow:
 
         # Create some expenses first
         for i in range(3):
-            resp = client.post("/api/expenses/claims", json={
+            resp = client.post("/api/v1/expenses/claims", json={
                 "employee_id": test_employee.id,
                 "claim_title": f"Report Test Expense {i}",
                 "claim_date": date.today().isoformat(),
@@ -691,13 +691,13 @@ class TestExpenseReportingFlow:
             claim = get_json(resp)
 
             # Submit and approve
-            resp = client.post(f"/api/expenses/claims/{claim['id']}/submit")
+            resp = client.post(f"/api/v1/expenses/claims/{claim['id']}/submit")
             assert_http_ok(resp)
-            resp = client.post(f"/api/expenses/claims/{claim['id']}/approve")
+            resp = client.post(f"/api/v1/expenses/claims/{claim['id']}/approve")
             assert_http_ok(resp)
 
         # Get expense analytics
-        resp = client.get("/api/expenses/analytics/summary", params={
+        resp = client.get("/api/v1/expenses/analytics/summary", params={
             "start_date": (date.today() - timedelta(days=30)).isoformat(),
             "end_date": date.today().isoformat(),
         })
@@ -725,7 +725,7 @@ class TestExpenseFilteringFlow:
 
         # Create claims in different states
         # Draft claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Draft Claim",
             "claim_date": date.today().isoformat(),
@@ -742,7 +742,7 @@ class TestExpenseFilteringFlow:
         draft_claim = get_json(resp)
 
         # Submitted claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Submitted Claim",
             "claim_date": date.today().isoformat(),
@@ -757,11 +757,11 @@ class TestExpenseFilteringFlow:
             }],
         })
         submitted_claim = get_json(resp)
-        resp = client.post(f"/api/expenses/claims/{submitted_claim['id']}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{submitted_claim['id']}/submit")
         assert_http_ok(resp)
 
         # Filter by draft status
-        resp = client.get("/api/expenses/claims", params={"status": "draft"})
+        resp = client.get("/api/v1/expenses/claims", params={"status": "draft"})
         assert_http_ok(resp)
         claims = get_json(resp)
         # All returned claims should be draft
@@ -770,7 +770,7 @@ class TestExpenseFilteringFlow:
                 assert claim["status"] == "draft"
 
         # Filter by pending_approval status
-        resp = client.get("/api/expenses/claims", params={"status": "pending_approval"})
+        resp = client.get("/api/v1/expenses/claims", params={"status": "pending_approval"})
         assert_http_ok(resp)
         claims = get_json(resp)
         if isinstance(claims, list):
@@ -795,7 +795,7 @@ class TestExpensePolicyValidation:
         client = e2e_superuser_client
 
         # Try to create expense exceeding policy limit
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Large Expense Test",
             "claim_date": date.today().isoformat(),
@@ -840,7 +840,7 @@ class TestPerDiemFlow:
         client = e2e_superuser_client
 
         # Create per-diem claim
-        resp = client.post("/api/expenses/claims", json={
+        resp = client.post("/api/v1/expenses/claims", json={
             "employee_id": test_employee.id,
             "claim_title": "Training Trip - 3 Days Per Diem",
             "claim_date": date.today().isoformat(),
@@ -877,10 +877,10 @@ class TestPerDiemFlow:
         assert Decimal(str(claim["total_amount"])) == Decimal("75000.00")
 
         # Per-diem claims follow normal approval
-        resp = client.post(f"/api/expenses/claims/{claim['id']}/submit")
+        resp = client.post(f"/api/v1/expenses/claims/{claim['id']}/submit")
         assert_http_ok(resp)
 
-        resp = client.post(f"/api/expenses/claims/{claim['id']}/approve")
+        resp = client.post(f"/api/v1/expenses/claims/{claim['id']}/approve")
         assert_http_ok(resp)
         claim = get_json(resp)
         assert claim["status"] == "approved"

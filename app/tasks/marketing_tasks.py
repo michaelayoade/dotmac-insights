@@ -1179,114 +1179,114 @@ def sync_social_metrics(self, batch_size: int = 50):
 
     try:
         now = _utc_now()
-    posts = (
-        db.query(SocialPost, SocialAccount)
-        .join(SocialAccount, SocialPost.account_id == SocialAccount.id)
-        .filter(SocialPost.status == SocialPostStatus.PUBLISHED)
-        .order_by(SocialPost.updated_at.desc())
-        .limit(batch_size)
-        .all()
-    )
+        posts = (
+            db.query(SocialPost, SocialAccount)
+            .join(SocialAccount, SocialPost.account_id == SocialAccount.id)
+            .filter(SocialPost.status == SocialPostStatus.PUBLISHED)
+            .order_by(SocialPost.updated_at.desc())
+            .limit(batch_size)
+            .all()
+        )
 
-    for post, account in posts:
-        metrics = post.metrics or {}
-        metrics["last_synced_at"] = now.isoformat()
+        for post, account in posts:
+            metrics = post.metrics or {}
+            metrics["last_synced_at"] = now.isoformat()
 
-        if account.platform == SocialPlatform.WHATSAPP:
-            statuses = metrics.get("whatsapp_statuses") or {}
-            counts = {"sent": 0, "delivered": 0, "read": 0, "failed": 0}
-            for status_data in statuses.values():
-                status_value = (status_data or {}).get("status") if isinstance(status_data, dict) else status_data
-                status_key = str(status_value or "").lower()
-                if status_key in counts:
-                    counts[status_key] += 1
-            for key, value in counts.items():
-                metrics[f"whatsapp_{key}_count"] = value
-        elif account.platform == SocialPlatform.TWITTER:
-            access_token = _resolve_social_credentials(db, account, "twitter").get("access_token")
-            if access_token and post.platform_post_id:
-                client = TwitterClient(access_token=access_token)
-                try:
-                    response = _run_async(client.get_tweet_metrics(post.platform_post_id))
-                    data = response.get("data") if isinstance(response, dict) else None
-                    public_metrics = (data or {}).get("public_metrics") or {}
-                    metrics["public_metrics"] = public_metrics
-                    metrics["engagements"] = sum(
-                        int(public_metrics.get(key, 0))
-                        for key in ["retweet_count", "reply_count", "like_count", "quote_count"]
-                    )
-                    metrics.pop("sync_error", None)
-                except Exception as exc:
-                    metrics["sync_error"] = str(exc)[:200]
-                finally:
-                    _run_async(client.close())
-            else:
-                metrics["sync_error"] = "missing_access_token_or_post_id"
-        elif account.platform == SocialPlatform.FACEBOOK:
-            access_token = _resolve_social_credentials(db, account, "meta").get("access_token")
-            if access_token and post.platform_post_id:
-                client = MetaBusinessClient(access_token=access_token)
-                try:
-                    response = _run_async(client.get_post_metrics(post.platform_post_id))
-                    reactions = ((response.get("reactions") or {}).get("summary") or {}).get("total_count")
-                    comments = ((response.get("comments") or {}).get("summary") or {}).get("total_count")
-                    shares = (response.get("shares") or {}).get("count")
-                    metrics["reactions"] = reactions or 0
-                    metrics["comments"] = comments or 0
-                    metrics["shares"] = shares or 0
-                    metrics["permalink_url"] = response.get("permalink_url")
-                    metrics["engagements"] = int(reactions or 0) + int(comments or 0) + int(shares or 0)
-                    metrics.pop("sync_error", None)
-                except Exception as exc:
-                    metrics["sync_error"] = str(exc)[:200]
-                finally:
-                    _run_async(client.close())
-            else:
-                metrics["sync_error"] = "missing_access_token_or_post_id"
-        elif account.platform == SocialPlatform.INSTAGRAM:
-            access_token = _resolve_social_credentials(db, account, "meta").get("access_token")
-            if access_token and post.platform_post_id:
-                client = MetaBusinessClient(access_token=access_token)
-                try:
-                    response = _run_async(client.get_instagram_media_metrics(post.platform_post_id))
-                    like_count = response.get("like_count") if isinstance(response, dict) else 0
-                    comments_count = response.get("comments_count") if isinstance(response, dict) else 0
-                    metrics["like_count"] = like_count or 0
-                    metrics["comments_count"] = comments_count or 0
-                    metrics["permalink_url"] = response.get("permalink")
-                    metrics["media_type"] = response.get("media_type")
-                    metrics["engagements"] = int(like_count or 0) + int(comments_count or 0)
-                    metrics.pop("sync_error", None)
-                except Exception as exc:
-                    metrics["sync_error"] = str(exc)[:200]
-                finally:
-                    _run_async(client.close())
-            else:
-                metrics["sync_error"] = "missing_access_token_or_post_id"
-        elif account.platform == SocialPlatform.LINKEDIN:
-            access_token = _resolve_social_credentials(db, account, "linkedin").get("access_token")
-            if access_token and post.platform_post_id:
-                client = LinkedInClient(access_token=access_token)
-                try:
-                    response = _run_async(client.get_post_metrics(post.platform_post_id))
-                    likes = ((response.get("likesSummary") or {}).get("count")) if isinstance(response, dict) else 0
-                    comments = ((response.get("commentsSummary") or {}).get("count")) if isinstance(response, dict) else 0
-                    shares = ((response.get("sharesSummary") or {}).get("count")) if isinstance(response, dict) else 0
-                    metrics["likes_count"] = likes or 0
-                    metrics["comments_count"] = comments or 0
-                    metrics["shares_count"] = shares or 0
-                    metrics["engagements"] = int(likes or 0) + int(comments or 0) + int(shares or 0)
-                    metrics.pop("sync_error", None)
-                except Exception as exc:
-                    metrics["sync_error"] = str(exc)[:200]
-                finally:
-                    _run_async(client.close())
-            else:
-                metrics["sync_error"] = "missing_access_token_or_post_id"
+            if account.platform == SocialPlatform.WHATSAPP:
+                statuses = metrics.get("whatsapp_statuses") or {}
+                counts = {"sent": 0, "delivered": 0, "read": 0, "failed": 0}
+                for status_data in statuses.values():
+                    status_value = (status_data or {}).get("status") if isinstance(status_data, dict) else status_data
+                    status_key = str(status_value or "").lower()
+                    if status_key in counts:
+                        counts[status_key] += 1
+                for key, value in counts.items():
+                    metrics[f"whatsapp_{key}_count"] = value
+            elif account.platform == SocialPlatform.TWITTER:
+                access_token = _resolve_social_credentials(db, account, "twitter").get("access_token")
+                if access_token and post.platform_post_id:
+                    client = TwitterClient(access_token=access_token)
+                    try:
+                        response = _run_async(client.get_tweet_metrics(post.platform_post_id))
+                        data = response.get("data") if isinstance(response, dict) else None
+                        public_metrics = (data or {}).get("public_metrics") or {}
+                        metrics["public_metrics"] = public_metrics
+                        metrics["engagements"] = sum(
+                            int(public_metrics.get(key, 0))
+                            for key in ["retweet_count", "reply_count", "like_count", "quote_count"]
+                        )
+                        metrics.pop("sync_error", None)
+                    except Exception as exc:
+                        metrics["sync_error"] = str(exc)[:200]
+                    finally:
+                        _run_async(client.close())
+                else:
+                    metrics["sync_error"] = "missing_access_token_or_post_id"
+            elif account.platform == SocialPlatform.FACEBOOK:
+                access_token = _resolve_social_credentials(db, account, "meta").get("access_token")
+                if access_token and post.platform_post_id:
+                    client = MetaBusinessClient(access_token=access_token)
+                    try:
+                        response = _run_async(client.get_post_metrics(post.platform_post_id))
+                        reactions = ((response.get("reactions") or {}).get("summary") or {}).get("total_count")
+                        comments = ((response.get("comments") or {}).get("summary") or {}).get("total_count")
+                        shares = (response.get("shares") or {}).get("count")
+                        metrics["reactions"] = reactions or 0
+                        metrics["comments"] = comments or 0
+                        metrics["shares"] = shares or 0
+                        metrics["permalink_url"] = response.get("permalink_url")
+                        metrics["engagements"] = int(reactions or 0) + int(comments or 0) + int(shares or 0)
+                        metrics.pop("sync_error", None)
+                    except Exception as exc:
+                        metrics["sync_error"] = str(exc)[:200]
+                    finally:
+                        _run_async(client.close())
+                else:
+                    metrics["sync_error"] = "missing_access_token_or_post_id"
+            elif account.platform == SocialPlatform.INSTAGRAM:
+                access_token = _resolve_social_credentials(db, account, "meta").get("access_token")
+                if access_token and post.platform_post_id:
+                    client = MetaBusinessClient(access_token=access_token)
+                    try:
+                        response = _run_async(client.get_instagram_media_metrics(post.platform_post_id))
+                        like_count = response.get("like_count") if isinstance(response, dict) else 0
+                        comments_count = response.get("comments_count") if isinstance(response, dict) else 0
+                        metrics["like_count"] = like_count or 0
+                        metrics["comments_count"] = comments_count or 0
+                        metrics["permalink_url"] = response.get("permalink")
+                        metrics["media_type"] = response.get("media_type")
+                        metrics["engagements"] = int(like_count or 0) + int(comments_count or 0)
+                        metrics.pop("sync_error", None)
+                    except Exception as exc:
+                        metrics["sync_error"] = str(exc)[:200]
+                    finally:
+                        _run_async(client.close())
+                else:
+                    metrics["sync_error"] = "missing_access_token_or_post_id"
+            elif account.platform == SocialPlatform.LINKEDIN:
+                access_token = _resolve_social_credentials(db, account, "linkedin").get("access_token")
+                if access_token and post.platform_post_id:
+                    client = LinkedInClient(access_token=access_token)
+                    try:
+                        response = _run_async(client.get_post_metrics(post.platform_post_id))
+                        likes = ((response.get("likesSummary") or {}).get("count")) if isinstance(response, dict) else 0
+                        comments = ((response.get("commentsSummary") or {}).get("count")) if isinstance(response, dict) else 0
+                        shares = ((response.get("sharesSummary") or {}).get("count")) if isinstance(response, dict) else 0
+                        metrics["likes_count"] = likes or 0
+                        metrics["comments_count"] = comments or 0
+                        metrics["shares_count"] = shares or 0
+                        metrics["engagements"] = int(likes or 0) + int(comments or 0) + int(shares or 0)
+                        metrics.pop("sync_error", None)
+                    except Exception as exc:
+                        metrics["sync_error"] = str(exc)[:200]
+                    finally:
+                        _run_async(client.close())
+                else:
+                    metrics["sync_error"] = "missing_access_token_or_post_id"
 
-        post.metrics = metrics
-        post.updated_at = now
-        processed += 1
+            post.metrics = metrics
+            post.updated_at = now
+            processed += 1
 
         db.commit()
         logger.info("task_completed", task=task_name, processed=processed)

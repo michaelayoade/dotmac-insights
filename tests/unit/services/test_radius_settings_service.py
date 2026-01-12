@@ -379,7 +379,7 @@ class TestAttributeMappings:
         mock_paginate.items = [mock_attribute_mapping]
         mock_paginate.total = 1
 
-        with patch.object(service, 'paginate', return_value=mock_paginate):
+        with patch('app.services.subscriptions.radius_settings.paginate', return_value=mock_paginate):
             filters = AttributeMappingFilters()
             pagination = PaginationParams(offset=0, limit=50)
             result = service.list_attribute_mappings(filters, pagination)
@@ -391,7 +391,7 @@ class TestAttributeMappings:
         """Should filter mappings by NAS type."""
         filters = AttributeMappingFilters(nas_type="MIKROTIK")
 
-        with patch.object(service, 'paginate'):
+        with patch('app.services.subscriptions.radius_settings.paginate'):
             service.list_attribute_mappings(filters)
 
         # Verify filter was applied
@@ -488,7 +488,7 @@ class TestNASConfig:
         mock_paginate.items = [mock_nas_config]
         mock_paginate.total = 1
 
-        with patch.object(service, 'paginate', return_value=mock_paginate):
+        with patch('app.services.subscriptions.radius_settings.paginate', return_value=mock_paginate):
             filters = NASConfigFilters()
             pagination = PaginationParams(offset=0, limit=50)
             result = service.list_nas_configs(filters, pagination)
@@ -499,7 +499,7 @@ class TestNASConfig:
         """Should filter configs by router_id."""
         filters = NASConfigFilters(router_id=100)
 
-        with patch.object(service, 'paginate'):
+        with patch('app.services.subscriptions.radius_settings.paginate'):
             service.list_nas_configs(filters)
 
         mock_db.query.return_value.filter.assert_called()
@@ -610,7 +610,7 @@ class TestDictionary:
         mock_paginate.items = [mock_dictionary_entry]
         mock_paginate.total = 1
 
-        with patch.object(service, 'paginate', return_value=mock_paginate):
+        with patch('app.services.subscriptions.radius_settings.paginate', return_value=mock_paginate):
             filters = DictionaryFilters()
             pagination = PaginationParams(offset=0, limit=50)
             result = service.list_dictionary_entries(filters, pagination)
@@ -621,7 +621,7 @@ class TestDictionary:
         """Should filter entries by vendor."""
         filters = DictionaryFilters(vendor_name="MikroTik", vendor_id=14988)
 
-        with patch.object(service, 'paginate'):
+        with patch('app.services.subscriptions.radius_settings.paginate'):
             service.list_dictionary_entries(filters)
 
         mock_db.query.return_value.filter.assert_called()

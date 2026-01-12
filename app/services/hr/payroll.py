@@ -1531,6 +1531,10 @@ class PayrollService:
             elif isinstance(node, ast.Num):
                 # Python 3.7 compatibility
                 return Decimal(str(node.n))
+            elif isinstance(node, ast.Name):
+                if node.id not in variables:
+                    raise ValueError(f"Unknown variable: {node.id}")
+                return Decimal(str(variables[node.id]))
             elif isinstance(node, ast.BinOp):
                 left = safe_eval_node(node.left)
                 right = safe_eval_node(node.right)
@@ -1548,16 +1552,8 @@ class PayrollService:
                 raise ValueError(f"Unsupported AST node: {type(node).__name__}")
 
         try:
-            # Substitute variable names with their values
-            expr = formula
-            # Sort by length descending to avoid partial replacements
-            # e.g., replace "gross_pay" before "gross"
-            for name in sorted(variables.keys(), key=len, reverse=True):
-                value = variables[name]
-                expr = expr.replace(name, str(value))
-
             # Parse and safely evaluate
-            tree = ast.parse(expr, mode='eval')
+            tree = ast.parse(formula, mode='eval')
             result = safe_eval_node(tree)
             return result.quantize(Decimal("0.01"))
         except Exception:

@@ -12,7 +12,8 @@ Routes are thin wrappers around services - all business logic is in:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+import logging
+from typing import Optional, Callable, TypeVar
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -27,6 +28,7 @@ from app.web.context import (
 from app.templates.environment import get_template_env
 from decimal import Decimal
 from sqlalchemy.orm import joinedload
+from sqlalchemy.exc import SQLAlchemyError
 from app.models.sales import QuotationStatus, SalesOrderStatus, SalesPerson, ERPNextLead, Quotation, SalesOrder
 from app.models.party import CustomerAccount
 from app.models.tax import TaxCode
@@ -54,6 +56,17 @@ RequireSalesWrite = Depends(require_scope("sales:write"))
 
 router = APIRouter(prefix="/sales", tags=["sales"])
 templates = get_template_env()
+logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
+
+
+def _safe_query_list(fetcher: Callable[[], list[T]], label: str) -> list[T]:
+    try:
+        return fetcher()
+    except SQLAlchemyError as exc:
+        logger.warning("sales_form_options_load_failed", extra={"option": label, "error": str(exc)})
+        return []
 
 
 # ============= QUOTATIONS =============
@@ -133,123 +146,136 @@ def _format_party_address(addresses: list[dict]) -> str:
 
 def _get_customer_accounts(db: DB) -> list[dict]:
     company = get_company_context(allow_null=True) or ""
-    accounts = (
-        db.query(CustomerAccount)
-        .options(joinedload(CustomerAccount.party))
-        .order_by(CustomerAccount.id.desc())
-        .limit(200)
-        .all()
-    )
-    options = []
-    for account in accounts:
-        party = account.party
-        party_name = ""
-        contact_email = ""
-        contact_phone = ""
-        address = ""
-        addr_struct = {}
-        if party:
-            party_name = party.name or party.legal_name or party.trading_name or ""
-            contact_email = party.primary_email or ""
-            contact_phone = party.primary_phone or ""
-            if party.addresses:
-                addr_struct = _extract_party_address(party.addresses)
-                address = _format_party_address(party.addresses)
-        options.append(
-            {
-                "id": account.id,
-                "name": party_name or f"Account {account.id}",
-                "contact_name": party_name,
-                "contact_email": contact_email,
-                "contact_phone": contact_phone,
-                "billing_address": address,
-                "shipping_address": address,
-                "billing_address_line1": addr_struct.get("address_line1", ""),
-                "billing_address_line2": addr_struct.get("address_line2", ""),
-                "billing_city": addr_struct.get("city", ""),
-                "billing_state": addr_struct.get("state", ""),
-                "billing_postal_code": addr_struct.get("postal_code", ""),
-                "billing_country": addr_struct.get("country", ""),
-                "billing_gps_lat": addr_struct.get("gps_lat", ""),
-                "billing_gps_lng": addr_struct.get("gps_lng", ""),
-                "shipping_address_line1": addr_struct.get("address_line1", ""),
-                "shipping_address_line2": addr_struct.get("address_line2", ""),
-                "shipping_city": addr_struct.get("city", ""),
-                "shipping_state": addr_struct.get("state", ""),
-                "shipping_postal_code": addr_struct.get("postal_code", ""),
-                "shipping_country": addr_struct.get("country", ""),
-                "shipping_gps_lat": addr_struct.get("gps_lat", ""),
-                "shipping_gps_lng": addr_struct.get("gps_lng", ""),
-                "currency": account.currency or "NGN",
-                "company": company,
-            }
+    def fetch_accounts() -> list[dict]:
+        accounts = (
+            db.query(CustomerAccount)
+            .options(joinedload(CustomerAccount.party))
+            .order_by(CustomerAccount.id.desc())
+            .limit(200)
+            .all()
         )
-    return options
-
-def _get_sales_people(db: DB) -> list[SalesPerson]:
-    return db.query(SalesPerson).filter(SalesPerson.enabled == True).order_by(SalesPerson.sales_person_name).all()
-
-def _get_tax_codes(db: DB) -> list[TaxCode]:
-    return db.query(TaxCode).filter(TaxCode.is_active == True).order_by(TaxCode.code).all()
-
-def _get_recent_quotations(db: DB) -> list[dict]:
-    quotes = (
-        db.query(Quotation)
-        .options(joinedload(Quotation.items))
-        .filter(Quotation.is_deleted == False)
-        .order_by(Quotation.id.desc())
-        .limit(200)
-        .all()
-    )
-    results = []
-    for quote in quotes:
-        items = []
-        for item in quote.items or []:
-            items.append(
+        options = []
+        for account in accounts:
+            party = account.party
+            party_name = ""
+            contact_email = ""
+            contact_phone = ""
+            address = ""
+            addr_struct = {}
+            if party:
+                party_name = party.name or party.legal_name or party.trading_name or ""
+                contact_email = party.primary_email or ""
+                contact_phone = party.primary_phone or ""
+                if party.addresses:
+                    addr_struct = _extract_party_address(party.addresses)
+                    address = _format_party_address(party.addresses)
+            options.append(
                 {
-                    "name": item.item_name or item.item_code or "Item",
-                    "qty": float(item.qty or 0),
-                    "rate": float(item.rate or 0),
-                    "tax_code_id": item.tax_code_id,
+                    "id": account.id,
+                    "name": party_name or f"Account {account.id}",
+                    "contact_name": party_name,
+                    "contact_email": contact_email,
+                    "contact_phone": contact_phone,
+                    "billing_address": address,
+                    "shipping_address": address,
+                    "billing_address_line1": addr_struct.get("address_line1", ""),
+                    "billing_address_line2": addr_struct.get("address_line2", ""),
+                    "billing_city": addr_struct.get("city", ""),
+                    "billing_state": addr_struct.get("state", ""),
+                    "billing_postal_code": addr_struct.get("postal_code", ""),
+                    "billing_country": addr_struct.get("country", ""),
+                    "billing_gps_lat": addr_struct.get("gps_lat", ""),
+                    "billing_gps_lng": addr_struct.get("gps_lng", ""),
+                    "shipping_address_line1": addr_struct.get("address_line1", ""),
+                    "shipping_address_line2": addr_struct.get("address_line2", ""),
+                    "shipping_city": addr_struct.get("city", ""),
+                    "shipping_state": addr_struct.get("state", ""),
+                    "shipping_postal_code": addr_struct.get("postal_code", ""),
+                    "shipping_country": addr_struct.get("country", ""),
+                    "shipping_gps_lat": addr_struct.get("gps_lat", ""),
+                    "shipping_gps_lng": addr_struct.get("gps_lng", ""),
+                    "currency": account.currency or "NGN",
+                    "company": company,
                 }
             )
-        results.append(
-            {
-                "id": quote.id,
-                "erpnext_id": quote.erpnext_id,
-                "customer_name": quote.customer_name,
-                "party_name": quote.party_name,
-                "customer_account_id": quote.customer_account_id,
-                "contact_name": quote.contact_name,
-                "contact_email": quote.contact_email,
-                "contact_phone": quote.contact_phone,
-                "billing_address": quote.billing_address,
-                "shipping_address": quote.shipping_address,
-                "billing_address_line1": quote.billing_address_line1,
-                "billing_address_line2": quote.billing_address_line2,
-                "billing_city": quote.billing_city,
-                "billing_state": quote.billing_state,
-                "billing_postal_code": quote.billing_postal_code,
-                "billing_country": quote.billing_country,
-                "billing_gps_lat": quote.billing_gps_lat,
-                "billing_gps_lng": quote.billing_gps_lng,
-                "shipping_address_line1": quote.shipping_address_line1,
-                "shipping_address_line2": quote.shipping_address_line2,
-                "shipping_city": quote.shipping_city,
-                "shipping_state": quote.shipping_state,
-                "shipping_postal_code": quote.shipping_postal_code,
-                "shipping_country": quote.shipping_country,
-                "shipping_gps_lat": quote.shipping_gps_lat,
-                "shipping_gps_lng": quote.shipping_gps_lng,
-                "company": quote.company,
-                "currency": quote.currency,
-                "items": items,
-            }
+        return options
+    return _safe_query_list(fetch_accounts, "customer_accounts")
+
+def _get_sales_people(db: DB) -> list[SalesPerson]:
+    return _safe_query_list(
+        lambda: db.query(SalesPerson).filter(SalesPerson.enabled == True).order_by(SalesPerson.sales_person_name).all(),
+        "sales_people",
+    )
+
+def _get_tax_codes(db: DB) -> list[TaxCode]:
+    return _safe_query_list(
+        lambda: db.query(TaxCode).filter(TaxCode.is_active == True).order_by(TaxCode.code).all(),
+        "tax_codes",
+    )
+
+def _get_recent_quotations(db: DB) -> list[dict]:
+    def fetch_quotes() -> list[dict]:
+        quotes = (
+            db.query(Quotation)
+            .options(joinedload(Quotation.items))
+            .filter(Quotation.is_deleted == False)
+            .order_by(Quotation.id.desc())
+            .limit(200)
+            .all()
         )
-    return results
+        results = []
+        for quote in quotes:
+            items = []
+            for item in quote.items or []:
+                items.append(
+                    {
+                        "name": item.item_name or item.item_code or "Item",
+                        "qty": float(item.qty or 0),
+                        "rate": float(item.rate or 0),
+                        "tax_code_id": item.tax_code_id,
+                    }
+                )
+            results.append(
+                {
+                    "id": quote.id,
+                    "erpnext_id": quote.erpnext_id,
+                    "customer_name": quote.customer_name,
+                    "party_name": quote.party_name,
+                    "customer_account_id": quote.customer_account_id,
+                    "contact_name": quote.contact_name,
+                    "contact_email": quote.contact_email,
+                    "contact_phone": quote.contact_phone,
+                    "billing_address": quote.billing_address,
+                    "shipping_address": quote.shipping_address,
+                    "billing_address_line1": quote.billing_address_line1,
+                    "billing_address_line2": quote.billing_address_line2,
+                    "billing_city": quote.billing_city,
+                    "billing_state": quote.billing_state,
+                    "billing_postal_code": quote.billing_postal_code,
+                    "billing_country": quote.billing_country,
+                    "billing_gps_lat": quote.billing_gps_lat,
+                    "billing_gps_lng": quote.billing_gps_lng,
+                    "shipping_address_line1": quote.shipping_address_line1,
+                    "shipping_address_line2": quote.shipping_address_line2,
+                    "shipping_city": quote.shipping_city,
+                    "shipping_state": quote.shipping_state,
+                    "shipping_postal_code": quote.shipping_postal_code,
+                    "shipping_country": quote.shipping_country,
+                    "shipping_gps_lat": quote.shipping_gps_lat,
+                    "shipping_gps_lng": quote.shipping_gps_lng,
+                    "company": quote.company,
+                    "currency": quote.currency,
+                    "items": items,
+                }
+            )
+        return results
+    return _safe_query_list(fetch_quotes, "quotations")
 
 def _get_recent_leads(db: DB) -> list[ERPNextLead]:
-    return db.query(ERPNextLead).order_by(ERPNextLead.id.desc()).limit(200).all()
+    return _safe_query_list(
+        lambda: db.query(ERPNextLead).order_by(ERPNextLead.id.desc()).limit(200).all(),
+        "leads",
+    )
 
 def _parse_line_items(form: dict, tax_codes: dict[int, TaxCode]) -> list[SalesOrderLineItemData]:
     indices = []
@@ -1089,6 +1115,22 @@ async def order_create(
     contact_name = _form_str(form, "contact_name")
     contact_email = _form_str(form, "contact_email")
     contact_phone = _form_str(form, "contact_phone")
+    billing_address_line1 = _form_str(form, "billing_address_line1")
+    billing_address_line2 = _form_str(form, "billing_address_line2")
+    billing_city = _form_str(form, "billing_city")
+    billing_state = _form_str(form, "billing_state")
+    billing_postal_code = _form_str(form, "billing_postal_code")
+    billing_country = _form_str(form, "billing_country")
+    billing_gps_lat = _form_decimal(form, "billing_gps_lat")
+    billing_gps_lng = _form_decimal(form, "billing_gps_lng")
+    shipping_address_line1 = _form_str(form, "shipping_address_line1")
+    shipping_address_line2 = _form_str(form, "shipping_address_line2")
+    shipping_city = _form_str(form, "shipping_city")
+    shipping_state = _form_str(form, "shipping_state")
+    shipping_postal_code = _form_str(form, "shipping_postal_code")
+    shipping_country = _form_str(form, "shipping_country")
+    shipping_gps_lat = _form_decimal(form, "shipping_gps_lat")
+    shipping_gps_lng = _form_decimal(form, "shipping_gps_lng")
     billing_address = _form_str(form, "billing_address")
     shipping_address = _form_str(form, "shipping_address")
     company = _form_str(form, "company") or get_company_context(allow_null=True)

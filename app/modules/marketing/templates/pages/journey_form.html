@@ -1,0 +1,74 @@
+{% extends "layouts/app.html" %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-2xl font-display font-bold text-gray-900">New Journey</h1>
+        <p class="mt-1 text-sm text-gray-500">Create a customer journey and start orchestrating touchpoints</p>
+    </div>
+    <a href="/marketing/journeys" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">
+        Back to Journeys
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% include "modules/marketing/templates/partials/marketing_tabs.html" %}
+
+<div class="max-w-3xl">
+    <form method="post" action="/marketing/journeys" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h2 class="text-lg font-display font-semibold text-gray-900">Journey Setup</h2>
+            <p class="mt-1 text-sm text-gray-500">Choose a template or start with a blank journey.</p>
+        </div>
+        <div class="px-6 py-6 space-y-6">
+            <div>
+                <label for="name" class="block text-sm font-medium text-gray-700 mb-1.5">Journey Name <span class="text-red-500">*</span></label>
+                <input type="text" name="name" id="name" value="{{ form_data.name if form_data else '' }}" class="block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm" placeholder="e.g., New Customer Welcome">
+                {% if errors.name %}<p class="mt-1.5 text-sm text-red-600">{{ errors.name }}</p>{% endif %}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 mb-1.5">Status <span class="text-red-500">*</span></label>
+                    <select name="status" id="status" class="block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Select status</option>
+                        {% for opt in status_options %}
+                        <option value="{{ opt.value }}" {{ 'selected' if form_data and form_data.status == opt.value else '' }}>{{ opt.label }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.status %}<p class="mt-1.5 text-sm text-red-600">{{ errors.status }}</p>{% endif %}
+                </div>
+                <div>
+                    <label for="template_id" class="block text-sm font-medium text-gray-700 mb-1.5">Template</label>
+                    <select name="template_id" id="template_id" class="block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">Start from scratch</option>
+                        {% for template in templates %}
+                        <option value="{{ template.id }}" {{ 'selected' if form_data and form_data.template_id == template.id|string else '' }}>{{ template.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="campaign_id" class="block text-sm font-medium text-gray-700 mb-1.5">Linked Campaign</label>
+                    <select name="campaign_id" id="campaign_id" class="block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                        <option value="">No campaign</option>
+                        {% for campaign in campaigns %}
+                        <option value="{{ campaign.id }}" {{ 'selected' if form_data and form_data.campaign_id == campaign.id|string else '' }}>{{ campaign.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="entry_trigger" class="block text-sm font-medium text-gray-700 mb-1.5">Entry Trigger</label>
+                    <input type="text" name="entry_trigger" id="entry_trigger" value="{{ form_data.entry_trigger if form_data else '' }}" class="block w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm" placeholder="e.g., signup_completed">
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
+            <a href="/marketing/journeys" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
+            <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-primary-600 rounded-xl shadow-lg shadow-primary-600/25 hover:bg-primary-700">Create Journey</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

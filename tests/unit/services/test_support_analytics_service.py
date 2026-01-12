@@ -1258,10 +1258,11 @@ class TestStatusGroupings:
     def test_open_statuses(self):
         """Test OPEN_STATUSES constant."""
         from app.services.support.analytics import OPEN_STATUSES
-        from app.models.ticket import TicketStatus
+        from app.models.unified_ticket import TicketStatus
 
         assert TicketStatus.OPEN in OPEN_STATUSES
-        assert TicketStatus.REPLIED in OPEN_STATUSES
+        assert TicketStatus.IN_PROGRESS in OPEN_STATUSES
+        assert TicketStatus.WAITING in OPEN_STATUSES
         assert TicketStatus.ON_HOLD in OPEN_STATUSES
         assert TicketStatus.RESOLVED not in OPEN_STATUSES
         assert TicketStatus.CLOSED not in OPEN_STATUSES
@@ -1269,7 +1270,7 @@ class TestStatusGroupings:
     def test_closed_statuses(self):
         """Test CLOSED_STATUSES constant."""
         from app.services.support.analytics import CLOSED_STATUSES
-        from app.models.ticket import TicketStatus
+        from app.models.unified_ticket import TicketStatus
 
         assert TicketStatus.RESOLVED in CLOSED_STATUSES
         assert TicketStatus.CLOSED in CLOSED_STATUSES

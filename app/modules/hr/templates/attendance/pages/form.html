@@ -1,6 +1,9 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
+{% set is_edit = record is defined and record %}
+{% set status_value = (record.status.value if is_edit and record.status is not string else (record.status if is_edit else '')) | lower %}
+{% set status_label = status_value.replace('_', ' ').title() if status_value else '' %}
 <div class="max-w-2xl mx-auto">
     <form method="POST" action="{{ '/hr/attendance/' ~ record.id if record else '/hr/attendance' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -12,15 +15,15 @@
         <div class="px-6 py-6 space-y-6">
             <div>
                 <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1.5">Employee <span class="text-red-500">*</span></label>
-                <select name="employee_id" id="employee_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <select name="employee_id" id="employee_id" required {{ 'disabled' if is_edit else '' }} class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm {{ 'bg-gray-50 text-gray-500' if is_edit else '' }}">
                     <option value="">Select employee</option>
-                    {% for opt in employee_options %}<option value="{{ opt.value }}" {{ 'selected' if (record and record.employee_id == opt.value) or (form_data and form_data.employee_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                    {% for opt in employee_options %}<option value="{{ opt.value }}" {{ 'selected' if (is_edit and (record.employee_id | string) == opt.value) or (form_data and form_data.employee_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
                 </select>
                 {% if errors.employee_id %}<p class="mt-1.5 text-sm text-red-600">{{ errors.employee_id }}</p>{% endif %}
             </div>
             <div>
                 <label for="attendance_date" class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-500">*</span></label>
-                <input type="date" name="attendance_date" id="attendance_date" required value="{{ record.attendance_date if record else (form_data.attendance_date if form_data else '') }}" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <input type="date" name="attendance_date" id="attendance_date" required value="{{ record.attendance_date if record else (form_data.attendance_date if form_data else '') }}" {{ 'disabled' if is_edit else '' }} class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm {{ 'bg-gray-50 text-gray-500' if is_edit else '' }}">
                 {% if errors.attendance_date %}<p class="mt-1.5 text-sm text-red-600">{{ errors.attendance_date }}</p>{% endif %}
             </div>
             <div>
@@ -28,7 +31,7 @@
                 <select name="status" id="status" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
                     <option value="">Select status</option>
                     {% for s in ['Present', 'Absent', 'Half Day', 'On Leave'] %}
-                    <option value="{{ s }}" {{ 'selected' if (record and record.status == s) or (form_data and form_data.status == s) else '' }}>{{ s }}</option>
+                    <option value="{{ s }}" {{ 'selected' if (is_edit and status_label == s) or (form_data and form_data.status == s) else '' }}>{{ s }}</option>
                     {% endfor %}
                 </select>
                 {% if errors.status %}<p class="mt-1.5 text-sm text-red-600">{{ errors.status }}</p>{% endif %}
@@ -37,7 +40,7 @@
                 <label for="shift_id" class="block text-sm font-medium text-gray-700 mb-1.5">Shift</label>
                 <select name="shift_id" id="shift_id" class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
                     <option value="">No shift</option>
-                    {% for opt in shift_options %}<option value="{{ opt.value }}" {{ 'selected' if (record and record.shift_id == opt.value) or (form_data and form_data.shift_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
+                    {% for opt in shift_options %}<option value="{{ opt.value }}" {{ 'selected' if (is_edit and record.shift == opt.label) or (form_data and form_data.shift_id == opt.value) else '' }}>{{ opt.label }}</option>{% endfor %}
                 </select>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

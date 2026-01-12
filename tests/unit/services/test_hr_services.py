@@ -6,16 +6,17 @@ Tests the critical fixes applied to the HR service layer:
 2. Sorting with sort.descending attribute
 3. Error handling and error classes
 4. Timezone-aware datetime handling (utc_now)
+5. Local-time attendance handling
 """
 from __future__ import annotations
 
 from datetime import datetime, date, timezone, timedelta
 from decimal import Decimal
 from typing import Optional, List, Any, Dict
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 from dataclasses import dataclass, field
 import enum
-import ast
+from types import SimpleNamespace
 
 import pytest
 
@@ -110,53 +111,10 @@ class TestFormulaEvaluation:
         Copy of the safe formula evaluator for testing.
         This mirrors the implementation in payroll.py.
         """
-        import operator
+        from app.services.hr.payroll import PayrollService
 
-        SAFE_OPERATORS = {
-            ast.Add: operator.add,
-            ast.Sub: operator.sub,
-            ast.Mult: operator.mul,
-            ast.Div: operator.truediv,
-            ast.USub: operator.neg,
-            ast.UAdd: operator.pos,
-        }
-
-        def safe_eval_node(node: ast.AST) -> Decimal:
-            if isinstance(node, ast.Expression):
-                return safe_eval_node(node.body)
-            elif isinstance(node, ast.Constant):
-                if isinstance(node.value, (int, float, Decimal)):
-                    return Decimal(str(node.value))
-                raise ValueError(f"Unsupported constant type: {type(node.value)}")
-            elif isinstance(node, ast.Num):
-                return Decimal(str(node.n))
-            elif isinstance(node, ast.BinOp):
-                left = safe_eval_node(node.left)
-                right = safe_eval_node(node.right)
-                op_func = SAFE_OPERATORS.get(type(node.op))
-                if op_func is None:
-                    raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
-                return Decimal(str(op_func(left, right)))
-            elif isinstance(node, ast.UnaryOp):
-                operand = safe_eval_node(node.operand)
-                op_func = SAFE_OPERATORS.get(type(node.op))
-                if op_func is None:
-                    raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
-                return Decimal(str(op_func(operand)))
-            else:
-                raise ValueError(f"Unsupported AST node: {type(node).__name__}")
-
-        try:
-            expr = formula
-            for name in sorted(variables.keys(), key=len, reverse=True):
-                value = variables[name]
-                expr = expr.replace(name, str(value))
-
-            tree = ast.parse(expr, mode='eval')
-            result = safe_eval_node(tree)
-            return result.quantize(Decimal("0.01"))
-        except Exception:
-            return Decimal("0")
+        service = PayrollService(MagicMock())
+        return service._evaluate_formula(formula, **variables)
 
     # -------------------------------------------------------------------------
     # Basic Arithmetic Tests
@@ -569,6 +527,63 @@ class TestDatetimeHandling:
         from app.utils.datetime_utils import is_aware
 
         assert is_aware(None) is False
+
+
+# =============================================================================
+# ATTENDANCE LOCAL TIME TESTS
+# =============================================================================
+
+
+class TestAttendanceLocalTime:
+    """Tests for local-time attendance normalization."""
+
+    def test_ensure_naive_strips_timezone(self):
+        """Ensure attendance service strips tzinfo from aware datetimes."""
+        from app.services.hr.attendance import AttendanceService
+
+        service = AttendanceService(MagicMock())
+        aware = datetime(2025, 1, 15, 9, 30, tzinfo=timezone.utc)
+        naive = service._ensure_naive(aware)
+
+        assert naive.tzinfo is None
+        assert naive.year == 2025
+        assert naive.month == 1
+        assert naive.day == 15
+        assert naive.hour == 9
+        assert naive.minute == 30
+
+    def test_check_in_uses_naive_time(self):
+        """Check-in should store naive local time even if input is aware."""
+        from app.services.hr.attendance import AttendanceService
+        from app.services.hr.attendance_types import CheckInData
+
+        db = MagicMock()
+        employee = SimpleNamespace(
+            id=1,
+            erpnext_id=None,
+            name="Test Employee",
+            company="Test Company",
+        )
+        db.get.return_value = employee
+
+        service = AttendanceService(db)
+        service._get_settings = MagicMock(
+            return_value=SimpleNamespace(
+                allow_backdated_attendance=False,
+                backdated_attendance_days=0,
+                geolocation_required=False,
+                late_entry_grace_minutes=0,
+            )
+        )
+        service.get_attendance_by_employee_date = MagicMock(return_value=None)
+        service.get_employee_current_shift = MagicMock(return_value=None)
+
+        aware_time = datetime.now(timezone.utc)
+        data = CheckInData(attendance_date=date.today(), in_time=aware_time)
+
+        attendance = service.check_in(employee_id=1, data=data)
+
+        assert attendance.in_time.tzinfo is None
 
 
 # =============================================================================

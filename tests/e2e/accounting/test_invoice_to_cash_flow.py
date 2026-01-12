@@ -31,7 +31,7 @@ class TestInvoiceCreation:
         customer = create_customer(e2e_db, name="Invoice Test Customer")
 
         payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "invoice_date": datetime.now().isoformat(),
             "due_date": (datetime.now() + timedelta(days=30)).isoformat(),
             "amount": 500000,
@@ -41,11 +41,11 @@ class TestInvoiceCreation:
             "status": "pending",
         }
 
-        response = e2e_superuser_client.post("/api/sales/invoices", json=payload)
+        response = e2e_superuser_client.post("/api/v1/sales/invoices", json=payload)
         assert_http_ok(response, "Create invoice")
 
         data = get_json(response)
-        assert data["customer_id"] == customer.id
+        assert data["customer_account_id"] == customer.id
         assert "id" in data
 
     def test_list_invoices(self, e2e_superuser_client, e2e_db):
@@ -54,7 +54,7 @@ class TestInvoiceCreation:
         create_invoice(e2e_db, customer_id=customer.id, amount=Decimal("100000"))
         create_invoice(e2e_db, customer_id=customer.id, amount=Decimal("200000"))
 
-        response = e2e_superuser_client.get("/api/sales/invoices")
+        response = e2e_superuser_client.get("/api/v1/sales/invoices")
         assert_http_ok(response, "List invoices")
 
         data = get_json(response)
@@ -68,7 +68,7 @@ class TestInvoiceCreation:
         create_invoice(e2e_db, customer_id=customer.id, status="paid")
 
         # Filter pending only
-        response = e2e_superuser_client.get("/api/sales/invoices", params={"status": "pending"})
+        response = e2e_superuser_client.get("/api/v1/sales/invoices", params={"status": "pending"})
         assert_http_ok(response, "Filter invoices by status")
 
         data = get_json(response)
@@ -104,7 +104,7 @@ class TestAccountsReceivable:
             status="overdue",
         )
 
-        response = e2e_superuser_client.get("/api/accounting/accounts-receivable")
+        response = e2e_superuser_client.get("/api/v1/accounting/accounts-receivable")
         assert_http_ok(response, "Get AR aging")
 
         data = get_json(response)
@@ -129,8 +129,8 @@ class TestAccountsReceivable:
         )
 
         response = e2e_superuser_client.get(
-            "/api/accounting/accounts-receivable",
-            params={"customer_id": customer.id},
+            "/api/v1/accounting/accounts-receivable",
+            params={"customer_account_id": customer.id},
         )
         assert_http_ok(response, "Get customer AR")
 
@@ -146,7 +146,7 @@ class TestPaymentCreation:
         customer = create_customer(e2e_db, name="Payment Test Customer")
 
         payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "payment_date": datetime.now().isoformat(),
             "amount": 100000.0,
             "currency": "NGN",
@@ -154,7 +154,7 @@ class TestPaymentCreation:
             "transaction_reference": "TRF-123456",
         }
 
-        response = e2e_superuser_client.post("/api/accounting/ar-payments", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/ar-payments", json=payload)
         assert_http_ok(response, "Create payment")
 
         data = get_json(response)
@@ -166,7 +166,7 @@ class TestPaymentCreation:
         create_payment(e2e_db, customer_id=customer.id, amount=Decimal("50000"))
         create_payment(e2e_db, customer_id=customer.id, amount=Decimal("75000"))
 
-        response = e2e_superuser_client.get("/api/accounting/ar-payments")
+        response = e2e_superuser_client.get("/api/v1/accounting/ar-payments")
         assert_http_ok(response, "List payments")
 
         data = get_json(response)
@@ -189,7 +189,7 @@ class TestPaymentAllocation:
 
         # Create payment with allocation
         payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "payment_date": datetime.now().isoformat(),
             "amount": 100000.0,
             "currency": "NGN",
@@ -203,7 +203,7 @@ class TestPaymentAllocation:
             ],
         }
 
-        response = e2e_superuser_client.post("/api/accounting/ar-payments", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/ar-payments", json=payload)
         assert_http_ok(response, "Create payment with allocation")
 
         # Verify invoice status
@@ -224,7 +224,7 @@ class TestPaymentAllocation:
 
         # Create partial payment
         payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "payment_date": datetime.now().isoformat(),
             "amount": 100000.0,
             "currency": "NGN",
@@ -238,7 +238,7 @@ class TestPaymentAllocation:
             ],
         }
 
-        response = e2e_superuser_client.post("/api/accounting/ar-payments", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/ar-payments", json=payload)
         assert_http_ok(response, "Create partial payment")
 
         # Verify invoice status is partially paid
@@ -260,7 +260,7 @@ class TestPaymentAllocation:
 
         # Attempt to allocate more than invoice amount
         payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "payment_date": datetime.now().isoformat(),
             "amount": 100000.0,
             "currency": "NGN",
@@ -274,7 +274,7 @@ class TestPaymentAllocation:
             ],
         }
 
-        response = e2e_superuser_client.post("/api/accounting/ar-payments", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/ar-payments", json=payload)
         # Should fail with 400 error
         assert_http_error(response, 400, "Overpayment should be rejected")
 
@@ -309,15 +309,15 @@ class TestInvoiceToCashFlow:
 
         # Step 3: Verify AR shows outstanding
         ar_resp = e2e_superuser_client.get(
-            "/api/accounting/accounts-receivable",
-            params={"customer_id": customer.id},
+            "/api/v1/accounting/accounts-receivable",
+            params={"customer_account_id": customer.id},
         )
         ar_data = get_json(ar_resp)
         assert ar_data["total_receivable"] >= float(invoice_amount)
 
         # Step 4 & 5: Create payment with allocation
         payment_payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "payment_date": datetime.now().isoformat(),
             "amount": float(invoice_amount),
             "currency": "NGN",
@@ -331,7 +331,7 @@ class TestInvoiceToCashFlow:
                 },
             ],
         }
-        pay_resp = e2e_superuser_client.post("/api/accounting/ar-payments", json=payment_payload)
+        pay_resp = e2e_superuser_client.post("/api/v1/accounting/ar-payments", json=payment_payload)
         assert_http_ok(pay_resp, "Create payment")
 
         # Step 6: Verify invoice marked as paid
@@ -343,8 +343,8 @@ class TestInvoiceToCashFlow:
 
         # Step 7: Verify AR cleared for this customer
         ar_resp_after = e2e_superuser_client.get(
-            "/api/accounting/accounts-receivable",
-            params={"customer_id": customer.id},
+            "/api/v1/accounting/accounts-receivable",
+            params={"customer_account_id": customer.id},
         )
         ar_data_after = get_json(ar_resp_after)
         # Should have no outstanding after full payment - use explicit assertions
@@ -377,7 +377,7 @@ class TestInvoiceToCashFlow:
 
         # Pay both with single payment
         payload = {
-            "customer_id": customer.id,
+            "customer_account_id": customer.id,
             "payment_date": datetime.now().isoformat(),
             "amount": 250000.0,
             "currency": "NGN",
@@ -396,7 +396,7 @@ class TestInvoiceToCashFlow:
             ],
         }
 
-        response = e2e_superuser_client.post("/api/accounting/ar-payments", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/ar-payments", json=payload)
         assert_http_ok(response, "Pay multiple invoices")
 
         # Verify both invoices are paid
@@ -438,7 +438,7 @@ class TestJournalEntryWorkflow:
             ],
         }
 
-        response = e2e_superuser_client.post("/api/accounting/journal-entries", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/journal-entries", json=payload)
         # May return 201 or 200 depending on implementation
         assert response.status_code in [200, 201], f"Create JE: {response.text}"
 
@@ -468,6 +468,6 @@ class TestJournalEntryWorkflow:
             ],
         }
 
-        response = e2e_superuser_client.post("/api/accounting/journal-entries", json=payload)
+        response = e2e_superuser_client.post("/api/v1/accounting/journal-entries", json=payload)
         # Should fail with 400
         assert_http_error(response, 400, "Unbalanced JE should be rejected")

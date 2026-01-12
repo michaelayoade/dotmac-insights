@@ -138,8 +138,8 @@ def auth_client(integration_db, integration_client):
 
     Usage:
         def test_api(auth_client):
-            client = auth_client(["contacts:read", "contacts:write"])
-            resp = client.get("/api/v1/crm/contacts")
+            client = auth_client(["crm:read", "crm:write"])
+            resp = client.get("/api/v1/crm/parties")
     """
     def _make_client(scopes: list[str], is_superuser: bool = False, user_id: int = 1):
         mock_principal = create_integration_principal(
@@ -196,7 +196,7 @@ def test_client(integration_db, integration_client):
 def readonly_client(integration_db, integration_client):
     """Client with read-only permissions."""
     mock_principal = create_integration_principal(
-        scopes={"contacts:read", "invoices:read", "tickets:read"},
+        scopes={"crm:read", "invoices:read", "tickets:read"},
         is_superuser=False,
     )
 
@@ -214,7 +214,7 @@ def readonly_client(integration_db, integration_client):
 def limited_scope_client(integration_db, integration_client):
     """Client with limited scopes and non-superuser."""
     mock_principal = create_integration_principal(
-        scopes={"contacts:read", "contacts:write"},
+        scopes={"crm:read", "crm:write"},
         is_superuser=False,
         user_id=2,  # Different user ID for ownership tests
     )
@@ -290,41 +290,64 @@ class IntegrationDataFactory:
         email: str = None,
         phone: str = None,
     ) -> Any:
-        """Create a contact."""
-        from app.models.contact import Contact
+        """Create a party record."""
+        from app.models.party import Party
 
-        contact = Contact(
-            contact_name=contact_name,
-            contact_type=contact_type,
-            email_id=email or f"contact_{datetime.now().timestamp()}@example.com",
-            mobile_no=phone,
+        email = email or f"contact_{datetime.now().timestamp()}@example.com"
+        phone = phone or "+234 800 000 0000"
+        party_type = "organization"
+        if contact_type and contact_type.lower() in {"person", "individual"}:
+            party_type = "person"
+
+        party = Party(
+            type=party_type,
+            status="active",
+            name=contact_name,
+            primary_email=email,
+            primary_phone=phone,
+            emails=[{"address": email, "label": "primary", "is_primary": True}],
+            phones=[{"number": phone, "label": "primary", "is_primary": True}],
         )
-        self.db.add(contact)
+        self.db.add(party)
         self.db.commit()
-        self.db.refresh(contact)
-        return contact
+        self.db.refresh(party)
+        return party
 
     def create_customer(
         self,
         name: str = "Test Customer",
         email: str = None,
     ) -> Any:
-        """Create a legacy customer."""
-        from app.models.customer import Customer
+        """Create a customer account."""
+        from app.models.party import Party, CustomerAccount
 
-        customer = Customer(
-            customer_name=name,
-            email=email or f"customer_{datetime.now().timestamp()}@example.com",
+        email = email or f"customer_{datetime.now().timestamp()}@example.com"
+        party = Party(
+            type="organization",
+            status="active",
+            name=name,
+            primary_email=email,
+            emails=[{"address": email, "label": "primary", "is_primary": True}],
         )
-        self.db.add(customer)
+        self.db.add(party)
         self.db.commit()
-        self.db.refresh(customer)
-        return customer
+        self.db.refresh(party)
+
+        account = CustomerAccount(
+            party_id=party.id,
+            account_number=f"CA-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            status="active",
+            tier="standard",
+            account_type="direct",
+        )
+        self.db.add(account)
+        self.db.commit()
+        self.db.refresh(account)
+        return account
 
     def create_invoice(
         self,
-        customer_id: int = None,
-        contact_id: int = None,
+        customer_account_id: int = None,
         total_amount: Decimal = Decimal("1000.00"),
         status: str = "unpaid",
     ) -> Any:
@@ -332,8 +355,7 @@ class IntegrationDataFactory:
         from app.models.invoice import Invoice, InvoiceStatus
 
         invoice = Invoice(
-            customer_id=customer_id,
-            contact_id=contact_id,
+            customer_account_id=customer_account_id,
             invoice_number=f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             total_amount=total_amount,
             amount=total_amount,
@@ -352,14 +374,14 @@ class IntegrationDataFactory:
 
     def create_payment(
         self,
-        customer_id: int,
+        customer_account_id: int,
         amount: Decimal = Decimal("500.00"),
     ) -> Any:
         """Create a payment."""
         from app.models.payment import Payment
 
         payment = Payment(
-            customer_id=customer_id,
+            customer_account_id=customer_account_id,
             receipt_number=f"REC-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             amount=amount,
             total_allocated=Decimal("0"),
@@ -377,7 +399,7 @@ class IntegrationDataFactory:
         subject: str = "Test Ticket",
         priority: str = "medium",
         status: str = "open",
-        customer_id: int = None,
+        customer_account_id: int = None,
     ) -> Any:
         """Create a support ticket."""
         from app.models.ticket import Ticket, TicketStatus, TicketPriority
@@ -386,7 +408,7 @@ class IntegrationDataFactory:
             subject=subject,
             status=TicketStatus(status) if isinstance(status, str) else status,
             priority=TicketPriority(priority) if isinstance(priority, str) else priority,
-            customer_id=customer_id,
+            customer_account_id=customer_account_id,
             opening_date=datetime.now(timezone.utc),
         )
         self.db.add(ticket)

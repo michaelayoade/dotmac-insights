@@ -27,38 +27,35 @@ class TestLeadLifecycle:
     def test_create_lead(self, e2e_superuser_client, e2e_db):
         """Test lead creation via API."""
         payload = {
-            "lead_name": "E2E Test Lead",
-            "company_name": "Test Company Ltd",
-            "email_id": "lead@testcompany.com",
-            "phone": "+2348012345678",
+            "name": "E2E Test Lead",
+            "type": "organization",
+            "primary_email": "lead@testcompany.com",
+            "primary_phone": "+2348012345678",
             "source": "Website",
-            "territory": "Lagos",
-            "industry": "Technology",
         }
 
-        response = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        response = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         assert_http_ok(response, "Create lead")
 
         data = get_json(response)
-        assert data["lead_name"] == "E2E Test Lead"
-        assert data["status"] == "lead"
-        assert data["converted"] is False
+        assert data["name"] == "E2E Test Lead"
+        assert data["status"] == "active"
 
         # Store for cleanup
-        self._lead_id = data["id"]
+        self._lead_id = data["party_id"]
 
     def test_lead_listing(self, e2e_superuser_client, e2e_db):
         """Test lead listing and filtering."""
         # Create a lead first
         payload = {
-            "lead_name": "List Test Lead",
-            "email_id": "listtest@example.com",
+            "name": "List Test Lead",
+            "primary_email": "listtest@example.com",
         }
-        create_resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        create_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         assert_http_ok(create_resp, "Create lead for listing")
 
         # List all leads
-        response = e2e_superuser_client.get("/api/crm/leads")
+        response = e2e_superuser_client.get("/api/v1/crm/leads")
         assert_http_ok(response, "List leads")
 
         data = get_json(response)
@@ -69,46 +66,51 @@ class TestLeadLifecycle:
     def test_qualify_lead(self, e2e_superuser_client, e2e_db):
         """Test lead qualification workflow."""
         # Create lead
-        payload = {"lead_name": "Qualify Test Lead", "email_id": "qualify@test.com"}
-        create_resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        payload = {"name": "Qualify Test Lead", "primary_email": "qualify@test.com"}
+        create_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         lead = get_json(create_resp)
-        lead_id = lead["id"]
+        lead_id = lead["party_id"]
 
         # Qualify the lead
-        response = e2e_superuser_client.post(f"/api/crm/leads/{lead_id}/qualify")
+        response = e2e_superuser_client.post(
+            f"/api/v1/crm/leads/{lead_id}/qualify",
+            json={"qualification": "qualified"},
+        )
         assert_http_ok(response, "Qualify lead")
 
         result = get_json(response)
-        assert result["success"] is True
+        assert result["qualification"] == "qualified"
 
         # Verify status changed
-        verify_resp = e2e_superuser_client.get(f"/api/crm/leads/{lead_id}")
+        verify_resp = e2e_superuser_client.get(f"/api/v1/crm/leads/{lead_id}")
         verified = get_json(verify_resp)
-        assert verified["status"] == "opportunity"
-        assert verified["qualification_status"] == "qualified"
+        assert verified["qualification"] == "qualified"
+        assert verified["status"] == "active"
 
     def test_disqualify_lead(self, e2e_superuser_client, e2e_db):
         """Test lead disqualification."""
         # Create lead
-        payload = {"lead_name": "Disqualify Test Lead", "email_id": "disqual@test.com"}
-        create_resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        payload = {"name": "Disqualify Test Lead", "primary_email": "disqual@test.com"}
+        create_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         lead = get_json(create_resp)
-        lead_id = lead["id"]
+        lead_id = lead["party_id"]
 
         # Disqualify with reason
         response = e2e_superuser_client.post(
-            f"/api/crm/leads/{lead_id}/disqualify",
-            params={"reason": "No budget"},
+            f"/api/v1/crm/leads/{lead_id}/disqualify",
+            json={"reason": "No budget"},
         )
         assert_http_ok(response, "Disqualify lead")
 
         result = get_json(response)
-        assert result["success"] is True
+        assert result["qualification"] == "disqualified"
+        assert result["status"] == "inactive"
 
         # Verify status changed
-        verify_resp = e2e_superuser_client.get(f"/api/crm/leads/{lead_id}")
+        verify_resp = e2e_superuser_client.get(f"/api/v1/crm/leads/{lead_id}")
         verified = get_json(verify_resp)
-        assert verified["status"] == "do_not_contact"
+        assert verified["qualification"] == "disqualified"
+        assert verified["status"] == "inactive"
 
 
 class TestLeadConversion:
@@ -118,77 +120,70 @@ class TestLeadConversion:
         """Test full lead conversion to customer."""
         # Create lead
         payload = {
-            "lead_name": "Convert Test Lead",
-            "company_name": "Convertible Ltd",
-            "email_id": "convert@test.com",
-            "phone": "+2348099999999",
-            "city": "Lagos",
+            "name": "Convert Test Lead",
+            "type": "organization",
+            "primary_email": "convert@test.com",
+            "primary_phone": "+2348099999999",
         }
-        create_resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        create_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         lead = get_json(create_resp)
-        lead_id = lead["id"]
+        lead_id = lead["party_id"]
 
         # Convert lead to customer
-        convert_payload = {
-            "customer_name": "Converted Customer Ltd",
-            "customer_type": "business",
-            "create_opportunity": False,
-        }
         response = e2e_superuser_client.post(
-            f"/api/crm/leads/{lead_id}/convert",
-            json=convert_payload,
+            f"/api/v1/crm/leads/{lead_id}/convert/customer",
+            json={},
         )
         assert_http_ok(response, "Convert lead")
 
         result = get_json(response)
-        assert result["success"] is True
-        assert result["customer_id"] is not None
-        assert result["contact_id"] is not None
+        assert result["id"] is not None
 
         # Verify lead marked as converted
-        verify_resp = e2e_superuser_client.get(f"/api/crm/leads/{lead_id}")
+        verify_resp = e2e_superuser_client.get(f"/api/v1/crm/leads/{lead_id}")
         verified = get_json(verify_resp)
-        assert verified["converted"] is True
-        assert verified["status"] == "converted"
+        assert verified["qualification"] == "converted"
 
         # Verify customer exists
-        customer_id = result["customer_id"]
-        customer_resp = e2e_superuser_client.get(f"/api/customers/{customer_id}")
+        customer_party_id = result["id"]
+        customer_resp = e2e_superuser_client.get(
+            f"/api/v1/crm/parties/{customer_party_id}",
+            params={"include_roles": True},
+        )
         assert_http_ok(customer_resp, "Get created customer")
+        customer_data = get_json(customer_resp)
+        assert customer_data["id"] == customer_party_id
+        assert any(role["role"] == "customer" for role in (customer_data.get("roles") or []))
 
     def test_convert_lead_with_opportunity(self, e2e_superuser_client, e2e_db):
         """Test lead conversion with opportunity creation."""
         # Create lead
         payload = {
-            "lead_name": "Opp Convert Lead",
-            "company_name": "Big Deal Ltd",
-            "email_id": "bigdeal@test.com",
+            "name": "Opp Convert Lead",
+            "type": "organization",
+            "primary_email": "bigdeal@test.com",
         }
-        create_resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        create_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         lead = get_json(create_resp)
-        lead_id = lead["id"]
+        lead_id = lead["party_id"]
 
-        # Convert with opportunity
+        # Convert to opportunity
         convert_payload = {
-            "customer_name": "Big Deal Customer",
-            "customer_type": "enterprise",
-            "create_opportunity": True,
             "opportunity_name": "Big Enterprise Deal",
             "deal_value": 5000000.0,
         }
         response = e2e_superuser_client.post(
-            f"/api/crm/leads/{lead_id}/convert",
+            f"/api/v1/crm/leads/{lead_id}/convert/opportunity",
             json=convert_payload,
         )
         assert_http_ok(response, "Convert lead with opportunity")
 
         result = get_json(response)
-        assert result["success"] is True
-        assert result["opportunity_id"] is not None
+        assert result["id"] is not None
 
         # Verify opportunity exists
-        opp_id = result["opportunity_id"]
-        opp_resp = e2e_superuser_client.get(f"/api/crm/opportunities/{opp_id}")
+        opp_id = result["id"]
+        opp_resp = e2e_superuser_client.get(f"/api/v1/crm/opportunities/{opp_id}")
         assert_http_ok(opp_resp, "Get created opportunity")
 
         opp_data = get_json(opp_resp)
@@ -198,21 +193,21 @@ class TestLeadConversion:
     def test_cannot_convert_already_converted(self, e2e_superuser_client, e2e_db):
         """Test that already converted leads cannot be converted again."""
         # Create and convert lead
-        payload = {"lead_name": "Double Convert Lead", "email_id": "double@test.com"}
-        create_resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+        payload = {"name": "Double Convert Lead", "primary_email": "double@test.com"}
+        create_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
         lead = get_json(create_resp)
-        lead_id = lead["id"]
+        lead_id = lead["party_id"]
 
         # First conversion
         e2e_superuser_client.post(
-            f"/api/crm/leads/{lead_id}/convert",
-            json={"customer_type": "business"},
+            f"/api/v1/crm/leads/{lead_id}/convert/customer",
+            json={},
         )
 
         # Second conversion should fail
         response = e2e_superuser_client.post(
-            f"/api/crm/leads/{lead_id}/convert",
-            json={"customer_type": "business"},
+            f"/api/v1/crm/leads/{lead_id}/convert/customer",
+            json={},
         )
         assert_http_error(response, 400, "Double conversion should fail")
 
@@ -228,14 +223,14 @@ class TestOpportunityPipeline:
 
         payload = {
             "name": "Test Opportunity",
-            "customer_id": customer.id,
+            "party_id": customer.party_id,
             "stage_id": stage.id,
             "deal_value": 100000.0,
             "probability": 20,
             "expected_close_date": (date.today() + timedelta(days=30)).isoformat(),
         }
 
-        response = e2e_superuser_client.post("/api/crm/opportunities/", json=payload)
+        response = e2e_superuser_client.post("/api/v1/crm/opportunities/", json=payload)
         assert_http_ok(response, "Create opportunity")
 
         data = get_json(response)
@@ -254,23 +249,23 @@ class TestOpportunityPipeline:
         # Create opportunity
         payload = {
             "name": "Pipeline Test Opp",
-            "customer_id": customer.id,
+            "party_id": customer.party_id,
             "stage_id": new_stage.id,
             "deal_value": 250000.0,
             "expected_close_date": (date.today() + timedelta(days=60)).isoformat(),
         }
-        create_resp = e2e_superuser_client.post("/api/crm/opportunities/", json=payload)
+        create_resp = e2e_superuser_client.post("/api/v1/crm/opportunities/", json=payload)
         opp = get_json(create_resp)
         opp_id = opp["id"]
 
         # Progress to Qualification stage
         update_resp = e2e_superuser_client.patch(
-            f"/api/crm/opportunities/{opp_id}",
+            f"/api/v1/crm/opportunities/{opp_id}",
             json={"stage_id": qual_stage.id},
         )
         assert_http_ok(update_resp, "Update to Qualification")
 
-        verify_resp = e2e_superuser_client.get(f"/api/crm/opportunities/{opp_id}")
+        verify_resp = e2e_superuser_client.get(f"/api/v1/crm/opportunities/{opp_id}")
         verified = get_json(verify_resp)
         assert verified["stage"]["name"] == "Qualification"
 
@@ -284,18 +279,18 @@ class TestOpportunityPipeline:
         # Create opportunity
         payload = {
             "name": "Win Test Opp",
-            "customer_id": customer.id,
+            "party_id": customer.party_id,
             "stage_id": neg_stage.id,
             "deal_value": 500000.0,
             "expected_close_date": date.today().isoformat(),
         }
-        create_resp = e2e_superuser_client.post("/api/crm/opportunities/", json=payload)
+        create_resp = e2e_superuser_client.post("/api/v1/crm/opportunities/", json=payload)
         opp = get_json(create_resp)
         opp_id = opp["id"]
 
         # Mark as won
         response = e2e_superuser_client.patch(
-            f"/api/crm/opportunities/{opp_id}",
+            f"/api/v1/crm/opportunities/{opp_id}",
             json={"stage_id": won_stage.id, "status": "won"},
         )
         assert_http_ok(response, "Win opportunity")
@@ -313,18 +308,18 @@ class TestOpportunityPipeline:
         # Create opportunity
         payload = {
             "name": "Lose Test Opp",
-            "customer_id": customer.id,
+            "party_id": customer.party_id,
             "stage_id": proposal_stage.id,
             "deal_value": 300000.0,
             "expected_close_date": date.today().isoformat(),
         }
-        create_resp = e2e_superuser_client.post("/api/crm/opportunities/", json=payload)
+        create_resp = e2e_superuser_client.post("/api/v1/crm/opportunities/", json=payload)
         opp = get_json(create_resp)
         opp_id = opp["id"]
 
         # Mark as lost
         response = e2e_superuser_client.patch(
-            f"/api/crm/opportunities/{opp_id}",
+            f"/api/v1/crm/opportunities/{opp_id}",
             json={"stage_id": lost_stage.id, "status": "lost"},
         )
         assert_http_ok(response, "Lose opportunity")
@@ -340,29 +335,32 @@ class TestLeadSummary:
         """Test lead summary statistics."""
         # Create some leads in different states
         leads_data = [
-            {"lead_name": "Summary Lead 1", "email_id": "summary1@test.com"},
-            {"lead_name": "Summary Lead 2", "email_id": "summary2@test.com"},
-            {"lead_name": "Summary Lead 3", "email_id": "summary3@test.com"},
+            {"name": "Summary Lead 1", "primary_email": "summary1@test.com"},
+            {"name": "Summary Lead 2", "primary_email": "summary2@test.com"},
+            {"name": "Summary Lead 3", "primary_email": "summary3@test.com"},
         ]
 
         lead_ids = []
         for payload in leads_data:
-            resp = e2e_superuser_client.post("/api/crm/leads", json=payload)
+            resp = e2e_superuser_client.post("/api/v1/crm/leads", json=payload)
             lead = get_json(resp)
-            lead_ids.append(lead["id"])
+            lead_ids.append(lead["party_id"])
 
         # Qualify one lead
-        e2e_superuser_client.post(f"/api/crm/leads/{lead_ids[1]}/qualify")
+        e2e_superuser_client.post(
+            f"/api/v1/crm/leads/{lead_ids[1]}/qualify",
+            json={"qualification": "qualified"},
+        )
 
         # Get summary
-        response = e2e_superuser_client.get("/api/crm/leads/summary")
+        response = e2e_superuser_client.get("/api/v1/crm/leads/summary")
         assert_http_ok(response, "Get leads summary")
 
         data = get_json(response)
         assert "total_leads" in data
-        assert "new_leads" in data
+        assert "active_leads" in data
         assert "qualified_leads" in data
-        assert "by_status" in data
+        assert "by_source" in data
         assert data["total_leads"] >= 3
 
 
@@ -388,67 +386,72 @@ class TestFullSalesCycle:
 
         # Step 1: Create Lead
         lead_payload = {
-            "lead_name": "Full Cycle Lead",
-            "company_name": "Full Cycle Corp",
-            "email_id": "fullcycle@test.com",
-            "phone": "+2348011111111",
+            "name": "Full Cycle Lead",
+            "type": "organization",
+            "primary_email": "fullcycle@test.com",
+            "primary_phone": "+2348011111111",
             "source": "Referral",
-            "industry": "Finance",
         }
-        lead_resp = e2e_superuser_client.post("/api/crm/leads", json=lead_payload)
+        lead_resp = e2e_superuser_client.post("/api/v1/crm/leads", json=lead_payload)
         assert_http_ok(lead_resp, "Step 1: Create lead")
         lead = get_json(lead_resp)
-        lead_id = lead["id"]
+        lead_id = lead["party_id"]
 
         # Step 2: Qualify Lead
-        qual_resp = e2e_superuser_client.post(f"/api/crm/leads/{lead_id}/qualify")
+        qual_resp = e2e_superuser_client.post(
+            f"/api/v1/crm/leads/{lead_id}/qualify",
+            json={"qualification": "qualified"},
+        )
         assert_http_ok(qual_resp, "Step 2: Qualify lead")
 
-        # Step 3: Convert to Customer with Opportunity
+        # Step 3: Convert to Opportunity and Customer
         convert_payload = {
-            "customer_name": "Full Cycle Customer Corp",
-            "customer_type": "enterprise",
-            "create_opportunity": True,
             "opportunity_name": "Full Cycle Enterprise Deal",
             "deal_value": 10000000.0,
         }
         convert_resp = e2e_superuser_client.post(
-            f"/api/crm/leads/{lead_id}/convert",
+            f"/api/v1/crm/leads/{lead_id}/convert/opportunity",
             json=convert_payload,
         )
-        assert_http_ok(convert_resp, "Step 3: Convert lead")
+        assert_http_ok(convert_resp, "Step 3: Convert lead to opportunity")
         convert_result = get_json(convert_resp)
-        customer_id = convert_result["customer_id"]
-        opp_id = convert_result["opportunity_id"]
+        opp_id = convert_result["id"]
+
+        customer_resp = e2e_superuser_client.post(
+            f"/api/v1/crm/leads/{lead_id}/convert/customer",
+            json={},
+        )
+        assert_http_ok(customer_resp, "Step 3: Convert lead to customer")
+        customer_id = get_json(customer_resp)["id"]
 
         # Step 4: Progress Opportunity through stages
         stage_ids = [qual_stage.id, proposal_stage.id, neg_stage.id]
         stage_names = ["Qualification", "Proposal", "Negotiation"]
         for stage_id, stage_name in zip(stage_ids, stage_names):
             stage_resp = e2e_superuser_client.patch(
-                f"/api/crm/opportunities/{opp_id}",
+                f"/api/v1/crm/opportunities/{opp_id}",
                 json={"stage_id": stage_id},
             )
             assert_http_ok(stage_resp, f"Step 4: Progress to {stage_name}")
 
         # Step 5: Win Opportunity
         win_resp = e2e_superuser_client.patch(
-            f"/api/crm/opportunities/{opp_id}",
+            f"/api/v1/crm/opportunities/{opp_id}",
             json={"stage_id": won_stage.id, "status": "won"},
         )
         assert_http_ok(win_resp, "Step 5: Win opportunity")
 
         # Final Verification
         # - Lead should be converted
-        lead_check = e2e_superuser_client.get(f"/api/crm/leads/{lead_id}")
+        lead_check = e2e_superuser_client.get(f"/api/v1/crm/leads/{lead_id}")
         lead_final = get_json(lead_check)
-        assert lead_final["converted"] is True
+        assert lead_final["qualification"] == "converted"
 
         # - Customer should exist
-        customer_check = e2e_superuser_client.get(f"/api/customers/{customer_id}")
+        customer_check = e2e_superuser_client.get(f"/api/v1/crm/parties/{customer_id}")
         assert_http_ok(customer_check, "Customer exists")
 
         # - Opportunity should be won
-        opp_check = e2e_superuser_client.get(f"/api/crm/opportunities/{opp_id}")
+        opp_check = e2e_superuser_client.get(f"/api/v1/crm/opportunities/{opp_id}")
         opp_final = get_json(opp_check)
         assert opp_final["stage"]["name"] == "Won"

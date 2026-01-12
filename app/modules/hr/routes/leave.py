@@ -9,6 +9,7 @@ Permission Requirements:
 """
 from typing import Optional, Any
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Request, Response, Query, HTTPException, Depends, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -26,7 +27,12 @@ from app.services.hr.employees import EmployeeService
 from app.services.hr.employee_types import EmployeeFilters
 from app.core.security import is_htmx_request, htmx_toast, set_flash
 from app.services.hr.leave import LeaveService
-from app.services.hr.leave_types import ApplicationFilters, ApplicationCreateData, AllocationFilters
+from app.services.hr.leave_types import (
+    ApplicationFilters,
+    ApplicationCreateData,
+    ApplicationUpdateData,
+    AllocationFilters,
+)
 from app.services.types import PaginationParams
 from app.services.hr.errors import (
     EmployeeNotFoundError,
@@ -323,6 +329,150 @@ async def leave_application_create(
 
     set_flash(response, "Leave application submitted successfully.", "success")
     return RedirectResponse(url=f"/hr/leave/{application.id}", status_code=303)
+
+
+@router.get("/{application_id}/edit", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def leave_application_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    application_id: int,
+):
+    """Edit leave application form."""
+    service = LeaveService(db, user)
+    try:
+        application = service.get_application(application_id)
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
+    form_data = {
+        "employee_id": str(application.employee_id) if application.employee_id else "",
+        "leave_type_id": str(application.leave_type_id) if application.leave_type_id else "",
+        "from_date": application.from_date.isoformat() if application.from_date else "",
+        "to_date": application.to_date.isoformat() if application.to_date else "",
+        "half_day": bool(application.half_day),
+        "description": application.description or "",
+    }
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit Leave Application"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "HR", "href": "/hr/employees"},
+        {"label": "Leave", "href": "/hr/leave"},
+        {"label": f"Application #{application.id}", "href": f"/hr/leave/{application.id}"},
+        {"label": "Edit"},
+    ])
+    context["application"] = application
+    context["leave_type_options"] = get_leave_type_options(db)
+    context["employee_options"] = get_employee_options(db)
+    context["errors"] = {}
+    context["form_data"] = form_data
+
+    template = templates.get_template("modules/hr/templates/leave/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{application_id}", response_class=HTMLResponse, dependencies=[RequireHRWrite])
+async def leave_application_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    application_id: int,
+):
+    """Update an existing leave application."""
+    form = await request.form()
+    service = LeaveService(db, user)
+
+    try:
+        application = service.get_application(application_id)
+    except LeaveApplicationNotFoundError:
+        raise HTTPException(status_code=404, detail="Leave application not found")
+
+    errors = {}
+    from_date = _form_date(form, "from_date")
+    to_date = _form_date(form, "to_date")
+    half_day = _form_str(form, "half_day") == "on"
+    description = _form_str(form, "description") or None
+
+    if from_date is None:
+        errors["from_date"] = "From date is required"
+    if to_date is None:
+        errors["to_date"] = "To date is required"
+
+    if from_date and to_date and to_date < from_date:
+        errors["to_date"] = "To date must be on or after from date"
+
+    form_data = {
+        "employee_id": str(application.employee_id) if application.employee_id else "",
+        "leave_type_id": str(application.leave_type_id) if application.leave_type_id else "",
+        "from_date": _form_str(form, "from_date"),
+        "to_date": _form_str(form, "to_date"),
+        "half_day": half_day,
+        "description": _form_str(form, "description"),
+    }
+
+    if errors:
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Leave Application"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Leave", "href": "/hr/leave"},
+            {"label": f"Application #{application.id}", "href": f"/hr/leave/{application.id}"},
+            {"label": "Edit"},
+        ])
+        context["application"] = application
+        context["leave_type_options"] = get_leave_type_options(db)
+        context["employee_options"] = get_employee_options(db)
+        context["errors"] = errors
+        context["form_data"] = form_data
+        template = templates.get_template("modules/hr/templates/leave/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    days = (to_date - from_date).days + 1
+    total_leave_days = Decimal(str(days))
+    if half_day:
+        total_leave_days = total_leave_days - Decimal("0.5")
+
+    try:
+        service.update_application(
+            application_id,
+            ApplicationUpdateData(
+                from_date=from_date,
+                to_date=to_date,
+                half_day=half_day,
+                total_leave_days=total_leave_days,
+                description=description,
+            ),
+        )
+        db.commit()
+    except LeaveStatusTransitionError as e:
+        db.rollback()
+        errors["_form"] = str(e)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = "Edit Leave Application"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "HR", "href": "/hr/employees"},
+            {"label": "Leave", "href": "/hr/leave"},
+            {"label": f"Application #{application.id}", "href": f"/hr/leave/{application.id}"},
+            {"label": "Edit"},
+        ])
+        context["application"] = application
+        context["leave_type_options"] = get_leave_type_options(db)
+        context["employee_options"] = get_employee_options(db)
+        context["errors"] = errors
+        context["form_data"] = form_data
+        template = templates.get_template("modules/hr/templates/leave/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    set_flash(response, "Leave application updated successfully.", "success")
+    return RedirectResponse(url=f"/hr/leave/{application_id}", status_code=303)
 
 
 @router.get("/{application_id}", response_class=HTMLResponse, dependencies=[RequireHRRead])

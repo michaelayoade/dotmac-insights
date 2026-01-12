@@ -210,14 +210,15 @@
         <h2 class="text-lg font-display font-semibold text-gray-900 mb-4">Employees by Department</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             {% for dept in department_stats %}
-            <div class="flex items-center gap-3 p-3 bg-surface-50 rounded-xl">
+            {% set dept_filter = dept.id if dept.id is not none else dept.name %}
+            <a href="/hr/employees?department={{ dept_filter }}" class="flex items-center gap-3 p-3 bg-surface-50 rounded-xl hover:bg-surface-100 hover:ring-1 hover:ring-primary-200 transition-all">
                 <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 font-bold text-sm">
                     {{ dept.count }}
                 </div>
                 <div class="flex-1 min-w-0">
                     <p class="font-medium text-gray-900 truncate">{{ dept.name }}</p>
                 </div>
-            </div>
+            </a>
             {% endfor %}
         </div>
     </div>

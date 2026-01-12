@@ -348,212 +348,6 @@ async def warehouse_create(
         return HTMLResponse(template.render(context), status_code=422)
 
 
-@router.get("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryRead])
-async def warehouse_detail(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    warehouse_id: int,
-    service: WarehouseService = Depends(get_warehouse_service),
-):
-    """Warehouse detail page."""
-    try:
-        warehouse = service.get_warehouse(warehouse_id)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Warehouse not found")
-
-    validation_issues = _get_validation_issues(
-        db,
-        model_name="Warehouse",
-        record_id=warehouse_id,
-        scope="inventory",
-    )
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = warehouse.warehouse_name
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "Operations"},
-        {"label": "Inventory", "href": "/inventory"},
-        {"label": warehouse.warehouse_name},
-    ])
-    context["warehouse"] = warehouse
-    context["validation_issues"] = validation_issues
-
-    template = templates.get_template("modules/inventory/templates/pages/detail.html")
-    return HTMLResponse(template.render(context))
-
-
-@router.get("/{warehouse_id}/edit", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
-async def warehouse_edit(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    warehouse_id: int,
-    service: WarehouseService = Depends(get_warehouse_service),
-):
-    """Warehouse edit form page."""
-    try:
-        warehouse = service.get_warehouse(warehouse_id)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Warehouse not found")
-
-    # Get parent warehouses excluding current
-    parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["navigation"] = get_navigation_context(user)
-    context["page_title"] = f"Edit {warehouse.warehouse_name}"
-    context["breadcrumbs"] = build_breadcrumbs([
-        {"label": "Operations"},
-        {"label": "Inventory", "href": "/inventory"},
-        {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
-        {"label": "Edit"},
-    ])
-    context["warehouse"] = warehouse
-    context["type_options"] = get_warehouse_type_options()
-    context["parent_warehouses"] = parent_warehouses
-    context["errors"] = {}
-
-    template = templates.get_template("modules/inventory/templates/pages/form.html")
-    return HTMLResponse(template.render(context))
-
-
-@router.post("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
-async def warehouse_update(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    csrf: CSRFProtect,
-    db: DB,
-    warehouse_id: int,
-    service: WarehouseService = Depends(get_warehouse_service),
-):
-    """Update a warehouse."""
-    try:
-        warehouse = service.get_warehouse(warehouse_id)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Warehouse not found")
-
-    form = await request.form()
-    warehouse_name = _form_str(form, "warehouse_name")
-
-    # Basic client-side validation for UX
-    if not warehouse_name:
-        parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
-        context = get_base_context(request, response, user, csrf_token)
-        context["navigation"] = get_navigation_context(user)
-        context["page_title"] = f"Edit {warehouse.warehouse_name}"
-        context["breadcrumbs"] = build_breadcrumbs([
-            {"label": "Operations"},
-            {"label": "Inventory", "href": "/inventory"},
-            {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
-            {"label": "Edit"},
-        ])
-        context["warehouse"] = warehouse
-        context["type_options"] = get_warehouse_type_options()
-        context["parent_warehouses"] = parent_warehouses
-        context["errors"] = {"warehouse_name": "Warehouse name is required"}
-
-        template = templates.get_template("modules/inventory/templates/pages/form.html")
-        return HTMLResponse(template.render(context), status_code=422)
-
-    try:
-        # Update warehouse via service
-        data = WarehouseUpdateData(
-            warehouse_name=warehouse_name,
-            warehouse_type=_form_str(form, "warehouse_type") or None,
-            parent_warehouse=_form_str(form, "parent_warehouse") or None,
-            is_group=form.get("is_group") == "on",
-            company=_form_str(form, "company") or None,
-        )
-        warehouse = service.update_warehouse(warehouse_id, data)
-        db.commit()
-
-        set_flash(response, f"Warehouse '{warehouse.warehouse_name}' updated successfully.", "success")
-        return RedirectResponse(url=f"/inventory/{warehouse.id}", status_code=303)
-
-    except (ValidationError, ConflictError) as e:
-        db.rollback()
-        parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
-        context = get_base_context(request, response, user, csrf_token)
-        context["navigation"] = get_navigation_context(user)
-        context["page_title"] = f"Edit {warehouse.warehouse_name}"
-        context["breadcrumbs"] = build_breadcrumbs([
-            {"label": "Operations"},
-            {"label": "Inventory", "href": "/inventory"},
-            {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
-            {"label": "Edit"},
-        ])
-        context["warehouse"] = warehouse
-        context["type_options"] = get_warehouse_type_options()
-        context["parent_warehouses"] = parent_warehouses
-        context["errors"] = {"warehouse_name": str(e)}
-
-        template = templates.get_template("modules/inventory/templates/pages/form.html")
-        return HTMLResponse(template.render(context), status_code=422)
-
-
-@router.delete("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
-async def warehouse_delete(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf: CSRFProtect,
-    db: DB,
-    warehouse_id: int,
-    service: WarehouseService = Depends(get_warehouse_service),
-):
-    """Delete a warehouse (soft delete)."""
-    try:
-        warehouse = service.get_warehouse(warehouse_id)
-        name = warehouse.warehouse_name
-        service.delete_warehouse(warehouse_id)
-        db.commit()
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Warehouse not found")
-    except ValidationError as e:
-        if is_htmx_request(request):
-            htmx_toast(response, str(e), "error")
-            return HTMLResponse("", status_code=422, headers=dict(response.headers))
-        raise HTTPException(status_code=422, detail=str(e))
-
-    if is_htmx_request(request):
-        htmx_toast(response, f"Warehouse '{name}' deleted.", "success")
-        return HTMLResponse("", headers=dict(response.headers))
-
-    set_flash(response, f"Warehouse '{name}' deleted.", "success")
-    return RedirectResponse(url="/inventory", status_code=303)
-
-
-@router.get("/{warehouse_id}/row", response_class=HTMLResponse, dependencies=[RequireInventoryRead])
-async def warehouse_row(
-    request: Request,
-    response: Response,
-    user: SessionUser,
-    csrf_token: CSRFToken,
-    db: DB,
-    warehouse_id: int,
-    service: WarehouseService = Depends(get_warehouse_service),
-):
-    """Single warehouse row partial for HTMX updates."""
-    try:
-        warehouse = service.get_warehouse(warehouse_id)
-    except NotFoundError:
-        return HTMLResponse("", status_code=404)
-
-    context = get_base_context(request, response, user, csrf_token)
-    context["warehouse"] = warehouse
-
-    template = templates.get_template("modules/inventory/templates/partials/warehouse_row.html")
-    return HTMLResponse(template.render(context))
-
-
 # =============================================================================
 # STOCK ENTRIES ROUTES
 # =============================================================================
@@ -964,3 +758,213 @@ async def stock_entry_delete(
 
     set_flash(response, "Stock entry deleted.", "success")
     return RedirectResponse(url="/inventory/stock-entries", status_code=303)
+
+
+# =============================================================================
+# WAREHOUSE DETAIL ROUTES (must be after /stock-entries)
+# =============================================================================
+
+@router.get("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryRead])
+async def warehouse_detail(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
+):
+    """Warehouse detail page."""
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+
+    validation_issues = _get_validation_issues(
+        db,
+        model_name="Warehouse",
+        record_id=warehouse_id,
+        scope="inventory",
+    )
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = warehouse.warehouse_name
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Operations"},
+        {"label": "Inventory", "href": "/inventory"},
+        {"label": warehouse.warehouse_name},
+    ])
+    context["warehouse"] = warehouse
+    context["validation_issues"] = validation_issues
+
+    template = templates.get_template("modules/inventory/templates/pages/detail.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.get("/{warehouse_id}/edit", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
+async def warehouse_edit(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
+):
+    """Warehouse edit form page."""
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+
+    # Get parent warehouses excluding current
+    parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["navigation"] = get_navigation_context(user)
+    context["page_title"] = f"Edit {warehouse.warehouse_name}"
+    context["breadcrumbs"] = build_breadcrumbs([
+        {"label": "Operations"},
+        {"label": "Inventory", "href": "/inventory"},
+        {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
+        {"label": "Edit"},
+    ])
+    context["warehouse"] = warehouse
+    context["type_options"] = get_warehouse_type_options()
+    context["parent_warehouses"] = parent_warehouses
+    context["errors"] = {}
+
+    template = templates.get_template("modules/inventory/templates/pages/form.html")
+    return HTMLResponse(template.render(context))
+
+
+@router.post("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
+async def warehouse_update(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    csrf: CSRFProtect,
+    db: DB,
+    warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
+):
+    """Update a warehouse."""
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+
+    form = await request.form()
+    warehouse_name = _form_str(form, "warehouse_name")
+
+    # Basic client-side validation for UX
+    if not warehouse_name:
+        parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {warehouse.warehouse_name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Inventory", "href": "/inventory"},
+            {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
+            {"label": "Edit"},
+        ])
+        context["warehouse"] = warehouse
+        context["type_options"] = get_warehouse_type_options()
+        context["parent_warehouses"] = parent_warehouses
+        context["errors"] = {"warehouse_name": "Warehouse name is required"}
+
+        template = templates.get_template("modules/inventory/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+    try:
+        # Update warehouse via service
+        data = WarehouseUpdateData(
+            warehouse_name=warehouse_name,
+            warehouse_type=_form_str(form, "warehouse_type") or None,
+            parent_warehouse=_form_str(form, "parent_warehouse") or None,
+            is_group=form.get("is_group") == "on",
+            company=_form_str(form, "company") or None,
+        )
+        warehouse = service.update_warehouse(warehouse_id, data)
+        db.commit()
+
+        set_flash(response, f"Warehouse '{warehouse.warehouse_name}' updated successfully.", "success")
+        return RedirectResponse(url=f"/inventory/{warehouse.id}", status_code=303)
+
+    except (ValidationError, ConflictError) as e:
+        db.rollback()
+        parent_warehouses = service.get_parent_warehouses_excluding(warehouse_id)
+        context = get_base_context(request, response, user, csrf_token)
+        context["navigation"] = get_navigation_context(user)
+        context["page_title"] = f"Edit {warehouse.warehouse_name}"
+        context["breadcrumbs"] = build_breadcrumbs([
+            {"label": "Operations"},
+            {"label": "Inventory", "href": "/inventory"},
+            {"label": warehouse.warehouse_name, "href": f"/inventory/{warehouse.id}"},
+            {"label": "Edit"},
+        ])
+        context["warehouse"] = warehouse
+        context["type_options"] = get_warehouse_type_options()
+        context["parent_warehouses"] = parent_warehouses
+        context["errors"] = {"warehouse_name": str(e)}
+
+        template = templates.get_template("modules/inventory/templates/pages/form.html")
+        return HTMLResponse(template.render(context), status_code=422)
+
+
+@router.delete("/{warehouse_id}", response_class=HTMLResponse, dependencies=[RequireInventoryWrite])
+async def warehouse_delete(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf: CSRFProtect,
+    db: DB,
+    warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
+):
+    """Delete a warehouse (soft delete)."""
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+        name = warehouse.warehouse_name
+        service.delete_warehouse(warehouse_id)
+        db.commit()
+    except NotFoundError:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+    except ValidationError as e:
+        if is_htmx_request(request):
+            htmx_toast(response, str(e), "error")
+            return HTMLResponse("", status_code=422, headers=dict(response.headers))
+        raise HTTPException(status_code=422, detail=str(e))
+
+    if is_htmx_request(request):
+        htmx_toast(response, f"Warehouse '{name}' deleted.", "success")
+        return HTMLResponse("", headers=dict(response.headers))
+
+    set_flash(response, f"Warehouse '{name}' deleted.", "success")
+    return RedirectResponse(url="/inventory", status_code=303)
+
+
+@router.get("/{warehouse_id}/row", response_class=HTMLResponse, dependencies=[RequireInventoryRead])
+async def warehouse_row(
+    request: Request,
+    response: Response,
+    user: SessionUser,
+    csrf_token: CSRFToken,
+    db: DB,
+    warehouse_id: int,
+    service: WarehouseService = Depends(get_warehouse_service),
+):
+    """Single warehouse row partial for HTMX updates."""
+    try:
+        warehouse = service.get_warehouse(warehouse_id)
+    except NotFoundError:
+        return HTMLResponse("", status_code=404)
+
+    context = get_base_context(request, response, user, csrf_token)
+    context["warehouse"] = warehouse
+
+    template = templates.get_template("modules/inventory/templates/partials/warehouse_row.html")
+    return HTMLResponse(template.render(context))

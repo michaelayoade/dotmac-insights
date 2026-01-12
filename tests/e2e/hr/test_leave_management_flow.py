@@ -40,7 +40,7 @@ class TestLeaveAllocation:
             "total_leaves_allocated": 21,
         }
 
-        response = e2e_superuser_client.post("/api/hr/leave-allocations", json=payload)
+        response = e2e_superuser_client.post("/api/v1/hr/leave-allocations", json=payload)
         assert_http_ok(response, "Create leave allocation")
 
         data = get_json(response)
@@ -53,7 +53,7 @@ class TestLeaveAllocation:
         employee = create_employee(e2e_db, name="Allocation List Employee")
         create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("21"))
 
-        response = e2e_superuser_client.get("/api/hr/leave-allocations")
+        response = e2e_superuser_client.get("/api/v1/hr/leave-allocations")
         assert_http_ok(response, "List leave allocations")
 
         data = get_json(response)
@@ -67,7 +67,7 @@ class TestLeaveAllocation:
         create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
 
         response = e2e_superuser_client.get(
-            "/api/hr/leave/balance",
+            "/api/v1/hr/leave/balance",
             params={"employee_id": employee.id},
         )
         # Endpoint may vary - adjust as needed
@@ -95,7 +95,7 @@ class TestLeaveApplication:
             "reason": "Family vacation",
         }
 
-        response = e2e_superuser_client.post("/api/hr/leave-applications", json=payload)
+        response = e2e_superuser_client.post("/api/v1/hr/leave-applications", json=payload)
         assert_http_ok(response, "Submit leave application")
 
         data = get_json(response)
@@ -110,7 +110,7 @@ class TestLeaveApplication:
         create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
         create_leave_application(e2e_db, employee.id)
 
-        response = e2e_superuser_client.get("/api/hr/leave-applications")
+        response = e2e_superuser_client.get("/api/v1/hr/leave-applications")
         assert_http_ok(response, "List leave applications")
 
         data = get_json(response)
@@ -124,7 +124,7 @@ class TestLeaveApplication:
         create_leave_allocation(e2e_db, employee.id, new_leaves_allocated=Decimal("20"))
         application = create_leave_application(e2e_db, employee.id)
 
-        response = e2e_superuser_client.get(f"/api/hr/leave-applications/{application.id}")
+        response = e2e_superuser_client.get(f"/api/v1/hr/leave-applications/{application.id}")
         assert_http_ok(response, "Get leave application")
 
         data = get_json(response)
@@ -143,7 +143,7 @@ class TestLeaveApproval:
         application = create_leave_application(e2e_db, employee.id, status="open")
 
         response = e2e_superuser_client.post(
-            f"/api/hr/leave-applications/{application.id}/approve",
+            f"/api/v1/hr/leave-applications/{application.id}/approve",
         )
         assert_http_ok(response, "Approve leave")
 
@@ -159,7 +159,7 @@ class TestLeaveApproval:
         application = create_leave_application(e2e_db, employee.id, status="open")
 
         response = e2e_superuser_client.post(
-            f"/api/hr/leave-applications/{application.id}/reject",
+            f"/api/v1/hr/leave-applications/{application.id}/reject",
             json={"reason": "Business-critical period"},
         )
         assert_http_ok(response, "Reject leave")
@@ -186,7 +186,7 @@ class TestLeaveApproval:
             "reason": "Long vacation",
         }
 
-        response = e2e_superuser_client.post("/api/hr/leave-applications", json=payload)
+        response = e2e_superuser_client.post("/api/v1/hr/leave-applications", json=payload)
         # Should either fail or return warning
         # Behavior depends on implementation
         assert response.status_code in [200, 201, 400], f"Exceed allocation: {response.text}"
@@ -212,7 +212,7 @@ class TestLeaveBalance:
         )
 
         # Approve
-        e2e_superuser_client.post(f"/api/hr/leave-applications/{application.id}/approve")
+        e2e_superuser_client.post(f"/api/v1/hr/leave-applications/{application.id}/approve")
 
         # Check allocation was updated
         e2e_db.refresh(allocation)
@@ -224,7 +224,7 @@ class TestLeaveTypes:
 
     def test_list_leave_types(self, e2e_superuser_client, e2e_db):
         """Test listing available leave types."""
-        response = e2e_superuser_client.get("/api/hr/leave-types")
+        response = e2e_superuser_client.get("/api/v1/hr/leave-types")
         # May return 200 or 404 depending on endpoint availability
         assert response.status_code in [200, 404], f"List leave types: {response.text}"
 
@@ -234,13 +234,13 @@ class TestLeaveAnalytics:
 
     def test_leave_summary(self, e2e_superuser_client, e2e_db):
         """Test leave summary endpoint."""
-        response = e2e_superuser_client.get("/api/hr/analytics/leave-balance")
+        response = e2e_superuser_client.get("/api/v1/hr/analytics/leave-balance")
         assert_http_ok(response, "Leave summary")
 
     def test_leave_calendar(self, e2e_superuser_client, e2e_db):
         """Test leave calendar endpoint."""
         response = e2e_superuser_client.get(
-            "/api/hr/leave/calendar",
+            "/api/v1/hr/leave/calendar",
             params={
                 "start_date": date.today().isoformat(),
                 "end_date": (date.today() + timedelta(days=30)).isoformat(),
@@ -277,7 +277,7 @@ class TestFullLeaveWorkflow:
             "new_leaves_allocated": 21,
             "total_leaves_allocated": 21,
         }
-        alloc_resp = e2e_superuser_client.post("/api/hr/leave-allocations", json=alloc_payload)
+        alloc_resp = e2e_superuser_client.post("/api/v1/hr/leave-allocations", json=alloc_payload)
         assert_http_ok(alloc_resp, "Step 2: Allocate leave")
 
         # Step 3: Submit application
@@ -291,18 +291,18 @@ class TestFullLeaveWorkflow:
             "to_date": end_date.isoformat(),
             "reason": "Annual family vacation",
         }
-        app_resp = e2e_superuser_client.post("/api/hr/leave-applications", json=app_payload)
+        app_resp = e2e_superuser_client.post("/api/v1/hr/leave-applications", json=app_payload)
         assert_http_ok(app_resp, "Step 3: Submit application")
         application = get_json(app_resp)
         app_id = application["id"]
 
         # Step 4: Approve application
-        approve_resp = e2e_superuser_client.post(f"/api/hr/leave-applications/{app_id}/approve")
+        approve_resp = e2e_superuser_client.post(f"/api/v1/hr/leave-applications/{app_id}/approve")
         assert_http_ok(approve_resp, "Step 4: Approve application")
 
         # Step 5: Verify balance updated (check allocation)
         alloc_list_resp = e2e_superuser_client.get(
-            "/api/hr/leave-allocations",
+            "/api/v1/hr/leave-allocations",
             params={"employee_id": employee.id},
         )
         alloc_data = get_json(alloc_list_resp)

@@ -1,17 +1,18 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
+{% set is_edit = application is defined and application %}
 <div class="max-w-2xl mx-auto">
-    <form method="POST" action="/hr/leave" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true" data-testid="leave-form">
+    <form method="POST" action="{{ '/hr/leave/' ~ application.id if is_edit else '/hr/leave' }}" class="bg-white rounded-2xl shadow-warm-sm ring-1 ring-gray-100 overflow-hidden" x-data="{ submitting: false }" @submit="submitting = true" data-testid="leave-form">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="px-6 py-5 border-b border-gray-100">
-            <h3 class="text-lg font-display font-semibold text-gray-900">Apply for Leave</h3>
-            <p class="mt-1 text-sm text-gray-500">Submit a new leave application</p>
+            <h3 class="text-lg font-display font-semibold text-gray-900">{{ "Edit Leave Application" if is_edit else "Apply for Leave" }}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{ "Update this leave application." if is_edit else "Submit a new leave application" }}</p>
         </div>
         <div class="px-6 py-6 space-y-6">
             <div>
                 <label for="employee_id" class="block text-sm font-medium text-gray-700 mb-1.5">Employee <span class="text-red-500">*</span></label>
-                <select name="employee_id" id="employee_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <select name="employee_id" id="employee_id" required {{ 'disabled' if is_edit else '' }} class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm {{ 'bg-gray-50 text-gray-500' if is_edit else '' }}">
                     <option value="">Select employee</option>
                     {% for opt in employee_options %}<option value="{{ opt.value }}" {{ 'selected' if form_data and form_data.employee_id == opt.value else '' }}>{{ opt.label }}</option>{% endfor %}
                 </select>
@@ -19,7 +20,7 @@
             </div>
             <div>
                 <label for="leave_type_id" class="block text-sm font-medium text-gray-700 mb-1.5">Leave Type <span class="text-red-500">*</span></label>
-                <select name="leave_type_id" id="leave_type_id" required class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm">
+                <select name="leave_type_id" id="leave_type_id" required {{ 'disabled' if is_edit else '' }} class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl shadow-warm-sm focus:border-primary-400 focus:ring-2 focus:ring-primary-100 sm:text-sm {{ 'bg-gray-50 text-gray-500' if is_edit else '' }}">
                     <option value="">Select leave type</option>
                     {% for opt in leave_type_options %}<option value="{{ opt.value }}" {{ 'selected' if form_data and form_data.leave_type_id == opt.value else '' }}>{{ opt.label }}</option>{% endfor %}
                 </select>
@@ -49,7 +50,7 @@
         <div class="px-6 py-4 bg-surface-50 border-t border-gray-100 flex items-center justify-end gap-3">
             <a href="/hr/leave" class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl shadow-warm-sm hover:bg-surface-50">Cancel</a>
             <button type="submit" class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl shadow-lg shadow-primary-600/25 hover:from-primary-500 hover:to-primary-600 disabled:opacity-50" :class="{ 'pointer-events-none': submitting }">
-                <span x-show="!submitting">Submit Application</span>
+                <span x-show="!submitting">{{ "Save Changes" if is_edit else "Submit Application" }}</span>
                 <svg x-show="submitting" x-cloak class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
             </button>
         </div>

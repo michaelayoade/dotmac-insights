@@ -1,7 +1,7 @@
 """Leave Management models for ERPNext HR Module sync."""
 from __future__ import annotations
 
-from sqlalchemy import String, Text, ForeignKey, Enum, Index
+from sqlalchemy import Boolean, String, Text, ForeignKey, Enum, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime, date
 from decimal import Decimal
@@ -38,6 +38,7 @@ class LeaveType(Base):
     erpnext_id: Mapped[Optional[str]] = mapped_column(String(255), unique=True, index=True, nullable=True)
 
     leave_type_name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     max_leaves_allowed: Mapped[int] = mapped_column(default=0)
     max_continuous_days_allowed: Mapped[Optional[int]] = mapped_column(nullable=True)
 

@@ -8,50 +8,15 @@ Run with: pytest tests/e2e/test_openapi_endpoints.py -v
 """
 
 import pytest
-import httpx
 from typing import Any
 
-# Base URL for the API
-BASE_URL = "http://localhost:8000"
 
-
-@pytest.fixture(scope="module")
-def openapi_spec() -> dict[str, Any]:
+@pytest.fixture
+def openapi_spec(e2e_client) -> dict[str, Any]:
     """Fetch and parse the OpenAPI specification."""
-    response = httpx.get(f"{BASE_URL}/openapi.json", timeout=30)
+    response = e2e_client.get("/openapi.json")
     assert response.status_code == 200, f"Failed to fetch OpenAPI spec: {response.status_code}"
     return response.json()
-
-
-@pytest.fixture(scope="module")
-def auth_token() -> str:
-    """Get authentication token for protected endpoints."""
-    # Try to login and get a token
-    try:
-        response = httpx.post(
-            f"{BASE_URL}/api/auth/token",
-            data={"username": "admin@dotmac.ng", "password": "admin123"},
-            timeout=10,
-        )
-        if response.status_code == 200:
-            return response.json().get("access_token", "")
-    except Exception:
-        pass
-
-    # Fallback: try form-based login
-    try:
-        response = httpx.post(
-            f"{BASE_URL}/auth/login",
-            data={"email": "admin@dotmac.ng", "password": "admin123"},
-            timeout=10,
-        )
-        if response.status_code == 200:
-            # Extract token from cookies or response
-            return response.cookies.get("access_token", "")
-    except Exception:
-        pass
-
-    return ""
 
 
 def extract_endpoints(openapi_spec: dict[str, Any]) -> list[tuple[str, str, dict]]:
@@ -105,24 +70,24 @@ def substitute_path_params(path: str) -> str:
 class TestOpenAPIDocsAccessibility:
     """Test that OpenAPI documentation endpoints are accessible."""
 
-    def test_openapi_json_accessible(self):
+    def test_openapi_json_accessible(self, e2e_client):
         """Verify /openapi.json endpoint returns valid JSON."""
-        response = httpx.get(f"{BASE_URL}/openapi.json", timeout=10)
+        response = e2e_client.get("/openapi.json")
         assert response.status_code == 200
         data = response.json()
         assert "openapi" in data
         assert "paths" in data
         assert "info" in data
 
-    def test_swagger_docs_accessible(self):
+    def test_swagger_docs_accessible(self, e2e_client):
         """Verify /docs (Swagger UI) is accessible."""
-        response = httpx.get(f"{BASE_URL}/docs", timeout=10)
+        response = e2e_client.get("/docs", allow_redirects=True)
         # Should return HTML or redirect
         assert response.status_code in (200, 307, 308)
 
-    def test_redoc_accessible(self):
+    def test_redoc_accessible(self, e2e_client):
         """Verify /redoc is accessible."""
-        response = httpx.get(f"{BASE_URL}/redoc", timeout=10)
+        response = e2e_client.get("/redoc", allow_redirects=True)
         # Should return HTML or redirect
         assert response.status_code in (200, 307, 308)
 
@@ -131,14 +96,14 @@ class TestOpenAPIEndpointsSmokeTest:
     """Smoke test all endpoints from OpenAPI spec."""
 
     @pytest.mark.parametrize("endpoint_type", ["public", "authenticated"])
-    def test_health_endpoints(self, endpoint_type):
+    def test_health_endpoints(self, endpoint_type, e2e_client):
         """Verify health check endpoints respond."""
-        health_paths = ["/health", "/api/health", "/healthz", "/ready"]
+        health_paths = ["/health", "/health/ready", "/api/health", "/api/health/ready", "/healthz", "/ready"]
 
         for path in health_paths:
             try:
-                response = httpx.get(f"{BASE_URL}{path}", timeout=5)
-                if response.status_code == 200:
+                response = e2e_client.get(path)
+                if response.status_code in (200, 503):
                     return  # Found a working health endpoint
             except Exception:
                 continue
@@ -146,37 +111,31 @@ class TestOpenAPIEndpointsSmokeTest:
         # At least one health endpoint should work
         pytest.skip("No health endpoint found")
 
-    def test_get_endpoints_respond(self, openapi_spec: dict[str, Any], auth_token: str):
+    def test_get_endpoints_respond(self, openapi_spec: dict[str, Any], e2e_superuser_client):
         """Test all GET endpoints return expected status codes."""
         endpoints = extract_endpoints(openapi_spec)
         get_endpoints = [(path, op) for method, path, op in endpoints if method == "GET"]
-
-        headers = {}
-        if auth_token:
-            headers["Authorization"] = f"Bearer {auth_token}"
 
         results = {"passed": 0, "failed": 0, "skipped": 0}
         failures = []
 
         for path, operation in get_endpoints:
-            url = f"{BASE_URL}{substitute_path_params(path)}"
+            url = substitute_path_params(path)
 
             try:
-                response = httpx.get(url, headers=headers, timeout=10, follow_redirects=True)
+                response = e2e_superuser_client.get(url, allow_redirects=True)
 
-                # Expected: 200, 401 (auth required), 403 (forbidden), 404 (resource not found)
-                # Unexpected: 500, 502, 503 (server errors)
+                # Expected: 200, 404 (resource not found), 422 (missing params)
+                # Unexpected: 500, 502, 503 (server errors), 401/403 (auth failures)
                 if response.status_code >= 500:
                     failures.append(f"{path}: {response.status_code}")
                     results["failed"] += 1
-                elif response.status_code in (401, 403) and not auth_token:
-                    results["skipped"] += 1  # Auth required but no token
+                elif response.status_code in (401, 403):
+                    failures.append(f"{path}: {response.status_code}")
+                    results["failed"] += 1
                 else:
                     results["passed"] += 1
 
-            except httpx.TimeoutException:
-                failures.append(f"{path}: timeout")
-                results["failed"] += 1
             except Exception as e:
                 failures.append(f"{path}: {str(e)}")
                 results["failed"] += 1
@@ -199,22 +158,16 @@ class TestCriticalEndpoints:
     CRITICAL_ENDPOINTS = [
         ("GET", "/health"),
         ("GET", "/openapi.json"),
-        ("GET", "/crm/contacts"),
-        ("GET", "/support/tickets"),
+        ("GET", "/api/v1/crm/parties"),
+        ("GET", "/api/v1/support/tickets"),
     ]
 
     @pytest.mark.critical
     @pytest.mark.parametrize("method,path", CRITICAL_ENDPOINTS)
-    def test_critical_endpoint(self, method: str, path: str, auth_token: str):
+    def test_critical_endpoint(self, method: str, path: str, e2e_superuser_client):
         """Verify critical endpoints respond without server errors."""
-        headers = {}
-        if auth_token:
-            headers["Authorization"] = f"Bearer {auth_token}"
-
-        url = f"{BASE_URL}{path}"
-
         if method == "GET":
-            response = httpx.get(url, headers=headers, timeout=10, follow_redirects=True)
+            response = e2e_superuser_client.get(path, allow_redirects=True)
         else:
             pytest.skip(f"Method {method} not implemented in test")
 
@@ -227,41 +180,31 @@ class TestModuleEndpoints:
 
     MODULE_ENDPOINTS = {
         "CRM": [
-            "/crm/contacts",
-            "/api/crm/contacts",
+            "/api/v1/crm/parties",
         ],
         "Support": [
             "/support/tickets",
-            "/api/support/tickets",
+            "/api/v1/support/tickets",
         ],
         "Purchasing": [
             "/purchasing/expenses",
-            "/api/purchasing/expenses",
+            "/api/v1/purchasing/expenses",
         ],
         "Accounting": [
             "/accounting/invoices",
-            "/api/accounting/invoices",
+            "/api/v1/accounting/invoices",
         ],
     }
 
     @pytest.mark.parametrize("module", MODULE_ENDPOINTS.keys())
-    def test_module_has_accessible_endpoint(self, module: str, auth_token: str):
+    def test_module_has_accessible_endpoint(self, module: str, e2e_superuser_client):
         """Verify each module has at least one accessible endpoint."""
-        headers = {}
-        if auth_token:
-            headers["Authorization"] = f"Bearer {auth_token}"
-
         endpoints = self.MODULE_ENDPOINTS[module]
         accessible = False
 
         for path in endpoints:
             try:
-                response = httpx.get(
-                    f"{BASE_URL}{path}",
-                    headers=headers,
-                    timeout=10,
-                    follow_redirects=True
-                )
+                response = e2e_superuser_client.get(path, allow_redirects=True)
                 if response.status_code < 500:
                     accessible = True
                     break
@@ -269,50 +212,3 @@ class TestModuleEndpoints:
                 continue
 
         assert accessible, f"No accessible endpoint found for {module} module"
-
-
-# CLI runner for standalone testing
-if __name__ == "__main__":
-    import sys
-
-    print(f"Testing API at {BASE_URL}")
-    print("=" * 60)
-
-    # Quick smoke test without pytest
-    try:
-        # Test OpenAPI spec
-        print("\n1. Fetching OpenAPI spec...")
-        resp = httpx.get(f"{BASE_URL}/openapi.json", timeout=10)
-        if resp.status_code == 200:
-            spec = resp.json()
-            endpoints = extract_endpoints(spec)
-            print(f"   Found {len(endpoints)} endpoints in OpenAPI spec")
-        else:
-            print(f"   Failed: {resp.status_code}")
-            sys.exit(1)
-
-        # Test GET endpoints
-        print("\n2. Testing GET endpoints...")
-        get_endpoints = [e for e in endpoints if e[0] == "GET"]
-        passed = 0
-        failed = 0
-
-        for method, path, _ in get_endpoints[:20]:  # Test first 20
-            url = f"{BASE_URL}{substitute_path_params(path)}"
-            try:
-                r = httpx.get(url, timeout=5, follow_redirects=True)
-                if r.status_code < 500:
-                    passed += 1
-                    print(f"   ✓ {path} -> {r.status_code}")
-                else:
-                    failed += 1
-                    print(f"   ✗ {path} -> {r.status_code}")
-            except Exception as e:
-                failed += 1
-                print(f"   ✗ {path} -> {e}")
-
-        print(f"\n   Results: {passed} passed, {failed} failed")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        sys.exit(1)

@@ -24,7 +24,7 @@ import pytest
 
 class MockInvoiceStatus(str, enum.Enum):
     DRAFT = "draft"
-    UNPAID = "unpaid"
+    PENDING = "pending"
     PARTIALLY_PAID = "partially_paid"
     PAID = "paid"
     CANCELLED = "cancelled"
@@ -82,13 +82,14 @@ class MockInvoice:
     id: int
     invoice_number: str = "INV-001"
     customer_id: int = 1
+    customer_account_id: Optional[int] = None
     contact_id: Optional[int] = None
     total_amount: Decimal = Decimal("1000.00")
     amount: Decimal = Decimal("900.00")  # Net amount
     tax_amount: Decimal = Decimal("100.00")
     amount_paid: Decimal = Decimal("0.00")
     balance: Optional[Decimal] = None
-    status: MockInvoiceStatus = MockInvoiceStatus.UNPAID
+    status: MockInvoiceStatus = MockInvoiceStatus.PENDING
     invoice_date: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     due_date: Optional[datetime] = None
     currency: str = "NGN"
@@ -101,6 +102,8 @@ class MockInvoice:
     def __post_init__(self):
         if self.balance is None:
             self.balance = self.total_amount - self.amount_paid
+        if self.customer_account_id is None:
+            self.customer_account_id = self.customer_id
 
 
 @dataclass
@@ -116,7 +119,7 @@ class MockPurchaseInvoice:
     paid_amount: Decimal = Decimal("0.00")
     outstanding_amount: Optional[Decimal] = None
     status: MockPurchaseInvoiceStatus = MockPurchaseInvoiceStatus.UNPAID
-    posting_date: date = field(default_factory=date.today)
+    posting_date: date | datetime = field(default_factory=date.today)
     due_date: Optional[date] = None
     currency: str = "NGN"
     company: Optional[str] = "Default Company"
@@ -128,6 +131,12 @@ class MockPurchaseInvoice:
     def __post_init__(self):
         if self.outstanding_amount is None:
             self.outstanding_amount = self.grand_total - self.paid_amount
+        if isinstance(self.posting_date, date) and not isinstance(self.posting_date, datetime):
+            self.posting_date = datetime.combine(
+                self.posting_date,
+                datetime.min.time(),
+                tzinfo=timezone.utc,
+            )
 
 
 @dataclass
@@ -135,6 +144,7 @@ class MockPayment:
     """Mock Payment for testing."""
     id: int
     customer_id: int = 1
+    customer_account_id: Optional[int] = None
     receipt_number: str = "REC-001"
     amount: Decimal = Decimal("500.00")
     total_allocated: Decimal = Decimal("0.00")
@@ -150,6 +160,8 @@ class MockPayment:
     def __post_init__(self):
         if self.unallocated_amount is None:
             self.unallocated_amount = self.amount - self.total_allocated
+        if self.customer_account_id is None:
+            self.customer_account_id = self.customer_id
 
 
 @dataclass
@@ -161,7 +173,7 @@ class MockSupplierPayment:
     paid_amount: Decimal = Decimal("500.00")
     total_allocated: Decimal = Decimal("0.00")
     unallocated_amount: Optional[Decimal] = None
-    posting_date: date = field(default_factory=date.today)
+    posting_date: date | datetime = field(default_factory=date.today)
     currency: str = "NGN"
     conversion_rate: Decimal = Decimal("1")
     company: Optional[str] = "Default Company"
@@ -172,6 +184,12 @@ class MockSupplierPayment:
     def __post_init__(self):
         if self.unallocated_amount is None:
             self.unallocated_amount = self.paid_amount - self.total_allocated
+        if isinstance(self.posting_date, date) and not isinstance(self.posting_date, datetime):
+            self.posting_date = datetime.combine(
+                self.posting_date,
+                datetime.min.time(),
+                tzinfo=timezone.utc,
+            )
 
 
 @dataclass
@@ -269,11 +287,31 @@ class MockAgent:
     id: int
     email: str = "agent@example.com"
     display_name: str = "Test Agent"
+    name: Optional[str] = None
+    primary_email: Optional[str] = None
     is_active: bool = True
     capacity: int = 10
     routing_weight: int = 1
     skills: Dict[str, Any] = field(default_factory=dict)
     domains: Dict[str, Any] = field(default_factory=dict)
+    agent_capacity: Optional[int] = None
+    agent_routing_weight: Optional[int] = None
+    agent_skills: Optional[Dict[str, Any]] = None
+    agent_domains: Optional[Dict[str, Any]] = None
+
+    def __post_init__(self):
+        if self.name is None:
+            self.name = self.display_name
+        if self.primary_email is None:
+            self.primary_email = self.email
+        if self.agent_capacity is None:
+            self.agent_capacity = self.capacity
+        if self.agent_routing_weight is None:
+            self.agent_routing_weight = self.routing_weight
+        if self.agent_skills is None or (not self.agent_skills and self.skills):
+            self.agent_skills = self.skills
+        if self.agent_domains is None or (not self.agent_domains and self.domains):
+            self.agent_domains = self.domains
 
 
 @dataclass
@@ -316,6 +354,9 @@ class MockQuery:
         return self
 
     def filter_by(self, **kwargs):
+        return self
+
+    def options(self, *args, **kwargs):
         return self
 
     def order_by(self, *args):
@@ -474,7 +515,7 @@ def sample_invoice():
         amount=Decimal("900.00"),
         tax_amount=Decimal("100.00"),
         amount_paid=Decimal("0.00"),
-        status=MockInvoiceStatus.UNPAID,
+        status=MockInvoiceStatus.PENDING,
     )
 
 

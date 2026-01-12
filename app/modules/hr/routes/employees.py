@@ -21,6 +21,7 @@ from app.web.context import (
 )
 from app.templates.environment import get_template_env
 from app.models.employee import EmploymentStatus
+from app.models.hr import Department
 from app.services.hr.employees import EmployeeService
 from app.services.hr.employee_types import (
     EmployeeFilters,
@@ -127,10 +128,26 @@ async def employees_list(
         except ValueError:
             pass
 
+    department_id = None
+    current_department = None
+    if department:
+        try:
+            department_id = int(department)
+            current_department = str(department_id)
+        except ValueError:
+            dept = db.query(Department).filter(
+                Department.department_name == department
+            ).first()
+            if dept:
+                department_id = dept.id
+                current_department = str(dept.id)
+            else:
+                current_department = department
+
     filters = EmployeeFilters(
         search=q,
         status=status_enum,
-        department_id=int(department) if department else None,
+        department_id=department_id,
     )
     offset = (page - 1) * per_page
     pagination = PaginationParams(offset=offset, limit=per_page)
@@ -144,7 +161,7 @@ async def employees_list(
     context["employees"] = employees
     context["search_query"] = q or ""
     context["current_status"] = status
-    context["current_department"] = department
+    context["current_department"] = current_department
     context["status_options"] = get_status_options()
     context["department_options"] = get_department_options(org_service)
     context["sort_key"] = sort

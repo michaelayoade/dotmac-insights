@@ -391,14 +391,26 @@ class TestPaymentTermsServiceList:
         from app.services.accounting.payment_terms import PaymentTermsService
         from app.services.accounting.payment_terms_types import PaymentTermsFilters
         from app.services.types import PaginationParams
+        from collections import namedtuple
 
         with patch.object(mock_db, 'query') as mock_query:
+            class MockRow:
+                def __init__(self, item, total):
+                    self._item = item
+                    self._total = total
+
+                def __getitem__(self, idx):
+                    if idx == 0:
+                        return self._item
+                    raise IndexError
+
             mock_q = MagicMock()
             mock_q.filter.return_value = mock_q
             mock_q.order_by.return_value = mock_q
+            mock_q.add_columns.return_value = mock_q
             mock_q.offset.return_value = mock_q
             mock_q.limit.return_value = mock_q
-            mock_q.all.return_value = [sample_payment_terms]
+            mock_q.all.return_value = [MockRow(sample_payment_terms, 1)]
             mock_q.count.return_value = 1
             mock_query.return_value = mock_q
 
@@ -920,7 +932,7 @@ class TestCreditNoteServiceCreate:
         from app.services.accounting.credit_notes import CreditNoteService
         from app.services.accounting.credit_notes_types import CreditNoteCreateData, CreditNoteLineData
 
-        with patch('app.services.accounting.credit_notes.generate_voucher_number') as mock_gen:
+        with patch('app.services.number_generator.generate_voucher_number') as mock_gen:
             mock_gen.return_value = "CN-001"
 
             service = CreditNoteService(mock_db, mock_principal)
@@ -1142,7 +1154,7 @@ class TestDebitNoteServiceCreate:
         from app.services.accounting.debit_notes import DebitNoteService
         from app.services.accounting.debit_notes_types import DebitNoteCreateData, DebitNoteLineData
 
-        with patch('app.services.accounting.debit_notes.generate_voucher_number') as mock_gen:
+        with patch('app.services.number_generator.generate_voucher_number') as mock_gen:
             mock_gen.return_value = "DN-001"
 
             service = DebitNoteService(mock_db, mock_principal)
@@ -1533,7 +1545,7 @@ class TestReportExportServiceStatus:
         """Get export status returns availability."""
         from app.services.accounting.exports import ReportExportService
 
-        with patch('app.services.accounting.exports.WEASYPRINT_AVAILABLE', True):
+        with patch('app.services.export_service.WEASYPRINT_AVAILABLE', True):
             service = ReportExportService(mock_db, mock_principal)
             status = service.get_export_status()
 
@@ -1546,7 +1558,7 @@ class TestReportExportServiceStatus:
         """PDF not available when weasyprint missing."""
         from app.services.accounting.exports import ReportExportService
 
-        with patch('app.services.accounting.exports.WEASYPRINT_AVAILABLE', False):
+        with patch('app.services.export_service.WEASYPRINT_AVAILABLE', False):
             service = ReportExportService(mock_db, mock_principal)
             result = service.is_pdf_available()
 
@@ -1562,7 +1574,7 @@ class TestReportExportServiceExport:
         """Export to CSV calls ExportService."""
         from app.services.accounting.exports import ReportExportService
 
-        with patch('app.services.accounting.exports.ExportService') as MockExportService:
+        with patch('app.services.export_service.ExportService') as MockExportService:
             mock_export = MagicMock()
             mock_export.export_csv.return_value = b"col1,col2\nval1,val2"
             MockExportService.return_value = mock_export
@@ -1580,7 +1592,7 @@ class TestReportExportServiceExport:
         from app.services.accounting.exports import ReportExportService
         from app.services.errors import ValidationError
 
-        with patch('app.services.accounting.exports.WEASYPRINT_AVAILABLE', False):
+        with patch('app.services.export_service.WEASYPRINT_AVAILABLE', False):
             service = ReportExportService(mock_db, mock_principal)
 
             with pytest.raises(ValidationError) as exc_info:
@@ -1635,7 +1647,7 @@ class TestReportExportServiceAuditLogging:
         from app.services.accounting.exports import ReportExportService
         from app.services.accounting.exports_types import ExportFormat
 
-        with patch('app.services.accounting.exports.AuditLogger') as MockAuditLogger:
+        with patch('app.services.audit_logger.AuditLogger') as MockAuditLogger:
             mock_audit = MagicMock()
             MockAuditLogger.return_value = mock_audit
 

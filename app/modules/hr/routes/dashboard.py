@@ -74,7 +74,7 @@ async def hr_dashboard(
         }
         context["recent_leave_requests"] = dashboard_data.recent_leave_requests
         context["department_stats"] = [
-            {"name": d.name, "count": d.count}
+            {"id": d.id, "name": d.name, "count": d.count}
             for d in dashboard_data.department_stats
         ]
         context["anniversaries"] = [

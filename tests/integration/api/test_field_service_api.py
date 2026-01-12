@@ -12,7 +12,7 @@ from app.models.field_service import (
     ServiceOrder, ServiceOrderStatus, ServiceOrderType, ServiceOrderPriority,
     ServiceChecklist, ServiceTimeEntry, ServiceOrderItem, TimeEntryType
 )
-from app.models.customer import Customer
+from app.models.party import Party, CustomerAccount
 from app.models.employee import Employee
 
 
@@ -23,17 +23,31 @@ from app.models.employee import Employee
 
 @pytest.fixture
 def sample_customer(integration_db):
-    """Create a test customer."""
-    customer = Customer(
+    """Create a test customer account."""
+    party = Party(
+        type="organization",
+        status="active",
         name="Test Customer",
-        email="customer@test.com",
-        phone="+234 800 123 4567",
-        address="123 Test Street, Lagos",
+        primary_email="customer@test.com",
+        primary_phone="+234 800 123 4567",
+        emails=[{"address": "customer@test.com", "label": "primary", "is_primary": True}],
+        phones=[{"number": "+234 800 123 4567", "label": "primary", "is_primary": True}],
     )
-    integration_db.add(customer)
+    integration_db.add(party)
     integration_db.commit()
-    integration_db.refresh(customer)
-    return customer
+    integration_db.refresh(party)
+
+    account = CustomerAccount(
+        party_id=party.id,
+        account_number=f"CA-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+        status="active",
+        tier="standard",
+        account_type="direct",
+    )
+    integration_db.add(account)
+    integration_db.commit()
+    integration_db.refresh(account)
+    return account
 
 
 @pytest.fixture
@@ -42,7 +56,7 @@ def sample_technician(integration_db):
     technician = Employee(
         name="John Technician",
         email="tech@test.com",
-        is_active=True,
+        status="ACTIVE",
     )
     integration_db.add(technician)
     integration_db.commit()
@@ -56,7 +70,7 @@ def sample_order_payload(sample_customer):
     return {
         "order_type": "installation",
         "priority": "medium",
-        "customer_id": sample_customer.id,
+        "customer_account_id": sample_customer.id,
         "service_address": "456 Service Road, Lagos",
         "city": "Lagos",
         "state": "Lagos",
@@ -90,7 +104,7 @@ def create_test_order(integration_db, sample_customer):
             order_type=order_type,
             status=status,
             priority=priority,
-            customer_id=sample_customer.id,
+            customer_account_id=sample_customer.id,
             assigned_technician_id=assigned_technician_id,
             service_address=service_address,
             city="Lagos",
@@ -138,7 +152,7 @@ class TestServiceOrderCreate:
         for order_type in ["installation", "maintenance", "repair", "survey", "disconnect"]:
             payload = {
                 "order_type": order_type,
-                "customer_id": sample_customer.id,
+                "customer_account_id": sample_customer.id,
                 "service_address": "Test Address",
                 "scheduled_date": date.today().isoformat(),
                 "title": f"Test {order_type.capitalize()}",
@@ -155,7 +169,7 @@ class TestServiceOrderCreate:
             payload = {
                 "order_type": "maintenance",
                 "priority": priority,
-                "customer_id": sample_customer.id,
+                "customer_account_id": sample_customer.id,
                 "service_address": "Test Address",
                 "scheduled_date": date.today().isoformat(),
                 "title": f"Test {priority} priority",
@@ -169,7 +183,7 @@ class TestServiceOrderCreate:
         client = auth_client(["field-service:write"])
         payload = {
             "order_type": "installation",
-            "customer_id": 99999,
+            "customer_account_id": 99999,
             "service_address": "Test Address",
             "scheduled_date": date.today().isoformat(),
             "title": "Test Order",
@@ -177,7 +191,7 @@ class TestServiceOrderCreate:
         resp = client.post("/api/field-service/orders", json=payload)
 
         assert resp.status_code == 400
-        assert "customer not found" in resp.json()["detail"].lower()
+        assert "customer account" in resp.json()["detail"].lower()
 
     def test_create_order_without_write_scope_fails(self, auth_client, sample_order_payload):
         """Cannot create order without field-service:write scope."""
@@ -786,7 +800,7 @@ class TestFieldServiceRBAC:
         client = auth_client(["explorer:read"])
         resp = client.post("/api/field-service/orders", json={
             "order_type": "installation",
-            "customer_id": sample_customer.id,
+            "customer_account_id": sample_customer.id,
             "service_address": "Test",
             "scheduled_date": date.today().isoformat(),
             "title": "Test",

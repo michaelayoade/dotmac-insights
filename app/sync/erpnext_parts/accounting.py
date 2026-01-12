@@ -396,6 +396,13 @@ async def sync_gl_entries(
     sync_client.start_sync("gl_entries", "full" if full_sync else "incremental")
 
     try:
+        accounts_by_erpnext_id = {
+            row.erpnext_id: row.id
+            for row in sync_client.db.query(Account)
+            .filter(Account.erpnext_id.isnot(None))
+            .all()
+        }
+
         gl_entries = await sync_client._fetch_all_doctype(
             client,
             "GL Entry",
@@ -411,6 +418,7 @@ async def sync_gl_entries(
 
             if existing:
                 existing.account = gl_data.get("account")
+                existing.account_id = accounts_by_erpnext_id.get(existing.account)
                 existing.party_type = gl_data.get("party_type")
                 existing.party = gl_data.get("party")
                 existing.debit = Decimal(str(gl_data.get("debit", 0) or 0))
@@ -433,9 +441,11 @@ async def sync_gl_entries(
 
                 sync_client.increment_updated()
             else:
+                account_name = gl_data.get("account")
                 gl_entry = GLEntry(
                     erpnext_id=erpnext_id,
-                    account=gl_data.get("account"),
+                    account=account_name,
+                    account_id=accounts_by_erpnext_id.get(account_name),
                     party_type=gl_data.get("party_type"),
                     party=gl_data.get("party"),
                     debit=float(gl_data.get("debit", 0) or 0),

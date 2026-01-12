@@ -165,7 +165,10 @@ class ReceivablesService:
                 continue  # Skip invoices with no date
 
             days_overdue = (cutoff - due).days if cutoff > due else 0
-            outstanding = Decimal(str(inv.balance or (inv.total_amount - (inv.amount_paid or 0))))
+            if inv.balance is not None:
+                outstanding = Decimal(str(inv.balance))
+            else:
+                outstanding = Decimal(str(inv.total_amount - (inv.amount_paid or 0)))
 
             if outstanding <= 0:
                 continue
@@ -371,7 +374,10 @@ class ReceivablesService:
         entities: Dict[tuple, Dict] = {}
 
         for inv in invoices:
-            outstanding = Decimal(str(inv.balance or (inv.total_amount - (inv.amount_paid or 0))))
+            if inv.balance is not None:
+                outstanding = Decimal(str(inv.balance))
+            else:
+                outstanding = Decimal(str(inv.total_amount - (inv.amount_paid or 0)))
             if outstanding <= 0:
                 continue
 

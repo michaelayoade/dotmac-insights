@@ -33,18 +33,18 @@ class TestConcurrentPaymentAllocation:
         # Create customer and invoice
         customer = data_factory.create_customer(name="Concurrency Test Customer")
         invoice = data_factory.create_invoice(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             total_amount=Decimal("10000.00"),
             status="unpaid",
         )
 
         # Create two payments, each enough to fully pay
         payment1 = data_factory.create_payment(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             amount=Decimal("10000.00"),
         )
         payment2 = data_factory.create_payment(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             amount=Decimal("10000.00"),
         )
 
@@ -94,14 +94,14 @@ class TestConcurrentPaymentAllocation:
         """
         customer = data_factory.create_customer(name="Partial Allocation Test")
         invoice = data_factory.create_invoice(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             total_amount=Decimal("10000.00"),
             status="unpaid",
         )
 
         # Create 5 payments of 3000 each (total 15000, more than invoice)
         payments = [
-            data_factory.create_payment(customer_id=customer.id, amount=Decimal("3000.00"))
+            data_factory.create_payment(customer_account_id=customer.id, amount=Decimal("3000.00"))
             for _ in range(5)
         ]
 
@@ -149,7 +149,7 @@ class TestConcurrentInvoiceUpdates:
         """
         customer = data_factory.create_customer(name="Invoice Status Test")
         invoice = data_factory.create_invoice(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             total_amount=Decimal("5000.00"),
             status="unpaid",
         )
@@ -184,7 +184,7 @@ class TestConcurrentInvoiceUpdates:
         """
         customer = data_factory.create_customer(name="Amount Update Test")
         invoice = data_factory.create_invoice(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             total_amount=Decimal("1000.00"),
             status="unpaid",
         )
@@ -254,7 +254,7 @@ class TestConcurrentTicketOperations:
         customer = data_factory.create_customer(name="Ticket Assignment Test")
         ticket = data_factory.create_ticket(
             subject="Concurrent Assignment Test",
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             status="open",
         )
 
@@ -287,7 +287,7 @@ class TestConcurrentTicketOperations:
         customer = data_factory.create_customer(name="Ticket Status Test")
         ticket = data_factory.create_ticket(
             subject="Concurrent Status Test",
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             status="open",
         )
 
@@ -364,9 +364,9 @@ class TestOptimisticLocking:
         )
 
         # Get initial version
-        resp = superuser_client.get(f"/api/contacts/{contact.id}")
+        resp = superuser_client.get(f"/api/v1/crm/parties/{contact.id}")
         if resp.status_code != 200:
-            pytest.skip("Contact endpoint not available")
+            pytest.skip("Party endpoint not available")
 
         initial = resp.json()
         initial_version = initial.get("version") or initial.get("updated_at")
@@ -376,15 +376,15 @@ class TestOptimisticLocking:
 
         # First update - should succeed
         resp = superuser_client.patch(
-            f"/api/contacts/{contact.id}",
-            json={"contact_name": "Updated Name First"}
+            f"/api/v1/crm/parties/{contact.id}",
+            json={"name": "Updated Name First"}
         )
 
         # Second update with stale version - might fail with 409
         resp = superuser_client.patch(
-            f"/api/contacts/{contact.id}",
+            f"/api/v1/crm/parties/{contact.id}",
             json={
-                "contact_name": "Updated Name Second",
+                "name": "Updated Name Second",
                 "version": initial_version,  # Stale
             }
         )
@@ -399,9 +399,9 @@ class TestOptimisticLocking:
         customer = data_factory.create_customer(name="ETag Test Customer")
 
         # Get resource with ETag
-        resp = superuser_client.get(f"/api/customers/{customer.id}")
+        resp = superuser_client.get(f"/api/v1/crm/parties/{customer.party_id}")
         if resp.status_code != 200:
-            pytest.skip("Customer endpoint not available")
+            pytest.skip("Party endpoint not available")
 
         etag = resp.headers.get("ETag")
 
@@ -410,15 +410,15 @@ class TestOptimisticLocking:
 
         # Try conditional update with If-Match
         resp = superuser_client.patch(
-            f"/api/customers/{customer.id}",
-            json={"customer_name": "Updated with ETag"},
+            f"/api/v1/crm/parties/{customer.party_id}",
+            json={"name": "Updated with ETag"},
             headers={"If-Match": etag}
         )
 
         # Try update with stale ETag
         resp = superuser_client.patch(
-            f"/api/customers/{customer.id}",
-            json={"customer_name": "Update with Stale ETag"},
+            f"/api/v1/crm/parties/{customer.party_id}",
+            json={"name": "Update with Stale ETag"},
             headers={"If-Match": etag}  # Now stale
         )
 
@@ -439,11 +439,11 @@ class TestDeadlockPrevention:
         """
         customer = data_factory.create_customer(name="Deadlock Test Customer")
         invoice1 = data_factory.create_invoice(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             total_amount=Decimal("1000.00"),
         )
         invoice2 = data_factory.create_invoice(
-            customer_id=customer.id,
+            customer_account_id=customer.id,
             total_amount=Decimal("2000.00"),
         )
 
@@ -472,7 +472,7 @@ class TestDeadlockPrevention:
         def update_customer():
             try:
                 resp = superuser_client.patch(
-                    f"/api/customers/{customer.id}",
+                    f"/api/v1/crm/parties/{customer.party_id}",
                     json={"notes": "Updated from thread 3"}
                 )
                 return {"resource": "customer", "status": resp.status_code}

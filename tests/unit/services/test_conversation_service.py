@@ -56,6 +56,7 @@ class MockOmniConversation:
     ticket_id: Optional[int] = None
     lead_id: Optional[int] = None
     assigned_agent_id: Optional[int] = None
+    assigned_party_id: Optional[int] = None
     assigned_team_id: Optional[int] = None
     assigned_at: Optional[datetime] = None
     contact_name: Optional[str] = "Test Contact"
@@ -140,6 +141,14 @@ def mock_principal():
     return MockPrincipal(id=42, email="agent@example.com")
 
 
+@pytest.fixture(autouse=True)
+def disable_soft_validation(monkeypatch):
+    """Disable soft validation for unit tests with mock models."""
+    from app.services.validation.soft_validation_service import SoftValidationService
+
+    monkeypatch.setattr(SoftValidationService, "validate_and_store", lambda *args, **kwargs: None)
+
+
 @pytest.fixture
 def sample_channel():
     """Create a sample channel."""
@@ -164,6 +173,7 @@ def sample_conversations():
             status="pending",
             priority="medium",
             assigned_agent_id=10,
+            assigned_party_id=10,
             unread_count=0,
         ),
         MockOmniConversation(
@@ -172,6 +182,7 @@ def sample_conversations():
             status="resolved",
             priority="low",
             assigned_agent_id=10,
+            assigned_party_id=10,
             resolved_at=datetime.now(timezone.utc),
         ),
     ]
@@ -560,6 +571,7 @@ class TestConversationAssignment:
 
             with patch.object(service, 'db') as mock_db_patched:
                 mock_query = MagicMock()
+                mock_query.join.return_value = mock_query
                 mock_query.filter.return_value = mock_query
                 mock_query.first.return_value = mock_agent
                 mock_db_patched.query.return_value = mock_query
@@ -567,7 +579,7 @@ class TestConversationAssignment:
 
                 result = service.assign(1, agent_id=10)
 
-                assert result.assigned_agent_id == 10
+                assert result.assigned_party_id == 10
                 assert result.assigned_at is not None
 
     def test_unassign(self, mock_db, sample_conversations):
@@ -583,7 +595,7 @@ class TestConversationAssignment:
 
                 result = service.unassign(2)
 
-                assert result.assigned_agent_id is None
+                assert result.assigned_party_id is None
                 assert result.assigned_team_id is None
 
 
@@ -806,6 +818,7 @@ class TestEdgeCases:
         with patch.object(service, 'get', return_value=conv):
             with patch.object(service, 'db') as mock_db_patched:
                 mock_query = MagicMock()
+                mock_query.join.return_value = mock_query
                 mock_query.filter.return_value = mock_query
                 mock_query.first.return_value = None  # Agent not found
                 mock_db_patched.query.return_value = mock_query

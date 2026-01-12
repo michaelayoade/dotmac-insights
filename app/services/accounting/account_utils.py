@@ -548,35 +548,36 @@ def get_equity_component_type(acc: Account) -> Optional[str]:
 def get_account_balances(
     db: Session,
     as_of: Optional[date] = None,
-    account_ids: Optional[List[str]] = None,
-) -> Dict[str, Decimal]:
+    account_ids: Optional[List[int]] = None,
+) -> Dict[int, Decimal]:
     """Get GL account balances as of a date.
 
     Args:
         db: Database session
         as_of: Date to calculate balances as of (defaults to today)
-        account_ids: Optional list of account IDs to filter
+        account_ids: Optional list of internal account IDs to filter
 
     Returns:
-        Dict mapping account erpnext_id to balance (debit - credit)
+        Dict mapping account_id to balance (debit - credit)
     """
     if as_of is None:
         as_of = date.today()
 
     query = db.query(
-        GLEntry.account,
+        GLEntry.account_id,
         func.sum(GLEntry.debit - GLEntry.credit).label("balance"),
     ).filter(
         GLEntry.is_cancelled == False,
         GLEntry.posting_date <= as_of,
+        GLEntry.account_id.isnot(None),
     )
 
     if account_ids:
-        query = query.filter(GLEntry.account.in_(account_ids))
+        query = query.filter(GLEntry.account_id.in_(account_ids))
 
-    query = query.group_by(GLEntry.account)
+    query = query.group_by(GLEntry.account_id)
 
-    return {row.account: Decimal(str(row.balance or 0)) for row in query.all()}
+    return {row.account_id: Decimal(str(row.balance or 0)) for row in query.all()}
 
 
 def gl_ar_ap_balances(db: Session, as_of: date) -> Dict[str, float]:
@@ -591,27 +592,27 @@ def gl_ar_ap_balances(db: Session, as_of: date) -> Dict[str, float]:
     Returns:
         Dict with 'ar' and 'ap' totals
     """
-    accounts = get_accounts_by_erpnext_id(db)
+    accounts = {acc.id: acc for acc in db.query(Account).all()}
 
     entries = (
         db.query(
-            GLEntry.account,
+            GLEntry.account_id,
             func.sum(GLEntry.debit).label("debit"),
             func.sum(GLEntry.credit).label("credit"),
         )
         .filter(
             GLEntry.is_cancelled == False,
             GLEntry.posting_date <= as_of,
-            GLEntry.account.isnot(None),
+            GLEntry.account_id.isnot(None),
         )
-        .group_by(GLEntry.account)
+        .group_by(GLEntry.account_id)
         .all()
     )
 
     ar_total = 0.0
     ap_total = 0.0
     for row in entries:
-        acc = accounts.get(row.account)
+        acc = accounts.get(row.account_id)
         debit = float(row.debit or 0)
         credit = float(row.credit or 0)
         if acc and (acc.account_type == "Receivable" or acc.root_type == AccountType.ASSET):

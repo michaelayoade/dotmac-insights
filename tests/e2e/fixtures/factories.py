@@ -161,33 +161,44 @@ def create_customer(
     status: str = None,
     customer_type: str = None,
     **kwargs
-) -> "Customer":
+) -> "CustomerAccount":
     """Create a customer record for testing."""
-    from app.models.customer import Customer, CustomerStatus, CustomerType
+    from app.models.party import Party, CustomerAccount
 
-    customer = Customer(
+    party_email = email or random_email()
+    party_phone = phone or random_phone()
+    party = Party(
+        type="organization",
+        status=(status or "active").lower(),
         name=name or f"Test Customer {random_string(6)}",
-        email=email or random_email(),
-        phone=phone or random_phone(),
-        status=CustomerStatus(status) if status else CustomerStatus.ACTIVE,
-        customer_type=CustomerType(customer_type) if customer_type else CustomerType.BUSINESS,
-        address="123 Test Street",
-        city="Lagos",
-        state="Lagos",
-        country="Nigeria",
-        **kwargs
+        primary_email=party_email,
+        primary_phone=party_phone,
+        emails=[{"address": party_email, "label": "primary", "is_primary": True}],
+        phones=[{"number": party_phone, "label": "primary", "is_primary": True}],
+        **kwargs,
     )
-    db.add(customer)
+    db.add(party)
     db.commit()
-    db.refresh(customer)
-    return customer
+    db.refresh(party)
+
+    account = CustomerAccount(
+        party_id=party.id,
+        account_number=f"CA-{random_string(8).upper()}",
+        status=(status or "active").lower(),
+        tier="standard",
+        account_type="direct",
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    return account
 
 
 def create_opportunity(
     db: Session,
     client,
     name: str = None,
-    customer_id: int = None,
+    party_id: int = None,
     stage_id: int = None,
     deal_value: Decimal = None,
     **kwargs
@@ -200,12 +211,12 @@ def create_opportunity(
         "probability": 50,
         **kwargs
     }
-    if customer_id:
-        payload["customer_id"] = customer_id
+    if party_id:
+        payload["party_id"] = party_id
     if stage_id:
         payload["stage_id"] = stage_id
 
-    response = client.post("/api/crm/opportunities/", json=payload)
+    response = client.post("/api/v1/crm/opportunities/", json=payload)
     assert response.status_code in [200, 201], f"Failed to create opportunity: {response.text}"
     return response.json()
 
@@ -233,8 +244,7 @@ def create_invoice(
 
     invoice = Invoice(
         source=InvoiceSource.INTERNAL,
-        customer_id=customer_id,
-        contact_id=contact_id,
+        customer_account_id=customer_id,
         invoice_number=f"INV-{random_string(8).upper()}",
         invoice_date=datetime.combine(inv_date, datetime.min.time()),
         due_date=datetime.combine(due_date or inv_date + timedelta(days=30), datetime.min.time()),
@@ -275,7 +285,7 @@ def create_payment(
 
     payment = Payment(
         source=PaymentSource.INTERNAL,
-        customer_id=customer_id,
+        customer_account_id=customer_id,
         receipt_number=f"PAY-{random_string(8).upper()}",
         amount=payment_amount,
         currency="NGN",
@@ -514,7 +524,7 @@ def create_ticket(
 
     ticket = Ticket(
         source=TicketSource.ERPNEXT,
-        customer_id=customer_id,
+        customer_account_id=customer_id,
         ticket_number=f"TKT-{random_string(8).upper()}",
         subject=subject or f"Test Ticket {random_string(6)}",
         description="This is a test ticket for E2E testing",
@@ -765,7 +775,7 @@ def create_project(
 
     project = Project(
         project_name=project_name or f"Test Project {random_string(6)}",
-        customer_id=customer_id,
+        customer_account_id=customer_id,
         project_manager_id=project_manager_id,
         status=ProjectStatus(status),
         priority=ProjectPriority(priority),
@@ -815,16 +825,18 @@ def create_supplier(
     name: str = None,
     email: str = None,
     **kwargs
-) -> "Contact":
-    """Create a supplier contact for testing."""
-    from app.models.contact import Contact, ContactType
+) -> "Party":
+    """Create a supplier party for testing."""
+    from app.models.party import Party
 
-    supplier = Contact(
+    supplier_email = email or random_email()
+    supplier = Party(
+        type="organization",
+        status="active",
         name=name or f"Test Supplier {random_string(6)}",
-        email=email or random_email(),
-        phone=random_phone(),
-        contact_type=ContactType.SUPPLIER,
-        is_active=True,
+        primary_email=supplier_email,
+        emails=[{"address": supplier_email, "label": "primary", "is_primary": True}],
+        phones=[{"number": random_phone(), "label": "primary", "is_primary": True}],
         **kwargs
     )
     db.add(supplier)
@@ -878,35 +890,40 @@ def create_unified_contact(
     status: str = "active",
     company_name: str = None,
     **kwargs
-) -> "UnifiedContact":
+) -> "Party":
     """
     Create a unified contact for testing.
 
     Contact types: lead, prospect, customer, churned, person
     Categories: residential, business, enterprise, government, non_profit
     """
-    from app.models.unified_contact import (
-        UnifiedContact, ContactType, ContactCategory, ContactStatus
-    )
+    from app.models.party import Party
 
-    contact = UnifiedContact(
+    party_email = email or random_email()
+    party_phone = phone or random_phone()
+    party_type = "organization"
+    if contact_type in {"person"}:
+        party_type = "person"
+
+    party = Party(
+        type=party_type,
+        status=status,
         name=name or f"Test Contact {random_string(6)}",
-        contact_type=ContactType(contact_type),
-        category=ContactCategory(category),
-        status=ContactStatus(status),
-        email=email or random_email(),
-        phone=phone or random_phone(),
-        company_name=company_name,
-        city="Lagos",
-        state="Lagos",
-        country="Nigeria",
-        first_contact_date=datetime.now(),
+        primary_email=party_email,
+        primary_phone=party_phone,
+        emails=[{"address": party_email, "label": "primary", "is_primary": True}],
+        phones=[{"number": party_phone, "label": "primary", "is_primary": True}],
+        custom_fields={
+            "contact_type": contact_type,
+            "category": category,
+            "company_name": company_name,
+        },
         **kwargs
     )
-    db.add(contact)
+    db.add(party)
     db.commit()
-    db.refresh(contact)
-    return contact
+    db.refresh(party)
+    return party
 
 
 def create_person_contact(
@@ -916,29 +933,28 @@ def create_person_contact(
     role: str = "Primary Contact",
     email: str = None,
     **kwargs
-) -> "UnifiedContact":
+) -> "Party":
     """Create a person contact linked to an organization."""
-    from app.models.unified_contact import (
-        UnifiedContact, ContactType, ContactCategory, ContactStatus
-    )
+    from app.models.party import Party
 
-    contact = UnifiedContact(
+    person_email = email or random_email()
+    person = Party(
+        type="person",
+        status="active",
         name=name or f"Contact Person {random_string(6)}",
-        contact_type=ContactType.PERSON,
-        category=ContactCategory.BUSINESS,
-        status=ContactStatus.ACTIVE,
-        email=email or random_email(),
-        phone=random_phone(),
-        parent_id=parent_id,
-        designation=role,
-        is_primary_contact=True,
-        first_contact_date=datetime.now(),
+        primary_email=person_email,
+        emails=[{"address": person_email, "label": "primary", "is_primary": True}],
+        phones=[{"number": random_phone(), "label": "primary", "is_primary": True}],
+        custom_fields={
+            "parent_id": parent_id,
+            "role": role,
+        },
         **kwargs
     )
-    db.add(contact)
+    db.add(person)
     db.commit()
-    db.refresh(contact)
-    return contact
+    db.refresh(person)
+    return person
 
 
 # =============================================================================
@@ -988,15 +1004,21 @@ def create_service_order(
         ServiceOrder, ServiceOrderType, ServiceOrderStatus, ServiceOrderPriority
     )
 
+    if customer_id is None:
+        customer = create_customer(db, name="Field Service Customer")
+        customer_id = customer.id
+
     order = ServiceOrder(
         order_number=f"FSO-{random_string(8).upper()}",
-        customer_id=customer_id,
+        customer_account_id=customer_id,
         order_type=ServiceOrderType(order_type),
         status=ServiceOrderStatus(status),
         priority=ServiceOrderPriority(priority),
         scheduled_date=scheduled_date or date.today() + timedelta(days=1),
+        service_address="123 Test Street",
+        title=f"Test service order - {order_type}",
         description=f"Test service order - {order_type}",
-        technician_id=technician_id,
+        assigned_technician_id=technician_id,
         **kwargs
     )
     db.add(order)

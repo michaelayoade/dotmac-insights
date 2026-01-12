@@ -47,7 +47,7 @@ class MockRoutingRoundRobinState:
     """Mock round-robin state."""
     id: int = 1
     team_id: int = 1
-    last_agent_id: Optional[int] = None
+    last_party_id: Optional[int] = None
 
 
 # =============================================================================
@@ -584,7 +584,7 @@ class TestRoundRobinSelection:
 
     def test_rotates_to_next_agent(self, routing_engine, mock_db, agents):
         """Test rotates to next agent in list."""
-        state = MockRoutingRoundRobinState(id=1, team_id=1, last_agent_id=1)
+        state = MockRoutingRoundRobinState(id=1, team_id=1, last_party_id=1)
 
         with patch.object(mock_db, 'query') as mock_query:
             mock_state_query = MagicMock()
@@ -594,11 +594,11 @@ class TestRoundRobinSelection:
             result = routing_engine._round_robin(1, agents)
 
         assert result == agents[1]  # Rotated from agent 1 to agent 2
-        assert state.last_agent_id == 2
+        assert state.last_party_id == 2
 
     def test_wraps_around_to_first(self, routing_engine, mock_db, agents):
         """Test wraps around when reaching end of list."""
-        state = MockRoutingRoundRobinState(id=1, team_id=1, last_agent_id=3)  # Last agent
+        state = MockRoutingRoundRobinState(id=1, team_id=1, last_party_id=3)  # Last agent
 
         with patch.object(mock_db, 'query') as mock_query:
             mock_state_query = MagicMock()
@@ -656,8 +656,8 @@ class TestSkillBasedSelection:
         """Test considers region in domains."""
         ticket = MockTicket(
             id=1,
-            ticket_type="billing",
-            issue_type="payment",
+            ticket_type="unknown",
+            issue_type="unknown",
             region="lagos",  # Agent 1 has lagos domain
         )
 
@@ -750,7 +750,9 @@ class TestGetWorkloadSummary:
         with patch.object(mock_db, 'query') as mock_query:
             # Mock agent query
             mock_agent_query = MagicMock()
-            mock_agent_query.filter.return_value.all.return_value = agents
+            mock_agent_query.join.return_value = mock_agent_query
+            mock_agent_query.filter.return_value = mock_agent_query
+            mock_agent_query.all.return_value = agents
 
             # Mock ticket count queries
             mock_count_query = MagicMock()
@@ -773,7 +775,9 @@ class TestGetWorkloadSummary:
 
             # Mock agent query
             mock_agent_query = MagicMock()
-            mock_agent_query.filter.return_value.filter.return_value.all.return_value = agents[:2]
+            mock_agent_query.join.return_value = mock_agent_query
+            mock_agent_query.filter.return_value = mock_agent_query
+            mock_agent_query.all.return_value = agents[:2]
 
             # Mock ticket counts
             mock_count_query = MagicMock()

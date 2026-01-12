@@ -49,9 +49,9 @@ RequireProjectsRead = Depends(require_scope("projects:read"))
 RequireProjectsWrite = Depends(require_scope("projects:write"))
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-dashboard_router = APIRouter(prefix="/projects", tags=["projects-dashboard"])
-tasks_router = APIRouter(prefix="/projects", tags=["projects-tasks"])
-milestones_router = APIRouter(prefix="/projects", tags=["projects-milestones"])
+dashboard_router = APIRouter(tags=["projects-dashboard"])
+tasks_router = APIRouter(tags=["projects-tasks"])
+milestones_router = APIRouter(tags=["projects-milestones"])
 templates = get_template_env()
 
 

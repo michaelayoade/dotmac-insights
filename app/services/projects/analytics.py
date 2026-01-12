@@ -220,6 +220,36 @@ class ProjectsAnalyticsService:
             total_open_tasks=open_tasks,
         )
 
+    def get_status_distribution(
+        self,
+        filters: Optional[AnalyticsFilters] = None,
+    ) -> List[StatusDistribution]:
+        """Get project count distribution by status.
+
+        Args:
+            filters: Optional filters for company/date range.
+
+        Returns:
+            List of StatusDistribution with status and count.
+        """
+        if filters is None:
+            filters = AnalyticsFilters()
+
+        query = self.db.query(
+            Project.status,
+            func.count(Project.id).label("count"),
+        ).filter(Project.is_deleted == False)
+
+        if filters.company:
+            query = query.filter(Project.company == filters.company)
+
+        results = query.group_by(Project.status).all()
+
+        return [
+            StatusDistribution(status=row.status.value, count=int(row.count or 0))
+            for row in results
+        ]
+
     def get_dashboard_data(
         self,
         recent_limit: int = 10,

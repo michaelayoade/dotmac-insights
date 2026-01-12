@@ -1,0 +1,209 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <form
+        method="POST"
+        action="/hr/payroll"
+        class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+    >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="px-6 py-5 border-b border-gray-100">
+            <h1 class="text-lg font-semibold text-gray-900">New Salary Slip</h1>
+            <p class="mt-1 text-sm text-gray-500 font-body">Create a salary slip for an employee.</p>
+        </div>
+
+        <div class="px-6 py-6 space-y-6">
+            {% if errors.general %}
+            <div class="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 font-body">
+                {{ errors.general }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label for="employee_id" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Employee
+                    </label>
+                    <select
+                        name="employee_id"
+                        id="employee_id"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.employee_id else '' }}"
+                    >
+                        <option value="">Select employee</option>
+                        {% for employee in employees %}
+                        <option value="{{ employee.id }}" {{ 'selected' if form_data.employee_id == employee.id|string else '' }}>
+                            {{ employee.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% if errors.employee_id %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.employee_id }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="posting_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Posting Date
+                    </label>
+                    <input
+                        type="date"
+                        name="posting_date"
+                        id="posting_date"
+                        value="{{ form_data.posting_date if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.posting_date else '' }}"
+                    >
+                    {% if errors.posting_date %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.posting_date }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="start_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Period Start
+                    </label>
+                    <input
+                        type="date"
+                        name="start_date"
+                        id="start_date"
+                        value="{{ form_data.start_date if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.start_date else '' }}"
+                    >
+                    {% if errors.start_date %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.start_date }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="end_date" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Period End
+                    </label>
+                    <input
+                        type="date"
+                        name="end_date"
+                        id="end_date"
+                        value="{{ form_data.end_date if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm {{ 'border-red-300 focus:border-red-400 focus:ring-red-100' if errors.end_date else '' }}"
+                    >
+                    {% if errors.end_date %}
+                    <p class="mt-1.5 text-sm text-red-600 font-body">{{ errors.end_date }}</p>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <label for="gross_pay" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Gross Pay
+                    </label>
+                    <input
+                        type="number"
+                        name="gross_pay"
+                        id="gross_pay"
+                        value="{{ form_data.gross_pay if form_data else '' }}"
+                        min="0"
+                        step="0.01"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="total_deduction" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Total Deduction
+                    </label>
+                    <input
+                        type="number"
+                        name="total_deduction"
+                        id="total_deduction"
+                        value="{{ form_data.total_deduction if form_data else '' }}"
+                        min="0"
+                        step="0.01"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="net_pay" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Net Pay
+                    </label>
+                    <input
+                        type="number"
+                        name="net_pay"
+                        id="net_pay"
+                        value="{{ form_data.net_pay if form_data else '' }}"
+                        min="0"
+                        step="0.01"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="currency" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Currency
+                    </label>
+                    <input
+                        type="text"
+                        name="currency"
+                        id="currency"
+                        value="{{ form_data.currency if form_data else 'NGN' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label for="company" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Company
+                    </label>
+                    <input
+                        type="text"
+                        name="company"
+                        id="company"
+                        value="{{ form_data.company if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="bank_name" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Bank Name
+                    </label>
+                    <input
+                        type="text"
+                        name="bank_name"
+                        id="bank_name"
+                        value="{{ form_data.bank_name if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+
+                <div>
+                    <label for="bank_account_no" class="block text-sm font-medium text-gray-700 font-body mb-1.5">
+                        Bank Account No.
+                    </label>
+                    <input
+                        type="text"
+                        name="bank_account_no"
+                        id="bank_account_no"
+                        value="{{ form_data.bank_account_no if form_data else '' }}"
+                        class="block w-full px-4 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl focus:border-primary-400 focus:ring-2 focus:ring-primary-100 transition-all font-body sm:text-sm"
+                    >
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-gray-100 bg-gray-50/60 flex items-center justify-end gap-3">
+            <a
+                href="/hr/payroll"
+                class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-surface-50 transition-all"
+            >
+                Cancel
+            </a>
+            <button
+                type="submit"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl transition-all shadow-sm"
+            >
+                Create Slip
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

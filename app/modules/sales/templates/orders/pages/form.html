@@ -114,7 +114,7 @@
                             data-shipping-gps-lng="{{ quotation.shipping_gps_lng or '' }}"
                             data-company="{{ quotation.company or '' }}"
                             data-currency="{{ quotation.currency or '' }}"
-                            data-items='{{ quotation.items | tojson | e }}'
+                            data-items='{{ quotation.get("items", []) | tojson | e }}'
                             {{ 'selected' if form_data.quotation_id == quotation.id|string else '' }}
                         >
                             {{ quotation.erpnext_id or ('QTN-' ~ quotation.id) }} - {{ quotation.customer_name or quotation.party_name or 'Unknown' }}
@@ -561,8 +561,8 @@
                         Add line
                     </button>
                 </div>
-                {% if errors.items %}
-                <p class="mb-3 text-sm text-red-600 font-body">{{ errors.items }}</p>
+                {% if errors.get("items") %}
+                <p class="mb-3 text-sm text-red-600 font-body">{{ errors.get("items") }}</p>
                 {% endif %}
                 <div class="overflow-x-auto" id="line-items" data-testid="line-items">
                     <table class="min-w-full divide-y divide-gray-100">

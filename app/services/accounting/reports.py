@@ -17,7 +17,6 @@ from app.models.accounting import Account, AccountType, GLEntry
 from app.services.errors import NotFoundError, ValidationError
 
 from .account_utils import (
-    get_accounts_by_erpnext_id,
     get_effective_root_type,
     is_cogs_account,
     is_finance_cost_account,
@@ -59,6 +58,34 @@ class ReportsService:
         today = date.today()
         return date(today.year, 1, 1), date(today.year, 12, 31)
 
+    def _get_gl_sums(
+        self,
+        end_date: datetime,
+        start_date: Optional[datetime] = None,
+    ) -> Dict[int, Dict[str, Decimal]]:
+        """Return GL debit/credit sums keyed by account identifier."""
+        query = self.db.query(
+            GLEntry.account_id,
+            func.sum(GLEntry.debit).label("total_debit"),
+            func.sum(GLEntry.credit).label("total_credit"),
+        ).filter(
+            GLEntry.is_cancelled == False,
+            GLEntry.posting_date <= end_date,
+            GLEntry.account_id.isnot(None),
+        )
+        if start_date:
+            query = query.filter(GLEntry.posting_date >= start_date)
+
+        rows = query.group_by(GLEntry.account_id).all()
+        return {
+            row.account_id: {
+                "debit": row.total_debit or Decimal("0"),
+                "credit": row.total_credit or Decimal("0"),
+            }
+            for row in rows
+            if row.account_id
+        }
+
     def get_trial_balance(self, params: TrialBalanceParams) -> Dict[str, Any]:
         """Get trial balance report.
 
@@ -71,12 +98,13 @@ class ReportsService:
             start_date, _ = self._get_fiscal_year_dates(params.fiscal_year)
 
         query = self.db.query(
-            GLEntry.account,
+            GLEntry.account_id,
             func.sum(GLEntry.debit).label("total_debit"),
             func.sum(GLEntry.credit).label("total_credit"),
         ).filter(
             GLEntry.is_cancelled == False,
             GLEntry.posting_date <= end_date,
+            GLEntry.account_id.isnot(None),
         )
 
         if start_date:
@@ -85,24 +113,27 @@ class ReportsService:
         if params.cost_center:
             query = query.filter(GLEntry.cost_center == params.cost_center)
 
-        query = query.group_by(GLEntry.account)
+        query = query.group_by(GLEntry.account_id)
         results = query.all()
 
-        accounts: Dict[str, Account] = get_accounts_by_erpnext_id(self.db)
+        accounts: Dict[int, Account] = {
+            acc.id: acc for acc in self.db.query(Account).all()
+        }
 
         trial_balance = []
         total_debit = Decimal("0")
         total_credit = Decimal("0")
 
         for row in results:
-            acc = accounts.get(row.account)
+            acc = accounts.get(row.account_id)
             debit = row.total_debit or Decimal("0")
             credit = row.total_credit or Decimal("0")
             balance = debit - credit
 
             entry = {
-                "account": row.account,
-                "account_name": acc.account_name if acc else row.account,
+                "account": acc.account_name if acc else None,
+                "account_id": row.account_id,
+                "account_name": acc.account_name if acc else None,
                 "root_type": acc.root_type.value if acc and acc.root_type else None,
                 "debit": float(debit),
                 "credit": float(credit),
@@ -142,19 +173,12 @@ class ReportsService:
 
         total_debit = Decimal("0")
         total_credit = Decimal("0")
+        gl_sums = self._get_gl_sums(as_of_date)
 
         for account in accounts:
-            debit_sum = self.db.query(func.sum(GLEntry.debit)).filter(
-                GLEntry.account == account.account_name,
-                GLEntry.is_cancelled == False,
-                GLEntry.posting_date <= as_of_date,
-            ).scalar() or Decimal("0")
-
-            credit_sum = self.db.query(func.sum(GLEntry.credit)).filter(
-                GLEntry.account == account.account_name,
-                GLEntry.is_cancelled == False,
-                GLEntry.posting_date <= as_of_date,
-            ).scalar() or Decimal("0")
+            sums = gl_sums.get(account.id, {"debit": Decimal("0"), "credit": Decimal("0")})
+            debit_sum = sums["debit"]
+            credit_sum = sums["credit"]
 
             balance = debit_sum - credit_sum
 
@@ -164,7 +188,8 @@ class ReportsService:
             debit_balance = Decimal("0")
             credit_balance = Decimal("0")
 
-            if account.root_type and account.root_type.value in ["asset", "expense"]:
+            root_type = get_effective_root_type(account)
+            if root_type and root_type.value in ["asset", "expense"]:
                 if balance >= 0:
                     debit_balance = balance
                 else:
@@ -199,22 +224,16 @@ class ReportsService:
         def get_section_data(root_type: AccountType) -> list:
             accounts = self.db.query(Account).filter(
                 Account.is_group == False,
-                Account.root_type == root_type,
             ).order_by(Account.account_number, Account.account_name).all()
 
             result = []
+            gl_sums = self._get_gl_sums(as_of_date)
             for account in accounts:
-                debit_sum = self.db.query(func.sum(GLEntry.debit)).filter(
-                    GLEntry.account == account.account_name,
-                    GLEntry.is_cancelled == False,
-                    GLEntry.posting_date <= as_of_date,
-                ).scalar() or Decimal("0")
-
-                credit_sum = self.db.query(func.sum(GLEntry.credit)).filter(
-                    GLEntry.account == account.account_name,
-                    GLEntry.is_cancelled == False,
-                    GLEntry.posting_date <= as_of_date,
-                ).scalar() or Decimal("0")
+                if get_effective_root_type(account) != root_type:
+                    continue
+                sums = gl_sums.get(account.id, {"debit": Decimal("0"), "credit": Decimal("0")})
+                debit_sum = sums["debit"]
+                credit_sum = sums["credit"]
 
                 balance = debit_sum - credit_sum
                 if root_type in [AccountType.LIABILITY, AccountType.EQUITY]:
@@ -232,16 +251,23 @@ class ReportsService:
         liabilities = get_section_data(AccountType.LIABILITY)
         equity = get_section_data(AccountType.EQUITY)
 
+        income_keys = [
+            acc.id
+            for acc in self.db.query(Account).filter(Account.is_group == False).all()
+            if get_effective_root_type(acc) == AccountType.INCOME
+        ]
+        expense_keys = [
+            acc.id
+            for acc in self.db.query(Account).filter(Account.is_group == False).all()
+            if get_effective_root_type(acc) == AccountType.EXPENSE
+        ]
+
         income_sum = self.db.query(
             func.sum(GLEntry.credit) - func.sum(GLEntry.debit)
         ).filter(
             GLEntry.is_cancelled == False,
             GLEntry.posting_date <= as_of_date,
-            GLEntry.account.in_(
-                self.db.query(Account.account_name).filter(
-                    Account.root_type == AccountType.INCOME
-                )
-            ),
+            GLEntry.account_id.in_(income_keys) if income_keys else False,
         ).scalar() or Decimal("0")
 
         expense_sum = self.db.query(
@@ -249,11 +275,7 @@ class ReportsService:
         ).filter(
             GLEntry.is_cancelled == False,
             GLEntry.posting_date <= as_of_date,
-            GLEntry.account.in_(
-                self.db.query(Account.account_name).filter(
-                    Account.root_type == AccountType.EXPENSE
-                )
-            ),
+            GLEntry.account_id.in_(expense_keys) if expense_keys else False,
         ).scalar() or Decimal("0")
 
         net_income = income_sum - expense_sum
@@ -285,24 +307,16 @@ class ReportsService:
         def get_section_data(root_type: AccountType) -> list:
             accounts = self.db.query(Account).filter(
                 Account.is_group == False,
-                Account.root_type == root_type,
             ).order_by(Account.account_number, Account.account_name).all()
 
             result = []
+            gl_sums = self._get_gl_sums(end_date, start_date)
             for account in accounts:
-                debit_sum = self.db.query(func.sum(GLEntry.debit)).filter(
-                    GLEntry.account == account.account_name,
-                    GLEntry.is_cancelled == False,
-                    GLEntry.posting_date >= start_date,
-                    GLEntry.posting_date <= end_date,
-                ).scalar() or Decimal("0")
-
-                credit_sum = self.db.query(func.sum(GLEntry.credit)).filter(
-                    GLEntry.account == account.account_name,
-                    GLEntry.is_cancelled == False,
-                    GLEntry.posting_date >= start_date,
-                    GLEntry.posting_date <= end_date,
-                ).scalar() or Decimal("0")
+                if get_effective_root_type(account) != root_type:
+                    continue
+                sums = gl_sums.get(account.id, {"debit": Decimal("0"), "credit": Decimal("0")})
+                debit_sum = sums["debit"]
+                credit_sum = sums["credit"]
 
                 if root_type == AccountType.INCOME:
                     balance = credit_sum - debit_sum
@@ -342,27 +356,27 @@ class ReportsService:
             month=1, day=1, hour=0, minute=0, second=0, microsecond=0
         )
 
-        cash_accounts = self.db.query(Account).filter(
-            Account.is_group == False,
-            Account.root_type == AccountType.ASSET,
-            or_(
-                Account.account_type.ilike("%cash%"),
-                Account.account_type.ilike("%bank%"),
-                Account.account_name.ilike("%cash%"),
-                Account.account_name.ilike("%bank%"),
+        cash_accounts = [
+            acc
+            for acc in self.db.query(Account).filter(Account.is_group == False).all()
+            if get_effective_root_type(acc) == AccountType.ASSET
+            and (
+                (acc.account_type and ("cash" in acc.account_type.lower() or "bank" in acc.account_type.lower()))
+                or ("cash" in acc.account_name.lower())
+                or ("bank" in acc.account_name.lower())
             )
-        ).all()
+        ]
 
-        cash_account_names = [a.account_name for a in cash_accounts]
+        cash_account_ids = [a.id for a in cash_accounts]
 
         opening_debit = self.db.query(func.sum(GLEntry.debit)).filter(
-            GLEntry.account.in_(cash_account_names),
+            GLEntry.account_id.in_(cash_account_ids),
             GLEntry.is_cancelled == False,
             GLEntry.posting_date < start_date,
         ).scalar() or Decimal("0")
 
         opening_credit = self.db.query(func.sum(GLEntry.credit)).filter(
-            GLEntry.account.in_(cash_account_names),
+            GLEntry.account_id.in_(cash_account_ids),
             GLEntry.is_cancelled == False,
             GLEntry.posting_date < start_date,
         ).scalar() or Decimal("0")
@@ -370,14 +384,14 @@ class ReportsService:
         opening_balance = opening_debit - opening_credit
 
         period_debit = self.db.query(func.sum(GLEntry.debit)).filter(
-            GLEntry.account.in_(cash_account_names),
+            GLEntry.account_id.in_(cash_account_ids),
             GLEntry.is_cancelled == False,
             GLEntry.posting_date >= start_date,
             GLEntry.posting_date <= end_date,
         ).scalar() or Decimal("0")
 
         period_credit = self.db.query(func.sum(GLEntry.credit)).filter(
-            GLEntry.account.in_(cash_account_names),
+            GLEntry.account_id.in_(cash_account_ids),
             GLEntry.is_cancelled == False,
             GLEntry.posting_date >= start_date,
             GLEntry.posting_date <= end_date,
@@ -387,7 +401,7 @@ class ReportsService:
         closing_balance = opening_balance + net_cash_flow
 
         cash_transactions = self.db.query(GLEntry).filter(
-            GLEntry.account.in_(cash_account_names),
+            GLEntry.account_id.in_(cash_account_ids),
             GLEntry.is_cancelled == False,
             GLEntry.posting_date >= start_date,
             GLEntry.posting_date <= end_date,
@@ -418,33 +432,37 @@ class ReportsService:
             period_start = date(end_date.year, 1, 1)
             period_end = end_date
 
-        accounts: Dict[str, Account] = get_accounts_by_erpnext_id(self.db)
+        accounts: Dict[int, Account] = {
+            acc.id: acc for acc in self.db.query(Account).all()
+        }
 
         # Balance sheet balances
         balances = self.db.query(
-            GLEntry.account,
+            GLEntry.account_id,
             func.sum(GLEntry.debit - GLEntry.credit).label("balance"),
         ).filter(
             GLEntry.is_cancelled == False,
             GLEntry.posting_date <= end_date,
-        ).group_by(GLEntry.account).all()
+            GLEntry.account_id.isnot(None),
+        ).group_by(GLEntry.account_id).all()
 
-        balance_map = {r.account: float(r.balance or 0) for r in balances if r.account}
+        balance_map = {r.account_id: float(r.balance or 0) for r in balances if r.account_id}
 
         # P&L period data
         period_data = self.db.query(
-            GLEntry.account,
+            GLEntry.account_id,
             func.sum(GLEntry.debit).label("debit"),
             func.sum(GLEntry.credit).label("credit"),
         ).filter(
             GLEntry.is_cancelled == False,
             GLEntry.posting_date >= period_start,
             GLEntry.posting_date <= period_end,
-        ).group_by(GLEntry.account).all()
+            GLEntry.account_id.isnot(None),
+        ).group_by(GLEntry.account_id).all()
 
         period_map = {
-            r.account: {"debit": float(r.debit or 0), "credit": float(r.credit or 0)}
-            for r in period_data if r.account
+            r.account_id: {"debit": float(r.debit or 0), "credit": float(r.credit or 0)}
+            for r in period_data if r.account_id
         }
 
         # Balance sheet components

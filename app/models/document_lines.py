@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from sqlalchemy import String, Text, ForeignKey, Numeric, Date
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym, declared_attr
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Optional, TYPE_CHECKING
@@ -32,6 +32,9 @@ class DocumentLineMixin:
 
     # Quantity and rate
     quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("1"))
+    @declared_attr
+    def qty(cls) -> Mapped[Decimal]:
+        return synonym("quantity")
     rate: Mapped[Decimal] = mapped_column(Numeric(18, 6), default=Decimal("0"))
     uom: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # Unit of measure
 

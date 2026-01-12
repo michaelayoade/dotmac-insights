@@ -96,7 +96,9 @@ class RoutingEngine:
             }
 
         # Perform assignment
-        ticket.assigned_to = selected.display_name or selected.primary_email
+        display_name = getattr(selected, "display_name", None)
+        primary_email = getattr(selected, "primary_email", None)
+        ticket.assigned_to = display_name or primary_email
         if rule.team_id:
             team = self.db.query(Team).filter(Team.id == rule.team_id).first()
             if team:
@@ -108,7 +110,7 @@ class RoutingEngine:
             "ticket_auto_assigned",
             ticket_id=ticket.id,
             agent_id=selected.id,
-            agent_name=selected.name,
+            agent_name=getattr(selected, "name", None),
             rule_id=rule.id,
             strategy=rule.strategy,
         )
@@ -116,7 +118,7 @@ class RoutingEngine:
         return {
             "assigned": True,
             "agent_id": selected.id,
-            "agent_name": selected.display_name or selected.primary_email,
+            "agent_name": display_name or primary_email,
             "team_id": rule.team_id,
             "rule_id": rule.id,
             "rule_name": rule.name,
@@ -325,7 +327,7 @@ class RoutingEngine:
 
         ticket_counts: Dict[int, int] = {}
         for agent in agents:
-            name: str = agent.display_name or agent.primary_email or f"agent-{agent.id}"
+            name: str = getattr(agent, "display_name", None) or getattr(agent, "primary_email", None) or f"agent-{agent.id}"
             name = str(name)
             count = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -360,8 +362,8 @@ class RoutingEngine:
         for agent in agents:
             score = 0.0
             # Get agent metadata for skills/domains (stored in Party metadata)
-            skills = agent.agent_skills
-            domains = agent.agent_domains
+            skills = getattr(agent, "agent_skills", None) or {}
+            domains = getattr(agent, "agent_domains", None) or {}
 
             # Match ticket type
             if ticket_type:
@@ -381,7 +383,8 @@ class RoutingEngine:
                     score += 1
 
             # Consider routing weight from metadata
-            score += float(agent.agent_routing_weight) * 0.1
+            routing_weight = getattr(agent, "agent_routing_weight", 0) or 0
+            score += float(routing_weight) * 0.1
 
             if score > best_score:
                 best_score = score
@@ -398,8 +401,8 @@ class RoutingEngine:
         lowest_utilization = float('inf')
 
         for agent in agents:
-            capacity = agent.agent_capacity
-            name = agent.display_name or agent.primary_email or f"agent-{agent.id}"
+            capacity = getattr(agent, "agent_capacity", 0) or 0
+            name = getattr(agent, "display_name", None) or getattr(agent, "primary_email", None) or f"agent-{agent.id}"
 
             current_load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -452,8 +455,8 @@ class RoutingEngine:
         agent_data: List[Dict[str, Any]] = []
 
         for agent in agents:
-            capacity = agent.agent_capacity
-            name: str = agent.display_name or agent.primary_email or f"agent-{agent.id}"
+            capacity = getattr(agent, "agent_capacity", 0) or 0
+            name: str = getattr(agent, "display_name", None) or getattr(agent, "primary_email", None) or f"agent-{agent.id}"
 
             load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,
@@ -467,10 +470,12 @@ class RoutingEngine:
             total_capacity += capacity
             total_load += load
 
+            display_name = getattr(agent, "display_name", None)
+            primary_email = getattr(agent, "primary_email", None)
             agent_data.append({
                 "agent_id": agent.id,
-                "agent_name": agent.display_name,
-                "email": agent.primary_email,
+                "agent_name": display_name,
+                "email": primary_email,
                 "capacity": capacity,
                 "current_load": load,
                 "utilization_pct": round(load / capacity * 100, 1) if capacity > 0 else 0,
@@ -527,8 +532,8 @@ class RoutingEngine:
         # Calculate current workloads
         workloads: Dict[int, WorkloadEntry] = {}
         for agent in agents:
-            name: str = agent.display_name or agent.primary_email or f"agent-{agent.id}"
-            capacity = agent.agent_capacity
+            name: str = getattr(agent, "display_name", None) or getattr(agent, "primary_email", None) or f"agent-{agent.id}"
+            capacity = getattr(agent, "agent_capacity", 0) or 0
 
             load = self.db.query(func.count(Ticket.id)).filter(
                 Ticket.assigned_to == name,

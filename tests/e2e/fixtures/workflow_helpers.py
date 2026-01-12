@@ -114,7 +114,7 @@ def get_account_balance(
 
 def verify_ar_balance(
     db: Session,
-    customer_id: int,
+    customer_account_id: int,
     expected_balance: Decimal,
     tolerance: Decimal = Decimal("0.01"),
 ) -> bool:
@@ -123,7 +123,7 @@ def verify_ar_balance(
 
     Args:
         db: Database session
-        customer_id: ID of the customer
+        customer_account_id: ID of the customer account
         expected_balance: Expected AR balance
         tolerance: Acceptable difference
 
@@ -134,7 +134,7 @@ def verify_ar_balance(
 
     # Sum unpaid invoice balances
     invoices = db.query(Invoice).filter(
-        Invoice.customer_id == customer_id,
+        Invoice.customer_account_id == customer_account_id,
         Invoice.status.in_([
             InvoiceStatus.PENDING,
             InvoiceStatus.PARTIALLY_PAID,
@@ -258,7 +258,7 @@ def verify_lead_converted(
     Verify a lead has been converted to a customer.
 
     Returns:
-        Dict with conversion status and customer_id if converted
+        Dict with conversion status and customer account ID if converted
     """
     from app.models.lead import Lead
 
@@ -267,8 +267,8 @@ def verify_lead_converted(
         return {"converted": False, "customer_id": None}
 
     return {
-        "converted": lead.customer_id is not None,
-        "customer_id": lead.customer_id,
+        "converted": lead.customer_account_id is not None,
+        "customer_id": lead.customer_account_id,
         "conversion_date": lead.conversion_date,
         "status": lead.status,
     }
