@@ -30,7 +30,8 @@ DotMac BOS integrates with external systems (Splynx, ERPNext, Chatwoot) while pr
 - **Multi-currency**: Support for NGN, USD, and other currencies
 - **RBAC**: Role-based access control with granular permissions
 - **Audit Trail**: Complete tracking of all changes
-- **Observability**: OpenTelemetry integration for tracing and metrics
+- **Observability**: OpenTelemetry integration for tracing and metrics, with
+  the bounded scrape contract in `docs/METRICS_SCRAPE_SAFETY.md`
 
 ## Tech Stack
 
